@@ -8,6 +8,7 @@ const VISION_RADIUS = 5;
 const START_X = Math.floor(GRID_W / 2);
 const START_Y = Math.floor(GRID_H / 2);
 const START_FUEL = 420;
+const START_HP = 7;
 const IDLE_FUEL_DRAIN = 0.8;
 const MOVE_FUEL_COST = 1.8;
 const STRIKE_FUEL_COST = 4.5;
@@ -17,11 +18,38 @@ const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 44;
 const TILES_PER_PERK_ZONE = 480;
 const BASE_MIN_DISTANCE = 50;
+const RADAR_BASE_CHARGES = 10;
 const SCRAP_PERK_BASE_COST = 30;
 const SCRAP_PERK_COST_MULTIPLIER = 1.35;
 const SCRAP_PERK_POPUP_DELAY = 0.5;
 const BASE_MOVE_INTERVAL = 10;
 const BASE_MOVE_AWAY_CHANCE = 0.5;
+const GAS_POCKET_GROUPS = 10;
+const STEAM_POCKET_GROUPS = 8;
+const BOULDER_POCKET_GROUPS = 8;
+const GAS_SPREAD_INTERVAL = 2;
+const GAS_SPREAD_STEPS = 3;
+const GAS_DAMAGE = 1;
+const BOULDER_DELAY = 1;
+const BOULDER_MOVE_INTERVAL = 0.12;
+const BOULDER_BREAK_LIMIT = 4;
+const BOULDER_DAMAGE = 5;
+const BOULDER_MIN_START_DISTANCE = BOULDER_BREAK_LIMIT;
+const STEAM_PULSE_INTERVAL = 1.2;
+const STEAM_PULSE_COUNT = 3;
+const STEAM_DAMAGE = 1;
+const STEAM_RANGE = 6;
+const EXPLOSION_BREAK_DAMAGE = 9999;
+const FUEL_DEPLETION_HP_COST = 1;
+const FUEL_DEPLETION_RECOVERY = 50;
+const HAZARD_TYPES = {
+  SPIKE: 1,
+  VOLATILE: 2,
+};
+const HAZARD_DATA = {
+  [HAZARD_TYPES.SPIKE]: { damage: 1, color: "#ff6b48" },
+  [HAZARD_TYPES.VOLATILE]: { damage: 2, color: "#ffd166" },
+};
 
 const BLOCK_TYPES = [
   { hp: 0, color: "#1a1410", scrap: 0, vein: "#3c2d22" },
@@ -41,6 +69,7 @@ const TILE_PERK_TYPES = [
   { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.5 к силе удара бура" },
   { name: "Бомба", icon: "*", color: "#ff7c5f", desc: "Взрыв в радиусе 2 тайлов с уроном x10" },
   { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+15% к скорости нового удара" },
+  { name: "HP+", icon: "H", color: "#ff8f8f", desc: "+1 к текущему здоровью" },
 ];
 
 const SCRAP_PERK_TYPES = [
@@ -55,9 +84,10 @@ const SCRAP_PERK_TYPES = [
   { name: "Гео-линза", desc: "+2 к радиусу обзора и +2 шага от радара" },
   { name: "Рециркулятор", desc: "+2 скрапа и +2 топлива за каждый разрушенный блок" },
   { name: "Перегрузка", desc: "Переполнение топлива запускает дальнюю бомбу, бак -50, топлива +50" },
+  { name: "Усиленный корпус", desc: "+1 к максимуму HP и полное исцеление" },
 ];
 
-const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3];
+const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
 
 const state = {
   canvas: document.getElementById("game"),
@@ -71,10 +101,13 @@ const state = {
   lastTs: 0,
   fuel: START_FUEL,
   maxFuel: START_FUEL,
+  hp: START_HP,
+  maxHp: START_HP,
   depth: 0,
   scrap: 0,
   baseFound: false,
   outOfFuel: false,
+  dead: false,
   visionRadius: VISION_RADIUS,
   dragId: null,
   padCenterX: 0,
@@ -94,6 +127,16 @@ const state = {
   perkZoneMask: new Int16Array(GRID_W * GRID_H),
   perkZones: [],
   hardness: new Uint8Array(GRID_W * GRID_H),
+  hazardMask: new Uint8Array(GRID_W * GRID_H),
+  hazardTriggeredMask: new Uint8Array(GRID_W * GRID_H),
+  gasPocketMask: new Uint8Array(GRID_W * GRID_H),
+  gasMask: new Uint8Array(GRID_W * GRID_H),
+  gasClouds: [],
+  steamPocketMask: new Uint8Array(GRID_W * GRID_H),
+  steamMask: new Uint8Array(GRID_W * GRID_H),
+  steamJets: [],
+  boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
+  boulders: [],
   health: new Float32Array(GRID_W * GRID_H),
   signalMovesLeft: 0,
   signalMovesMax: 0,
@@ -115,10 +158,12 @@ const state = {
   resolvingOverflowBomb: false,
   radarBonus: 0,
   blocksBroken: 0,
+  drillBrokenBlocks: 0,
   sideDrills: 0,
   jumpDrive: false,
   jumpCharges: 0,
   jumpRange: 0,
+  movedTiles: 0,
   longDrillPower: 0,
   diagonalDrillPower: 0,
   lowFuelSpeedBonus: 0,
@@ -132,10 +177,15 @@ const state = {
     value: 0,
     time: 0,
   },
+  hpToast: {
+    value: 0,
+    time: 0,
+  },
   scrapToast: {
     value: 0,
     time: 0,
   },
+  damageFlash: 0,
   base: {
     x: 0,
     y: 0,
@@ -312,6 +362,364 @@ function addDangerVein(field, startX, startY, length, radius, strength, random) 
   }
 }
 
+function chooseHazardType(random, x, y) {
+  const centerRatio = clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.4);
+  const roll = random() + centerRatio * 0.2;
+  if (roll > 0.8) {
+    return HAZARD_TYPES.VOLATILE;
+  }
+  return HAZARD_TYPES.SPIKE;
+}
+
+function getHazardOrigin(random) {
+  if (random() < 0.35) {
+    return {
+      x: Math.round(clamp(START_X + (random() - 0.5) * 56, 1, GRID_W - 2)),
+      y: Math.round(clamp(START_Y + (random() - 0.5) * 56, 1, GRID_H - 2)),
+    };
+  }
+  return {
+    x: 1 + Math.floor(random() * (GRID_W - 2)),
+    y: 1 + Math.floor(random() * (GRID_H - 2)),
+  };
+}
+
+function canPlaceHazardAt(x, y) {
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+}
+
+function placeHazardBlob(random, blockCount) {
+  const origin = getHazardOrigin(random);
+  const hazardType = chooseHazardType(random, origin.x, origin.y);
+  const frontier = [{ x: origin.x, y: origin.y }];
+  const seen = new Set();
+  let placed = 0;
+
+  while (frontier.length > 0 && placed < blockCount) {
+    const frontierIndex = Math.floor(random() * frontier.length);
+    const cell = frontier.splice(frontierIndex, 1)[0];
+    const key = `${cell.x},${cell.y}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    if (!canPlaceHazardAt(cell.x, cell.y)) {
+      continue;
+    }
+
+    state.hazardMask[cellIndex(cell.x, cell.y)] = hazardType;
+    placed += 1;
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+      { x: cell.x + 1, y: cell.y + 1 },
+      { x: cell.x + 1, y: cell.y - 1 },
+      { x: cell.x - 1, y: cell.y + 1 },
+      { x: cell.x - 1, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      if (random() < 0.88) {
+        frontier.push(neighbors[i]);
+      }
+    }
+  }
+}
+
+function placeHazardVein(random, blockCount) {
+  const origin = getHazardOrigin(random);
+  const hazardType = chooseHazardType(random, origin.x, origin.y);
+  let x = origin.x;
+  let y = origin.y;
+  let angle = random() * Math.PI * 2;
+  let placed = 0;
+  let attempts = 0;
+
+  while (placed < blockCount && attempts < blockCount * 8) {
+    attempts += 1;
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (canPlaceHazardAt(ix, iy)) {
+      state.hazardMask[cellIndex(ix, iy)] = hazardType;
+      placed += 1;
+    }
+    angle += (random() - 0.5) * 0.85;
+    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
+    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
+  }
+}
+
+function canPlaceGasPocketAt(x, y) {
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+}
+
+function canPlaceSteamPocketAt(x, y) {
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+}
+
+function canPlaceBoulderPocketAt(x, y) {
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+}
+
+function placeGasPocket(random, cellCount) {
+  const origin = getHazardOrigin(random);
+  const frontier = [{ x: origin.x, y: origin.y }];
+  const seen = new Set();
+  let placed = 0;
+
+  while (frontier.length > 0 && placed < cellCount) {
+    const frontierIndex = Math.floor(random() * frontier.length);
+    const cell = frontier.splice(frontierIndex, 1)[0];
+    const key = `${cell.x},${cell.y}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    if (!canPlaceGasPocketAt(cell.x, cell.y)) {
+      continue;
+    }
+
+    const index = cellIndex(cell.x, cell.y);
+    state.gasPocketMask[index] = 1;
+    state.hazardMask[index] = 0;
+    placed += 1;
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+      { x: cell.x + 1, y: cell.y + 1 },
+      { x: cell.x + 1, y: cell.y - 1 },
+      { x: cell.x - 1, y: cell.y + 1 },
+      { x: cell.x - 1, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      if (random() < 0.82) {
+        frontier.push(neighbors[i]);
+      }
+    }
+  }
+}
+
+function revealGasPocket(x, y) {
+  const startIndex = cellIndex(x, y);
+  if (!state.gasPocketMask[startIndex]) {
+    return;
+  }
+
+  const frontier = [{ x, y }];
+  const released = [];
+  state.gasPocketMask[startIndex] = 0;
+
+  while (frontier.length > 0) {
+    const cell = frontier.pop();
+    released.push(cell);
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      const nx = neighbors[i].x;
+      const ny = neighbors[i].y;
+      if (!canPlaceGasPocketAt(nx, ny)) {
+        continue;
+      }
+      const index = cellIndex(nx, ny);
+      if (!state.gasPocketMask[index]) {
+        continue;
+      }
+      state.gasPocketMask[index] = 0;
+      frontier.push({ x: nx, y: ny });
+    }
+  }
+
+  for (let i = 0; i < released.length; i += 1) {
+    const cell = released[i];
+    const index = cellIndex(cell.x, cell.y);
+    state.tunnelMask[index] = 1;
+    state.hardness[index] = 0;
+    state.health[index] = 0;
+    state.hazardMask[index] = 0;
+    state.gasMask[index] = 1;
+  }
+
+  state.gasClouds.push({
+    frontier: released.slice(),
+    cells: released.slice(),
+    visited: new Set(released.map((cell) => `${cell.x},${cell.y}`)),
+    timer: GAS_SPREAD_INTERVAL,
+    spreadsDone: 0,
+  });
+  applyGasContactDamage();
+}
+
+function placeSteamPocket(random, cellCount) {
+  const origin = getHazardOrigin(random);
+  const frontier = [{ x: origin.x, y: origin.y }];
+  const seen = new Set();
+  let placed = 0;
+
+  while (frontier.length > 0 && placed < cellCount) {
+    const frontierIndex = Math.floor(random() * frontier.length);
+    const cell = frontier.splice(frontierIndex, 1)[0];
+    const key = `${cell.x},${cell.y}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    if (!canPlaceSteamPocketAt(cell.x, cell.y)) {
+      continue;
+    }
+
+    const index = cellIndex(cell.x, cell.y);
+    state.steamPocketMask[index] = 1;
+    state.hazardMask[index] = 0;
+    state.gasPocketMask[index] = 0;
+    placed += 1;
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+      { x: cell.x + 1, y: cell.y + 1 },
+      { x: cell.x + 1, y: cell.y - 1 },
+      { x: cell.x - 1, y: cell.y + 1 },
+      { x: cell.x - 1, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      if (random() < 0.78) {
+        frontier.push(neighbors[i]);
+      }
+    }
+  }
+}
+
+function placeBoulderPocket(random) {
+  const origin = getHazardOrigin(random);
+  if (!canPlaceBoulderPocketAt(origin.x, origin.y)) {
+    return;
+  }
+  if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) {
+    return;
+  }
+
+  const index = cellIndex(origin.x, origin.y);
+  state.boulderPocketMask[index] = 1;
+  state.hazardMask[index] = 0;
+  state.gasPocketMask[index] = 0;
+  state.steamPocketMask[index] = 0;
+}
+
+function addSteamCells(cells, delta) {
+  for (let i = 0; i < cells.length; i += 1) {
+    const index = cellIndex(cells[i].x, cells[i].y);
+    state.steamMask[index] = Math.max(0, state.steamMask[index] + delta);
+  }
+}
+
+function traceSteamLine(origins, dirX, dirY) {
+  const cells = [];
+  const seen = new Set();
+  for (let i = 0; i < origins.length; i += 1) {
+    let x = origins[i].x + dirX;
+    let y = origins[i].y + dirY;
+    for (let step = 0; step < STEAM_RANGE; step += 1) {
+      if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) {
+        break;
+      }
+      const index = cellIndex(x, y);
+      if (!state.tunnelMask[index]) {
+        break;
+      }
+      const key = `${x},${y}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        cells.push({ x, y });
+      }
+      x += dirX;
+      y += dirY;
+    }
+  }
+  return cells;
+}
+
+function applySteamContactDamage() {
+  if (state.steamMask[cellIndex(state.drill.x, state.drill.y)]) {
+    applyHazardDamage(STEAM_DAMAGE);
+  }
+}
+
+function refreshSteamJet(jet) {
+  addSteamCells(jet.cells, -1);
+  jet.cells = traceSteamLine(jet.origins, jet.dirX, jet.dirY);
+  addSteamCells(jet.cells, 1);
+  applySteamContactDamage();
+}
+
+function revealSteamPocket(x, y, dirX, dirY) {
+  const startIndex = cellIndex(x, y);
+  if (!state.steamPocketMask[startIndex]) {
+    return;
+  }
+
+  const frontier = [{ x, y }];
+  const released = [];
+  state.steamPocketMask[startIndex] = 0;
+
+  while (frontier.length > 0) {
+    const cell = frontier.pop();
+    released.push(cell);
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      const nx = neighbors[i].x;
+      const ny = neighbors[i].y;
+      if (!canPlaceSteamPocketAt(nx, ny)) {
+        continue;
+      }
+      const index = cellIndex(nx, ny);
+      if (!state.steamPocketMask[index]) {
+        continue;
+      }
+      state.steamPocketMask[index] = 0;
+      frontier.push({ x: nx, y: ny });
+    }
+  }
+
+  for (let i = 0; i < released.length; i += 1) {
+    const cell = released[i];
+    const index = cellIndex(cell.x, cell.y);
+    state.tunnelMask[index] = 1;
+    state.hardness[index] = 0;
+    state.health[index] = 0;
+    state.hazardMask[index] = 0;
+    state.gasPocketMask[index] = 0;
+  }
+
+  const jet = {
+    origins: released,
+    dirX,
+    dirY,
+    timer: STEAM_PULSE_INTERVAL,
+    pulsesRemaining: STEAM_PULSE_COUNT,
+    cells: [],
+  };
+  state.steamJets.push(jet);
+  refreshSteamJet(jet);
+}
+
 function generateHardnessMap(random) {
   const danger = new Float32Array(GRID_W * GRID_H);
 
@@ -381,7 +789,31 @@ function generateHardnessMap(random) {
       state.hardness[index] = clamp(Math.round(danger[index] + microNoise), 1, 7);
       state.health[index] = BLOCK_TYPES[state.hardness[index]].hp;
       state.tunnelMask[index] = 0;
+      state.hazardMask[index] = 0;
+      state.hazardTriggeredMask[index] = 0;
+      state.gasPocketMask[index] = 0;
+      state.steamPocketMask[index] = 0;
+      state.boulderPocketMask[index] = 0;
+      state.steamMask[index] = 0;
     }
+  }
+
+  const hazardBlobGroups = Math.max(12, Math.round(area / 3000));
+  const hazardVeinGroups = Math.max(12, Math.round(area / 3000));
+  for (let i = 0; i < hazardBlobGroups; i += 1) {
+    placeHazardBlob(random, 4 + Math.floor(random() * 17));
+  }
+  for (let i = 0; i < hazardVeinGroups; i += 1) {
+    placeHazardVein(random, 4 + Math.floor(random() * 37));
+  }
+  for (let i = 0; i < GAS_POCKET_GROUPS; i += 1) {
+    placeGasPocket(random, 4 + Math.floor(random() * 17));
+  }
+  for (let i = 0; i < STEAM_POCKET_GROUPS; i += 1) {
+    placeSteamPocket(random, 3 + Math.floor(random() * 7));
+  }
+  for (let i = 0; i < BOULDER_POCKET_GROUPS; i += 1) {
+    placeBoulderPocket(random);
   }
 }
 
@@ -389,14 +821,26 @@ function setupField() {
   state.pathIndexByCell.fill(-1);
   state.perkMask.fill(0);
   state.perkZoneMask.fill(-1);
+  state.gasMask.fill(0);
+  state.steamMask.fill(0);
+  state.hazardTriggeredMask.fill(0);
+  state.gasPocketMask.fill(0);
+  state.steamPocketMask.fill(0);
+  state.boulderPocketMask.fill(0);
   state.perkZones.length = 0;
+  state.gasClouds.length = 0;
+  state.steamJets.length = 0;
+  state.boulders.length = 0;
   state.baseFound = false;
   state.base.visible = false;
   state.cameraShake.time = 0;
   state.cameraShake.amplitude = 0;
   state.outOfFuel = false;
+  state.dead = false;
   state.fuel = START_FUEL;
   state.maxFuel = START_FUEL;
+  state.hp = START_HP;
+  state.maxHp = START_HP;
   state.scrap = 0;
   state.depth = 0;
   state.signalText = "Старт";
@@ -425,10 +869,12 @@ function setupField() {
   state.resolvingOverflowBomb = false;
   state.radarBonus = 0;
   state.blocksBroken = 0;
+  state.drillBrokenBlocks = 0;
   state.sideDrills = 0;
   state.jumpDrive = false;
   state.jumpCharges = 0;
   state.jumpRange = 0;
+  state.movedTiles = 0;
   state.longDrillPower = 0;
   state.diagonalDrillPower = 0;
   state.lowFuelSpeedBonus = 0;
@@ -438,8 +884,11 @@ function setupField() {
   state.perkToast.time = 0;
   state.fuelToast.value = 0;
   state.fuelToast.time = 0;
+  state.hpToast.value = 0;
+  state.hpToast.time = 0;
   state.scrapToast.value = 0;
   state.scrapToast.time = 0;
+  state.damageFlash = 0;
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
@@ -469,7 +918,15 @@ function placeHiddenBase() {
   for (let i = 0; i < offsets.length; i += 1) {
     const x = START_X + offsets[i].x;
     const y = START_Y + offsets[i].y;
-    if (x >= 3 && x <= GRID_W - 4 && y >= 3 && y <= GRID_H - 4) {
+    if (
+      x >= 3 &&
+      x <= GRID_W - 4 &&
+      y >= 3 &&
+      y <= GRID_H - 4 &&
+      !state.gasPocketMask[cellIndex(x, y)] &&
+      !state.steamPocketMask[cellIndex(x, y)] &&
+      !state.boulderPocketMask[cellIndex(x, y)]
+    ) {
       state.base.x = x;
       state.base.y = y;
       return;
@@ -491,6 +948,9 @@ function placePerkTiles() {
     attempts += 1;
 
     if (state.tunnelMask[index] || state.perkMask[index] > 0) {
+      continue;
+    }
+    if (state.gasPocketMask[index] || state.steamPocketMask[index] || state.boulderPocketMask[index]) {
       continue;
     }
     if ((x === state.base.x && y === state.base.y) || (x === START_X && y === START_Y)) {
@@ -532,7 +992,13 @@ function placePerkZones() {
         const x = centerX + ox;
         const y = centerY + oy;
         const index = cellIndex(x, y);
-        if (state.tunnelMask[index] || state.perkZoneMask[index] !== -1) {
+        if (
+          state.tunnelMask[index] ||
+          state.perkZoneMask[index] !== -1 ||
+          state.gasPocketMask[index] ||
+          state.steamPocketMask[index] ||
+          state.boulderPocketMask[index]
+        ) {
           blocked = true;
           break;
         }
@@ -635,7 +1101,7 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       state.perkText = "Бак";
       break;
     case 2:
-      state.signalMovesLeft += 5 + state.radarBonus;
+      state.signalMovesLeft += RADAR_BASE_CHARGES + state.radarBonus;
       state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
       state.perkText = `Радар: ${consumeSignalMove(state.signalPrevX, state.signalPrevY, x, y)}`;
       break;
@@ -650,6 +1116,10 @@ function applyTilePerk(perkType, x, y, showToast = true) {
     case 5:
       state.strikeSpeed += 0.15;
       state.perkText = "Скорость";
+      break;
+    case 6:
+      state.hp = Math.min(state.maxHp, state.hp + 1);
+      state.perkText = "HP+";
       break;
     default:
       break;
@@ -709,6 +1179,11 @@ function applyScrapPerk(perkType) {
       state.maxFuel = Math.max(100, state.maxFuel - 50);
       state.fuel = Math.min(state.fuel, state.maxFuel);
       state.perkText = "Перегрузка";
+      break;
+    case 11:
+      state.maxHp += 1;
+      state.hp = state.maxHp;
+      state.perkText = "Усиленный корпус";
       break;
     default:
       break;
@@ -861,21 +1336,24 @@ function frame(ts) {
 }
 
 function update(dt) {
-  if (state.isChoosingPerk) {
+  if (state.isChoosingPerk || state.dead) {
     return;
   }
 
   state.fuel = Math.max(0, state.fuel - IDLE_FUEL_DRAIN * dt);
   state.fuel = Math.min(state.maxFuel, state.fuel);
-  if (state.fuel <= 0) {
-    state.outOfFuel = true;
-  }
+  consumeFuelEmergency();
   updateDrill(dt);
+  updateGas(dt);
+  updateSteam(dt);
+  updateBoulders(dt);
   updateDiscovery();
   updateCameraShake(dt);
   state.perkToast.time = Math.max(0, state.perkToast.time - dt);
   state.fuelToast.time = Math.max(0, state.fuelToast.time - dt);
+  state.hpToast.time = Math.max(0, state.hpToast.time - dt);
   state.scrapToast.time = Math.max(0, state.scrapToast.time - dt);
+  state.damageFlash = Math.max(0, state.damageFlash - dt * 2.4);
   if (state.pendingPerkChoice) {
     state.pendingPerkDelay = Math.max(0, state.pendingPerkDelay - dt);
     if (state.pendingPerkDelay === 0) {
@@ -893,7 +1371,7 @@ function checkScrapPerkUnlock() {
     return;
   }
 
-  const bag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const bag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   for (let i = bag.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = bag[i];
@@ -968,6 +1446,202 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y) {
   }
 }
 
+function applyHazardDamage(amount) {
+  if (amount <= 0 || state.dead) {
+    return;
+  }
+
+  state.hp = Math.max(0, state.hp - amount);
+  state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
+  state.damageFlash = Math.min(1, state.damageFlash + 0.8);
+  showHpToast(amount);
+  if (state.hp <= 0) {
+    state.dead = true;
+  }
+}
+
+function showHpToast(value) {
+  if (value <= 0) {
+    return;
+  }
+  state.hpToast.value = value;
+  state.hpToast.time = 0.9;
+}
+
+function consumeFuelEmergency() {
+  if (state.dead) {
+    return;
+  }
+  if (state.fuel > 0) {
+    state.outOfFuel = false;
+    return;
+  }
+
+  state.fuel = 0;
+  state.outOfFuel = false;
+  applyHazardDamage(FUEL_DEPLETION_HP_COST);
+  if (!state.dead) {
+    state.fuel = Math.min(state.maxFuel, state.fuel + FUEL_DEPLETION_RECOVERY);
+  }
+}
+
+function applyGasContactDamage() {
+  if (state.gasMask[cellIndex(state.drill.x, state.drill.y)]) {
+    applyHazardDamage(GAS_DAMAGE);
+  }
+}
+
+function dissipateGasCloud(cloud) {
+  for (let i = 0; i < cloud.cells.length; i += 1) {
+    state.gasMask[cellIndex(cloud.cells[i].x, cloud.cells[i].y)] = 0;
+  }
+}
+
+function updateGas(dt) {
+  for (let i = state.gasClouds.length - 1; i >= 0; i -= 1) {
+    const cloud = state.gasClouds[i];
+    cloud.timer -= dt;
+    if (cloud.timer > 0) {
+      continue;
+    }
+
+    cloud.timer += GAS_SPREAD_INTERVAL;
+    cloud.spreadsDone += 1;
+    if (cloud.spreadsDone > GAS_SPREAD_STEPS) {
+      dissipateGasCloud(cloud);
+      state.gasClouds.splice(i, 1);
+      continue;
+    }
+
+    const nextFrontier = [];
+    for (let j = 0; j < cloud.frontier.length; j += 1) {
+      const cell = cloud.frontier[j];
+      const neighbors = [
+        { x: cell.x + 1, y: cell.y },
+        { x: cell.x - 1, y: cell.y },
+        { x: cell.x, y: cell.y + 1 },
+        { x: cell.x, y: cell.y - 1 },
+      ];
+      for (let n = 0; n < neighbors.length; n += 1) {
+        const nx = neighbors[n].x;
+        const ny = neighbors[n].y;
+        const key = `${nx},${ny}`;
+        if (cloud.visited.has(key) || nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
+          continue;
+        }
+        if (!state.tunnelMask[cellIndex(nx, ny)]) {
+          continue;
+        }
+        cloud.visited.add(key);
+        cloud.cells.push({ x: nx, y: ny });
+        nextFrontier.push({ x: nx, y: ny });
+        state.gasMask[cellIndex(nx, ny)] = 1;
+      }
+    }
+    cloud.frontier = nextFrontier;
+    applyGasContactDamage();
+  }
+}
+
+function updateSteam(dt) {
+  for (let i = state.steamJets.length - 1; i >= 0; i -= 1) {
+    const jet = state.steamJets[i];
+    jet.timer -= dt;
+    if (jet.timer > 0) {
+      continue;
+    }
+
+    jet.timer += STEAM_PULSE_INTERVAL;
+    jet.pulsesRemaining -= 1;
+    if (jet.pulsesRemaining <= 0) {
+      addSteamCells(jet.cells, -1);
+      state.steamJets.splice(i, 1);
+      continue;
+    }
+    refreshSteamJet(jet);
+  }
+}
+
+function startBoulderRoll(x, y, dirX, dirY) {
+  const index = cellIndex(x, y);
+  if (!state.boulderPocketMask[index]) {
+    return;
+  }
+
+  state.boulderPocketMask[index] = 0;
+  state.tunnelMask[index] = 1;
+  state.hardness[index] = 0;
+  state.health[index] = 0;
+  state.boulders.push({
+    x,
+    y,
+    dirX,
+    dirY,
+    delay: BOULDER_DELAY,
+    moveTimer: BOULDER_MOVE_INTERVAL,
+    brokenBlocks: 0,
+  });
+}
+
+function updateBoulders(dt) {
+  for (let i = state.boulders.length - 1; i >= 0; i -= 1) {
+    const boulder = state.boulders[i];
+    if (boulder.delay > 0) {
+      boulder.delay -= dt;
+      continue;
+    }
+
+    boulder.moveTimer -= dt;
+    if (boulder.moveTimer > 0) {
+      continue;
+    }
+    boulder.moveTimer += BOULDER_MOVE_INTERVAL;
+
+    const nextX = boulder.x + boulder.dirX;
+    const nextY = boulder.y + boulder.dirY;
+    if (nextX < 1 || nextY < 1 || nextX >= GRID_W - 1 || nextY >= GRID_H - 1) {
+      state.boulders.splice(i, 1);
+      continue;
+    }
+
+    const nextIndex = cellIndex(nextX, nextY);
+    if (!state.tunnelMask[nextIndex]) {
+      damageCell(nextX, nextY, EXPLOSION_BREAK_DAMAGE, { ignoreHazardEffect: true, allowHazardChain: true });
+      boulder.brokenBlocks += 1;
+      if (boulder.brokenBlocks >= BOULDER_BREAK_LIMIT) {
+        boulder.x = nextX;
+        boulder.y = nextY;
+        state.boulders.splice(i, 1);
+        continue;
+      }
+    }
+
+    boulder.x = nextX;
+    boulder.y = nextY;
+    state.tunnelMask[nextIndex] = 1;
+    state.hardness[nextIndex] = 0;
+    state.health[nextIndex] = 0;
+    if (boulder.x === state.drill.x && boulder.y === state.drill.y) {
+      applyHazardDamage(BOULDER_DAMAGE);
+    }
+  }
+}
+
+function triggerHazardEffect(hazardType, x, y, options = {}) {
+  if (!hazardType) {
+    return;
+  }
+
+  const hazard = HAZARD_DATA[hazardType];
+  if (hazard && hazard.damage && !options.suppressPlayerDamage) {
+    applyHazardDamage(hazard.damage);
+  }
+
+  if (hazardType === HAZARD_TYPES.VOLATILE) {
+    explodeAt(x, y, Math.max(1, state.drillPower * 3), 1.25);
+  }
+}
+
 function damageCell(x, y, damage, options = {}) {
   if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1 || damage <= 0) {
     return false;
@@ -976,6 +1650,12 @@ function damageCell(x, y, damage, options = {}) {
   const index = cellIndex(x, y);
   if (state.tunnelMask[index]) {
     return false;
+  }
+  const hazardType = state.hazardMask[index];
+  const allowHazardChain = options.allowHazardChain && hazardType === HAZARD_TYPES.VOLATILE;
+  if ((!options.ignoreHazardEffect || allowHazardChain) && hazardType && !state.hazardTriggeredMask[index]) {
+    state.hazardTriggeredMask[index] = 1;
+    triggerHazardEffect(hazardType, x, y, { suppressPlayerDamage: !!options.allowHazardChain });
   }
 
   state.health[index] -= damage;
@@ -989,19 +1669,44 @@ function damageCell(x, y, damage, options = {}) {
 
 function breakCell(x, y, index, options = {}) {
   const hardness = state.hardness[index];
+  const hazardType = state.hazardMask[index];
   const scrapGain = BLOCK_TYPES[hardness].scrap + state.scrapBonus;
   state.scrap += scrapGain;
   runFuelEvent(() => addFuel(state.fuelOnBreak, x, y));
   state.blocksBroken += 1;
-  showScrapToast(scrapGain);
-  if (state.jumpDrive && state.blocksBroken % 10 === 0) {
-    state.jumpCharges += 1;
+  if (options.byDrill) {
+    state.drillBrokenBlocks += 1;
   }
-  if (state.remoteBombLevel > 0 && state.blocksBroken % 15 === 0) {
+  showScrapToast(scrapGain);
+  state.hazardMask[index] = 0;
+  state.hazardTriggeredMask[index] = 0;
+  if (state.remoteBombLevel > 0 && options.byDrill && state.drillBrokenBlocks % 15 === 0) {
     triggerRemoteBombSquare(x, y, 3);
   }
 
   carveTunnel(x, y);
+  const gasNeighbors = [
+    { x: x + 1, y },
+    { x: x - 1, y },
+    { x, y: y + 1 },
+    { x, y: y - 1 },
+  ];
+  for (let i = 0; i < gasNeighbors.length; i += 1) {
+    const nx = gasNeighbors[i].x;
+    const ny = gasNeighbors[i].y;
+    if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
+      continue;
+    }
+    if (state.gasPocketMask[cellIndex(nx, ny)]) {
+      revealGasPocket(nx, ny);
+    }
+    if (state.steamPocketMask[cellIndex(nx, ny)]) {
+      revealSteamPocket(nx, ny, x - nx, y - ny);
+    }
+    if (state.boulderPocketMask[cellIndex(nx, ny)]) {
+      startBoulderRoll(nx, ny, x - nx, y - ny);
+    }
+  }
 
   if (options.moveDrill) {
     state.drill.x = x;
@@ -1011,6 +1716,7 @@ function breakCell(x, y, index, options = {}) {
 }
 
 function explodeAt(x, y, damage, radius = 2) {
+  const breakDamage = Math.max(damage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(radius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
     for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
@@ -1020,7 +1726,7 @@ function explodeAt(x, y, damage, radius = 2) {
       if (Math.hypot(ox, oy) > radius) {
         continue;
       }
-      damageCell(x + ox, y + oy, damage);
+      damageCell(x + ox, y + oy, breakDamage, { ignoreHazardEffect: true, allowHazardChain: true });
     }
   }
 }
@@ -1039,7 +1745,7 @@ function triggerOverflowBomb(originX, originY) {
   const dir = directions[Math.floor(Math.random() * directions.length)];
   const centerX = clamp(originX + dir.x * 3, 1, GRID_W - 2);
   const centerY = clamp(originY + dir.y * 3, 1, GRID_H - 2);
-  const damage = state.drillPower * 10;
+  const damage = EXPLOSION_BREAK_DAMAGE;
   const square = [
     { x: centerX, y: centerY },
     { x: clamp(centerX + (dir.x >= 0 ? 1 : -1), 1, GRID_W - 2), y: centerY },
@@ -1053,7 +1759,7 @@ function triggerOverflowBomb(originX, originY) {
   state.resolvingOverflowBomb = true;
   try {
     for (let i = 0; i < square.length; i += 1) {
-      damageCell(square[i].x, square[i].y, damage);
+      damageCell(square[i].x, square[i].y, damage, { ignoreHazardEffect: true, allowHazardChain: true });
     }
   } finally {
     state.resolvingOverflowBomb = false;
@@ -1076,7 +1782,7 @@ function triggerRemoteBombSquare(originX, originY, distance) {
   const centerY = clamp(originY + dir.y * distance, 1, GRID_H - 2);
   const stepX = dir.x === 0 ? 1 : Math.sign(dir.x);
   const stepY = dir.y === 0 ? 1 : Math.sign(dir.y);
-  const damage = state.drillPower * (8 + state.remoteBombLevel * 2);
+  const damage = EXPLOSION_BREAK_DAMAGE;
   const square = [
     { x: centerX, y: centerY },
     { x: clamp(centerX + stepX, 1, GRID_W - 2), y: centerY },
@@ -1085,7 +1791,7 @@ function triggerRemoteBombSquare(originX, originY, distance) {
   ];
 
   for (let i = 0; i < square.length; i += 1) {
-    damageCell(square[i].x, square[i].y, damage);
+    damageCell(square[i].x, square[i].y, damage, { ignoreHazardEffect: true, allowHazardChain: true });
   }
 }
 
@@ -1094,6 +1800,12 @@ function recordPlayerMove(fromX, fromY, toX, toY, moveWeight = 2) {
   extendPath(toX, toY);
   state.signalPrevX = toX;
   state.signalPrevY = toY;
+  applyGasContactDamage();
+  applySteamContactDamage();
+  state.movedTiles += 1;
+  if (state.jumpDrive && state.movedTiles % 10 === 0) {
+    state.jumpCharges += 1;
+  }
   state.playerMoveProgress += moveWeight;
   if (state.playerMoveProgress >= BASE_MOVE_INTERVAL) {
     state.playerMoveProgress -= BASE_MOVE_INTERVAL;
@@ -1208,7 +1920,6 @@ function tryJumpMove(dx, dy) {
   const moveCost = state.moveFuelCost * state.jumpRange;
   if (state.fuel < moveCost) {
     state.fuel = 0;
-    state.outOfFuel = true;
     return true;
   }
 
@@ -1248,7 +1959,6 @@ function updateCameraShake(dt) {
 function updateDrill(dt) {
   if (state.fuel <= 0) {
     state.fuel = 0;
-    state.outOfFuel = true;
     state.drill.progress = 0;
     state.drill.strikeEnergy = 0;
     state.drill.strikeLatch = false;
@@ -1296,7 +2006,6 @@ function updateDrill(dt) {
 
       if (state.fuel < state.moveFuelCost) {
         state.fuel = 0;
-        state.outOfFuel = true;
         return;
       }
       state.drill.strikeLatch = true;
@@ -1322,7 +2031,6 @@ function updateDrill(dt) {
   if (strikeWave > 0.92 && !state.drill.strikeLatch) {
     if (state.fuel < state.strikeFuelCost) {
       state.fuel = 0;
-      state.outOfFuel = true;
       return;
     }
 
@@ -1330,7 +2038,7 @@ function updateDrill(dt) {
     state.fuel -= state.strikeFuelCost;
     const strikeDamage = getStrikeDamage();
     const hardness = state.hardness[targetIndex];
-    damageCell(targetX, targetY, strikeDamage, { moveDrill: true, fromX: state.drill.x, fromY: state.drill.y });
+    damageCell(targetX, targetY, strikeDamage, { moveDrill: true, fromX: state.drill.x, fromY: state.drill.y, byDrill: true });
     state.drill.progress += strikeDamage;
     state.cameraShake.amplitude = Math.max(
       state.cameraShake.amplitude,
@@ -1339,19 +2047,19 @@ function updateDrill(dt) {
 
     if (state.sideDrills > 0) {
       const sideDamage = strikeDamage * (0.5 + state.sideDrills * 0.25);
-      damageCell(state.drill.x - dy, state.drill.y + dx, sideDamage);
-      damageCell(state.drill.x + dy, state.drill.y - dx, sideDamage);
+      damageCell(state.drill.x - dy, state.drill.y + dx, sideDamage, { byDrill: true });
+      damageCell(state.drill.x + dy, state.drill.y - dx, sideDamage, { byDrill: true });
     }
 
     if (state.longDrillPower > 0) {
       const longDamage = strikeDamage * (0.1 + state.longDrillPower);
-      damageCell(targetX + dx, targetY + dy, longDamage);
+      damageCell(targetX + dx, targetY + dy, longDamage, { byDrill: true });
     }
 
     if (state.diagonalDrillPower > 0) {
       const diagonalDamage = strikeDamage * (0.15 + state.diagonalDrillPower);
-      damageCell(targetX - dy, targetY + dx, diagonalDamage);
-      damageCell(targetX + dy, targetY - dx, diagonalDamage);
+      damageCell(targetX - dy, targetY + dx, diagonalDamage, { byDrill: true });
+      damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true });
     }
   } else if (strikeWave < 0.35) {
     state.drill.strikeLatch = false;
@@ -1359,7 +2067,6 @@ function updateDrill(dt) {
 
   if (state.fuel <= 0 && state.health[targetIndex] > 0) {
     state.fuel = 0;
-    state.outOfFuel = true;
     return;
   }
 }
@@ -1467,7 +2174,7 @@ function render() {
         continue;
       }
 
-      if (state.tunnelMask[index]) {
+      if (state.tunnelMask[index] || state.gasPocketMask[index] || state.steamPocketMask[index] || state.boulderPocketMask[index]) {
         ctx.fillStyle = y <= 3 ? "#38261a" : "#19110d";
       } else {
         ctx.fillStyle = BLOCK_TYPES[state.hardness[index]].color;
@@ -1477,7 +2184,7 @@ function render() {
       ctx.strokeStyle = "rgba(255, 225, 179, 0.05)";
       ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
 
-      if (state.tunnelMask[index]) {
+      if (state.tunnelMask[index] || state.gasPocketMask[index] || state.steamPocketMask[index] || state.boulderPocketMask[index]) {
         ctx.fillStyle = "rgba(230, 176, 99, 0.08)";
         ctx.fillRect(sx + 5, sy + 5, TILE_SIZE - 10, 4);
         ctx.fillRect(sx + 5, sy + TILE_SIZE - 9, TILE_SIZE - 10, 4);
@@ -1488,6 +2195,34 @@ function render() {
         ctx.arc(sx + 8, sy + TILE_SIZE - 8, 2, 0, Math.PI * 2);
         ctx.arc(sx + TILE_SIZE - 8, sy + TILE_SIZE - 8, 2, 0, Math.PI * 2);
         ctx.fill();
+        if (state.gasMask[index] || state.gasPocketMask[index]) {
+          ctx.fillStyle = "rgba(158, 240, 108, 0.22)";
+          ctx.beginPath();
+          ctx.arc(sx + TILE_SIZE * 0.38, sy + TILE_SIZE * 0.44, 7, 0, Math.PI * 2);
+          ctx.arc(sx + TILE_SIZE * 0.6, sy + TILE_SIZE * 0.54, 8, 0, Math.PI * 2);
+          ctx.arc(sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.7, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (state.steamMask[index] || state.steamPocketMask[index]) {
+          ctx.fillStyle = "rgba(255, 207, 122, 0.2)";
+          ctx.beginPath();
+          ctx.arc(sx + TILE_SIZE * 0.36, sy + TILE_SIZE * 0.48, 6, 0, Math.PI * 2);
+          ctx.arc(sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.38, 7, 0, Math.PI * 2);
+          ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.68, 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (state.boulderPocketMask[index]) {
+          ctx.fillStyle = "rgba(183, 161, 136, 0.32)";
+          ctx.beginPath();
+          ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.54, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(217, 196, 170, 0.8)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(sx + TILE_SIZE * 0.44, sy + TILE_SIZE * 0.48, 5, 0, Math.PI * 2);
+          ctx.arc(sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.46, 4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       } else {
         const type = BLOCK_TYPES[state.hardness[index]];
         ctx.strokeStyle = `${type.vein}66`;
@@ -1496,6 +2231,31 @@ function render() {
         ctx.lineTo(sx + TILE_SIZE * 0.48, sy + TILE_SIZE * 0.58);
         ctx.lineTo(sx + TILE_SIZE - 8, sy + TILE_SIZE * 0.22);
         ctx.stroke();
+        const hazardType = state.hazardMask[index];
+        if (hazardType) {
+          const hazard = HAZARD_DATA[hazardType];
+          ctx.strokeStyle = hazard.color;
+          ctx.fillStyle = `${hazard.color}22`;
+          ctx.lineWidth = 2;
+          if (hazardType === HAZARD_TYPES.SPIKE) {
+            ctx.beginPath();
+            ctx.moveTo(sx + TILE_SIZE * 0.25, sy + TILE_SIZE * 0.78);
+            ctx.lineTo(sx + TILE_SIZE * 0.42, sy + TILE_SIZE * 0.28);
+            ctx.lineTo(sx + TILE_SIZE * 0.52, sy + TILE_SIZE * 0.62);
+            ctx.lineTo(sx + TILE_SIZE * 0.7, sy + TILE_SIZE * 0.2);
+            ctx.stroke();
+          } else if (hazardType === HAZARD_TYPES.VOLATILE) {
+            ctx.beginPath();
+            ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, 7, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.24);
+            ctx.lineTo(sx + TILE_SIZE * 0.57, sy + TILE_SIZE * 0.45);
+            ctx.lineTo(sx + TILE_SIZE * 0.47, sy + TILE_SIZE * 0.45);
+            ctx.lineTo(sx + TILE_SIZE * 0.56, sy + TILE_SIZE * 0.76);
+            ctx.stroke();
+          }
+        }
       }
 
       if (!state.tunnelMask[index] && state.health[index] < BLOCK_TYPES[state.hardness[index]].hp) {
@@ -1511,13 +2271,20 @@ function render() {
 
   renderPath(camera);
   renderBase(camera);
+  renderBoulders(camera);
   renderDrill(camera);
   renderFuelToast(camera);
+  renderHpToast(camera);
   renderScrapToast(camera);
   renderPerkToast(camera);
   renderSignalStatus(camera);
   renderVisionMask(camera);
   renderHud();
+
+  if (state.damageFlash > 0) {
+    ctx.fillStyle = `rgba(255, 64, 64, ${0.16 * state.damageFlash})`;
+    ctx.fillRect(0, 0, state.width, state.height);
+  }
 
   if (state.baseFound) {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -1528,16 +2295,37 @@ function render() {
     ctx.fillText("База найдена", state.width * 0.5, state.height * 0.46);
     ctx.font = `400 16px ${HUD_FONT}`;
     ctx.fillText("Ты добрался до спрятанной цели. Можно расширять мета-игру поиска.", state.width * 0.5, state.height * 0.52);
-  } else if (state.outOfFuel) {
+  } else if (state.dead) {
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(0, 0, state.width, state.height);
-    ctx.fillStyle = "#fff5dd";
+    ctx.fillStyle = "#ffe2d5";
     ctx.font = `700 28px ${HUD_FONT}`;
     ctx.textAlign = "center";
-    ctx.fillText("Топливо закончилось", state.width * 0.5, state.height * 0.46);
+    ctx.fillText("Бур разбит", state.width * 0.5, state.height * 0.46);
     ctx.font = `400 16px ${HUD_FONT}`;
-    ctx.fillText("Ищи путь к перкам или перезагрузи карту.", state.width * 0.5, state.height * 0.52);
+    ctx.fillText("Опасные блоки нужно обходить или добивать осторожно.", state.width * 0.5, state.height * 0.52);
   }
+}
+
+function renderBoulders(camera) {
+  const ctx = state.ctx;
+  ctx.save();
+  for (let i = 0; i < state.boulders.length; i += 1) {
+    const boulder = state.boulders[i];
+    const x = boulder.x * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
+    const y = boulder.y * TILE_SIZE - camera.y + TILE_SIZE * 0.54;
+    ctx.fillStyle = "#8b7662";
+    ctx.beginPath();
+    ctx.arc(x, y, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#d9c4aa";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x - 4, y - 3, 5, 0, Math.PI * 2);
+    ctx.arc(x + 4, y - 4, 4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function renderPath(camera) {
@@ -1827,6 +2615,30 @@ function renderFuelToast(camera) {
   ctx.restore();
 }
 
+function renderHpToast(camera) {
+  if (state.hpToast.time <= 0 || state.hpToast.value <= 0) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const sx = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const sy = state.drill.y * TILE_SIZE - camera.y;
+  const lift = (0.9 - state.hpToast.time) * 24;
+  const alpha = clamp(state.hpToast.time / 0.9, 0, 1);
+  const text = `-${state.hpToast.value} HP`;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#ff8a8a";
+  ctx.strokeStyle = "rgba(43, 12, 12, 0.72)";
+  ctx.lineWidth = 3;
+  ctx.font = `700 14px ${HUD_FONT}`;
+  ctx.textAlign = "center";
+  ctx.strokeText(text, sx, sy - 26 - lift);
+  ctx.fillText(text, sx, sy - 26 - lift);
+  ctx.restore();
+}
+
 function renderScrapToast(camera) {
   if (state.scrapToast.time <= 0 || state.scrapToast.value <= 0) {
     return;
@@ -1858,6 +2670,7 @@ function renderScrapToast(camera) {
 
 function renderHud() {
   const fuelRatio = clamp(state.fuel / state.maxFuel, 0, 1);
+  const hpRatio = clamp(state.hp / state.maxHp, 0, 1);
   const currentScrapCost = getScrapPerkCost(state.scrapPerkLevel);
   const scrapCycle = state.nextScrapPerkAt - currentScrapCost;
   const scrapProgress = clamp(state.scrap - scrapCycle, 0, currentScrapCost);
@@ -1865,13 +2678,14 @@ function renderHud() {
   const top = 14 + (window.visualViewport?.offsetTop || 0);
   const gap = 10;
   const totalWidth = Math.min(state.width - 28, 420);
-  const panelWidth = (totalWidth - gap) * 0.5;
+  const panelWidth = (totalWidth - gap * 2) / 3;
   const panelHeight = 34;
   const left = state.width - 14 - totalWidth;
 
-  drawHudBar(left, top, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
+  drawHudBar(left, top, panelWidth, panelHeight, "HP", `${state.hp}/${state.maxHp}`, hpRatio, ["#ff9d7a", "#ff5c5c"]);
+  drawHudBar(left + panelWidth + gap, top, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
   drawHudBar(
-    left + panelWidth + gap,
+    left + (panelWidth + gap) * 2,
     top,
     panelWidth,
     panelHeight,
@@ -1893,7 +2707,7 @@ function renderHud() {
   ctx.font = `700 10px ${HUD_FONT}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(`SEED ${state.worldSeed}`, left + 10, top + panelHeight + 20);
+  ctx.fillText(`SEED ${state.worldSeed}  •  Опасные блоки: шипы, кислота, взрыв`, left + 10, top + panelHeight + 20);
   ctx.restore();
 }
 

@@ -12,8 +12,20 @@ const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 44;
 const TILES_PER_PERK_ZONE = 480;
+const GAS_POCKET_GROUPS = 10;
+const STEAM_POCKET_GROUPS = 8;
+const BOULDER_POCKET_GROUPS = 8;
+const BOULDER_MIN_START_DISTANCE = 4;
 const TILE_PX = 12;
 const LEGEND_W = 260;
+const HAZARD_TYPES = {
+  SPIKE: 1,
+  VOLATILE: 2,
+};
+const HAZARD_DATA = {
+  [HAZARD_TYPES.SPIKE]: { label: "Spike", color: "#ff6b48" },
+  [HAZARD_TYPES.VOLATILE]: { label: "Volatile", color: "#ffd166" },
+};
 
 const BLOCK_TYPES = [
   { color: "#1a1410", label: "Tunnel", vein: "#3c2d22" },
@@ -33,9 +45,10 @@ const TILE_PERK_TYPES = [
   { name: "Bur", icon: "D", color: "#ff9f6b" },
   { name: "Bomba", icon: "*", color: "#ff7c5f" },
   { name: "Skorost", icon: "S", color: "#9fd7ff" },
+  { name: "HP+", icon: "H", color: "#ff8f8f" },
 ];
 
-const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3];
+const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
 
 function parseArgs(argv) {
   let seed = 1;
@@ -206,10 +219,214 @@ function addDangerVein(random, field, startX, startY, length, radius, strength) 
   }
 }
 
+function chooseHazardType(random, x, y) {
+  const centerRatio = clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.4);
+  const roll = random() + centerRatio * 0.2;
+  if (roll > 1.0) {
+    return HAZARD_TYPES.VOLATILE;
+  }
+  return HAZARD_TYPES.SPIKE;
+}
+
+function getHazardOrigin(random) {
+  if (random() < 0.35) {
+    return {
+      x: Math.round(clamp(START_X + (random() - 0.5) * 56, 1, GRID_W - 2)),
+      y: Math.round(clamp(START_Y + (random() - 0.5) * 56, 1, GRID_H - 2)),
+    };
+  }
+  return {
+    x: 1 + Math.floor(random() * (GRID_W - 2)),
+    y: 1 + Math.floor(random() * (GRID_H - 2)),
+  };
+}
+
+function canPlaceHazardAt(x, y) {
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+}
+
+function canPlaceGasPocketAt(x, y) {
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+}
+
+function canPlaceSteamPocketAt(x, y) {
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+}
+
+function canPlaceBoulderPocketAt(x, y) {
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+}
+
+function placeHazardBlob(mask, random, blockCount) {
+  const origin = getHazardOrigin(random);
+  const hazardType = chooseHazardType(random, origin.x, origin.y);
+  const frontier = [{ x: origin.x, y: origin.y }];
+  const seen = new Set();
+  let placed = 0;
+
+  while (frontier.length > 0 && placed < blockCount) {
+    const frontierIndex = Math.floor(random() * frontier.length);
+    const cell = frontier.splice(frontierIndex, 1)[0];
+    const key = `${cell.x},${cell.y}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    if (!canPlaceHazardAt(cell.x, cell.y)) {
+      continue;
+    }
+
+    mask[cellIndex(cell.x, cell.y)] = hazardType;
+    placed += 1;
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+      { x: cell.x + 1, y: cell.y + 1 },
+      { x: cell.x + 1, y: cell.y - 1 },
+      { x: cell.x - 1, y: cell.y + 1 },
+      { x: cell.x - 1, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      if (random() < 0.88) {
+        frontier.push(neighbors[i]);
+      }
+    }
+  }
+}
+
+function placeHazardVein(mask, random, blockCount) {
+  const origin = getHazardOrigin(random);
+  const hazardType = chooseHazardType(random, origin.x, origin.y);
+  let x = origin.x;
+  let y = origin.y;
+  let angle = random() * Math.PI * 2;
+  let placed = 0;
+  let attempts = 0;
+
+  while (placed < blockCount && attempts < blockCount * 8) {
+    attempts += 1;
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (canPlaceHazardAt(ix, iy)) {
+      mask[cellIndex(ix, iy)] = hazardType;
+      placed += 1;
+    }
+    angle += (random() - 0.5) * 0.85;
+    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
+    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
+  }
+}
+
+function placeGasPocket(mask, hazardMask, random, cellCount) {
+  const origin = getHazardOrigin(random);
+  const frontier = [{ x: origin.x, y: origin.y }];
+  const seen = new Set();
+  let placed = 0;
+
+  while (frontier.length > 0 && placed < cellCount) {
+    const frontierIndex = Math.floor(random() * frontier.length);
+    const cell = frontier.splice(frontierIndex, 1)[0];
+    const key = `${cell.x},${cell.y}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    if (!canPlaceGasPocketAt(cell.x, cell.y)) {
+      continue;
+    }
+
+    const index = cellIndex(cell.x, cell.y);
+    mask[index] = 1;
+    hazardMask[index] = 0;
+    placed += 1;
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+      { x: cell.x + 1, y: cell.y + 1 },
+      { x: cell.x + 1, y: cell.y - 1 },
+      { x: cell.x - 1, y: cell.y + 1 },
+      { x: cell.x - 1, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      if (random() < 0.82) {
+        frontier.push(neighbors[i]);
+      }
+    }
+  }
+}
+
+function placeSteamPocket(mask, hazardMask, gasPocketMask, random, cellCount) {
+  const origin = getHazardOrigin(random);
+  const frontier = [{ x: origin.x, y: origin.y }];
+  const seen = new Set();
+  let placed = 0;
+
+  while (frontier.length > 0 && placed < cellCount) {
+    const frontierIndex = Math.floor(random() * frontier.length);
+    const cell = frontier.splice(frontierIndex, 1)[0];
+    const key = `${cell.x},${cell.y}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    if (!canPlaceSteamPocketAt(cell.x, cell.y)) {
+      continue;
+    }
+
+    const index = cellIndex(cell.x, cell.y);
+    mask[index] = 1;
+    hazardMask[index] = 0;
+    gasPocketMask[index] = 0;
+    placed += 1;
+
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+      { x: cell.x + 1, y: cell.y + 1 },
+      { x: cell.x + 1, y: cell.y - 1 },
+      { x: cell.x - 1, y: cell.y + 1 },
+      { x: cell.x - 1, y: cell.y - 1 },
+    ];
+    for (let i = 0; i < neighbors.length; i += 1) {
+      if (random() < 0.78) {
+        frontier.push(neighbors[i]);
+      }
+    }
+  }
+}
+
+function placeBoulderPocket(mask, hazardMask, gasPocketMask, steamPocketMask, random) {
+  const origin = getHazardOrigin(random);
+  if (!canPlaceBoulderPocketAt(origin.x, origin.y)) {
+    return;
+  }
+  if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) {
+    return;
+  }
+
+  const index = cellIndex(origin.x, origin.y);
+  mask[index] = 1;
+  hazardMask[index] = 0;
+  gasPocketMask[index] = 0;
+  steamPocketMask[index] = 0;
+}
+
 function generateMap(seed) {
   const random = mulberry32(seed);
   const danger = new Float32Array(GRID_W * GRID_H);
   const hardness = new Uint8Array(GRID_W * GRID_H);
+  const hazardMask = new Uint8Array(GRID_W * GRID_H);
+  const gasPocketMask = new Uint8Array(GRID_W * GRID_H);
+  const steamPocketMask = new Uint8Array(GRID_W * GRID_H);
+  const boulderPocketMask = new Uint8Array(GRID_W * GRID_H);
   const perkMask = new Uint8Array(GRID_W * GRID_H);
   const perkZoneMask = new Int32Array(GRID_W * GRID_H);
   perkZoneMask.fill(-1);
@@ -253,7 +470,26 @@ function generateMap(seed) {
       const index = cellIndex(x, y);
       const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.08;
       hardness[index] = clamp(Math.round(danger[index] + microNoise), 1, 7);
+      hazardMask[index] = 0;
     }
+  }
+
+  const hazardBlobGroups = Math.max(12, Math.round(area / 3000));
+  const hazardVeinGroups = Math.max(12, Math.round(area / 3000));
+  for (let i = 0; i < hazardBlobGroups; i += 1) {
+    placeHazardBlob(hazardMask, random, 4 + Math.floor(random() * 17));
+  }
+  for (let i = 0; i < hazardVeinGroups; i += 1) {
+    placeHazardVein(hazardMask, random, 4 + Math.floor(random() * 37));
+  }
+  for (let i = 0; i < GAS_POCKET_GROUPS; i += 1) {
+    placeGasPocket(gasPocketMask, hazardMask, random, 4 + Math.floor(random() * 10));
+  }
+  for (let i = 0; i < STEAM_POCKET_GROUPS; i += 1) {
+    placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, random, 4 + Math.floor(random() * 10));
+  }
+  for (let i = 0; i < BOULDER_POCKET_GROUPS; i += 1) {
+    placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, random);
   }
 
   const offsets = getExactDistanceOffsets(BASE_MIN_DISTANCE);
@@ -293,6 +529,9 @@ function generateMap(seed) {
     if (random() > getCenterPerkDensity(x, y)) {
       continue;
     }
+    if (gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) {
+      continue;
+    }
 
     perkMask[index] = chooseTilePerkForPosition(random, x, y);
     placedPerks.push({ x, y });
@@ -321,6 +560,10 @@ function generateMap(seed) {
           overlaps = true;
           break;
         }
+        if (gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) {
+          overlaps = true;
+          break;
+        }
       }
     }
     if (overlaps) {
@@ -339,7 +582,7 @@ function generateMap(seed) {
     }
   }
 
-  return { hardness, perkMask, perkZones, base };
+  return { hardness, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkMask, perkZones, base };
 }
 
 function esc(text) {
@@ -370,11 +613,38 @@ function renderSvg(seed, map) {
       const tile = BLOCK_TYPES[type];
       const px = x * TILE_PX;
       const py = y * TILE_PX;
-      parts.push(`<rect x="${px}" y="${py}" width="${TILE_PX}" height="${TILE_PX}" fill="${tile.color}"/>`);
+      const isGasPocket = map.gasPocketMask && map.gasPocketMask[cellIndex(x, y)];
+      const isSteamPocket = map.steamPocketMask && map.steamPocketMask[cellIndex(x, y)];
+      const isBoulderPocket = map.boulderPocketMask && map.boulderPocketMask[cellIndex(x, y)];
+      const isPocket = isGasPocket || isSteamPocket || isBoulderPocket;
+      parts.push(`<rect x="${px}" y="${py}" width="${TILE_PX}" height="${TILE_PX}" fill="${isPocket ? "#19110d" : tile.color}"/>`);
       parts.push(`<rect x="${px}" y="${py}" width="${TILE_PX}" height="${TILE_PX}" fill="none" stroke="rgba(255,225,179,0.05)" stroke-width="0.6"/>`);
-      parts.push(
-        `<path d="M ${px + TILE_PX * 0.18} ${py + TILE_PX * 0.3} L ${px + TILE_PX * 0.48} ${py + TILE_PX * 0.58} L ${px + TILE_PX * 0.82} ${py + TILE_PX * 0.22}" fill="none" stroke="${tile.vein}" stroke-opacity="0.45" stroke-width="1"/>`,
-      );
+      if (isGasPocket) {
+        parts.push(`<rect x="${px + 1.5}" y="${py + 1.5}" width="${TILE_PX - 3}" height="${TILE_PX - 3}" fill="none" stroke="rgba(255,226,184,0.16)" stroke-width="0.8"/>`);
+        parts.push(`<circle cx="${px + TILE_PX * 0.38}" cy="${py + TILE_PX * 0.44}" r="${TILE_PX * 0.16}" fill="rgba(158,240,108,0.22)"/>`);
+        parts.push(`<circle cx="${px + TILE_PX * 0.6}" cy="${py + TILE_PX * 0.54}" r="${TILE_PX * 0.18}" fill="rgba(158,240,108,0.22)"/>`);
+        parts.push(`<circle cx="${px + TILE_PX * 0.46}" cy="${py + TILE_PX * 0.7}" r="${TILE_PX * 0.14}" fill="rgba(158,240,108,0.22)"/>`);
+      } else if (isSteamPocket) {
+        parts.push(`<rect x="${px + 1.5}" y="${py + 1.5}" width="${TILE_PX - 3}" height="${TILE_PX - 3}" fill="none" stroke="rgba(255,226,184,0.16)" stroke-width="0.8"/>`);
+        parts.push(`<circle cx="${px + TILE_PX * 0.36}" cy="${py + TILE_PX * 0.46}" r="${TILE_PX * 0.14}" fill="rgba(255,184,109,0.22)"/>`);
+        parts.push(`<circle cx="${px + TILE_PX * 0.58}" cy="${py + TILE_PX * 0.42}" r="${TILE_PX * 0.18}" fill="rgba(255,184,109,0.22)"/>`);
+        parts.push(`<circle cx="${px + TILE_PX * 0.48}" cy="${py + TILE_PX * 0.68}" r="${TILE_PX * 0.16}" fill="rgba(255,184,109,0.22)"/>`);
+      } else if (isBoulderPocket) {
+        parts.push(`<rect x="${px + 1.5}" y="${py + 1.5}" width="${TILE_PX - 3}" height="${TILE_PX - 3}" fill="none" stroke="rgba(255,226,184,0.16)" stroke-width="0.8"/>`);
+        parts.push(`<circle cx="${px + TILE_PX * 0.5}" cy="${py + TILE_PX * 0.56}" r="${TILE_PX * 0.28}" fill="#8a6d5d" stroke="#d7b189" stroke-width="0.9"/>`);
+        parts.push(`<path d="M ${px + TILE_PX * 0.34} ${py + TILE_PX * 0.54} Q ${px + TILE_PX * 0.48} ${py + TILE_PX * 0.36} ${px + TILE_PX * 0.66} ${py + TILE_PX * 0.5}" fill="none" stroke="#efd1b0" stroke-opacity="0.35" stroke-width="0.9"/>`);
+      } else {
+        parts.push(
+          `<path d="M ${px + TILE_PX * 0.18} ${py + TILE_PX * 0.3} L ${px + TILE_PX * 0.48} ${py + TILE_PX * 0.58} L ${px + TILE_PX * 0.82} ${py + TILE_PX * 0.22}" fill="none" stroke="${tile.vein}" stroke-opacity="0.45" stroke-width="1"/>`,
+        );
+      }
+      const hazardType = map.hazardMask[cellIndex(x, y)];
+      if (hazardType === HAZARD_TYPES.SPIKE) {
+        parts.push(`<path d="M ${px + TILE_PX * 0.25} ${py + TILE_PX * 0.78} L ${px + TILE_PX * 0.42} ${py + TILE_PX * 0.28} L ${px + TILE_PX * 0.52} ${py + TILE_PX * 0.62} L ${px + TILE_PX * 0.7} ${py + TILE_PX * 0.2}" fill="none" stroke="${HAZARD_DATA[hazardType].color}" stroke-width="1.5"/>`);
+      } else if (hazardType === HAZARD_TYPES.VOLATILE) {
+        parts.push(`<circle cx="${px + TILE_PX * 0.5}" cy="${py + TILE_PX * 0.5}" r="${TILE_PX * 0.18}" fill="none" stroke="${HAZARD_DATA[hazardType].color}" stroke-width="1.2"/>`);
+        parts.push(`<path d="M ${px + TILE_PX * 0.5} ${py + TILE_PX * 0.24} L ${px + TILE_PX * 0.57} ${py + TILE_PX * 0.45} L ${px + TILE_PX * 0.47} ${py + TILE_PX * 0.45} L ${px + TILE_PX * 0.56} ${py + TILE_PX * 0.76}" fill="none" stroke="${HAZARD_DATA[hazardType].color}" stroke-width="1.2"/>`);
+      }
     }
   }
 
@@ -439,6 +709,27 @@ function renderSvg(seed, map) {
     );
     legendY += 20;
   }
+
+  legendY += 12;
+  for (const hazardType of [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE]) {
+    const hazard = HAZARD_DATA[hazardType];
+    parts.push(`<rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${hazard.color}"/>`);
+    parts.push(
+      `<text x="${legendX + 22}" y="${legendY + 1}" fill="#f7ebd4" font-size="12" font-family="Georgia, serif">${esc(hazard.label)}</text>`,
+    );
+    legendY += 20;
+  }
+
+  legendY += 12;
+  parts.push(`<rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="#19110d" stroke="rgba(158,240,108,0.5)" stroke-width="1"/>`);
+  parts.push(`<text x="${legendX + 22}" y="${legendY + 1}" fill="#f7ebd4" font-size="12" font-family="Georgia, serif">Gas Pocket</text>`);
+  legendY += 20;
+  parts.push(`<rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="#19110d" stroke="rgba(255,184,109,0.5)" stroke-width="1"/>`);
+  parts.push(`<text x="${legendX + 22}" y="${legendY + 1}" fill="#f7ebd4" font-size="12" font-family="Georgia, serif">Steam Pocket</text>`);
+  legendY += 20;
+  parts.push(`<rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="#8a6d5d"/>`);
+  parts.push(`<text x="${legendX + 22}" y="${legendY + 1}" fill="#f7ebd4" font-size="12" font-family="Georgia, serif">Boulder</text>`);
+  legendY += 20;
 
   legendY += 12;
   for (let i = 1; i < TILE_PERK_TYPES.length; i += 1) {
