@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Dig Path Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <canvas id="game"></canvas>
+      <div class="touch-zones">
+        <div id="movePad" class="move-pad">
+          <div id="moveStick" class="move-stick"></div>
+        </div>
+      </div>
+      <div id="perkChoice" class="perk-choice" hidden>
+        <div class="perk-choice__panel">
+          <div class="perk-choice__title">Выбери апгрейд</div>
+          <div class="perk-choice__subtitle">Мощный апгрейд за каждые 30 скрапа</div>
+          <div class="perk-choice__options">
+            <button class="perk-option" data-perk-slot="0"></button>
+            <button class="perk-option" data-perk-slot="1"></button>
+            <button class="perk-option" data-perk-slot="2"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./src/game.js"></script>
+  </body>
+</html>
