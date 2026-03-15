@@ -449,6 +449,16 @@ function placeBoulderPocket(mask, hazardMask, gasPocketMask, steamPocketMask, ra
   if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) {
     return;
   }
+  for (let y = 1; y < GRID_H - 1; y += 1) {
+    if (mask[cellIndex(origin.x, y)]) {
+      return;
+    }
+  }
+  for (let x = 1; x < GRID_W - 1; x += 1) {
+    if (mask[cellIndex(x, origin.y)]) {
+      return;
+    }
+  }
 
   const index = cellIndex(origin.x, origin.y);
   mask[index] = 1;

@@ -145,8 +145,8 @@ Current behavior:
 - on pickup, radar immediately compares the previous player tile and the current tile
 - after that, each next movement compares the previous tile and the new tile
 - it always returns one of two states:
-  - `Горячее`
-  - `Холоднее`
+  - `Горячо`
+  - `Холодно`
 
 There is no `Ровно`.
 

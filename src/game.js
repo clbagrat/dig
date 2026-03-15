@@ -33,9 +33,9 @@ const GAS_SPREAD_STEPS = 3;
 const GAS_DAMAGE = 1;
 const BOULDER_DELAY = 1;
 const BOULDER_MOVE_INTERVAL = 0.12;
-const BOULDER_BREAK_LIMIT = 4;
+const BOULDER_BREAK_LIMIT = 20;
 const BOULDER_DAMAGE = 5;
-const BOULDER_MIN_START_DISTANCE = BOULDER_BREAK_LIMIT;
+const BOULDER_MIN_START_DISTANCE = 4;
 const STEAM_RELEASE_DELAY = 2;
 const STEAM_LIFETIME = 3;
 const STEAM_DAMAGE = 1;
@@ -46,6 +46,7 @@ const FUEL_DEPLETION_RECOVERY = 50;
 const IMPACT_EFFECT_DURATION = 0.22;
 const BREAK_EFFECT_DURATION = 0.42;
 const EXPLOSION_EFFECT_DURATION = 0.48;
+const LOOP_FIELD_EFFECT_DURATION = 0.52;
 const HAZARD_TYPES = {
   SPIKE: 1,
   VOLATILE: 2,
@@ -82,15 +83,18 @@ const SCRAP_PERK_TYPES = [
   { name: "Прыжковый привод", desc: "Каждые 10 блоков дает рывок, повторный выбор увеличивает дальность" },
   { name: "Длинный бур", desc: "Бьет следующий тайл вперед, повторно усиливает дальний удар" },
   { name: "Диагональные буры", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
+  { name: "Контурный разряд", desc: "+50% к урону от замыкания контура" },
   { name: "Форсаж на нуле", desc: "Чем меньше топлива, тем быстрее следующий удар" },
-  { name: "Саперный заряд", desc: "Каждые 15 разрушенных блоков кидает бомбу 2x2 на дистанцию 1" },
+  { name: "Саперный заряд", desc: "Сначала каждые 30 блоков, потом быстрее до предела 15" },
   { name: "Топливный контур", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
-  { name: "Гео-линза", desc: "+2 к радиусу обзора и +2 шага от радара" },
+  { name: "Линза обзора", desc: "+1 к радиусу обзора, до максимума 9" },
+  { name: "Радарный модуль", desc: "+2 шага от радара" },
   { name: "Ломосбор", desc: "+2 скрапа за каждый разрушенный блок" },
   { name: "Топлорециркулятор", desc: "+2 топлива за каждый разрушенный блок" },
-  { name: "Перегрузка", desc: "Переполнение топлива запускает дальнюю бомбу, бак -50, топлива +50" },
+  { name: "Перегрузка", desc: "Переполнение топлива запускает дальнюю бомбу, бак -150, топлива +50" },
   { name: "Усиленный корпус", desc: "+1 к максимуму HP и лечит на 2" },
-  { name: "Перелив адреналина", desc: "Overheal дает 5 секунд быстрого бурения без траты топлива" },
+  { name: "Перелив адреналина", desc: "Overheal дает 3 секунды бафа, потом растет до максимума 7" },
+  { name: "Контурный трофей", desc: "Большой контур может создать случайный перк внутри" },
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
@@ -151,6 +155,7 @@ const state = {
   boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
   boulders: [],
   health: new Float32Array(GRID_W * GRID_H),
+  loopScrapMask: new Uint8Array(GRID_W * GRID_H),
   visibleMask: new Uint8Array(GRID_W * GRID_H),
   signalMovesLeft: 0,
   signalMovesMax: 0,
@@ -180,9 +185,13 @@ const state = {
   movedTiles: 0,
   longDrillPower: 0,
   diagonalDrillPower: 0,
+  loopDamageBonus: 0,
+  loopPerkChance: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
+  remoteBombInterval: 0,
   overhealOverdrive: false,
+  overhealOverdriveDuration: 0,
   overhealDrillTimer: 0,
   playerMoveProgress: 0,
   perkToast: {
@@ -1050,6 +1059,16 @@ function placeBoulderPocket(random) {
   if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) {
     return;
   }
+  for (let y = 1; y < GRID_H - 1; y += 1) {
+    if (state.boulderPocketMask[cellIndex(origin.x, y)]) {
+      return;
+    }
+  }
+  for (let x = 1; x < GRID_W - 1; x += 1) {
+    if (state.boulderPocketMask[cellIndex(x, origin.y)]) {
+      return;
+    }
+  }
 
   const index = cellIndex(origin.x, origin.y);
   state.boulderPocketMask[index] = 1;
@@ -1269,6 +1288,7 @@ function setupField() {
   state.perkZoneMask.fill(-1);
   state.gasMask.fill(0);
   state.steamMask.fill(0);
+  state.loopScrapMask.fill(0);
   state.hazardTriggeredMask.fill(0);
   state.metalMask.fill(0);
   state.visibleMask.fill(0);
@@ -1327,7 +1347,9 @@ function setupField() {
   state.diagonalDrillPower = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
+  state.remoteBombInterval = 0;
   state.overhealOverdrive = false;
+  state.overhealOverdriveDuration = 0;
   state.overhealDrillTimer = 0;
   state.playerMoveProgress = 0;
   state.perkToast.text = "";
@@ -1638,10 +1660,17 @@ function collectPerkZone(zone) {
 
 function applyTilePerk(perkType, x, y, showToast = true) {
   switch (perkType) {
-    case 1:
-      addFuel(Math.max(0, 90 - state.perkFuelBonus), x, y);
+    case 1: {
+      const fuelDelta = 90 - state.perkFuelBonus;
+      if (fuelDelta >= 0) {
+        addFuel(fuelDelta, x, y);
+      } else {
+        state.fuel = Math.max(0, state.fuel + fuelDelta);
+        showFuelToast(fuelDelta);
+      }
       state.perkText = "Бак";
       break;
+    }
     case 2:
       state.signalMovesLeft += RADAR_BASE_CHARGES + state.radarBonus;
       state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
@@ -1694,45 +1723,58 @@ function applyScrapPerk(perkType) {
       state.perkText = "Диагональные буры";
       break;
     case 5:
+      state.loopDamageBonus += 0.5;
+      state.perkText = "Контурный разряд";
+      break;
+    case 6:
       state.lowFuelSpeedBonus += 0.35;
       state.perkText = "Форсаж на нуле";
       break;
-    case 6:
+    case 7:
       state.remoteBombLevel += 1;
+      state.remoteBombInterval = Math.max(15, state.remoteBombInterval > 0 ? state.remoteBombInterval - 5 : 30);
       state.perkText = "Саперный заряд";
       break;
-    case 7:
+    case 8:
       state.perkFuelBonus += 50;
       state.perkText = "Топливный контур";
       break;
-    case 8:
-      state.visionRadius = Math.min(9, state.visionRadius + 2);
-      state.radarBonus += 2;
-      state.perkText = "Гео-линза";
-      break;
     case 9:
+      state.visionRadius = Math.min(9, state.visionRadius + 1);
+      state.perkText = "Линза обзора";
+      break;
+    case 10:
+      state.radarBonus += 2;
+      state.perkText = "Радарный модуль";
+      break;
+    case 11:
       state.scrapBonus += 2;
       state.perkText = "Ломосбор";
       break;
-    case 10:
+    case 12:
       state.fuelOnBreak += 2;
       state.perkText = "Топлорециркулятор";
       break;
-    case 11:
+    case 13:
       state.overflowBomb = true;
       state.fuelPickupBonus += 50;
-      state.maxFuel = Math.max(100, state.maxFuel - 50);
+      state.maxFuel = Math.max(100, state.maxFuel - 150);
       state.fuel = Math.min(state.fuel, state.maxFuel);
       state.perkText = "Перегрузка";
       break;
-    case 12:
+    case 14:
       state.maxHp += 1;
       healPlayer(2, "Усиленный корпус");
       state.perkText = "Усиленный корпус";
       break;
-    case 13:
+    case 15:
       state.overhealOverdrive = true;
+      state.overhealOverdriveDuration = Math.min(7, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 1 : 3);
       state.perkText = "Перелив адреналина";
+      break;
+    case 16:
+      state.loopPerkChance = Math.min(0.5, state.loopPerkChance > 0 ? state.loopPerkChance + 0.25 : 0.25);
+      state.perkText = "Контурный трофей";
       break;
     default:
       break;
@@ -1990,7 +2032,22 @@ function checkScrapPerkUnlock() {
     return;
   }
 
-  const bag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+  const bag = [1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 14, 15];
+  if (state.remoteBombInterval === 0 || state.remoteBombInterval > 15) {
+    bag.push(7);
+  }
+  if (state.visionRadius < 9) {
+    bag.push(9);
+  }
+  if (!state.overflowBomb) {
+    bag.push(13);
+  }
+  if (state.overhealOverdriveDuration < 7) {
+    bag.push(15);
+  }
+  if (state.loopPerkChance < 0.5) {
+    bag.push(16);
+  }
   for (let i = bag.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = bag[i];
@@ -2006,7 +2063,7 @@ function checkScrapPerkUnlock() {
 }
 
 function activateOverhealDrillBoost() {
-  state.overhealDrillTimer = 5;
+  state.overhealDrillTimer = state.overhealOverdriveDuration || 3;
   showPerkToast("Перелив адреналина");
 }
 
@@ -2250,6 +2307,20 @@ function updateBoulders(dt) {
     }
 
     const nextIndex = cellIndex(nextX, nextY);
+    let hitsOtherBoulder = false;
+    for (let j = 0; j < state.boulders.length; j += 1) {
+      if (j === i) {
+        continue;
+      }
+      if (state.boulders[j].x === nextX && state.boulders[j].y === nextY) {
+        hitsOtherBoulder = true;
+        break;
+      }
+    }
+    if (hitsOtherBoulder || state.boulderPocketMask[nextIndex]) {
+      state.boulders.splice(i, 1);
+      continue;
+    }
     if (state.metalMask[nextIndex]) {
       state.boulders.splice(i, 1);
       continue;
@@ -2329,7 +2400,7 @@ function damageCell(x, y, damage, options = {}) {
 function breakCell(x, y, index, options = {}) {
   const hardness = state.hardness[index];
   const hazardType = state.hazardMask[index];
-  const scrapGain = BLOCK_TYPES[hardness].scrap + state.scrapBonus;
+  const scrapGain = BLOCK_TYPES[hardness].scrap + state.scrapBonus + state.loopScrapMask[index];
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   state.scrap += scrapGain;
   runFuelEvent(() => addFuel(state.fuelOnBreak, x, y));
@@ -2340,7 +2411,8 @@ function breakCell(x, y, index, options = {}) {
   showScrapToast(scrapGain);
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
-  if (state.remoteBombLevel > 0 && options.byDrill && state.drillBrokenBlocks % 15 === 0) {
+  state.loopScrapMask[index] = 0;
+  if (state.remoteBombInterval > 0 && options.byDrill && state.drillBrokenBlocks % state.remoteBombInterval === 0) {
     triggerRemoteBombSquare(x, y, 1);
   }
 
@@ -2770,14 +2842,14 @@ function consumeSignalMove(fromX, fromY, toX, toY) {
   const currentDistance = getDistanceToBase(toX, toY);
   const delta = currentDistance - previousDistance;
   state.signalMovesLeft -= 1;
-  let reading = "Холоднее";
+  let reading = "Холодно";
 
   if (delta < 0) {
-    state.signalText = "Горячее";
-    reading = "Горячее";
+    state.signalText = "Горячо";
+    reading = "Горячо";
   } else {
-    state.signalText = "Холоднее";
-    reading = "Холоднее";
+    state.signalText = "Холодно";
+    reading = "Холодно";
   }
 
   if (state.signalMovesLeft === 0) {
@@ -2800,9 +2872,153 @@ function extendPath(x, y) {
     return;
   }
 
+  const existingIndex = state.pathIndexByCell[cellIndex(x, y)];
+  if (existingIndex !== -1) {
+    triggerPathLoop(existingIndex, x, y);
+    state.pathTiles.length = 0;
+    state.pathTiles.push({ x, y });
+    rebuildPathIndex();
+    return;
+  }
+
   state.depth = Math.max(state.depth, Math.abs(y - START_Y));
   state.pathTiles.push({ x, y });
   rebuildPathIndex();
+}
+
+function triggerPathLoop(loopStartIndex, targetX, targetY) {
+  const loopPath = state.pathTiles.slice(loopStartIndex);
+  if (loopPath.length < 3) {
+    return;
+  }
+
+  const polygon = [];
+  for (let i = 0; i < loopPath.length; i += 1) {
+    polygon.push({
+      x: loopPath[i].x + 0.5,
+      y: loopPath[i].y + 0.5,
+    });
+  }
+  polygon.push({ x: targetX + 0.5, y: targetY + 0.5 });
+
+  let minX = GRID_W;
+  let maxX = 0;
+  let minY = GRID_H;
+  let maxY = 0;
+  for (let i = 0; i < loopPath.length; i += 1) {
+    minX = Math.min(minX, loopPath[i].x);
+    maxX = Math.max(maxX, loopPath[i].x);
+    minY = Math.min(minY, loopPath[i].y);
+    maxY = Math.max(maxY, loopPath[i].y);
+  }
+  minX = clamp(minX, 1, GRID_W - 2);
+  maxX = clamp(maxX, 1, GRID_W - 2);
+  minY = clamp(minY, 1, GRID_H - 2);
+  maxY = clamp(maxY, 1, GRID_H - 2);
+
+  if (maxX - minX < 1 || maxY - minY < 1) {
+    return;
+  }
+
+  const loopDamage = state.drillPower * 5 * (1 + state.loopDamageBonus);
+  const affectedCells = [];
+  const interiorCells = [];
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      if (!isPointInPolygon(x + 0.5, y + 0.5, polygon)) {
+        continue;
+      }
+      interiorCells.push({ x, y });
+      const index = cellIndex(x, y);
+      state.loopScrapMask[index] = 1;
+      if (state.tunnelMask[index]) {
+        continue;
+      }
+      affectedCells.push({ x, y });
+      damageCell(x, y, loopDamage, {
+        ignoreHazardEffect: true,
+        allowHazardChain: true,
+        cause: "explosion",
+      });
+    }
+  }
+
+  maybeSpawnLoopPerk(interiorCells);
+  spawnLoopFieldEffect(loopPath, affectedCells);
+}
+
+function maybeSpawnLoopPerk(interiorCells) {
+  if (state.loopPerkChance <= 0 || interiorCells.length < 9 || state.worldRandom() >= state.loopPerkChance) {
+    return;
+  }
+
+  const candidates = [];
+  for (let i = 0; i < interiorCells.length; i += 1) {
+    const cell = interiorCells[i];
+    const index = cellIndex(cell.x, cell.y);
+    if (
+      state.perkMask[index] > 0 ||
+      state.perkZoneMask[index] !== -1 ||
+      state.metalMask[index] ||
+      state.gasPocketMask[index] ||
+      state.steamPocketMask[index] ||
+      state.boulderPocketMask[index] ||
+      (cell.x === state.base.x && cell.y === state.base.y) ||
+      (cell.x === START_X && cell.y === START_Y)
+    ) {
+      continue;
+    }
+    candidates.push(cell);
+  }
+
+  if (!candidates.length) {
+    return;
+  }
+
+  const cell = candidates[Math.floor(state.worldRandom() * candidates.length)];
+  state.perkMask[cellIndex(cell.x, cell.y)] = chooseTilePerkForPosition(cell.x, cell.y, state.worldRandom);
+  showPerkToast("Контурный трофей");
+}
+
+function isPointInPolygon(px, py, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+    const intersects =
+      yi > py !== yj > py &&
+      px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-6) + xi;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function spawnLoopFieldEffect(loopPath, affectedCells) {
+  const sampleLimit = 84;
+  const sampledCells = [];
+  const sampleStep = Math.max(1, Math.floor(affectedCells.length / sampleLimit));
+  for (let i = 0; i < affectedCells.length; i += sampleStep) {
+    sampledCells.push(affectedCells[i]);
+    if (sampledCells.length >= sampleLimit) {
+      break;
+    }
+  }
+
+  const perimeter = loopPath.map((tile) => ({ x: tile.x, y: tile.y }));
+  perimeter.push({ x: loopPath[0].x, y: loopPath[0].y });
+
+  state.effects.push({
+    kind: "loopField",
+    time: LOOP_FIELD_EFFECT_DURATION,
+    duration: LOOP_FIELD_EFFECT_DURATION,
+    perimeter,
+    cells: sampledCells,
+    seed: (state.lastTs || 0) + affectedCells.length * 17,
+  });
 }
 
 function isVisibleCell(x, y) {
@@ -2917,6 +3133,43 @@ function renderEffects(camera) {
         ctx.beginPath();
         ctx.arc(cx + Math.cos(angle) * puffReach, cy + Math.sin(angle) * puffReach, 5 + progress * 9 + puff, 0, Math.PI * 2);
         ctx.fill();
+      }
+    } else if (effect.kind === "loopField") {
+      const alpha = 1 - progress;
+      ctx.globalAlpha = alpha;
+      for (let cellIndex = 0; cellIndex < effect.cells.length; cellIndex += 1) {
+        const cell = effect.cells[cellIndex];
+        const sx = cell.x * TILE_SIZE - camera.x;
+        const sy = cell.y * TILE_SIZE - camera.y;
+        const pulse = 0.35 + (Math.sin(progress * 16 - cellIndex * 0.6) * 0.5 + 0.5) * 0.45;
+        ctx.fillStyle = `rgba(110, 228, 255, ${0.1 + pulse * 0.22})`;
+        ctx.fillRect(sx + 3, sy + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+        ctx.strokeStyle = `rgba(255, 230, 164, ${0.18 + pulse * 0.28})`;
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(sx + 5, sy + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+      }
+
+      if (effect.perimeter.length > 1) {
+        ctx.strokeStyle = `rgba(255, 219, 142, ${0.32 + alpha * 0.42})`;
+        ctx.lineWidth = 8;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        for (let pointIndex = 0; pointIndex < effect.perimeter.length; pointIndex += 1) {
+          const point = effect.perimeter[pointIndex];
+          const px = point.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+          const py = point.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+          if (pointIndex === 0) {
+            ctx.moveTo(px, py);
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(112, 232, 255, ${0.28 + alpha * 0.4})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
       }
     }
   }
@@ -3368,7 +3621,7 @@ function renderOverdriveStatus(camera) {
   const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
   const y = state.drill.y * TILE_SIZE - camera.y + 20;
   const width = 64;
-  const ratio = clamp(state.overhealDrillTimer / 5, 0, 1);
+  const ratio = clamp(state.overhealDrillTimer / Math.max(1, state.overhealOverdriveDuration || 3), 0, 1);
 
   ctx.save();
   ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
@@ -3416,7 +3669,7 @@ function renderPerkToast(camera) {
 }
 
 function renderFuelToast(camera) {
-  if (state.fuelToast.time <= 0 || state.fuelToast.value <= 0) {
+  if (state.fuelToast.time <= 0 || state.fuelToast.value === 0) {
     return;
   }
 
@@ -3425,7 +3678,7 @@ function renderFuelToast(camera) {
   const lift = (0.9 - state.fuelToast.time) * 22;
   const y = state.drill.y * TILE_SIZE - camera.y - 78 - lift;
   const alpha = clamp(state.fuelToast.time / 0.9, 0, 1);
-  const text = `+${state.fuelToast.value} fuel`;
+  const text = `${state.fuelToast.value > 0 ? "+" : ""}${state.fuelToast.value} fuel`;
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -3434,12 +3687,12 @@ function renderFuelToast(camera) {
   ctx.textBaseline = "middle";
   const width = Math.max(80, ctx.measureText(text).width + 18);
   ctx.fillStyle = "rgba(41, 26, 12, 0.88)";
-  ctx.strokeStyle = "rgba(255, 191, 98, 0.38)";
+  ctx.strokeStyle = state.fuelToast.value > 0 ? "rgba(255, 191, 98, 0.38)" : "rgba(255, 128, 128, 0.4)";
   ctx.lineWidth = 1.5;
   drawRoundedRectPath(x - width * 0.5, y - 12, width, 24, 11);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#ffbf62";
+  ctx.fillStyle = state.fuelToast.value > 0 ? "#ffbf62" : "#ff8f8f";
   ctx.fillText(text, x, y + 1);
   ctx.restore();
 }
