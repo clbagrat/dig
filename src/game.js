@@ -42,6 +42,9 @@ const STEAM_RANGE = 6;
 const EXPLOSION_BREAK_DAMAGE = 9999;
 const FUEL_DEPLETION_HP_COST = 1;
 const FUEL_DEPLETION_RECOVERY = 50;
+const IMPACT_EFFECT_DURATION = 0.22;
+const BREAK_EFFECT_DURATION = 0.42;
+const EXPLOSION_EFFECT_DURATION = 0.48;
 const HAZARD_TYPES = {
   SPIKE: 1,
   VOLATILE: 2,
@@ -186,6 +189,8 @@ const state = {
     time: 0,
   },
   damageFlash: 0,
+  sprites: null,
+  effects: [],
   base: {
     x: 0,
     y: 0,
@@ -216,6 +221,267 @@ function cellIndex(x, y) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function makeSpriteCanvas(size = TILE_SIZE) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  return canvas;
+}
+
+function fillRoundRect(ctx, x, y, width, height, radius) {
+  buildRoundedRectPath(ctx, x, y, width, height, radius);
+  ctx.fill();
+}
+
+function buildRoundedRectPath(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width * 0.5, height * 0.5);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+function shiftHexColor(color, amount) {
+  const hex = color.replace("#", "");
+  const r = clamp(parseInt(hex.slice(0, 2), 16) + amount, 0, 255);
+  const g = clamp(parseInt(hex.slice(2, 4), 16) + amount, 0, 255);
+  const b = clamp(parseInt(hex.slice(4, 6), 16) + amount, 0, 255);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function lightenColor(color, amount) {
+  return shiftHexColor(color, amount);
+}
+
+function darkenColor(color, amount) {
+  return shiftHexColor(color, -amount);
+}
+
+function createBlockSprite(type, tier) {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  const gradient = ctx.createLinearGradient(0, 0, TILE_SIZE, TILE_SIZE);
+  gradient.addColorStop(0, lightenColor(type.color, 18));
+  gradient.addColorStop(0.52, type.color);
+  gradient.addColorStop(1, darkenColor(type.color, 24));
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+  ctx.fillStyle = "rgba(255, 236, 204, 0.08)";
+  fillRoundRect(ctx, 2, 2, TILE_SIZE - 4, 7, 4);
+  ctx.fillStyle = "rgba(18, 10, 7, 0.22)";
+  fillRoundRect(ctx, 3, TILE_SIZE - 10, TILE_SIZE - 6, 7, 4);
+
+  ctx.strokeStyle = `${type.vein}aa`;
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i += 1) {
+    const y = 7 + i * 9 + ((tier * 3 + i * 5) % 4);
+    ctx.beginPath();
+    ctx.moveTo(4, y);
+    ctx.lineTo(TILE_SIZE * 0.3, y + 3 + (i % 2) * 2);
+    ctx.lineTo(TILE_SIZE * 0.54, y - 1 + (tier % 3));
+    ctx.lineTo(TILE_SIZE - 5, y + 4);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = `${type.vein}55`;
+  for (let i = 0; i < 11; i += 1) {
+    const x = 4 + ((i * 11 + tier * 7) % (TILE_SIZE - 8));
+    const y = 4 + ((i * 7 + tier * 13) % (TILE_SIZE - 8));
+    ctx.fillRect(x, y, 2 + (i % 2), 2 + ((i + tier) % 2));
+  }
+
+  ctx.strokeStyle = "rgba(255, 232, 198, 0.08)";
+  ctx.strokeRect(0.5, 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+  return canvas;
+}
+
+function createTunnelSprite() {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  const gradient = ctx.createLinearGradient(0, 0, 0, TILE_SIZE);
+  gradient.addColorStop(0, "#24160f");
+  gradient.addColorStop(1, "#120b08");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+  ctx.fillStyle = "rgba(204, 145, 83, 0.12)";
+  ctx.fillRect(5, 5, TILE_SIZE - 10, 4);
+  ctx.fillRect(5, TILE_SIZE - 9, TILE_SIZE - 10, 4);
+
+  ctx.strokeStyle = "rgba(255, 230, 194, 0.15)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(3.5, 3.5, TILE_SIZE - 7, TILE_SIZE - 7);
+
+  ctx.fillStyle = "rgba(255, 226, 184, 0.16)";
+  for (const [x, y] of [
+    [8, 8],
+    [TILE_SIZE - 8, 8],
+    [8, TILE_SIZE - 8],
+    [TILE_SIZE - 8, TILE_SIZE - 8],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return canvas;
+}
+
+function createPocketSprite(kind) {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(createTunnelSprite(), 0, 0);
+
+  if (kind === "gas") {
+    ctx.fillStyle = "rgba(158, 240, 108, 0.22)";
+    for (const [x, y, r] of [
+      [TILE_SIZE * 0.38, TILE_SIZE * 0.44, 7],
+      [TILE_SIZE * 0.6, TILE_SIZE * 0.54, 8],
+      [TILE_SIZE * 0.46, TILE_SIZE * 0.7, 6],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (kind === "steam") {
+    ctx.fillStyle = "rgba(255, 207, 122, 0.22)";
+    for (const [x, y, r] of [
+      [TILE_SIZE * 0.36, TILE_SIZE * 0.48, 6],
+      [TILE_SIZE * 0.58, TILE_SIZE * 0.38, 7],
+      [TILE_SIZE * 0.5, TILE_SIZE * 0.68, 5],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (kind === "boulder") {
+    const gradient = ctx.createRadialGradient(TILE_SIZE * 0.42, TILE_SIZE * 0.38, 2, TILE_SIZE * 0.5, TILE_SIZE * 0.54, 10);
+    gradient.addColorStop(0, "#b8a390");
+    gradient.addColorStop(1, "#7f6a58");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(TILE_SIZE * 0.5, TILE_SIZE * 0.54, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(237, 214, 184, 0.55)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(TILE_SIZE * 0.44, TILE_SIZE * 0.48, 5, 0, Math.PI * 2);
+    ctx.arc(TILE_SIZE * 0.58, TILE_SIZE * 0.46, 4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  return canvas;
+}
+
+function createHazardSprite(hazardType) {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  const hazard = HAZARD_DATA[hazardType];
+  ctx.strokeStyle = hazard.color;
+  ctx.lineWidth = 2.4;
+  if (hazardType === HAZARD_TYPES.SPIKE) {
+    ctx.beginPath();
+    ctx.moveTo(TILE_SIZE * 0.25, TILE_SIZE * 0.78);
+    ctx.lineTo(TILE_SIZE * 0.42, TILE_SIZE * 0.28);
+    ctx.lineTo(TILE_SIZE * 0.52, TILE_SIZE * 0.62);
+    ctx.lineTo(TILE_SIZE * 0.7, TILE_SIZE * 0.2);
+    ctx.stroke();
+  } else if (hazardType === HAZARD_TYPES.VOLATILE) {
+    ctx.beginPath();
+    ctx.arc(TILE_SIZE * 0.5, TILE_SIZE * 0.5, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(TILE_SIZE * 0.5, TILE_SIZE * 0.24);
+    ctx.lineTo(TILE_SIZE * 0.57, TILE_SIZE * 0.45);
+    ctx.lineTo(TILE_SIZE * 0.47, TILE_SIZE * 0.45);
+    ctx.lineTo(TILE_SIZE * 0.56, TILE_SIZE * 0.76);
+    ctx.stroke();
+  }
+  return canvas;
+}
+
+function createCrackSprite(stage) {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  ctx.strokeStyle = `rgba(255, 242, 215, ${0.2 + stage * 0.12})`;
+  ctx.lineWidth = 1.2 + stage * 0.35;
+  const lines = [
+    [6, 7, 18, 14, 29, 11],
+    [10, 28, 18, 20, 28, 18],
+    [15, 6, 17, 17, 14, 31],
+  ];
+  for (let i = 0; i < Math.min(stage, lines.length); i += 1) {
+    const line = lines[i];
+    ctx.beginPath();
+    ctx.moveTo(line[0], line[1]);
+    ctx.lineTo(line[2], line[3]);
+    ctx.lineTo(line[4], line[5]);
+    ctx.stroke();
+  }
+  return canvas;
+}
+
+function createSpriteAtlas() {
+  const blocks = [null];
+  for (let i = 1; i < BLOCK_TYPES.length; i += 1) {
+    blocks[i] = createBlockSprite(BLOCK_TYPES[i], i);
+  }
+
+  return {
+    blocks,
+    tunnel: createTunnelSprite(),
+    gasPocket: createPocketSprite("gas"),
+    steamPocket: createPocketSprite("steam"),
+    boulderPocket: createPocketSprite("boulder"),
+    hazards: {
+      [HAZARD_TYPES.SPIKE]: createHazardSprite(HAZARD_TYPES.SPIKE),
+      [HAZARD_TYPES.VOLATILE]: createHazardSprite(HAZARD_TYPES.VOLATILE),
+    },
+    cracks: [null, createCrackSprite(1), createCrackSprite(2), createCrackSprite(3)],
+  };
+}
+
+function spawnImpactEffect(x, y, dirX, dirY, hardness) {
+  state.effects.push({
+    kind: "impact",
+    x,
+    y,
+    dirX,
+    dirY,
+    hardness,
+    time: IMPACT_EFFECT_DURATION,
+    duration: IMPACT_EFFECT_DURATION,
+  });
+}
+
+function spawnBreakEffect(x, y, hardness, cause = "break") {
+  state.effects.push({
+    kind: "break",
+    x,
+    y,
+    hardness,
+    cause,
+    time: BREAK_EFFECT_DURATION,
+    duration: BREAK_EFFECT_DURATION,
+    seed: (x * 92821 + y * 68917 + hardness * 131) % 1000,
+  });
+}
+
+function spawnExplosionEffect(x, y, radius) {
+  state.effects.push({
+    kind: "explosion",
+    x,
+    y,
+    radius,
+    time: EXPLOSION_EFFECT_DURATION,
+    duration: EXPLOSION_EFFECT_DURATION,
+    seed: (x * 7219 + y * 3571 + Math.round(radius * 10)) % 1000,
+  });
 }
 
 function mulberry32(seed) {
@@ -889,6 +1155,7 @@ function setupField() {
   state.scrapToast.value = 0;
   state.scrapToast.time = 0;
   state.damageFlash = 0;
+  state.effects.length = 0;
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
@@ -1235,6 +1502,7 @@ function rebuildPathIndex() {
 
 function init() {
   state.ctx = state.canvas.getContext("2d");
+  state.sprites = createSpriteAtlas();
   resize();
   setupField();
   bindUi();
@@ -1347,6 +1615,7 @@ function update(dt) {
   updateGas(dt);
   updateSteam(dt);
   updateBoulders(dt);
+  updateEffects(dt);
   updateDiscovery();
   updateCameraShake(dt);
   state.perkToast.time = Math.max(0, state.perkToast.time - dt);
@@ -1364,6 +1633,16 @@ function update(dt) {
     }
   }
   checkScrapPerkUnlock();
+}
+
+function updateEffects(dt) {
+  for (let i = state.effects.length - 1; i >= 0; i -= 1) {
+    const effect = state.effects[i];
+    effect.time -= dt;
+    if (effect.time <= 0) {
+      state.effects.splice(i, 1);
+    }
+  }
 }
 
 function checkScrapPerkUnlock() {
@@ -1658,6 +1937,10 @@ function damageCell(x, y, damage, options = {}) {
     triggerHazardEffect(hazardType, x, y, { suppressPlayerDamage: !!options.allowHazardChain });
   }
 
+  if (options.byDrill) {
+    spawnImpactEffect(x, y, options.dirX || state.drill.facingX || 0, options.dirY || state.drill.facingY || 1, state.hardness[index]);
+  }
+
   state.health[index] -= damage;
   if (state.health[index] > 0) {
     return false;
@@ -1671,6 +1954,7 @@ function breakCell(x, y, index, options = {}) {
   const hardness = state.hardness[index];
   const hazardType = state.hazardMask[index];
   const scrapGain = BLOCK_TYPES[hardness].scrap + state.scrapBonus;
+  spawnBreakEffect(x, y, hardness, options.cause || "break");
   state.scrap += scrapGain;
   runFuelEvent(() => addFuel(state.fuelOnBreak, x, y));
   state.blocksBroken += 1;
@@ -1716,6 +2000,7 @@ function breakCell(x, y, index, options = {}) {
 }
 
 function explodeAt(x, y, damage, radius = 2) {
+  spawnExplosionEffect(x, y, radius);
   const breakDamage = Math.max(damage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(radius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
@@ -1726,7 +2011,11 @@ function explodeAt(x, y, damage, radius = 2) {
       if (Math.hypot(ox, oy) > radius) {
         continue;
       }
-      damageCell(x + ox, y + oy, breakDamage, { ignoreHazardEffect: true, allowHazardChain: true });
+      damageCell(x + ox, y + oy, breakDamage, {
+        ignoreHazardEffect: true,
+        allowHazardChain: true,
+        cause: "explosion",
+      });
     }
   }
 }
@@ -2038,7 +2327,14 @@ function updateDrill(dt) {
     state.fuel -= state.strikeFuelCost;
     const strikeDamage = getStrikeDamage();
     const hardness = state.hardness[targetIndex];
-    damageCell(targetX, targetY, strikeDamage, { moveDrill: true, fromX: state.drill.x, fromY: state.drill.y, byDrill: true });
+    damageCell(targetX, targetY, strikeDamage, {
+      moveDrill: true,
+      fromX: state.drill.x,
+      fromY: state.drill.y,
+      byDrill: true,
+      dirX: dx,
+      dirY: dy,
+    });
     state.drill.progress += strikeDamage;
     state.cameraShake.amplitude = Math.max(
       state.cameraShake.amplitude,
@@ -2047,19 +2343,19 @@ function updateDrill(dt) {
 
     if (state.sideDrills > 0) {
       const sideDamage = strikeDamage * (0.5 + state.sideDrills * 0.25);
-      damageCell(state.drill.x - dy, state.drill.y + dx, sideDamage, { byDrill: true });
-      damageCell(state.drill.x + dy, state.drill.y - dx, sideDamage, { byDrill: true });
+      damageCell(state.drill.x - dy, state.drill.y + dx, sideDamage, { byDrill: true, dirX: -dy, dirY: dx });
+      damageCell(state.drill.x + dy, state.drill.y - dx, sideDamage, { byDrill: true, dirX: dy, dirY: -dx });
     }
 
     if (state.longDrillPower > 0) {
       const longDamage = strikeDamage * (0.1 + state.longDrillPower);
-      damageCell(targetX + dx, targetY + dy, longDamage, { byDrill: true });
+      damageCell(targetX + dx, targetY + dy, longDamage, { byDrill: true, dirX: dx, dirY: dy });
     }
 
     if (state.diagonalDrillPower > 0) {
       const diagonalDamage = strikeDamage * (0.15 + state.diagonalDrillPower);
-      damageCell(targetX - dy, targetY + dx, diagonalDamage, { byDrill: true });
-      damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true });
+      damageCell(targetX - dy, targetY + dx, diagonalDamage, { byDrill: true, dirX: -dy, dirY: dx });
+      damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dy, dirY: -dx });
     }
   } else if (strikeWave < 0.35) {
     state.drill.strikeLatch = false;
@@ -2137,6 +2433,102 @@ function getCamera() {
   };
 }
 
+function drawTileSprite(sprite, sx, sy) {
+  if (!sprite) {
+    return;
+  }
+  state.ctx.drawImage(sprite, sx, sy, TILE_SIZE, TILE_SIZE);
+}
+
+function renderEffects(camera) {
+  const ctx = state.ctx;
+  ctx.save();
+  for (let i = 0; i < state.effects.length; i += 1) {
+    const effect = state.effects[i];
+    const progress = 1 - effect.time / effect.duration;
+    const cx = effect.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+    const cy = effect.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+
+    if (effect.kind === "impact") {
+      const alpha = 1 - progress;
+      const reach = 6 + progress * 10 + effect.hardness * 0.3;
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = "#ffe2a6";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + effect.dirX * reach, cy + effect.dirY * reach);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255, 248, 220, 0.8)";
+      ctx.beginPath();
+      ctx.moveTo(cx + effect.dirX * reach, cy + effect.dirY * reach);
+      ctx.lineTo(cx + effect.dirX * (reach + 6) - effect.dirY * 4, cy + effect.dirY * (reach + 6) + effect.dirX * 4);
+      ctx.moveTo(cx + effect.dirX * reach, cy + effect.dirY * reach);
+      ctx.lineTo(cx + effect.dirX * (reach + 5) + effect.dirY * 4, cy + effect.dirY * (reach + 5) - effect.dirX * 4);
+      ctx.stroke();
+    } else if (effect.kind === "break") {
+      const alpha = 1 - progress;
+      const shardColor = BLOCK_TYPES[effect.hardness]?.vein || "#d6d9df";
+      for (let shard = 0; shard < 7; shard += 1) {
+        const angle = ((effect.seed + shard * 53) % 628) / 100;
+        const speed = 5 + ((effect.seed + shard * 29) % 7) + effect.hardness * 0.25;
+        const dx = Math.cos(angle) * speed * progress * 1.8;
+        const dy = Math.sin(angle) * speed * progress * 1.8 + progress * 10;
+        const size = 2 + ((effect.seed + shard * 17) % 3);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = shardColor;
+        ctx.fillRect(cx + dx - size * 0.5, cy + dy - size * 0.5, size, size);
+      }
+      ctx.globalAlpha = 0.45 * (1 - progress);
+      ctx.fillStyle = effect.cause === "explosion" ? "#ffb36a" : "#f3d7a4";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6 + progress * 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.18 * (1 - progress);
+      ctx.fillStyle = "#fff3dc";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 10 + progress * 16, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (effect.kind === "explosion") {
+      const alpha = 1 - progress;
+      const radius = TILE_SIZE * 0.35 + effect.radius * 8 * progress;
+      const gradient = ctx.createRadialGradient(cx, cy, 2, cx, cy, radius);
+      gradient.addColorStop(0, `rgba(255,245,210,${0.9 * alpha})`);
+      gradient.addColorStop(0.4, `rgba(255,180,92,${0.55 * alpha})`);
+      gradient.addColorStop(1, "rgba(255,120,32,0)");
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = "#ffd59b";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * 0.82, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let spark = 0; spark < 8; spark += 1) {
+        const angle = ((effect.seed + spark * 67) % 628) / 100;
+        const reach = radius * (0.6 + spark * 0.04);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * (reach * 0.25), cy + Math.sin(angle) * (reach * 0.25));
+        ctx.lineTo(cx + Math.cos(angle) * reach, cy + Math.sin(angle) * reach);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.fillStyle = "#3b2318";
+      for (let puff = 0; puff < 4; puff += 1) {
+        const angle = ((effect.seed + puff * 91) % 628) / 100;
+        const puffReach = radius * (0.28 + puff * 0.12);
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(angle) * puffReach, cy + Math.sin(angle) * puffReach, 5 + progress * 9 + puff, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
 function render() {
   const ctx = state.ctx;
   const camera = getCamera();
@@ -2174,92 +2566,55 @@ function render() {
         continue;
       }
 
-      if (state.tunnelMask[index] || state.gasPocketMask[index] || state.steamPocketMask[index] || state.boulderPocketMask[index]) {
-        ctx.fillStyle = y <= 3 ? "#38261a" : "#19110d";
+      if (state.tunnelMask[index]) {
+        drawTileSprite(state.sprites.tunnel, sx, sy);
+      } else if (state.gasPocketMask[index]) {
+        drawTileSprite(state.sprites.gasPocket, sx, sy);
+      } else if (state.steamPocketMask[index]) {
+        drawTileSprite(state.sprites.steamPocket, sx, sy);
+      } else if (state.boulderPocketMask[index]) {
+        drawTileSprite(state.sprites.boulderPocket, sx, sy);
       } else {
-        ctx.fillStyle = BLOCK_TYPES[state.hardness[index]].color;
+        drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
       }
 
-      ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
       ctx.strokeStyle = "rgba(255, 225, 179, 0.05)";
       ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
 
-      if (state.tunnelMask[index] || state.gasPocketMask[index] || state.steamPocketMask[index] || state.boulderPocketMask[index]) {
-        ctx.fillStyle = "rgba(230, 176, 99, 0.08)";
-        ctx.fillRect(sx + 5, sy + 5, TILE_SIZE - 10, 4);
-        ctx.fillRect(sx + 5, sy + TILE_SIZE - 9, TILE_SIZE - 10, 4);
-        ctx.fillStyle = "rgba(255, 226, 184, 0.16)";
+      if (state.gasMask[index] && !state.gasPocketMask[index]) {
+        const alpha = 0.18 + (Math.sin((state.lastTs || 0) * 0.008 + x + y) * 0.5 + 0.5) * 0.12;
+        ctx.fillStyle = `rgba(158, 240, 108, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(sx + 8, sy + 8, 2, 0, Math.PI * 2);
-        ctx.arc(sx + TILE_SIZE - 8, sy + 8, 2, 0, Math.PI * 2);
-        ctx.arc(sx + 8, sy + TILE_SIZE - 8, 2, 0, Math.PI * 2);
-        ctx.arc(sx + TILE_SIZE - 8, sy + TILE_SIZE - 8, 2, 0, Math.PI * 2);
+        ctx.arc(sx + TILE_SIZE * 0.38, sy + TILE_SIZE * 0.44, 7, 0, Math.PI * 2);
+        ctx.arc(sx + TILE_SIZE * 0.6, sy + TILE_SIZE * 0.54, 8, 0, Math.PI * 2);
+        ctx.arc(sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.7, 6, 0, Math.PI * 2);
         ctx.fill();
-        if (state.gasMask[index] || state.gasPocketMask[index]) {
-          ctx.fillStyle = "rgba(158, 240, 108, 0.22)";
-          ctx.beginPath();
-          ctx.arc(sx + TILE_SIZE * 0.38, sy + TILE_SIZE * 0.44, 7, 0, Math.PI * 2);
-          ctx.arc(sx + TILE_SIZE * 0.6, sy + TILE_SIZE * 0.54, 8, 0, Math.PI * 2);
-          ctx.arc(sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.7, 6, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        if (state.steamMask[index] || state.steamPocketMask[index]) {
-          ctx.fillStyle = "rgba(255, 207, 122, 0.2)";
-          ctx.beginPath();
-          ctx.arc(sx + TILE_SIZE * 0.36, sy + TILE_SIZE * 0.48, 6, 0, Math.PI * 2);
-          ctx.arc(sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.38, 7, 0, Math.PI * 2);
-          ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.68, 5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        if (state.boulderPocketMask[index]) {
-          ctx.fillStyle = "rgba(183, 161, 136, 0.32)";
-          ctx.beginPath();
-          ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.54, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "rgba(217, 196, 170, 0.8)";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(sx + TILE_SIZE * 0.44, sy + TILE_SIZE * 0.48, 5, 0, Math.PI * 2);
-          ctx.arc(sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.46, 4, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-      } else {
-        const type = BLOCK_TYPES[state.hardness[index]];
-        ctx.strokeStyle = `${type.vein}66`;
+      }
+      if (state.steamMask[index] && !state.steamPocketMask[index]) {
+        const alpha = 0.16 + (Math.sin((state.lastTs || 0) * 0.01 + x * 0.7 + y) * 0.5 + 0.5) * 0.12;
+        ctx.fillStyle = `rgba(255, 207, 122, ${alpha})`;
         ctx.beginPath();
-        ctx.moveTo(sx + 7, sy + TILE_SIZE * 0.3);
-        ctx.lineTo(sx + TILE_SIZE * 0.48, sy + TILE_SIZE * 0.58);
-        ctx.lineTo(sx + TILE_SIZE - 8, sy + TILE_SIZE * 0.22);
-        ctx.stroke();
+        ctx.arc(sx + TILE_SIZE * 0.36, sy + TILE_SIZE * 0.48, 6, 0, Math.PI * 2);
+        ctx.arc(sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.38, 7, 0, Math.PI * 2);
+        ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.68, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (!state.tunnelMask[index] && !state.gasPocketMask[index] && !state.steamPocketMask[index] && !state.boulderPocketMask[index]) {
         const hazardType = state.hazardMask[index];
         if (hazardType) {
-          const hazard = HAZARD_DATA[hazardType];
-          ctx.strokeStyle = hazard.color;
-          ctx.fillStyle = `${hazard.color}22`;
-          ctx.lineWidth = 2;
-          if (hazardType === HAZARD_TYPES.SPIKE) {
-            ctx.beginPath();
-            ctx.moveTo(sx + TILE_SIZE * 0.25, sy + TILE_SIZE * 0.78);
-            ctx.lineTo(sx + TILE_SIZE * 0.42, sy + TILE_SIZE * 0.28);
-            ctx.lineTo(sx + TILE_SIZE * 0.52, sy + TILE_SIZE * 0.62);
-            ctx.lineTo(sx + TILE_SIZE * 0.7, sy + TILE_SIZE * 0.2);
-            ctx.stroke();
-          } else if (hazardType === HAZARD_TYPES.VOLATILE) {
-            ctx.beginPath();
-            ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, 7, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.24);
-            ctx.lineTo(sx + TILE_SIZE * 0.57, sy + TILE_SIZE * 0.45);
-            ctx.lineTo(sx + TILE_SIZE * 0.47, sy + TILE_SIZE * 0.45);
-            ctx.lineTo(sx + TILE_SIZE * 0.56, sy + TILE_SIZE * 0.76);
-            ctx.stroke();
-          }
+          drawTileSprite(state.sprites.hazards[hazardType], sx, sy);
         }
       }
 
       if (!state.tunnelMask[index] && state.health[index] < BLOCK_TYPES[state.hardness[index]].hp) {
         const ratio = clamp(state.health[index] / BLOCK_TYPES[state.hardness[index]].hp, 0, 1);
+        const crackStage = clamp(Math.ceil((1 - ratio) * 3), 0, 3);
+        if (crackStage > 0) {
+          ctx.globalAlpha = 0.3 + (1 - ratio) * 0.5;
+          drawTileSprite(state.sprites.cracks[crackStage], sx, sy);
+          ctx.globalAlpha = 1;
+        }
         ctx.fillStyle = "rgba(255, 231, 195, 0.2)";
         ctx.fillRect(sx + 6, sy + TILE_SIZE - 9, (TILE_SIZE - 12) * ratio, 4);
       }
@@ -2270,6 +2625,7 @@ function render() {
   }
 
   renderPath(camera);
+  renderEffects(camera);
   renderBase(camera);
   renderBoulders(camera);
   renderDrill(camera);
@@ -2314,16 +2670,23 @@ function renderBoulders(camera) {
     const boulder = state.boulders[i];
     const x = boulder.x * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
     const y = boulder.y * TILE_SIZE - camera.y + TILE_SIZE * 0.54;
-    ctx.fillStyle = "#8b7662";
+    const gradient = ctx.createRadialGradient(x - 3, y - 4, 2, x, y, 12);
+    gradient.addColorStop(0, "#bcab97");
+    gradient.addColorStop(1, "#7d6857");
+    ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(x, y, 11, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#d9c4aa";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.arc(x - 4, y - 3, 5, 0, Math.PI * 2);
     ctx.arc(x + 4, y - 4, 4, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.fillStyle = "rgba(255, 240, 220, 0.16)";
+    ctx.beginPath();
+    ctx.arc(x - 2, y - 5, 3, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -2367,16 +2730,27 @@ function renderBase(camera) {
 
   const x = state.base.x * TILE_SIZE - camera.x;
   const y = state.base.y * TILE_SIZE - camera.y;
+  ctx.save();
+  ctx.fillStyle = "rgba(105, 210, 255, 0.14)";
+  ctx.beginPath();
+  ctx.arc(x + TILE_SIZE * 0.5, y + TILE_SIZE * 0.5, TILE_SIZE * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  const shell = ctx.createLinearGradient(x, y, x + TILE_SIZE, y + TILE_SIZE);
+  shell.addColorStop(0, "#f0c785");
+  shell.addColorStop(1, "#9b6233");
   ctx.fillStyle = "#2b1b14";
-  ctx.fillRect(x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10);
-  ctx.fillStyle = "#c79b58";
-  ctx.fillRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+  fillRoundRect(ctx, x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10, 7);
+  ctx.fillStyle = shell;
+  fillRoundRect(ctx, x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16, 6);
   ctx.fillStyle = "#6c4120";
-  ctx.fillRect(x + 15, y + 12, TILE_SIZE - 30, TILE_SIZE - 20);
+  fillRoundRect(ctx, x + 15, y + 12, TILE_SIZE - 30, TILE_SIZE - 20, 4);
   ctx.fillStyle = "rgba(255, 239, 194, 0.45)";
-  ctx.fillRect(x + 18, y + 16, TILE_SIZE - 36, 5);
+  fillRoundRect(ctx, x + 12, y + 12, TILE_SIZE - 24, 7, 4);
+  ctx.strokeStyle = "rgba(255, 238, 214, 0.45)";
+  ctx.strokeRect(x + 10.5, y + 10.5, TILE_SIZE - 21, TILE_SIZE - 21);
   renderCog(x + 14, y + TILE_SIZE - 13, 4, ctx);
   renderCog(x + TILE_SIZE - 14, y + TILE_SIZE - 13, 4, ctx);
+  ctx.restore();
 }
 
 function renderPerkTile(x, y, sx, sy) {
@@ -2389,9 +2763,13 @@ function renderPerkTile(x, y, sx, sy) {
 
   const perk = TILE_PERK_TYPES[perkType];
   ctx.save();
-  ctx.fillStyle = `${perk.color}55`;
+  ctx.fillStyle = `${perk.color}28`;
   ctx.beginPath();
-  ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, TILE_SIZE * 0.22, 0, Math.PI * 2);
+  ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, TILE_SIZE * 0.28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `${perk.color}18`;
+  ctx.beginPath();
+  ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, TILE_SIZE * 0.38, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = perk.color;
   ctx.lineWidth = 2;
@@ -2402,6 +2780,9 @@ function renderPerkTile(x, y, sx, sy) {
   ctx.lineTo(sx + 8, sy + TILE_SIZE * 0.5);
   ctx.closePath();
   ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 247, 232, 0.3)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(sx + 10.5, sy + 10.5, TILE_SIZE - 21, TILE_SIZE - 21);
   ctx.fillStyle = "#2b1b14";
   ctx.font = `700 9px ${HUD_FONT}`;
   ctx.textAlign = "center";
@@ -2476,31 +2857,46 @@ function renderDrill(camera) {
   const ctx = state.ctx;
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
   const thrust = strikeWave * state.drill.strikeEnergy;
+  const idleBob = Math.sin(state.drill.strikePhase * 0.5) * 0.7;
   const bodyOffsetX = -state.drill.facingX * thrust * 2.2;
-  const bodyOffsetY = -state.drill.facingY * thrust * 2.2;
+  const bodyOffsetY = -state.drill.facingY * thrust * 2.2 + idleBob;
   const hammerOffsetX = state.drill.facingX * thrust * 7;
   const hammerOffsetY = state.drill.facingY * thrust * 7;
   const px = state.drill.x * TILE_SIZE - camera.x + bodyOffsetX;
   const py = state.drill.y * TILE_SIZE - camera.y + bodyOffsetY;
-
-  ctx.fillStyle = "#5d3822";
-  ctx.fillRect(px + 6, py + 10, TILE_SIZE - 12, TILE_SIZE - 16);
-  ctx.fillStyle = "#d3a15a";
-  ctx.fillRect(px + 10, py + 12, TILE_SIZE - 20, TILE_SIZE - 20);
+  const bodyGrad = ctx.createLinearGradient(px, py, px + TILE_SIZE, py + TILE_SIZE);
+  bodyGrad.addColorStop(0, "#ebbe72");
+  bodyGrad.addColorStop(1, "#8d552a");
+  ctx.save();
+  ctx.fillStyle = "#4e2e1d";
+  fillRoundRect(ctx, px + 5, py + 9, TILE_SIZE - 10, TILE_SIZE - 14, 8);
+  ctx.fillStyle = bodyGrad;
+  fillRoundRect(ctx, px + 9, py + 11, TILE_SIZE - 18, TILE_SIZE - 18, 7);
   ctx.fillStyle = "#34231a";
-  ctx.fillRect(px + 14, py + 6, TILE_SIZE - 28, 10);
-  ctx.fillRect(px + TILE_SIZE - 18, py + 12, 6, 14);
-  ctx.fillStyle = "rgba(255, 240, 199, 0.25)";
-  ctx.fillRect(px + 12, py + 16, TILE_SIZE - 24, 4);
+  fillRoundRect(ctx, px + 12, py + 5, TILE_SIZE - 24, 11, 5);
+  ctx.fillStyle = "#6e4324";
+  fillRoundRect(ctx, px + TILE_SIZE - 18, py + 11, 7, 16, 3);
+  ctx.fillStyle = "rgba(255, 240, 199, 0.22)";
+  fillRoundRect(ctx, px + 12, py + 15, TILE_SIZE - 24, 4, 2);
+  ctx.strokeStyle = "rgba(255, 239, 194, 0.28)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 10.5, py + 12.5, TILE_SIZE - 21, TILE_SIZE - 21);
+  ctx.restore();
 
   const drillBaseX = px + TILE_SIZE * 0.5;
   const drillBaseY = py + TILE_SIZE * 0.5;
   const drillTipX = drillBaseX + state.drill.facingX * (12 + hammerOffsetX) + (state.drill.facingX === 0 ? hammerOffsetX * 0.25 : 0);
   const drillTipY = drillBaseY + state.drill.facingY * (12 + hammerOffsetY) + (state.drill.facingY === 0 ? hammerOffsetY * 0.25 : 0);
-  ctx.strokeStyle = "#f0d09b";
-  ctx.lineWidth = 5;
+  ctx.strokeStyle = "#ffe1a6";
+  ctx.lineWidth = 6;
   ctx.beginPath();
   ctx.moveTo(drillBaseX, drillBaseY);
+  ctx.lineTo(drillTipX, drillTipY);
+  ctx.stroke();
+  ctx.strokeStyle = "#7a8b92";
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(drillBaseX + state.drill.facingX * 4, drillBaseY + state.drill.facingY * 4);
   ctx.lineTo(drillTipX, drillTipY);
   ctx.stroke();
 
@@ -2517,6 +2913,9 @@ function renderDrill(camera) {
 
   renderCog(px + 14, py + TILE_SIZE - 12, 5, ctx);
   renderCog(px + TILE_SIZE - 14, py + TILE_SIZE - 12, 5, ctx);
+  ctx.fillStyle = "#553522";
+  fillRoundRect(ctx, px + 4, py + TILE_SIZE * 0.46, 8, 6, 2);
+  fillRoundRect(ctx, px + TILE_SIZE - 12, py + TILE_SIZE * 0.46, 8, 6, 2);
   renderSteamStack(px + TILE_SIZE - 14 - state.drill.facingX * thrust * 1.2, py + 7 - state.drill.facingY * thrust * 1.2, ctx);
 }
 
@@ -2538,20 +2937,17 @@ function renderSignalStatus(camera) {
   ctx.fillStyle = "rgba(23, 14, 9, 0.82)";
   ctx.strokeStyle = "rgba(196, 240, 255, 0.36)";
   ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(x - width * 0.5, y - 18, width, 30, 10);
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 18, width, 30, 10);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#c4f0ff";
   ctx.fillText(text, x, y - 1);
   ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
-  ctx.beginPath();
-  ctx.roundRect(x - width * 0.5 + 8, y + 2, width - 16, 4, 3);
+  buildRoundedRectPath(ctx, x - width * 0.5 + 8, y + 2, width - 16, 4, 3);
   ctx.fill();
   if (barRatio > 0) {
     ctx.fillStyle = "#8ef0cb";
-    ctx.beginPath();
-    ctx.roundRect(x - width * 0.5 + 8, y + 2, (width - 16) * barRatio, 4, 3);
+    buildRoundedRectPath(ctx, x - width * 0.5 + 8, y + 2, (width - 16) * barRatio, 4, 3);
     ctx.fill();
   }
   ctx.restore();
@@ -2707,7 +3103,7 @@ function renderHud() {
   ctx.font = `700 10px ${HUD_FONT}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(`SEED ${state.worldSeed}  •  Опасные блоки: шипы, кислота, взрыв`, left + 10, top + panelHeight + 20);
+  ctx.fillText(`SEED ${state.worldSeed}  •  Опасности: шипы, взрыв, газ, пар, валун`, left + 10, top + panelHeight + 20);
   ctx.restore();
 }
 
