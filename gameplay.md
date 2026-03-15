@@ -1,289 +1,353 @@
 # Gameplay
 
-## Core Loop
+## Premise
 
-The player controls a top-down driller on a tile-based map.
+Mobile top-down drilling game on a `canvas`.
 
-Main goal:
-- Find the hidden base.
-- The base counts as found only when the driller reaches its exact tile.
+The player starts in the center of a rock field and searches for a hidden moving base.
+The player sees only within a small radius around the driller.
 
-Main moment-to-moment loop:
-- Move through already opened tunnels.
-- Break rock tiles to create new tunnels.
-- Manage fuel.
-- Collect tile perks.
-- Earn scrap from broken blocks.
-- Choose stronger upgrades when enough scrap is collected.
+The run is about:
+- managing fuel,
+- choosing digging routes through mixed rock difficulty,
+- picking up tile perks,
+- buying stronger scrap upgrades,
+- tracking the base before it slips away.
 
-## Map And Visibility
+## Goal And Failure
 
-- The map is a grid.
-- The player starts near the center of the map.
-- The hidden base is placed randomly, but not too close to the start.
-- The player sees only in a limited radius around the driller.
-- The base can become visible inside the vision radius, but visibility alone does not win the run.
+Win condition:
+- the run is won only when the driller stands on the exact base tile.
 
-## Drilling And Movement
+Loss condition:
+- if fuel reaches `0`, the run ends.
 
-- Movement is discrete, on the same rhythm as drilling.
-- The driller attacks in cycles rather than continuous DPS.
-- Block HP decreases only at the hit moment.
-- Moving through a tunnel also happens on the same strike rhythm.
+## Map
 
-Block durability currently corresponds to hits:
-- Tier 1: 2 hits
-- Tier 2: 3 hits
-- Tier 3: 5 hits
-- Tier 4: 7 hits
+Current map size:
+- `150 x 220` tiles
 
-There is strike animation and camera shake during drilling.
+Start:
+- the driller starts at the center of the map
+- the start tile is opened immediately
+
+Base:
+- the base initially spawns at exact distance `50` tiles from the start
+- the base can become visible when inside vision radius
+- visibility alone does not count as success
+
+Base movement:
+- the base moves after enough player movement progress is accumulated
+- tunnel movement gives `1` progress
+- drilling into a new tile gives `2` progress
+- jump movement gives `2` progress
+- at `10` progress the base attempts to move by `1` tile
+- with `50%` probability it prefers a direction that increases distance from the player
+- otherwise it picks a random valid direction
+- when moving, it swaps places with the target tile contents
+- it does not move onto the player
+- it does not enter `3x3` perk zones
+- once found, it stops moving
+
+## Visibility
+
+Current base vision radius:
+- `5`
+
+The player only sees nearby cells around the driller.
+Everything outside the radius is hidden by fog of war.
+
+## Terrain Generation
+
+Rock is generated from a layered field rather than from independent random cells.
+
+Current model:
+- base danger increases with distance from the start
+- large soft/hard regions are added as blobs
+- extra variety is added with vein-like chains
+- final danger is quantized into `7` rock tiers
+
+Design intent:
+- farther from the center is usually harder
+- local routes still contain surprises
+- the field should look geological rather than like pure noise
+
+## Rock Tiers
+
+There are `7` rock tiers plus tunnel.
+
+Current durability / scrap:
+- Tier 1: `6 hp`, `2 scrap`
+- Tier 2: `9 hp`, `4 scrap`
+- Tier 3: `12 hp`, `6 scrap`
+- Tier 4: `15 hp`, `8 scrap`
+- Tier 5: `18 hp`, `11 scrap`
+- Tier 6: `21 hp`, `14 scrap`
+- Tier 7: `27 hp`, `18 scrap`
+
+The current drill power starts at `1`.
+Since damage is discrete, real hit counts depend on current drill power and upgrades.
+
+## Movement And Drilling
+
+Movement and drilling are both discrete and share the same strike rhythm.
+
+Rules:
+- the driller only deals damage on hit moments
+- the driller only steps on rhythm peaks
+- moving through tunnels uses the same cadence as drilling
+- drilling has strike animation and camera shake
+
+This creates a deliberate `chunk-chunk-chunk` feel instead of smooth sliding.
 
 ## Fuel
 
-Fuel is a hard resource.
+Current baseline:
+- starting fuel: `420`
+- max fuel: `420` by default
+- passive drain: `0.8 / sec`
+- tunnel move cost: `1.8`
+- drilling hit cost: `4.5`
 
-Current fuel rules:
-- Starting fuel: 300
-- Fuel max is dynamic, default 300
-- Passive drain: 1 fuel per second
-- Movement cost: 2 fuel per step
-- Drilling cost: 5 fuel per hit
+Fuel can be modified by perks and upgrades.
 
-Fuel can currently come from:
-- Tile perk `Bak`
-- Scrap perk `Recirculator`
-- Scrap perk `Overload`, which adds extra fuel to every fuel gain
-
-If fuel reaches zero:
-- The run ends in out-of-fuel state.
+Important note:
+- max fuel can become lower than the current default because of `Overload`
 
 ## Scrap
 
-Scrap is earned from breaking blocks.
+Scrap is earned from destroyed rock.
 
-Current base scrap rewards by block tier:
-- Tier 1: 2
-- Tier 2: 4
-- Tier 3: 7
-- Tier 4: 11
+Scrap is spent indirectly:
+- each threshold opens a choice of `3` random scrap upgrades
 
-Scrap is used to unlock a choice of 3 random scrap upgrades.
+Current timing:
+- the perk choice popup appears `500 ms` after the threshold is reached
 
-Scrap upgrade cost grows over time:
-- 1st: 30
-- 2nd: 55
-- 3rd: 80
-- 4th: 105
-- Then continues by +25 each time
+Current cost model:
+- base cost: `30`
+- geometric multiplier: `1.35`
+- current formula: `round(30 * 1.35^level)`
 
-The scrap choice menu appears with a 500 ms delay after the threshold is reached.
+So the sequence is roughly:
+- `30`
+- `41`
+- `55`
+- `74`
+- `100`
+- ...
 
-## Radar / Hotter-Colder
+## Radar
 
-Radar gives limited hotter-colder guidance.
+Radar is a tile perk.
 
-How it works:
-- When radar is gained, it grants signal charges.
-- It immediately evaluates the current position on pickup.
-- Then each next move consumes one signal charge.
-- The game says:
-  - `Hotter`
-  - `Colder`
-  - `Same`
+Current behavior:
+- on pickup, radar immediately compares the previous player tile and the current tile
+- after that, each next movement compares the previous tile and the new tile
+- it always returns one of two states:
+  - `Горячее`
+  - `Холоднее`
 
-When no charges remain:
-- Signal becomes empty.
+There is no `Ровно`.
+
+Charges:
+- base radar gives `5` charges
+- `Geo Lens` adds extra charges when radar is gained
+
+UI:
+- the radar message is shown above the driller
+- remaining charges are shown as a small progress bar under that text
+- charges are no longer shown as numbers in the text itself
 
 ## Tile Perks
 
-Tile perks are found directly in the world.
+Tile perks are pickups placed directly on the map.
 
 Current tile perk pool:
-- `Bak`
-  - Gives +90 fuel before global fuel bonuses.
-- `Radar`
-  - Grants radar charges.
-- `Bur`
-  - Increases drill power by +0.5.
-- `Bomba`
-  - Triggers an explosion around the pickup point.
-- `Skorost`
-  - Increases strike cycle speed by +15%.
+- `Бак`
+- `Радар`
+- `Бур`
+- `Бомба`
+- `Скорость`
 
-Current tile perk weights:
-- Bak: 7
-- Radar: 3
-- Bur: 2
-- Bomba: 4
-- Skorost: 3
+Current weighted spawn chances:
+- `Бак`: `7`
+- `Радар`: `3`
+- `Бур`: `2`
+- `Бомба`: `4`
+- `Скорость`: `3`
 
-Notes:
-- Tile perks are generated frequently.
-- Tile perks can coexist spatially with perk zones.
-- Picking up a perk shows its name as floating text near the driller.
+Current spatial rules:
+- tile perks are denser near the center of the map
+- near the center, `Бак` and `Радар` get extra weight
+- tile perks respect minimum local spacing
 
-## Bomb Tile Perk
+### Tile Perk Effects
 
-The bomb tile perk:
-- Deals damage based on drill power.
-- Uses damage equal to `drillPower * 10`.
-- Explodes in radius 2.
+`Бак`
+- gives fuel immediately
+- current raw amount before other fuel systems: `90`
 
-## Speed Tile Perk
+`Радар`
+- grants radar charges
+- immediately evaluates hotter/colder on pickup
 
-The speed tile perk affects cadence, not per-hit damage.
+`Бур`
+- `+0.5` drill power
 
-It:
-- Makes the next strike happen sooner.
-- Speeds up both drilling cadence and tunnel movement cadence because both use the same strike cycle.
+`Бомба`
+- explodes immediately on pickup
+- current damage: `drillPower * 10`
+- current radius: `2`
+
+`Скорость`
+- `+15%` strike speed
 
 ## Perk Zones
 
-There are also special hidden perk zones under rock.
+There are hidden `3x3` perk zones under rock.
 
-Zone rules:
-- Each zone is a 3x3 square.
-- A zone is assigned one tile perk type.
-- The floor of the zone shows that perk symbol after tiles are opened.
-- The zone reward triggers only when all 9 cells of the 3x3 area have been opened.
+Rules:
+- each zone is assigned one tile perk type
+- the symbol becomes visible on opened zone floor tiles
+- reward triggers only when all `9` cells are opened
 
 Reward:
-- The player gets 3 copies of that tile perk at once.
+- the player gets `3` copies of that tile perk
 
-Special bomb-zone behavior:
-- If the zone is a bomb zone, instead of normal bomb reward it triggers a larger explosion.
-- That larger explosion uses radius 3.
+Special bomb zone:
+- instead of three ordinary bomb pickups, it triggers one larger explosion
+- current large bomb radius: `3`
+
+Zones are generated from density rules and scale with map area.
 
 ## Scrap Upgrades
 
-Scrap upgrades are the stronger, long-term progression layer.
+Scrap upgrades are the stronger progression layer.
 
-Current scrap upgrade pool:
-- `Side Drills`
-- `Jump Drive`
-- `Long Drill`
-- `Diagonal Drills`
-- `Low Fuel Overdrive`
-- `Sapper Charge`
-- `Geo Lens`
-- `Recirculator`
-- `Overload`
+Current upgrade pool:
+- `Боковые буры`
+- `Прыжковый привод`
+- `Длинный бур`
+- `Диагональные буры`
+- `Форсаж на нуле`
+- `Саперный заряд`
+- `Топливный контур`
+- `Гео-линза`
+- `Рециркулятор`
+- `Перегрузка`
 
-When enough scrap is collected:
-- The player gets 3 random upgrades from this pool.
+### Upgrade Effects
 
-### 1. Side Drills
+`Боковые буры`
+- each strike also hits the cells left and right of the driller
 
-- Hits left and right of the driller.
-- They are relative to the driller position, not to the forward target tile.
+`Прыжковый привод`
+- every `10` destroyed blocks gives `1` jump charge
+- jump can move into rock
+- the driller swaps with the destination tile
+- repeated upgrade picks increase jump range
 
-### 2. Jump Drive
+`Длинный бур`
+- strikes the next forward tile as well
+- first pickup gives `20%` extra forward damage
+- each repeat adds `+10%`
 
-- Every 10 broken blocks grants 1 jump charge.
-- A charged jump can move the driller forward to a distant tile even if it is still rock.
-- The driller swaps with that tile.
-- Repeated upgrade picks increase jump distance.
+`Диагональные буры`
+- strike the two forward diagonal tiles
+- first pickup gives `20%` diagonal damage
+- each repeat adds `+5%`
 
-### 3. Long Drill
+`Форсаж на нуле`
+- lower fuel increases strike speed
+- repeated picks increase the low-fuel speed bonus
 
-- Hits the next tile further in the forward direction.
-- First pickup gives 20% extra forward damage.
-- Each repeated upgrade adds +10%.
+`Саперный заряд`
+- every `15` destroyed blocks launches a remote `2x2` bomb at distance `3`
+- repeated picks increase damage
 
-### 4. Diagonal Drills
+`Топливный контур`
+- any perk gives `+50` fuel
+- `Бак` becomes weaker instead of also getting that full bonus
 
-- Hits the two forward diagonal tiles.
-- First pickup gives 20% diagonal damage.
-- Each repeated upgrade adds +5%.
+`Гео-линза`
+- `+2` vision radius
+- `+2` extra radar charges whenever radar is gained
 
-### 5. Low Fuel Overdrive
+`Рециркулятор`
+- `+2` scrap per destroyed block
+- `+2` fuel per destroyed block
 
-- The less fuel the player has, the faster the strike cycle becomes.
-- This scales dynamically with current fuel ratio.
-- Repeated picks increase the size of the low-fuel speed bonus.
+`Перегрузка`
+- fuel gains get `+50` fuel
+- max fuel is reduced by `50`
+- if a fuel gain overflows max fuel, a remote overflow bomb is launched
 
-### 6. Sapper Charge
+## Overflow / Remote Bomb Rules
 
-- Every 15 broken blocks throws a remote bomb.
-- The bomb lands at distance 3 in a random direction.
-- It explodes as a 2x2 square.
-- Repeated picks increase the damage.
+There are multiple remote bomb style systems.
 
-### 7. Geo Lens
+`Перегрузка` overflow bomb:
+- triggered by fuel overflow
+- lands at distance `3`
+- affects a `2x2` square
 
-- +2 vision radius
-- +2 extra radar charges whenever radar is gained
+Safety rules:
+- overflow can trigger only once per fuel event
+- while the overflow bomb itself is resolving, fuel rewards from its own destruction chain cannot retrigger another overflow bomb
 
-### 8. Recirculator
+`Саперный заряд`:
+- separate remote bomb system
+- triggers every `15` destroyed blocks
 
-- +2 scrap from every broken block
-- +2 fuel from every broken block
+## Fuel Event Rules
 
-### 9. Overload
+Fuel gains can come from several stacked sources:
+- direct fuel perk
+- `Топливный контур`
+- `Рециркулятор`
+- future chained perk rewards
 
-This is now a scrap upgrade, not a tile perk.
+To prevent abuse and recursion:
+- one fuel event can cause at most one overflow trigger
+- zone rewards and perk rewards are grouped into single fuel events
 
-Effects:
-- Any fuel gain gets +50 extra fuel.
-- If a fuel gain would overflow max fuel, it triggers a remote bomb.
-- Max fuel is reduced by 50.
+## UI / Feedback
 
-Overload bomb behavior:
-- Triggered by fuel overflow.
-- Lands in a random direction at distance 3 from the fuel source.
-- Explodes as a 2x2 square.
+Current visible feedback:
+- fuel bar on top of the screen
+- scrap bar on top of the screen
+- seed displayed in HUD
+- radar text above the driller
+- radar charge bar under the radar text
+- floating text for picked perks
+- floating fuel gain text
+- floating scrap gain text
+- victory / out-of-fuel overlays
 
-## Remote / Overflow Bomb Logic
+## Debugging
 
-There are currently two remote bomb-style effects:
+There is a separate debug renderer for full-map inspection:
+- [render-map-debug.js](/Users/bagrat/dev/dig/scripts/render-map-debug.js)
 
-### Overload remote bomb
+Example command:
 
-- Trigger: fuel overflow
-- Range: distance 3
-- Shape: 2x2 square
+```bash
+node scripts/render-map-debug.js --seed 1 --output debug/map-seed-1.svg
+```
 
-### Sapper Charge remote bomb
+It renders:
+- full terrain
+- start
+- base
+- tile perks
+- perk zones
 
-- Trigger: every 15 broken blocks
-- Range: distance 3
-- Shape: 2x2 square
+## Current Design Intent
 
-## Floating Feedback
-
-The game already shows floating text near the driller for:
-- Picked perk names
-- Gained scrap
-- Gained fuel
-
-## UI
-
-Current UI is mostly canvas-rendered:
-- Fuel bar on top
-- Scrap progress bar on top
-- Radar result appears above the driller only while active
-- Floating pickup texts appear near the driller
-
-The perk choice menu is still DOM-based overlay.
-
-## Notable Generation Rules
-
-### Ordinary tile perks
-
-- Generated across the map using weighted random selection.
-- They are frequent.
-
-### Perk zones
-
-- Target count currently: 4
-- Can now generate together with ordinary tile perks
-- Still cannot overlap other perk zones, the base, or the start
-
-## Current Win / Lose
-
-Win:
-- Reach the exact base tile.
-
-Lose:
-- Run out of fuel.
+The current prototype is centered on:
+- uncertain search,
+- constrained fuel routing,
+- local tactical perk spikes,
+- long-form scrap progression,
+- and a target that can move away from the player if the route is inefficient.

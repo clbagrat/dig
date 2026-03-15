@@ -1,32 +1,37 @@
 const TILE_SIZE = 36;
-const GRID_W = 30;
-const GRID_H = 44;
+const GRID_W = 150;
+const GRID_H = 220;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
 const STEP_MS = 1000 / 60;
 const MAX_FRAME_MS = 100;
 const VISION_RADIUS = 5;
 const START_X = Math.floor(GRID_W / 2);
 const START_Y = Math.floor(GRID_H / 2);
-const START_FUEL = 300;
-const IDLE_FUEL_DRAIN = 1;
-const MOVE_FUEL_COST = 2;
-const STRIKE_FUEL_COST = 5;
+const START_FUEL = 420;
+const IDLE_FUEL_DRAIN = 0.8;
+const MOVE_FUEL_COST = 1.8;
+const STRIKE_FUEL_COST = 4.5;
 const STRIKE_CYCLE_SPEED = 8;
-const PERK_TILE_MIN_SPACING = 3;
-const PERK_TILE_MAX_SPACING = 4;
 const PERK_MIN_DISTANCE = 4;
-const PERK_ZONE_COUNT = 4;
-const PERK_ZONE_MIN_DISTANCE = 9;
+const PERK_ZONE_MIN_DISTANCE = 6;
+const TILES_PER_PERK_TILE = 44;
+const TILES_PER_PERK_ZONE = 480;
+const BASE_MIN_DISTANCE = 50;
 const SCRAP_PERK_BASE_COST = 30;
-const SCRAP_PERK_COST_GROWTH = 25;
+const SCRAP_PERK_COST_MULTIPLIER = 1.35;
 const SCRAP_PERK_POPUP_DELAY = 0.5;
+const BASE_MOVE_INTERVAL = 10;
+const BASE_MOVE_AWAY_CHANCE = 0.5;
 
 const BLOCK_TYPES = [
   { hp: 0, color: "#1a1410", scrap: 0, vein: "#3c2d22" },
   { hp: 6, color: "#5f4631", scrap: 2, vein: "#9b7a4a" },
   { hp: 9, color: "#715337", scrap: 4, vein: "#c59a5c" },
-  { hp: 15, color: "#6f4f40", scrap: 7, vein: "#b66e3b" },
-  { hp: 21, color: "#4f3d36", scrap: 11, vein: "#9cb1b7" },
+  { hp: 12, color: "#6a4f37", scrap: 6, vein: "#d0a66a" },
+  { hp: 15, color: "#6f4f40", scrap: 8, vein: "#b66e3b" },
+  { hp: 18, color: "#60473f", scrap: 11, vein: "#a57f58" },
+  { hp: 21, color: "#4f3d36", scrap: 14, vein: "#9cb1b7" },
+  { hp: 27, color: "#3e3236", scrap: 18, vein: "#d6d9df" },
 ];
 
 const TILE_PERK_TYPES = [
@@ -46,6 +51,7 @@ const SCRAP_PERK_TYPES = [
   { name: "Диагональные буры", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
   { name: "Форсаж на нуле", desc: "Чем меньше топлива, тем быстрее следующий удар" },
   { name: "Саперный заряд", desc: "Каждые 15 разрушенных блоков кидает бомбу 2x2 на дистанцию 3" },
+  { name: "Топливный контур", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
   { name: "Гео-линза", desc: "+2 к радиусу обзора и +2 шага от радара" },
   { name: "Рециркулятор", desc: "+2 скрапа и +2 топлива за каждый разрушенный блок" },
   { name: "Перегрузка", desc: "Переполнение топлива запускает дальнюю бомбу, бак -50, топлива +50" },
@@ -59,6 +65,8 @@ const state = {
   width: 0,
   height: 0,
   dpr: 1,
+  worldSeed: 0,
+  worldRandom: Math.random,
   timeAcc: 0,
   lastTs: 0,
   fuel: START_FUEL,
@@ -88,7 +96,9 @@ const state = {
   hardness: new Uint8Array(GRID_W * GRID_H),
   health: new Float32Array(GRID_W * GRID_H),
   signalMovesLeft: 0,
-  signalLastDistance: 0,
+  signalMovesMax: 0,
+  signalPrevX: START_X,
+  signalPrevY: START_Y,
   signalText: "Старт",
   perkText: "Нет",
   moveFuelCost: MOVE_FUEL_COST,
@@ -98,7 +108,11 @@ const state = {
   scrapBonus: 0,
   fuelOnBreak: 0,
   fuelPickupBonus: 0,
+  perkFuelBonus: 0,
   overflowBomb: false,
+  fuelEventDepth: 0,
+  overflowTriggeredInEvent: false,
+  resolvingOverflowBomb: false,
   radarBonus: 0,
   blocksBroken: 0,
   sideDrills: 0,
@@ -109,6 +123,7 @@ const state = {
   diagonalDrillPower: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
+  playerMoveProgress: 0,
   perkToast: {
     text: "",
     time: 0,
@@ -153,13 +168,32 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function chooseWeightedPerk(weights) {
+function mulberry32(seed) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let x = Math.imul(t ^ (t >>> 15), 1 | t);
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function newWorldSeed() {
+  if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
+    const buf = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(buf);
+    return buf[0];
+  }
+  return ((Date.now() >>> 0) ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+}
+
+function chooseWeightedPerk(weights, random = Math.random) {
   let total = 0;
   for (let i = 1; i < weights.length; i += 1) {
     total += weights[i];
   }
 
-  let roll = Math.random() * total;
+  let roll = random() * total;
   for (let i = 1; i < weights.length; i += 1) {
     roll -= weights[i];
     if (roll <= 0) {
@@ -171,7 +205,184 @@ function chooseWeightedPerk(weights) {
 }
 
 function getScrapPerkCost(level) {
-  return SCRAP_PERK_BASE_COST + level * SCRAP_PERK_COST_GROWTH;
+  return Math.round(SCRAP_PERK_BASE_COST * SCRAP_PERK_COST_MULTIPLIER ** level);
+}
+
+function getTargetPerkTileCount() {
+  return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_TILE));
+}
+
+function getTargetPerkZoneCount() {
+  return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_ZONE));
+}
+
+function getCenterDistanceRatio(x, y) {
+  return clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.8);
+}
+
+function getCenterPerkDensity(x, y) {
+  const ratio = getCenterDistanceRatio(x, y);
+  return clamp(1.28 - ratio * 0.48, 0.32, 1.28);
+}
+
+function chooseTilePerkForPosition(x, y, random = Math.random) {
+  const centerBias = 1 - clamp(getCenterDistanceRatio(x, y), 0, 1);
+  const weights = TILE_PERK_WEIGHTS.slice();
+  weights[1] += Math.round(centerBias * 6);
+  weights[2] += Math.round(centerBias * 4);
+  return chooseWeightedPerk(weights, random);
+}
+
+function isFarEnoughFromPlaced(x, y, placed, minDistance) {
+  for (let i = 0; i < placed.length; i += 1) {
+    const dx = x - placed[i].x;
+    const dy = y - placed[i].y;
+    if (Math.hypot(dx, dy) < minDistance) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getExactDistanceOffsets(distance) {
+  const offsets = [];
+  const seen = new Set();
+
+  for (let dx = 0; dx <= distance; dx += 1) {
+    for (let dy = 0; dy <= distance; dy += 1) {
+      if (dx * dx + dy * dy !== distance * distance) {
+        continue;
+      }
+
+      const variants = [
+        [dx, dy],
+        [dx, -dy],
+        [-dx, dy],
+        [-dx, -dy],
+        [dy, dx],
+        [dy, -dx],
+        [-dy, dx],
+        [-dy, -dx],
+      ];
+
+      for (let i = 0; i < variants.length; i += 1) {
+        const key = `${variants[i][0]},${variants[i][1]}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        offsets.push({ x: variants[i][0], y: variants[i][1] });
+      }
+    }
+  }
+
+  return offsets;
+}
+
+function addDangerBlob(field, cx, cy, radius, strength) {
+  const minX = Math.max(0, Math.floor(cx - radius));
+  const maxX = Math.min(GRID_W - 1, Math.ceil(cx + radius));
+  const minY = Math.max(0, Math.floor(cy - radius));
+  const maxY = Math.min(GRID_H - 1, Math.ceil(cy + radius));
+
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > radius) {
+        continue;
+      }
+      const influence = 1 - dist / radius;
+      field[cellIndex(x, y)] += strength * influence;
+    }
+  }
+}
+
+function addDangerVein(field, startX, startY, length, radius, strength, random) {
+  let x = startX;
+  let y = startY;
+  let angle = random() * Math.PI * 2;
+
+  for (let step = 0; step < length; step += 1) {
+    addDangerBlob(field, x, y, radius, strength);
+    angle += (random() - 0.5) * 0.95;
+    x = clamp(x + Math.cos(angle) * 1.35, 1, GRID_W - 2);
+    y = clamp(y + Math.sin(angle) * 1.35, 1, GRID_H - 2);
+  }
+}
+
+function generateHardnessMap(random) {
+  const danger = new Float32Array(GRID_W * GRID_H);
+
+  for (let y = 0; y < GRID_H; y += 1) {
+    for (let x = 0; x < GRID_W; x += 1) {
+      const distanceRatio = clamp(Math.hypot(x - START_X, y - START_Y) / 95, 0, 1);
+      danger[cellIndex(x, y)] = 1 + distanceRatio * 5.6;
+    }
+  }
+
+  const area = GRID_W * GRID_H;
+  const blobCount = Math.max(18, Math.round(area / 1500));
+  for (let i = 0; i < blobCount; i += 1) {
+    addDangerBlob(
+      danger,
+      2 + random() * (GRID_W - 4),
+      2 + random() * (GRID_H - 4),
+      8 + random() * 20,
+      -1.2 + random() * 2.5,
+    );
+  }
+
+  const softVeins = Math.max(10, Math.round(area / 2600));
+  const hardVeins = Math.max(12, Math.round(area / 2200));
+  const ultraVeins = Math.max(6, Math.round(area / 5200));
+
+  for (let i = 0; i < softVeins; i += 1) {
+    addDangerVein(
+      danger,
+      2 + random() * (GRID_W - 4),
+      2 + random() * (GRID_H - 4),
+      14 + Math.floor(random() * 24),
+      1.3 + random() * 1.6,
+      -0.95 - random() * 0.35,
+      random,
+    );
+  }
+
+  for (let i = 0; i < hardVeins; i += 1) {
+    addDangerVein(
+      danger,
+      2 + random() * (GRID_W - 4),
+      2 + random() * (GRID_H - 4),
+      16 + Math.floor(random() * 28),
+      1.1 + random() * 1.2,
+      0.85 + random() * 0.55,
+      random,
+    );
+  }
+
+  for (let i = 0; i < ultraVeins; i += 1) {
+    addDangerVein(
+      danger,
+      2 + random() * (GRID_W - 4),
+      2 + random() * (GRID_H - 4),
+      10 + Math.floor(random() * 16),
+      0.9 + random() * 0.8,
+      1.35 + random() * 0.75,
+      random,
+    );
+  }
+
+  for (let y = 0; y < GRID_H; y += 1) {
+    for (let x = 0; x < GRID_W; x += 1) {
+      const index = cellIndex(x, y);
+      const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.08;
+      state.hardness[index] = clamp(Math.round(danger[index] + microNoise), 1, 7);
+      state.health[index] = BLOCK_TYPES[state.hardness[index]].hp;
+      state.tunnelMask[index] = 0;
+    }
+  }
 }
 
 function setupField() {
@@ -197,6 +408,9 @@ function setupField() {
   state.scrapPerkLevel = 0;
   state.perkChoices = [];
   state.signalMovesLeft = 0;
+  state.signalMovesMax = 0;
+  state.signalPrevX = START_X;
+  state.signalPrevY = START_Y;
   state.moveFuelCost = MOVE_FUEL_COST;
   state.strikeFuelCost = STRIKE_FUEL_COST;
   state.strikeSpeed = 1;
@@ -204,7 +418,11 @@ function setupField() {
   state.scrapBonus = 0;
   state.fuelOnBreak = 0;
   state.fuelPickupBonus = 0;
+  state.perkFuelBonus = 0;
   state.overflowBomb = false;
+  state.fuelEventDepth = 0;
+  state.overflowTriggeredInEvent = false;
+  state.resolvingOverflowBomb = false;
   state.radarBonus = 0;
   state.blocksBroken = 0;
   state.sideDrills = 0;
@@ -215,6 +433,7 @@ function setupField() {
   state.diagonalDrillPower = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
+  state.playerMoveProgress = 0;
   state.perkToast.text = "";
   state.perkToast.time = 0;
   state.fuelToast.value = 0;
@@ -224,18 +443,10 @@ function setupField() {
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
+  state.worldSeed = newWorldSeed();
+  state.worldRandom = mulberry32(state.worldSeed);
 
-  for (let y = 0; y < GRID_H; y += 1) {
-    for (let x = 0; x < GRID_W; x += 1) {
-      const index = cellIndex(x, y);
-      const depthBand = clamp(1 + Math.floor(y / 10), 1, 4);
-      const noise = ((x * 13 + y * 7) % 3 === 0 ? 1 : 0) + (((x + y) % 11) === 0 ? 1 : 0);
-      const type = clamp(depthBand + noise - 1, 1, 4);
-      state.hardness[index] = type;
-      state.health[index] = BLOCK_TYPES[type].hp;
-      state.tunnelMask[index] = 0;
-    }
-  }
+  generateHardnessMap(state.worldRandom);
 
   state.pathTiles.length = 0;
   carveTunnel(state.drill.x, state.drill.y);
@@ -244,104 +455,74 @@ function setupField() {
   placeHiddenBase();
   placePerkTiles();
   placePerkZones();
-  state.signalLastDistance = getDistanceToBase(state.drill.x, state.drill.y);
 }
 
 function placeHiddenBase() {
-  const minY = 3;
-  const maxY = GRID_H - 4;
-  const minX = 3;
-  const maxX = GRID_W - 4;
-  let attempts = 0;
+  const offsets = getExactDistanceOffsets(BASE_MIN_DISTANCE);
+  for (let i = offsets.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(state.worldRandom() * (i + 1));
+    const tmp = offsets[i];
+    offsets[i] = offsets[j];
+    offsets[j] = tmp;
+  }
 
-  while (attempts < 200) {
-    const x = minX + Math.floor(Math.random() * (maxX - minX + 1));
-    const y = minY + Math.floor(Math.random() * (maxY - minY + 1));
-    const distance = Math.hypot(x - START_X, y - START_Y);
-    if (distance >= 8) {
+  for (let i = 0; i < offsets.length; i += 1) {
+    const x = START_X + offsets[i].x;
+    const y = START_Y + offsets[i].y;
+    if (x >= 3 && x <= GRID_W - 4 && y >= 3 && y <= GRID_H - 4) {
       state.base.x = x;
       state.base.y = y;
       return;
     }
-    attempts += 1;
   }
 
-  state.base.x = maxX;
-  state.base.y = maxY;
+  throw new Error("Unable to place base at exact required distance");
 }
 
 function placePerkTiles() {
-  const candidates = [];
   const placed = [];
+  const targetCount = getTargetPerkTileCount();
+  let attempts = 0;
 
-  for (let x = 5, stepIndex = 0; x < GRID_W - 3; stepIndex += 1) {
-    for (let y = 5, rowStep = 1; y < GRID_H - 3; rowStep += 1) {
-      const perkX = clamp(x + (((y * 3 + stepIndex * 5) % 5) - 2), 2, GRID_W - 3);
-      const perkY = clamp(y + (((x * 7 + rowStep * 11) % 5) - 2), 2, GRID_H - 3);
-      candidates.push({ x: perkX, y: perkY });
-      y += PERK_TILE_MIN_SPACING + (rowStep % (PERK_TILE_MAX_SPACING - PERK_TILE_MIN_SPACING + 1));
-    }
-    x += PERK_TILE_MIN_SPACING + (stepIndex % (PERK_TILE_MAX_SPACING - PERK_TILE_MIN_SPACING + 1));
-  }
+  while (placed.length < targetCount && attempts < targetCount * 80) {
+    const x = 2 + Math.floor(state.worldRandom() * (GRID_W - 4));
+    const y = 2 + Math.floor(state.worldRandom() * (GRID_H - 4));
+    const index = cellIndex(x, y);
+    attempts += 1;
 
-  for (let i = candidates.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = candidates[i];
-    candidates[i] = candidates[j];
-    candidates[j] = tmp;
-  }
-
-  for (let i = 0; i < candidates.length; i += 1) {
-    const candidate = candidates[i];
-    const index = cellIndex(candidate.x, candidate.y);
-
-    if (state.tunnelMask[index]) {
+    if (state.tunnelMask[index] || state.perkMask[index] > 0) {
       continue;
     }
-    if ((candidate.x === state.base.x && candidate.y === state.base.y) || (candidate.x === START_X && candidate.y === START_Y)) {
+    if ((x === state.base.x && y === state.base.y) || (x === START_X && y === START_Y)) {
+      continue;
+    }
+    if (!isFarEnoughFromPlaced(x, y, placed, PERK_MIN_DISTANCE)) {
+      continue;
+    }
+    if (state.worldRandom() > getCenterPerkDensity(x, y)) {
       continue;
     }
 
-    let tooClose = false;
-    for (let j = 0; j < placed.length; j += 1) {
-      const dx = candidate.x - placed[j].x;
-      const dy = candidate.y - placed[j].y;
-      if (Math.hypot(dx, dy) < PERK_MIN_DISTANCE) {
-        tooClose = true;
-        break;
-      }
-    }
-
-    if (tooClose) {
-      continue;
-    }
-
-    state.perkMask[index] = chooseWeightedPerk(TILE_PERK_WEIGHTS);
-    placed.push(candidate);
+    state.perkMask[index] = chooseTilePerkForPosition(x, y, state.worldRandom);
+    placed.push({ x, y });
   }
 }
 
 function placePerkZones() {
   const placed = [];
+  const targetCount = getTargetPerkZoneCount();
   let attempts = 0;
 
-  while (state.perkZones.length < PERK_ZONE_COUNT && attempts < 400) {
-    const centerX = 2 + Math.floor(Math.random() * (GRID_W - 4));
-    const centerY = 2 + Math.floor(Math.random() * (GRID_H - 4));
+  while (state.perkZones.length < targetCount && attempts < targetCount * 120) {
+    const centerX = 2 + Math.floor(state.worldRandom() * (GRID_W - 4));
+    const centerY = 2 + Math.floor(state.worldRandom() * (GRID_H - 4));
     attempts += 1;
 
     if ((centerX === START_X && centerY === START_Y) || (centerX === state.base.x && centerY === state.base.y)) {
       continue;
     }
 
-    let tooClose = false;
-    for (let i = 0; i < placed.length; i += 1) {
-      if (Math.hypot(centerX - placed[i].x, centerY - placed[i].y) < PERK_ZONE_MIN_DISTANCE) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (tooClose) {
+    if (!isFarEnoughFromPlaced(centerX, centerY, placed, PERK_ZONE_MIN_DISTANCE)) {
       continue;
     }
 
@@ -362,7 +543,7 @@ function placePerkZones() {
     }
 
     const zoneId = state.perkZones.length;
-    const perkType = chooseWeightedPerk(TILE_PERK_WEIGHTS);
+    const perkType = chooseTilePerkForPosition(centerX, centerY, state.worldRandom);
     state.perkZones.push({
       x: centerX,
       y: centerY,
@@ -406,7 +587,7 @@ function carveTunnel(x, y) {
 
 function collectPerkTile(x, y, index, perkType) {
   state.perkMask[index] = 0;
-  applyTilePerk(perkType, x, y);
+  runFuelEvent(() => applyTilePerk(perkType, x, y));
   state.outOfFuel = false;
 }
 
@@ -440,21 +621,23 @@ function collectPerkZone(zone) {
     return;
   }
 
-  for (let i = 0; i < 3; i += 1) {
-    applyTilePerk(zone.perkType, zone.x, zone.y, false);
-  }
+  runFuelEvent(() => {
+    for (let i = 0; i < 3; i += 1) {
+      applyTilePerk(zone.perkType, zone.x, zone.y, false);
+    }
+  });
 }
 
 function applyTilePerk(perkType, x, y, showToast = true) {
   switch (perkType) {
     case 1:
-      addFuel(90, x, y);
+      addFuel(Math.max(0, 90 - state.perkFuelBonus), x, y);
       state.perkText = "Бак";
       break;
     case 2:
       state.signalMovesLeft += 5 + state.radarBonus;
-      consumeSignalMove(x, y);
-      state.perkText = "Радар";
+      state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
+      state.perkText = `Радар: ${consumeSignalMove(state.signalPrevX, state.signalPrevY, x, y)}`;
       break;
     case 3:
       state.drillPower += 0.5;
@@ -470,6 +653,9 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       break;
     default:
       break;
+  }
+  if (state.perkFuelBonus > 0 && perkType !== 1) {
+    addFuel(state.perkFuelBonus, x, y);
   }
   if (showToast) {
     showPerkToast(state.perkText);
@@ -504,16 +690,20 @@ function applyScrapPerk(perkType) {
       state.perkText = "Саперный заряд";
       break;
     case 7:
+      state.perkFuelBonus += 50;
+      state.perkText = "Топливный контур";
+      break;
+    case 8:
       state.visionRadius = Math.min(9, state.visionRadius + 2);
       state.radarBonus += 2;
       state.perkText = "Гео-линза";
       break;
-    case 8:
+    case 9:
       state.scrapBonus += 2;
       state.fuelOnBreak += 2;
       state.perkText = "Рециркулятор";
       break;
-    case 9:
+    case 10:
       state.overflowBomb = true;
       state.fuelPickupBonus += 50;
       state.maxFuel = Math.max(100, state.maxFuel - 50);
@@ -522,6 +712,9 @@ function applyScrapPerk(perkType) {
       break;
     default:
       break;
+  }
+  if (state.perkFuelBonus > 0) {
+    addFuel(state.perkFuelBonus, state.drill.x, state.drill.y);
   }
   showPerkToast(state.perkText);
 }
@@ -539,6 +732,22 @@ function showFuelToast(value) {
 function showScrapToast(value) {
   state.scrapToast.value = value;
   state.scrapToast.time = 0.9;
+}
+
+function runFuelEvent(callback) {
+  state.fuelEventDepth += 1;
+  if (state.fuelEventDepth === 1) {
+    state.overflowTriggeredInEvent = false;
+  }
+
+  try {
+    return callback();
+  } finally {
+    state.fuelEventDepth -= 1;
+    if (state.fuelEventDepth === 0) {
+      state.overflowTriggeredInEvent = false;
+    }
+  }
 }
 
 function rebuildPathIndex() {
@@ -684,7 +893,7 @@ function checkScrapPerkUnlock() {
     return;
   }
 
-  const bag = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const bag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   for (let i = bag.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = bag[i];
@@ -709,7 +918,7 @@ function chooseScrapPerk(slotIndex) {
     return;
   }
 
-  applyScrapPerk(perkType);
+  runFuelEvent(() => applyScrapPerk(perkType));
   state.isChoosingPerk = false;
   state.perkChoices = [];
   syncPerkChoiceOverlay();
@@ -753,7 +962,8 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y) {
   const overflow = state.fuel + totalGain - state.maxFuel;
   state.fuel = Math.min(state.maxFuel, state.fuel + totalGain);
 
-  if (state.overflowBomb && overflow > 0) {
+  if (state.overflowBomb && overflow > 0 && !state.overflowTriggeredInEvent && !state.resolvingOverflowBomb) {
+    state.overflowTriggeredInEvent = true;
     triggerOverflowBomb(originX, originY);
   }
 }
@@ -781,7 +991,7 @@ function breakCell(x, y, index, options = {}) {
   const hardness = state.hardness[index];
   const scrapGain = BLOCK_TYPES[hardness].scrap + state.scrapBonus;
   state.scrap += scrapGain;
-  addFuel(state.fuelOnBreak, x, y);
+  runFuelEvent(() => addFuel(state.fuelOnBreak, x, y));
   state.blocksBroken += 1;
   showScrapToast(scrapGain);
   if (state.jumpDrive && state.blocksBroken % 10 === 0) {
@@ -796,8 +1006,7 @@ function breakCell(x, y, index, options = {}) {
   if (options.moveDrill) {
     state.drill.x = x;
     state.drill.y = y;
-    consumeSignalMove(x, y);
-    extendPath(x, y);
+    recordPlayerMove(options.fromX, options.fromY, x, y, 2);
   }
 }
 
@@ -841,8 +1050,13 @@ function triggerOverflowBomb(originX, originY) {
     },
   ];
 
-  for (let i = 0; i < square.length; i += 1) {
-    damageCell(square[i].x, square[i].y, damage);
+  state.resolvingOverflowBomb = true;
+  try {
+    for (let i = 0; i < square.length; i += 1) {
+      damageCell(square[i].x, square[i].y, damage);
+    }
+  } finally {
+    state.resolvingOverflowBomb = false;
   }
 }
 
@@ -872,6 +1086,101 @@ function triggerRemoteBombSquare(originX, originY, distance) {
 
   for (let i = 0; i < square.length; i += 1) {
     damageCell(square[i].x, square[i].y, damage);
+  }
+}
+
+function recordPlayerMove(fromX, fromY, toX, toY, moveWeight = 2) {
+  consumeSignalMove(fromX, fromY, toX, toY);
+  extendPath(toX, toY);
+  state.signalPrevX = toX;
+  state.signalPrevY = toY;
+  state.playerMoveProgress += moveWeight;
+  if (state.playerMoveProgress >= BASE_MOVE_INTERVAL) {
+    state.playerMoveProgress -= BASE_MOVE_INTERVAL;
+    maybeMoveBase();
+  }
+}
+
+function getBaseMoveDirections(awayFromHero) {
+  const directions = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+    { x: 1, y: 1 },
+    { x: 1, y: -1 },
+    { x: -1, y: 1 },
+    { x: -1, y: -1 },
+  ];
+  const currentDistance = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
+  const candidates = [];
+
+  for (let i = 0; i < directions.length; i += 1) {
+    const toX = state.base.x + directions[i].x;
+    const toY = state.base.y + directions[i].y;
+    if (toX < 1 || toY < 1 || toX >= GRID_W - 1 || toY >= GRID_H - 1) {
+      continue;
+    }
+    if (toX === state.drill.x && toY === state.drill.y) {
+      continue;
+    }
+    if (state.perkZoneMask[cellIndex(toX, toY)] !== -1) {
+      continue;
+    }
+
+    const nextDistance = Math.hypot(toX - state.drill.x, toY - state.drill.y);
+    if (!awayFromHero || nextDistance > currentDistance + 0.001) {
+      candidates.push(directions[i]);
+    }
+  }
+
+  return candidates;
+}
+
+function maybeMoveBase() {
+  if (state.baseFound) {
+    return;
+  }
+
+  const preferAway = state.worldRandom() < BASE_MOVE_AWAY_CHANCE;
+  let directions = getBaseMoveDirections(preferAway);
+  if (!directions.length) {
+    directions = getBaseMoveDirections(false);
+  }
+  if (!directions.length) {
+    return;
+  }
+
+  const dir = directions[Math.floor(state.worldRandom() * directions.length)];
+  const fromX = state.base.x;
+  const fromY = state.base.y;
+  const toX = fromX + dir.x;
+  const toY = fromY + dir.y;
+  const fromIndex = cellIndex(fromX, fromY);
+  const toIndex = cellIndex(toX, toY);
+  const targetTunnel = state.tunnelMask[toIndex];
+  const targetHardness = state.hardness[toIndex];
+  const targetHealth = state.health[toIndex];
+  const targetPerk = state.perkMask[toIndex];
+
+  state.tunnelMask[toIndex] = 0;
+  state.hardness[toIndex] = 0;
+  state.health[toIndex] = 0;
+  state.perkMask[toIndex] = 0;
+
+  state.tunnelMask[fromIndex] = targetTunnel;
+  state.hardness[fromIndex] = targetHardness;
+  state.health[fromIndex] = targetHealth;
+  state.perkMask[fromIndex] = targetPerk;
+  state.base.x = toX;
+  state.base.y = toY;
+
+  if (targetTunnel) {
+    removePathTile(toX, toY);
+    if (state.pathIndexByCell[fromIndex] === -1) {
+      state.pathTiles.push({ x: fromX, y: fromY });
+      rebuildPathIndex();
+    }
   }
 }
 
@@ -925,8 +1234,7 @@ function tryJumpMove(dx, dy) {
   state.drill.x = jumpX;
   state.drill.y = jumpY;
   carveTunnel(jumpX, jumpY);
-  consumeSignalMove(jumpX, jumpY);
-  extendPath(jumpX, jumpY);
+  recordPlayerMove(fromX, fromY, jumpX, jumpY, 2);
   state.drill.progress = 0;
   state.drill.strikeEnergy = 0.35;
   return true;
@@ -993,12 +1301,13 @@ function updateDrill(dt) {
       }
       state.drill.strikeLatch = true;
       state.fuel -= state.moveFuelCost;
+      const fromX = state.drill.x;
+      const fromY = state.drill.y;
       state.drill.x = targetX;
       state.drill.y = targetY;
-      consumeSignalMove(targetX, targetY);
       state.drill.progress = 0;
       state.drill.strikeEnergy = 0.35;
-      extendPath(targetX, targetY);
+      recordPlayerMove(fromX, fromY, targetX, targetY, 1);
     } else if (strikeWave < 0.35) {
       state.drill.strikeLatch = false;
     }
@@ -1021,7 +1330,7 @@ function updateDrill(dt) {
     state.fuel -= state.strikeFuelCost;
     const strikeDamage = getStrikeDamage();
     const hardness = state.hardness[targetIndex];
-    damageCell(targetX, targetY, strikeDamage, { moveDrill: true });
+    damageCell(targetX, targetY, strikeDamage, { moveDrill: true, fromX: state.drill.x, fromY: state.drill.y });
     state.drill.progress += strikeDamage;
     state.cameraShake.amplitude = Math.max(
       state.cameraShake.amplitude,
@@ -1055,27 +1364,30 @@ function updateDrill(dt) {
   }
 }
 
-function consumeSignalMove(x, y) {
+function consumeSignalMove(fromX, fromY, toX, toY) {
   if (state.signalMovesLeft <= 0) {
-    return;
+    return "Пусто";
   }
 
-  const currentDistance = getDistanceToBase(x, y);
-  const delta = currentDistance - state.signalLastDistance;
+  const previousDistance = getDistanceToBase(fromX, fromY);
+  const currentDistance = getDistanceToBase(toX, toY);
+  const delta = currentDistance - previousDistance;
   state.signalMovesLeft -= 1;
+  let reading = "Холоднее";
 
-  if (Math.abs(delta) < 0.2) {
-    state.signalText = `Ровно ${state.signalMovesLeft}`;
-  } else if (delta < 0) {
-    state.signalText = `Горячее ${state.signalMovesLeft}`;
+  if (delta < 0) {
+    state.signalText = "Горячее";
+    reading = "Горячее";
   } else {
-    state.signalText = `Холоднее ${state.signalMovesLeft}`;
+    state.signalText = "Холоднее";
+    reading = "Холоднее";
   }
 
-  state.signalLastDistance = currentDistance;
   if (state.signalMovesLeft === 0) {
+    state.signalMovesMax = 0;
     state.signalText = "Сигнал пуст";
   }
+  return reading;
 }
 
 function updateDiscovery() {
@@ -1434,15 +1746,26 @@ function renderSignalStatus(camera) {
   ctx.font = `700 13px ${HUD_FONT}`;
   ctx.textAlign = "center";
   const width = Math.max(74, ctx.measureText(text).width + 18);
+  const barRatio = state.signalMovesMax > 0 ? clamp(state.signalMovesLeft / state.signalMovesMax, 0, 1) : 0;
   ctx.fillStyle = "rgba(23, 14, 9, 0.82)";
   ctx.strokeStyle = "rgba(196, 240, 255, 0.36)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(x - width * 0.5, y - 18, width, 24, 10);
+  ctx.roundRect(x - width * 0.5, y - 18, width, 30, 10);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#c4f0ff";
   ctx.fillText(text, x, y - 1);
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  ctx.beginPath();
+  ctx.roundRect(x - width * 0.5 + 8, y + 2, width - 16, 4, 3);
+  ctx.fill();
+  if (barRatio > 0) {
+    ctx.fillStyle = "#8ef0cb";
+    ctx.beginPath();
+    ctx.roundRect(x - width * 0.5 + 8, y + 2, (width - 16) * barRatio, 4, 3);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -1557,6 +1880,21 @@ function renderHud() {
     scrapRatio,
     ["#f0df84", "#d7b548"],
   );
+
+  const ctx = state.ctx;
+  ctx.save();
+  ctx.fillStyle = "rgba(31, 18, 12, 0.82)";
+  ctx.strokeStyle = "rgba(220, 169, 93, 0.28)";
+  ctx.lineWidth = 1;
+  drawRoundedRectPath(left, top + panelHeight + 8, 150, 24, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#c6ab84";
+  ctx.font = `700 10px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`SEED ${state.worldSeed}`, left + 10, top + panelHeight + 20);
+  ctx.restore();
 }
 
 function drawHudBar(x, y, width, height, label, value, ratio, colors) {
