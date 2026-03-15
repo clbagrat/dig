@@ -22,11 +22,12 @@ const RADAR_BASE_CHARGES = 10;
 const SCRAP_PERK_BASE_COST = 30;
 const SCRAP_PERK_COST_MULTIPLIER = 1.35;
 const SCRAP_PERK_POPUP_DELAY = 0.5;
-const BASE_MOVE_INTERVAL = 10;
+const BASE_MOVE_INTERVAL = 3;
 const BASE_MOVE_AWAY_CHANCE = 0.5;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
+const METAL_VEIN_GROUPS = 16;
 const GAS_SPREAD_INTERVAL = 2;
 const GAS_SPREAD_STEPS = 3;
 const GAS_DAMAGE = 1;
@@ -35,10 +36,10 @@ const BOULDER_MOVE_INTERVAL = 0.12;
 const BOULDER_BREAK_LIMIT = 4;
 const BOULDER_DAMAGE = 5;
 const BOULDER_MIN_START_DISTANCE = BOULDER_BREAK_LIMIT;
-const STEAM_PULSE_INTERVAL = 1.2;
-const STEAM_PULSE_COUNT = 3;
+const STEAM_RELEASE_DELAY = 2;
+const STEAM_LIFETIME = 3;
 const STEAM_DAMAGE = 1;
-const STEAM_RANGE = 6;
+const STEAM_RANGE = 99;
 const EXPLOSION_BREAK_DAMAGE = 9999;
 const FUEL_DEPLETION_HP_COST = 1;
 const FUEL_DEPLETION_RECOVERY = 50;
@@ -82,15 +83,23 @@ const SCRAP_PERK_TYPES = [
   { name: "Длинный бур", desc: "Бьет следующий тайл вперед, повторно усиливает дальний удар" },
   { name: "Диагональные буры", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
   { name: "Форсаж на нуле", desc: "Чем меньше топлива, тем быстрее следующий удар" },
-  { name: "Саперный заряд", desc: "Каждые 15 разрушенных блоков кидает бомбу 2x2 на дистанцию 3" },
+  { name: "Саперный заряд", desc: "Каждые 15 разрушенных блоков кидает бомбу 2x2 на дистанцию 1" },
   { name: "Топливный контур", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
   { name: "Гео-линза", desc: "+2 к радиусу обзора и +2 шага от радара" },
-  { name: "Рециркулятор", desc: "+2 скрапа и +2 топлива за каждый разрушенный блок" },
+  { name: "Ломосбор", desc: "+2 скрапа за каждый разрушенный блок" },
+  { name: "Топлорециркулятор", desc: "+2 топлива за каждый разрушенный блок" },
   { name: "Перегрузка", desc: "Переполнение топлива запускает дальнюю бомбу, бак -50, топлива +50" },
-  { name: "Усиленный корпус", desc: "+1 к максимуму HP и полное исцеление" },
+  { name: "Усиленный корпус", desc: "+1 к максимуму HP и лечит на 2" },
+  { name: "Перелив адреналина", desc: "Overheal дает 5 секунд быстрого бурения без траты топлива" },
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
+const CARDINAL_DIRS = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
 
 const state = {
   canvas: document.getElementById("game"),
@@ -132,6 +141,7 @@ const state = {
   hardness: new Uint8Array(GRID_W * GRID_H),
   hazardMask: new Uint8Array(GRID_W * GRID_H),
   hazardTriggeredMask: new Uint8Array(GRID_W * GRID_H),
+  metalMask: new Uint8Array(GRID_W * GRID_H),
   gasPocketMask: new Uint8Array(GRID_W * GRID_H),
   gasMask: new Uint8Array(GRID_W * GRID_H),
   gasClouds: [],
@@ -141,6 +151,7 @@ const state = {
   boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
   boulders: [],
   health: new Float32Array(GRID_W * GRID_H),
+  visibleMask: new Uint8Array(GRID_W * GRID_H),
   signalMovesLeft: 0,
   signalMovesMax: 0,
   signalPrevX: START_X,
@@ -171,6 +182,8 @@ const state = {
   diagonalDrillPower: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
+  overhealOverdrive: false,
+  overhealDrillTimer: 0,
   playerMoveProgress: 0,
   perkToast: {
     text: "",
@@ -212,6 +225,8 @@ const state = {
     strikePhase: 0,
     strikeEnergy: 0,
     strikeLatch: false,
+    moveCooldown: 0,
+    strikeCooldown: 0,
   },
 };
 
@@ -426,6 +441,132 @@ function createCrackSprite(stage) {
   return canvas;
 }
 
+function createMetalSprite() {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  const gradient = ctx.createLinearGradient(0, 0, TILE_SIZE, TILE_SIZE);
+  gradient.addColorStop(0, "#d7dde0");
+  gradient.addColorStop(0.3, "#8f9ca4");
+  gradient.addColorStop(0.7, "#5c6971");
+  gradient.addColorStop(1, "#2f3940");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.28)";
+  ctx.lineWidth = 1.2;
+  for (let i = -1; i < 4; i += 1) {
+    const offset = i * 10;
+    ctx.beginPath();
+    ctx.moveTo(offset, 0);
+    ctx.lineTo(offset + 16, TILE_SIZE);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "rgba(25, 32, 38, 0.46)";
+  fillRoundRect(ctx, 4, 4, TILE_SIZE - 8, TILE_SIZE - 8, 5);
+  ctx.strokeStyle = "rgba(214, 225, 233, 0.38)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(4.5, 4.5, TILE_SIZE - 9, TILE_SIZE - 9);
+
+  ctx.fillStyle = "#ced6db";
+  for (const [x, y] of [
+    [8, 8],
+    [TILE_SIZE - 8, 8],
+    [8, TILE_SIZE - 8],
+    [TILE_SIZE - 8, TILE_SIZE - 8],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.beginPath();
+  ctx.moveTo(7, TILE_SIZE * 0.3);
+  ctx.lineTo(TILE_SIZE - 7, TILE_SIZE * 0.3);
+  ctx.moveTo(7, TILE_SIZE * 0.7);
+  ctx.lineTo(TILE_SIZE - 7, TILE_SIZE * 0.7);
+  ctx.stroke();
+
+  return canvas;
+}
+
+function createDrillFrame(frame) {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  const bodyGrad = ctx.createLinearGradient(0, 0, TILE_SIZE, TILE_SIZE);
+  bodyGrad.addColorStop(0, "#f3c57b");
+  bodyGrad.addColorStop(1, "#8a5128");
+
+  ctx.fillStyle = "#4a2b1a";
+  fillRoundRect(ctx, 5, 9, TILE_SIZE - 10, TILE_SIZE - 14, 8);
+  ctx.fillStyle = bodyGrad;
+  fillRoundRect(ctx, 9, 11, TILE_SIZE - 18, TILE_SIZE - 18, 7);
+  ctx.fillStyle = "#362218";
+  fillRoundRect(ctx, 12, 5, TILE_SIZE - 24, 11, 5);
+  ctx.fillStyle = "rgba(255, 241, 205, 0.22)";
+  fillRoundRect(ctx, 12, 15, TILE_SIZE - 24, 4, 2);
+  ctx.strokeStyle = "rgba(255, 236, 205, 0.25)";
+  ctx.strokeRect(10.5, 12.5, TILE_SIZE - 21, TILE_SIZE - 21);
+
+  const pistonShift = [-1, 1, 2, 0][frame % 4];
+  ctx.fillStyle = "#6c4325";
+  fillRoundRect(ctx, TILE_SIZE - 14 + pistonShift, 11, 6, 16, 3);
+  ctx.fillStyle = "#4f311f";
+  fillRoundRect(ctx, 4, TILE_SIZE * 0.46, 8, 6, 2);
+  fillRoundRect(ctx, TILE_SIZE - 12, TILE_SIZE * 0.46, 8, 6, 2);
+
+  ctx.fillStyle = "#5c3116";
+  fillRoundRect(ctx, 8, 25, 8, 5, 2);
+  fillRoundRect(ctx, TILE_SIZE - 16, 25, 8, 5, 2);
+  ctx.fillStyle = "#2d1a12";
+  fillRoundRect(ctx, 9, 29, 6, 3, 1);
+  fillRoundRect(ctx, TILE_SIZE - 15, 29, 6, 3, 1);
+
+  const windowGlow = 0.18 + ((frame + 1) % 2) * 0.12;
+  ctx.fillStyle = `rgba(255, 246, 219, ${windowGlow})`;
+  fillRoundRect(ctx, 13, 8, TILE_SIZE - 26, 5, 2);
+
+  return canvas;
+}
+
+function createBaseFrame(frame) {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+  const shell = ctx.createLinearGradient(0, 0, TILE_SIZE, TILE_SIZE);
+  shell.addColorStop(0, "#f0c785");
+  shell.addColorStop(1, "#9b6233");
+
+  ctx.fillStyle = "rgba(105, 210, 255, 0.12)";
+  ctx.beginPath();
+  ctx.arc(TILE_SIZE * 0.5, TILE_SIZE * 0.5, TILE_SIZE * 0.68, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#2b1b14";
+  fillRoundRect(ctx, 5, 5, TILE_SIZE - 10, TILE_SIZE - 10, 7);
+  ctx.fillStyle = shell;
+  fillRoundRect(ctx, 8, 8, TILE_SIZE - 16, TILE_SIZE - 16, 6);
+  ctx.fillStyle = "#6c4120";
+  fillRoundRect(ctx, 15, 12, TILE_SIZE - 30, TILE_SIZE - 20, 4);
+  ctx.fillStyle = `rgba(255, 239, 194, ${0.26 + ((frame + 1) % 3) * 0.08})`;
+  fillRoundRect(ctx, 11, 11, TILE_SIZE - 22, 7, 4);
+  ctx.strokeStyle = "rgba(255, 238, 214, 0.45)";
+  ctx.strokeRect(10.5, 10.5, TILE_SIZE - 21, TILE_SIZE - 21);
+
+  const antennaLift = [-1, 1, 0, 2][frame % 4];
+  ctx.strokeStyle = "#d8eefd";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(TILE_SIZE * 0.5, 10);
+  ctx.lineTo(TILE_SIZE * 0.5, 3 + antennaLift);
+  ctx.stroke();
+  ctx.fillStyle = "#8fe7ff";
+  ctx.beginPath();
+  ctx.arc(TILE_SIZE * 0.5, 3 + antennaLift, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  return canvas;
+}
+
 function createSpriteAtlas() {
   const blocks = [null];
   for (let i = 1; i < BLOCK_TYPES.length; i += 1) {
@@ -443,6 +584,9 @@ function createSpriteAtlas() {
       [HAZARD_TYPES.VOLATILE]: createHazardSprite(HAZARD_TYPES.VOLATILE),
     },
     cracks: [null, createCrackSprite(1), createCrackSprite(2), createCrackSprite(3)],
+    metal: createMetalSprite(),
+    drillFrames: [createDrillFrame(0), createDrillFrame(1), createDrillFrame(2), createDrillFrame(3)],
+    baseFrames: [createBaseFrame(0), createBaseFrame(1), createBaseFrame(2), createBaseFrame(3)],
   };
 }
 
@@ -654,6 +798,10 @@ function canPlaceHazardAt(x, y) {
   return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
 }
 
+function canPlaceMetalAt(x, y) {
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+}
+
 function placeHazardBlob(random, blockCount) {
   const origin = getHazardOrigin(random);
   const hazardType = chooseHazardType(random, origin.x, origin.y);
@@ -712,6 +860,33 @@ function placeHazardVein(random, blockCount) {
       placed += 1;
     }
     angle += (random() - 0.5) * 0.85;
+    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
+    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
+  }
+}
+
+function placeMetalVein(random, blockCount) {
+  const origin = getHazardOrigin(random);
+  let x = origin.x;
+  let y = origin.y;
+  let angle = random() * Math.PI * 2;
+  let placed = 0;
+  let attempts = 0;
+
+  while (placed < blockCount && attempts < blockCount * 10) {
+    attempts += 1;
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (canPlaceMetalAt(ix, iy)) {
+      const index = cellIndex(ix, iy);
+      state.metalMask[index] = 1;
+      state.hazardMask[index] = 0;
+      state.gasPocketMask[index] = 0;
+      state.steamPocketMask[index] = 0;
+      state.boulderPocketMask[index] = 0;
+      placed += 1;
+    }
+    angle += (random() - 0.5) * 0.55;
     x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
     y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
   }
@@ -974,16 +1149,18 @@ function revealSteamPocket(x, y, dirX, dirY) {
     state.gasPocketMask[index] = 0;
   }
 
+  addSteamCells(released, 1);
+  applySteamContactDamage();
   const jet = {
     origins: released,
     dirX,
     dirY,
-    timer: STEAM_PULSE_INTERVAL,
-    pulsesRemaining: STEAM_PULSE_COUNT,
-    cells: [],
+    timer: STEAM_RELEASE_DELAY,
+    released: false,
+    lifetime: STEAM_LIFETIME,
+    cells: released.slice(),
   };
   state.steamJets.push(jet);
-  refreshSteamJet(jet);
 }
 
 function generateHardnessMap(random) {
@@ -1072,6 +1249,9 @@ function generateHardnessMap(random) {
   for (let i = 0; i < hazardVeinGroups; i += 1) {
     placeHazardVein(random, 4 + Math.floor(random() * 37));
   }
+  for (let i = 0; i < METAL_VEIN_GROUPS; i += 1) {
+    placeMetalVein(random, 12 + Math.floor(random() * 22));
+  }
   for (let i = 0; i < GAS_POCKET_GROUPS; i += 1) {
     placeGasPocket(random, 4 + Math.floor(random() * 17));
   }
@@ -1090,6 +1270,8 @@ function setupField() {
   state.gasMask.fill(0);
   state.steamMask.fill(0);
   state.hazardTriggeredMask.fill(0);
+  state.metalMask.fill(0);
+  state.visibleMask.fill(0);
   state.gasPocketMask.fill(0);
   state.steamPocketMask.fill(0);
   state.boulderPocketMask.fill(0);
@@ -1145,6 +1327,8 @@ function setupField() {
   state.diagonalDrillPower = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
+  state.overhealOverdrive = false;
+  state.overhealDrillTimer = 0;
   state.playerMoveProgress = 0;
   state.perkToast.text = "";
   state.perkToast.time = 0;
@@ -1159,6 +1343,8 @@ function setupField() {
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
+  state.drill.moveCooldown = 0;
+  state.drill.strikeCooldown = 0;
   state.worldSeed = newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
 
@@ -1171,6 +1357,7 @@ function setupField() {
   placeHiddenBase();
   placePerkTiles();
   placePerkZones();
+  rebuildVisibilityMask();
 }
 
 function placeHiddenBase() {
@@ -1190,6 +1377,7 @@ function placeHiddenBase() {
       x <= GRID_W - 4 &&
       y >= 3 &&
       y <= GRID_H - 4 &&
+      !state.metalMask[cellIndex(x, y)] &&
       !state.gasPocketMask[cellIndex(x, y)] &&
       !state.steamPocketMask[cellIndex(x, y)] &&
       !state.boulderPocketMask[cellIndex(x, y)]
@@ -1214,7 +1402,7 @@ function placePerkTiles() {
     const index = cellIndex(x, y);
     attempts += 1;
 
-    if (state.tunnelMask[index] || state.perkMask[index] > 0) {
+    if (state.tunnelMask[index] || state.perkMask[index] > 0 || state.metalMask[index]) {
       continue;
     }
     if (state.gasPocketMask[index] || state.steamPocketMask[index] || state.boulderPocketMask[index]) {
@@ -1241,35 +1429,39 @@ function placePerkZones() {
   let attempts = 0;
 
   while (state.perkZones.length < targetCount && attempts < targetCount * 120) {
-    const centerX = 2 + Math.floor(state.worldRandom() * (GRID_W - 4));
-    const centerY = 2 + Math.floor(state.worldRandom() * (GRID_H - 4));
+    const shape = createPerkZoneShape(state.worldRandom);
+    const originX = 1 + Math.floor(state.worldRandom() * Math.max(1, GRID_W - shape.width - 2));
+    const originY = 1 + Math.floor(state.worldRandom() * Math.max(1, GRID_H - shape.height - 2));
     attempts += 1;
 
-    if ((centerX === START_X && centerY === START_Y) || (centerX === state.base.x && centerY === state.base.y)) {
-      continue;
-    }
+    const centerX = originX + shape.centerX;
+    const centerY = originY + shape.centerY;
 
     if (!isFarEnoughFromPlaced(centerX, centerY, placed, PERK_ZONE_MIN_DISTANCE)) {
       continue;
     }
 
     let blocked = false;
-    for (let oy = -1; oy <= 1 && !blocked; oy += 1) {
-      for (let ox = -1; ox <= 1; ox += 1) {
-        const x = centerX + ox;
-        const y = centerY + oy;
-        const index = cellIndex(x, y);
-        if (
-          state.tunnelMask[index] ||
-          state.perkZoneMask[index] !== -1 ||
-          state.gasPocketMask[index] ||
-          state.steamPocketMask[index] ||
-          state.boulderPocketMask[index]
-        ) {
-          blocked = true;
-          break;
-        }
+    const cells = [];
+    for (let i = 0; i < shape.cells.length; i += 1) {
+      const cell = shape.cells[i];
+      const x = originX + cell.x;
+      const y = originY + cell.y;
+      const index = cellIndex(x, y);
+      if (
+        (x === START_X && y === START_Y) ||
+        (x === state.base.x && y === state.base.y) ||
+        state.tunnelMask[index] ||
+        state.metalMask[index] ||
+        state.perkZoneMask[index] !== -1 ||
+        state.gasPocketMask[index] ||
+        state.steamPocketMask[index] ||
+        state.boulderPocketMask[index]
+      ) {
+        blocked = true;
+        break;
       }
+      cells.push({ x, y });
     }
     if (blocked) {
       continue;
@@ -1280,6 +1472,9 @@ function placePerkZones() {
     state.perkZones.push({
       x: centerX,
       y: centerY,
+      cells,
+      iconX: originX + shape.iconX,
+      iconY: originY + shape.iconY,
       perkType,
       openedCount: 0,
       openedMask: 0,
@@ -1287,12 +1482,83 @@ function placePerkZones() {
     });
     placed.push({ x: centerX, y: centerY });
 
-    for (let oy = -1; oy <= 1; oy += 1) {
-      for (let ox = -1; ox <= 1; ox += 1) {
-        state.perkZoneMask[cellIndex(centerX + ox, centerY + oy)] = zoneId;
-      }
+    for (let i = 0; i < cells.length; i += 1) {
+      state.perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
     }
   }
+}
+
+function createPerkZoneShape(random) {
+  const targetCells = 6 + Math.floor(random() * 4);
+  const cells = [{ x: 0, y: 0 }];
+  const used = new Set(["0,0"]);
+  let minX = 0;
+  let maxX = 0;
+  let minY = 0;
+  let maxY = 0;
+  let growthAttempts = 0;
+
+  while (cells.length < targetCells && growthAttempts < 80) {
+    const base = cells[Math.floor(random() * cells.length)];
+    const dir = CARDINAL_DIRS[Math.floor(random() * CARDINAL_DIRS.length)];
+    const nextX = base.x + dir.x;
+    const nextY = base.y + dir.y;
+    const key = `${nextX},${nextY}`;
+    growthAttempts += 1;
+
+    if (used.has(key)) {
+      continue;
+    }
+
+    const nextMinX = Math.min(minX, nextX);
+    const nextMaxX = Math.max(maxX, nextX);
+    const nextMinY = Math.min(minY, nextY);
+    const nextMaxY = Math.max(maxY, nextY);
+    if (nextMaxX - nextMinX > 3 || nextMaxY - nextMinY > 3) {
+      continue;
+    }
+
+    used.add(key);
+    cells.push({ x: nextX, y: nextY });
+    minX = nextMinX;
+    maxX = nextMaxX;
+    minY = nextMinY;
+    maxY = nextMaxY;
+  }
+
+  const normalizedCells = [];
+  let sumX = 0;
+  let sumY = 0;
+  for (let i = 0; i < cells.length; i += 1) {
+    const x = cells[i].x - minX;
+    const y = cells[i].y - minY;
+    normalizedCells.push({ x, y });
+    sumX += x;
+    sumY += y;
+  }
+
+  const centroidX = sumX / normalizedCells.length;
+  const centroidY = sumY / normalizedCells.length;
+  let iconCell = normalizedCells[0];
+  let bestDistance = Infinity;
+  for (let i = 0; i < normalizedCells.length; i += 1) {
+    const cell = normalizedCells[i];
+    const dist = Math.hypot(cell.x - centroidX, cell.y - centroidY);
+    if (dist < bestDistance) {
+      bestDistance = dist;
+      iconCell = cell;
+    }
+  }
+
+  return {
+    cells: normalizedCells,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+    centerX: centroidX,
+    centerY: centroidY,
+    iconX: iconCell.x,
+    iconY: iconCell.y,
+  };
 }
 
 function getDistanceToBase(x, y) {
@@ -1330,16 +1596,25 @@ function revealPerkZoneCell(zoneId, x, y) {
     return;
   }
 
-  const localX = x - (zone.x - 1);
-  const localY = y - (zone.y - 1);
-  const bit = 1 << (localY * 3 + localX);
+  let cellOrder = -1;
+  for (let i = 0; i < zone.cells.length; i += 1) {
+    if (zone.cells[i].x === x && zone.cells[i].y === y) {
+      cellOrder = i;
+      break;
+    }
+  }
+  if (cellOrder === -1) {
+    return;
+  }
+
+  const bit = 1 << cellOrder;
   if (zone.openedMask & bit) {
     return;
   }
 
   zone.openedMask |= bit;
   zone.openedCount += 1;
-  if (zone.openedCount === 9) {
+  if (zone.openedCount === zone.cells.length) {
     collectPerkZone(zone);
   }
 }
@@ -1385,7 +1660,7 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       state.perkText = "Скорость";
       break;
     case 6:
-      state.hp = Math.min(state.maxHp, state.hp + 1);
+      healPlayer(1, "HP+");
       state.perkText = "HP+";
       break;
     default:
@@ -1437,20 +1712,27 @@ function applyScrapPerk(perkType) {
       break;
     case 9:
       state.scrapBonus += 2;
-      state.fuelOnBreak += 2;
-      state.perkText = "Рециркулятор";
+      state.perkText = "Ломосбор";
       break;
     case 10:
+      state.fuelOnBreak += 2;
+      state.perkText = "Топлорециркулятор";
+      break;
+    case 11:
       state.overflowBomb = true;
       state.fuelPickupBonus += 50;
       state.maxFuel = Math.max(100, state.maxFuel - 50);
       state.fuel = Math.min(state.fuel, state.maxFuel);
       state.perkText = "Перегрузка";
       break;
-    case 11:
+    case 12:
       state.maxHp += 1;
-      state.hp = state.maxHp;
+      healPlayer(2, "Усиленный корпус");
       state.perkText = "Усиленный корпус";
+      break;
+    case 13:
+      state.overhealOverdrive = true;
+      state.perkText = "Перелив адреналина";
       break;
     default:
       break;
@@ -1616,8 +1898,10 @@ function update(dt) {
   updateSteam(dt);
   updateBoulders(dt);
   updateEffects(dt);
+  rebuildVisibilityMask();
   updateDiscovery();
   updateCameraShake(dt);
+  state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
   state.perkToast.time = Math.max(0, state.perkToast.time - dt);
   state.fuelToast.time = Math.max(0, state.fuelToast.time - dt);
   state.hpToast.time = Math.max(0, state.hpToast.time - dt);
@@ -1645,12 +1929,68 @@ function updateEffects(dt) {
   }
 }
 
+function rebuildVisibilityMask() {
+  state.visibleMask.fill(0);
+  const startX = state.drill.x;
+  const startY = state.drill.y;
+  const radiusSq = state.visionRadius * state.visionRadius;
+  const queue = [{ x: startX, y: startY }];
+  state.visibleMask[cellIndex(startX, startY)] = 1;
+
+  for (let i = 0; i < queue.length; i += 1) {
+    const cell = queue[i];
+    const neighbors = [
+      { x: cell.x + 1, y: cell.y },
+      { x: cell.x - 1, y: cell.y },
+      { x: cell.x, y: cell.y + 1 },
+      { x: cell.x, y: cell.y - 1 },
+      { x: cell.x + 1, y: cell.y + 1 },
+      { x: cell.x + 1, y: cell.y - 1 },
+      { x: cell.x - 1, y: cell.y + 1 },
+      { x: cell.x - 1, y: cell.y - 1 },
+    ];
+
+    for (let n = 0; n < neighbors.length; n += 1) {
+      const nx = neighbors[n].x;
+      const ny = neighbors[n].y;
+      if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
+        continue;
+      }
+      const dx = nx - startX;
+      const dy = ny - startY;
+      if (dx * dx + dy * dy > radiusSq) {
+        continue;
+      }
+
+      const index = cellIndex(nx, ny);
+      if (state.visibleMask[index]) {
+        continue;
+      }
+
+      const stepDx = nx - cell.x;
+      const stepDy = ny - cell.y;
+      if (stepDx !== 0 && stepDy !== 0) {
+        const sideA = cellIndex(cell.x + stepDx, cell.y);
+        const sideB = cellIndex(cell.x, cell.y + stepDy);
+        if (state.metalMask[sideA] || state.metalMask[sideB]) {
+          continue;
+        }
+      }
+
+      state.visibleMask[index] = 1;
+      if (!state.metalMask[index]) {
+        queue.push({ x: nx, y: ny });
+      }
+    }
+  }
+}
+
 function checkScrapPerkUnlock() {
   if (state.isChoosingPerk || state.pendingPerkChoice || state.scrap < state.nextScrapPerkAt) {
     return;
   }
 
-  const bag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const bag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
   for (let i = bag.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = bag[i];
@@ -1663,6 +2003,31 @@ function checkScrapPerkUnlock() {
   state.pendingPerkDelay = SCRAP_PERK_POPUP_DELAY;
   state.scrapPerkLevel += 1;
   state.nextScrapPerkAt += getScrapPerkCost(state.scrapPerkLevel);
+}
+
+function activateOverhealDrillBoost() {
+  state.overhealDrillTimer = 5;
+  showPerkToast("Перелив адреналина");
+}
+
+function healPlayer(amount, sourceText = "") {
+  if (amount <= 0) {
+    return 0;
+  }
+
+  const missingHp = Math.max(0, state.maxHp - state.hp);
+  const actualHeal = Math.min(amount, missingHp);
+  const overheal = Math.max(0, amount - actualHeal);
+  state.hp = Math.min(state.maxHp, state.hp + amount);
+
+  if (overheal > 0 && state.overhealOverdrive) {
+    activateOverhealDrillBoost();
+    if (sourceText) {
+      state.perkText = sourceText;
+    }
+  }
+
+  return actualHeal;
 }
 
 function chooseScrapPerk(slotIndex) {
@@ -1825,18 +2190,19 @@ function updateGas(dt) {
 function updateSteam(dt) {
   for (let i = state.steamJets.length - 1; i >= 0; i -= 1) {
     const jet = state.steamJets[i];
+    if (jet.released) {
+      jet.lifetime -= dt;
+      if (jet.lifetime <= 0) {
+        addSteamCells(jet.cells, -1);
+        state.steamJets.splice(i, 1);
+      }
+      continue;
+    }
     jet.timer -= dt;
     if (jet.timer > 0) {
       continue;
     }
-
-    jet.timer += STEAM_PULSE_INTERVAL;
-    jet.pulsesRemaining -= 1;
-    if (jet.pulsesRemaining <= 0) {
-      addSteamCells(jet.cells, -1);
-      state.steamJets.splice(i, 1);
-      continue;
-    }
+    jet.released = true;
     refreshSteamJet(jet);
   }
 }
@@ -1884,6 +2250,10 @@ function updateBoulders(dt) {
     }
 
     const nextIndex = cellIndex(nextX, nextY);
+    if (state.metalMask[nextIndex]) {
+      state.boulders.splice(i, 1);
+      continue;
+    }
     if (!state.tunnelMask[nextIndex]) {
       damageCell(nextX, nextY, EXPLOSION_BREAK_DAMAGE, { ignoreHazardEffect: true, allowHazardChain: true });
       boulder.brokenBlocks += 1;
@@ -1930,6 +2300,12 @@ function damageCell(x, y, damage, options = {}) {
   if (state.tunnelMask[index]) {
     return false;
   }
+  if (state.metalMask[index]) {
+    if (options.byDrill) {
+      spawnImpactEffect(x, y, options.dirX ?? state.drill.facingX ?? 0, options.dirY ?? state.drill.facingY ?? 1, 8);
+    }
+    return false;
+  }
   const hazardType = state.hazardMask[index];
   const allowHazardChain = options.allowHazardChain && hazardType === HAZARD_TYPES.VOLATILE;
   if ((!options.ignoreHazardEffect || allowHazardChain) && hazardType && !state.hazardTriggeredMask[index]) {
@@ -1938,7 +2314,7 @@ function damageCell(x, y, damage, options = {}) {
   }
 
   if (options.byDrill) {
-    spawnImpactEffect(x, y, options.dirX || state.drill.facingX || 0, options.dirY || state.drill.facingY || 1, state.hardness[index]);
+    spawnImpactEffect(x, y, options.dirX ?? state.drill.facingX ?? 0, options.dirY ?? state.drill.facingY ?? 1, state.hardness[index]);
   }
 
   state.health[index] -= damage;
@@ -1965,7 +2341,7 @@ function breakCell(x, y, index, options = {}) {
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
   if (state.remoteBombLevel > 0 && options.byDrill && state.drillBrokenBlocks % 15 === 0) {
-    triggerRemoteBombSquare(x, y, 3);
+    triggerRemoteBombSquare(x, y, 1);
   }
 
   carveTunnel(x, y);
@@ -1995,7 +2371,7 @@ function breakCell(x, y, index, options = {}) {
   if (options.moveDrill) {
     state.drill.x = x;
     state.drill.y = y;
-    recordPlayerMove(options.fromX, options.fromY, x, y, 2);
+    recordPlayerMove(options.fromX, options.fromY, x, y);
   }
 }
 
@@ -2032,8 +2408,8 @@ function triggerOverflowBomb(originX, originY) {
     { x: -1, y: -1 },
   ];
   const dir = directions[Math.floor(Math.random() * directions.length)];
-  const centerX = clamp(originX + dir.x * 3, 1, GRID_W - 2);
-  const centerY = clamp(originY + dir.y * 3, 1, GRID_H - 2);
+  const centerX = clamp(originX + dir.x, 1, GRID_W - 2);
+  const centerY = clamp(originY + dir.y, 1, GRID_H - 2);
   const damage = EXPLOSION_BREAK_DAMAGE;
   const square = [
     { x: centerX, y: centerY },
@@ -2084,7 +2460,7 @@ function triggerRemoteBombSquare(originX, originY, distance) {
   }
 }
 
-function recordPlayerMove(fromX, fromY, toX, toY, moveWeight = 2) {
+function recordPlayerMove(fromX, fromY, toX, toY) {
   consumeSignalMove(fromX, fromY, toX, toY);
   extendPath(toX, toY);
   state.signalPrevX = toX;
@@ -2095,7 +2471,7 @@ function recordPlayerMove(fromX, fromY, toX, toY, moveWeight = 2) {
   if (state.jumpDrive && state.movedTiles % 10 === 0) {
     state.jumpCharges += 1;
   }
-  state.playerMoveProgress += moveWeight;
+  state.playerMoveProgress += 1;
   if (state.playerMoveProgress >= BASE_MOVE_INTERVAL) {
     state.playerMoveProgress -= BASE_MOVE_INTERVAL;
     maybeMoveBase();
@@ -2123,6 +2499,9 @@ function getBaseMoveDirections(awayFromHero) {
       continue;
     }
     if (toX === state.drill.x && toY === state.drill.y) {
+      continue;
+    }
+    if (state.metalMask[cellIndex(toX, toY)]) {
       continue;
     }
     if (state.perkZoneMask[cellIndex(toX, toY)] !== -1) {
@@ -2216,6 +2595,9 @@ function tryJumpMove(dx, dy) {
   const fromY = state.drill.y;
   const fromIndex = cellIndex(fromX, fromY);
   const targetIndex = cellIndex(jumpX, jumpY);
+  if (state.metalMask[targetIndex]) {
+    return false;
+  }
   const targetWasTunnel = state.tunnelMask[targetIndex] === 1;
   const targetHardness = state.hardness[targetIndex];
   const targetHealth = state.health[targetIndex];
@@ -2234,7 +2616,7 @@ function tryJumpMove(dx, dy) {
   state.drill.x = jumpX;
   state.drill.y = jumpY;
   carveTunnel(jumpX, jumpY);
-  recordPlayerMove(fromX, fromY, jumpX, jumpY, 2);
+  recordPlayerMove(fromX, fromY, jumpX, jumpY);
   state.drill.progress = 0;
   state.drill.strikeEnergy = 0.35;
   return true;
@@ -2246,6 +2628,9 @@ function updateCameraShake(dt) {
 }
 
 function updateDrill(dt) {
+  state.drill.moveCooldown = Math.max(0, state.drill.moveCooldown - dt);
+  state.drill.strikeCooldown = Math.max(0, state.drill.strikeCooldown - dt);
+
   if (state.fuel <= 0) {
     state.fuel = 0;
     state.drill.progress = 0;
@@ -2282,83 +2667,92 @@ function updateDrill(dt) {
   state.drill.facingY = dy;
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
-  state.drill.strikePhase += dt * STRIKE_CYCLE_SPEED * state.strikeSpeed * lowFuelBoost;
+  const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
+  const actionRate = STRIKE_CYCLE_SPEED * state.strikeSpeed * lowFuelBoost * overdriveBoost;
+  const actionInterval = (Math.PI * 2) / actionRate;
+  state.drill.strikePhase += dt * actionRate;
   state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
 
   if (state.tunnelMask[targetIndex]) {
-    if (strikeWave > 0.92 && !state.drill.strikeLatch) {
-      if (tryJumpMove(dx, dy)) {
-        state.drill.strikeLatch = true;
-        return;
-      }
-
-      if (state.fuel < state.moveFuelCost) {
-        state.fuel = 0;
-        return;
-      }
-      state.drill.strikeLatch = true;
-      state.fuel -= state.moveFuelCost;
-      const fromX = state.drill.x;
-      const fromY = state.drill.y;
-      state.drill.x = targetX;
-      state.drill.y = targetY;
-      state.drill.progress = 0;
-      state.drill.strikeEnergy = 0.35;
-      recordPlayerMove(fromX, fromY, targetX, targetY, 1);
-    } else if (strikeWave < 0.35) {
-      state.drill.strikeLatch = false;
-    }
-    return;
-  }
-
-  if (strikeWave > 0.92 && !state.drill.strikeLatch && tryJumpMove(dx, dy)) {
-    state.drill.strikeLatch = true;
-    return;
-  }
-
-  if (strikeWave > 0.92 && !state.drill.strikeLatch) {
-    if (state.fuel < state.strikeFuelCost) {
-      state.fuel = 0;
+    if (state.drill.moveCooldown > 0) {
       return;
     }
 
-    state.drill.strikeLatch = true;
+    if (tryJumpMove(dx, dy)) {
+      state.drill.strikePhase = Math.PI * 0.5;
+      state.drill.moveCooldown = actionInterval;
+      return;
+    }
+
+    if (state.fuel < state.moveFuelCost) {
+      state.fuel = 0;
+      return;
+    }
+    state.drill.strikePhase = Math.PI * 0.5;
+    state.drill.moveCooldown = actionInterval;
+    state.fuel -= state.moveFuelCost;
+    const fromX = state.drill.x;
+    const fromY = state.drill.y;
+    state.drill.x = targetX;
+    state.drill.y = targetY;
+    state.drill.progress = 0;
+    state.drill.strikeEnergy = 0.35;
+    recordPlayerMove(fromX, fromY, targetX, targetY);
+    return;
+  }
+
+  if (state.drill.strikeCooldown > 0) {
+    return;
+  }
+
+  if (tryJumpMove(dx, dy)) {
+    state.drill.strikePhase = Math.PI * 0.5;
+    state.drill.moveCooldown = actionInterval;
+    return;
+  }
+
+  if (state.overhealDrillTimer <= 0 && state.fuel < state.strikeFuelCost) {
+    state.fuel = 0;
+    return;
+  }
+
+  state.drill.strikePhase = Math.PI * 0.5;
+  state.drill.strikeCooldown = actionInterval;
+  if (state.overhealDrillTimer <= 0) {
     state.fuel -= state.strikeFuelCost;
-    const strikeDamage = getStrikeDamage();
-    const hardness = state.hardness[targetIndex];
-    damageCell(targetX, targetY, strikeDamage, {
-      moveDrill: true,
-      fromX: state.drill.x,
-      fromY: state.drill.y,
-      byDrill: true,
-      dirX: dx,
-      dirY: dy,
-    });
-    state.drill.progress += strikeDamage;
-    state.cameraShake.amplitude = Math.max(
-      state.cameraShake.amplitude,
-      Math.min(1.8, 0.28 + hardness * 0.22) * state.drill.strikeEnergy,
-    );
+  }
+  const strikeDamage = getStrikeDamage();
+  const hardness = state.hardness[targetIndex];
+  damageCell(targetX, targetY, strikeDamage, {
+    moveDrill: true,
+    fromX: state.drill.x,
+    fromY: state.drill.y,
+    byDrill: true,
+    dirX: dx,
+    dirY: dy,
+  });
+  state.drill.progress += strikeDamage;
+  state.cameraShake.amplitude = Math.max(
+    state.cameraShake.amplitude,
+    Math.min(1.8, 0.28 + hardness * 0.22) * Math.max(state.drill.strikeEnergy, 0.35),
+  );
 
-    if (state.sideDrills > 0) {
-      const sideDamage = strikeDamage * (0.5 + state.sideDrills * 0.25);
-      damageCell(state.drill.x - dy, state.drill.y + dx, sideDamage, { byDrill: true, dirX: -dy, dirY: dx });
-      damageCell(state.drill.x + dy, state.drill.y - dx, sideDamage, { byDrill: true, dirX: dy, dirY: -dx });
-    }
+  if (state.sideDrills > 0) {
+    const sideDamage = strikeDamage * (0.5 + state.sideDrills * 0.25);
+    damageCell(state.drill.x - dy, state.drill.y + dx, sideDamage, { byDrill: true, dirX: -dy, dirY: dx });
+    damageCell(state.drill.x + dy, state.drill.y - dx, sideDamage, { byDrill: true, dirX: dy, dirY: -dx });
+  }
 
-    if (state.longDrillPower > 0) {
-      const longDamage = strikeDamage * (0.1 + state.longDrillPower);
-      damageCell(targetX + dx, targetY + dy, longDamage, { byDrill: true, dirX: dx, dirY: dy });
-    }
+  if (state.longDrillPower > 0) {
+    const longDamage = strikeDamage * (0.1 + state.longDrillPower);
+    damageCell(targetX + dx, targetY + dy, longDamage, { byDrill: true, dirX: dx, dirY: dy });
+  }
 
-    if (state.diagonalDrillPower > 0) {
-      const diagonalDamage = strikeDamage * (0.15 + state.diagonalDrillPower);
-      damageCell(targetX - dy, targetY + dx, diagonalDamage, { byDrill: true, dirX: -dy, dirY: dx });
-      damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dy, dirY: -dx });
-    }
-  } else if (strikeWave < 0.35) {
-    state.drill.strikeLatch = false;
+  if (state.diagonalDrillPower > 0) {
+    const diagonalDamage = strikeDamage * (0.15 + state.diagonalDrillPower);
+    damageCell(targetX - dy, targetY + dx, diagonalDamage, { byDrill: true, dirX: dx - dy, dirY: dy + dx });
+    damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dx + dy, dirY: dy - dx });
   }
 
   if (state.fuel <= 0 && state.health[targetIndex] > 0) {
@@ -2394,10 +2788,7 @@ function consumeSignalMove(fromX, fromY, toX, toY) {
 }
 
 function updateDiscovery() {
-  const dx = state.base.x - state.drill.x;
-  const dy = state.base.y - state.drill.y;
-  const distance = Math.hypot(dx, dy);
-  state.base.visible = distance <= state.visionRadius + 0.35;
+  state.base.visible = isVisibleCell(state.base.x, state.base.y);
   if (state.drill.x === state.base.x && state.drill.y === state.base.y) {
     state.baseFound = true;
   }
@@ -2415,9 +2806,7 @@ function extendPath(x, y) {
 }
 
 function isVisibleCell(x, y) {
-  const dx = x - state.drill.x;
-  const dy = y - state.drill.y;
-  return dx * dx + dy * dy <= state.visionRadius * state.visionRadius;
+  return state.visibleMask[cellIndex(x, y)] === 1;
 }
 
 function getCamera() {
@@ -2452,19 +2841,24 @@ function renderEffects(camera) {
     if (effect.kind === "impact") {
       const alpha = 1 - progress;
       const reach = 6 + progress * 10 + effect.hardness * 0.3;
+      const length = Math.hypot(effect.dirX, effect.dirY) || 1;
+      const dirX = effect.dirX / length;
+      const dirY = effect.dirY / length;
+      const perpX = -dirY;
+      const perpY = dirX;
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = "#ffe2a6";
       ctx.lineWidth = 2.2;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + effect.dirX * reach, cy + effect.dirY * reach);
+      ctx.lineTo(cx + dirX * reach, cy + dirY * reach);
       ctx.stroke();
       ctx.strokeStyle = "rgba(255, 248, 220, 0.8)";
       ctx.beginPath();
-      ctx.moveTo(cx + effect.dirX * reach, cy + effect.dirY * reach);
-      ctx.lineTo(cx + effect.dirX * (reach + 6) - effect.dirY * 4, cy + effect.dirY * (reach + 6) + effect.dirX * 4);
-      ctx.moveTo(cx + effect.dirX * reach, cy + effect.dirY * reach);
-      ctx.lineTo(cx + effect.dirX * (reach + 5) + effect.dirY * 4, cy + effect.dirY * (reach + 5) - effect.dirX * 4);
+      ctx.moveTo(cx + dirX * reach, cy + dirY * reach);
+      ctx.lineTo(cx + dirX * (reach + 6) + perpX * 4, cy + dirY * (reach + 6) + perpY * 4);
+      ctx.moveTo(cx + dirX * reach, cy + dirY * reach);
+      ctx.lineTo(cx + dirX * (reach + 5) - perpX * 4, cy + dirY * (reach + 5) - perpY * 4);
       ctx.stroke();
     } else if (effect.kind === "break") {
       const alpha = 1 - progress;
@@ -2559,15 +2953,31 @@ function render() {
       const visible = isVisibleCell(x, y);
 
       if (!visible) {
-        ctx.fillStyle = "#050403";
+        ctx.save();
+        ctx.globalAlpha = 0.16;
+        if (state.tunnelMask[index]) {
+          drawTileSprite(state.sprites.tunnel, sx, sy);
+        } else if (state.gasPocketMask[index]) {
+          drawTileSprite(state.sprites.gasPocket, sx, sy);
+        } else if (state.steamPocketMask[index]) {
+          drawTileSprite(state.sprites.steamPocket, sx, sy);
+        } else if (state.boulderPocketMask[index]) {
+          drawTileSprite(state.sprites.boulderPocket, sx, sy);
+        } else {
+          drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
+        }
+        ctx.restore();
+        ctx.fillStyle = "rgba(6, 4, 3, 0.72)";
         ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-        ctx.strokeStyle = "rgba(255, 225, 179, 0.02)";
+        ctx.strokeStyle = "rgba(255, 225, 179, 0.04)";
         ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
         continue;
       }
 
       if (state.tunnelMask[index]) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
+      } else if (state.metalMask[index]) {
+        drawTileSprite(state.sprites.metal, sx, sy);
       } else if (state.gasPocketMask[index]) {
         drawTileSprite(state.sprites.gasPocket, sx, sy);
       } else if (state.steamPocketMask[index]) {
@@ -2600,14 +3010,14 @@ function render() {
         ctx.fill();
       }
 
-      if (!state.tunnelMask[index] && !state.gasPocketMask[index] && !state.steamPocketMask[index] && !state.boulderPocketMask[index]) {
+      if (!state.tunnelMask[index] && !state.metalMask[index] && !state.gasPocketMask[index] && !state.steamPocketMask[index] && !state.boulderPocketMask[index]) {
         const hazardType = state.hazardMask[index];
         if (hazardType) {
           drawTileSprite(state.sprites.hazards[hazardType], sx, sy);
         }
       }
 
-      if (!state.tunnelMask[index] && state.health[index] < BLOCK_TYPES[state.hardness[index]].hp) {
+      if (!state.tunnelMask[index] && !state.metalMask[index] && state.health[index] < BLOCK_TYPES[state.hardness[index]].hp) {
         const ratio = clamp(state.health[index] / BLOCK_TYPES[state.hardness[index]].hp, 0, 1);
         const crackStage = clamp(Math.ceil((1 - ratio) * 3), 0, 3);
         if (crackStage > 0) {
@@ -2634,6 +3044,7 @@ function render() {
   renderScrapToast(camera);
   renderPerkToast(camera);
   renderSignalStatus(camera);
+  renderOverdriveStatus(camera);
   renderVisionMask(camera);
   renderHud();
 
@@ -2730,26 +3141,15 @@ function renderBase(camera) {
 
   const x = state.base.x * TILE_SIZE - camera.x;
   const y = state.base.y * TILE_SIZE - camera.y;
+  const frame = Math.floor((state.lastTs || 0) / 220) % state.sprites.baseFrames.length;
   ctx.save();
   ctx.fillStyle = "rgba(105, 210, 255, 0.14)";
   ctx.beginPath();
   ctx.arc(x + TILE_SIZE * 0.5, y + TILE_SIZE * 0.5, TILE_SIZE * 0.7, 0, Math.PI * 2);
   ctx.fill();
-  const shell = ctx.createLinearGradient(x, y, x + TILE_SIZE, y + TILE_SIZE);
-  shell.addColorStop(0, "#f0c785");
-  shell.addColorStop(1, "#9b6233");
-  ctx.fillStyle = "#2b1b14";
-  fillRoundRect(ctx, x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10, 7);
-  ctx.fillStyle = shell;
-  fillRoundRect(ctx, x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16, 6);
-  ctx.fillStyle = "#6c4120";
-  fillRoundRect(ctx, x + 15, y + 12, TILE_SIZE - 30, TILE_SIZE - 20, 4);
-  ctx.fillStyle = "rgba(255, 239, 194, 0.45)";
-  fillRoundRect(ctx, x + 12, y + 12, TILE_SIZE - 24, 7, 4);
-  ctx.strokeStyle = "rgba(255, 238, 214, 0.45)";
-  ctx.strokeRect(x + 10.5, y + 10.5, TILE_SIZE - 21, TILE_SIZE - 21);
-  renderCog(x + 14, y + TILE_SIZE - 13, 4, ctx);
-  renderCog(x + TILE_SIZE - 14, y + TILE_SIZE - 13, 4, ctx);
+  ctx.drawImage(state.sprites.baseFrames[frame], x, y, TILE_SIZE, TILE_SIZE);
+  renderCog(x + 14, y + TILE_SIZE - 13, 4 + (frame % 2), ctx);
+  renderCog(x + TILE_SIZE - 14, y + TILE_SIZE - 13, 4 + ((frame + 1) % 2), ctx);
   ctx.restore();
 }
 
@@ -2802,19 +3202,39 @@ function renderPerkZoneTile(x, y, sx, sy) {
   }
 
   const perk = TILE_PERK_TYPES[zone.perkType];
-  const localX = x - zone.x;
-  const localY = y - zone.y;
   const ctx = state.ctx;
+  const isZoneCell = (tx, ty) => {
+    if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) {
+      return false;
+    }
+    return state.perkZoneMask[cellIndex(tx, ty)] === zoneId;
+  };
 
   ctx.save();
   ctx.strokeStyle = `${perk.color}66`;
   ctx.lineWidth = 2;
-  ctx.strokeRect(sx + 3, sy + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-
   ctx.fillStyle = `${perk.color}18`;
   ctx.fillRect(sx + 5, sy + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+  ctx.beginPath();
+  if (!isZoneCell(x, y - 1)) {
+    ctx.moveTo(sx + 4, sy + 4);
+    ctx.lineTo(sx + TILE_SIZE - 4, sy + 4);
+  }
+  if (!isZoneCell(x + 1, y)) {
+    ctx.moveTo(sx + TILE_SIZE - 4, sy + 4);
+    ctx.lineTo(sx + TILE_SIZE - 4, sy + TILE_SIZE - 4);
+  }
+  if (!isZoneCell(x, y + 1)) {
+    ctx.moveTo(sx + 4, sy + TILE_SIZE - 4);
+    ctx.lineTo(sx + TILE_SIZE - 4, sy + TILE_SIZE - 4);
+  }
+  if (!isZoneCell(x - 1, y)) {
+    ctx.moveTo(sx + 4, sy + 4);
+    ctx.lineTo(sx + 4, sy + TILE_SIZE - 4);
+  }
+  ctx.stroke();
 
-  if (localX === 0 && localY === 0) {
+  if (x === zone.iconX && y === zone.iconY) {
     ctx.fillStyle = perk.color;
     ctx.font = `700 14px ${HUD_FONT}`;
     ctx.textAlign = "center";
@@ -2864,23 +3284,12 @@ function renderDrill(camera) {
   const hammerOffsetY = state.drill.facingY * thrust * 7;
   const px = state.drill.x * TILE_SIZE - camera.x + bodyOffsetX;
   const py = state.drill.y * TILE_SIZE - camera.y + bodyOffsetY;
-  const bodyGrad = ctx.createLinearGradient(px, py, px + TILE_SIZE, py + TILE_SIZE);
-  bodyGrad.addColorStop(0, "#ebbe72");
-  bodyGrad.addColorStop(1, "#8d552a");
+  const frame = strikeWave > 0.78 ? 2 + (Math.floor((state.lastTs || 0) / 50) % 2) : Math.floor((state.lastTs || 0) / 160) % 2;
+  const angle = state.drill.facingX > 0 ? Math.PI * 0.5 : state.drill.facingX < 0 ? -Math.PI * 0.5 : state.drill.facingY < 0 ? Math.PI : 0;
   ctx.save();
-  ctx.fillStyle = "#4e2e1d";
-  fillRoundRect(ctx, px + 5, py + 9, TILE_SIZE - 10, TILE_SIZE - 14, 8);
-  ctx.fillStyle = bodyGrad;
-  fillRoundRect(ctx, px + 9, py + 11, TILE_SIZE - 18, TILE_SIZE - 18, 7);
-  ctx.fillStyle = "#34231a";
-  fillRoundRect(ctx, px + 12, py + 5, TILE_SIZE - 24, 11, 5);
-  ctx.fillStyle = "#6e4324";
-  fillRoundRect(ctx, px + TILE_SIZE - 18, py + 11, 7, 16, 3);
-  ctx.fillStyle = "rgba(255, 240, 199, 0.22)";
-  fillRoundRect(ctx, px + 12, py + 15, TILE_SIZE - 24, 4, 2);
-  ctx.strokeStyle = "rgba(255, 239, 194, 0.28)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(px + 10.5, py + 12.5, TILE_SIZE - 21, TILE_SIZE - 21);
+  ctx.translate(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.5);
+  ctx.rotate(angle);
+  ctx.drawImage(state.sprites.drillFrames[frame], -TILE_SIZE * 0.5, -TILE_SIZE * 0.5, TILE_SIZE, TILE_SIZE);
   ctx.restore();
 
   const drillBaseX = px + TILE_SIZE * 0.5;
@@ -2911,11 +3320,8 @@ function renderDrill(camera) {
     ctx.stroke();
   }
 
-  renderCog(px + 14, py + TILE_SIZE - 12, 5, ctx);
-  renderCog(px + TILE_SIZE - 14, py + TILE_SIZE - 12, 5, ctx);
-  ctx.fillStyle = "#553522";
-  fillRoundRect(ctx, px + 4, py + TILE_SIZE * 0.46, 8, 6, 2);
-  fillRoundRect(ctx, px + TILE_SIZE - 12, py + TILE_SIZE * 0.46, 8, 6, 2);
+  renderCog(px + 14, py + TILE_SIZE - 12, 4 + (frame % 2), ctx);
+  renderCog(px + TILE_SIZE - 14, py + TILE_SIZE - 12, 4 + ((frame + 1) % 2), ctx);
   renderSteamStack(px + TILE_SIZE - 14 - state.drill.facingX * thrust * 1.2, py + 7 - state.drill.facingY * thrust * 1.2, ctx);
 }
 
@@ -2950,6 +3356,33 @@ function renderSignalStatus(camera) {
     buildRoundedRectPath(ctx, x - width * 0.5 + 8, y + 2, (width - 16) * barRatio, 4, 3);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+function renderOverdriveStatus(camera) {
+  if (state.overhealDrillTimer <= 0) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.y * TILE_SIZE - camera.y + 20;
+  const width = 64;
+  const ratio = clamp(state.overhealDrillTimer / 5, 0, 1);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
+  ctx.strokeStyle = "rgba(255, 188, 118, 0.34)";
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = "#ff9b52";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -3172,13 +3605,46 @@ function renderVisionMask(camera) {
   const centerX = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
   const centerY = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
   const radius = state.visionRadius * TILE_SIZE;
+  const facingX = state.drill.facingX ?? 0;
+  const facingY = state.drill.facingY ?? 1;
+  const angle = Math.atan2(facingY, facingX);
+  const coneLength = radius * 1.15;
+  const coneSpread = 0.48;
 
   ctx.save();
-  ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
   ctx.beginPath();
   ctx.rect(0, 0, state.width, state.height);
   ctx.arc(centerX, centerY, radius, 0, Math.PI * 2, true);
   ctx.fill("evenodd");
+
+  const glow = ctx.createRadialGradient(centerX, centerY, radius * 0.2, centerX, centerY, radius);
+  glow.addColorStop(0, "rgba(255, 214, 133, 0.12)");
+  glow.addColorStop(0.55, "rgba(255, 196, 104, 0.07)");
+  glow.addColorStop(1, "rgba(255, 196, 104, 0)");
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  const cone = ctx.createRadialGradient(centerX, centerY, radius * 0.1, centerX, centerY, coneLength);
+  cone.addColorStop(0, "rgba(255, 228, 171, 0.16)");
+  cone.addColorStop(0.55, "rgba(255, 205, 112, 0.1)");
+  cone.addColorStop(1, "rgba(255, 205, 112, 0)");
+  ctx.fillStyle = cone;
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY);
+  ctx.arc(centerX, centerY, coneLength, angle - coneSpread, angle + coneSpread);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = "rgba(255, 227, 170, 0.08)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius * 0.98, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 

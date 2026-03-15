@@ -12,6 +12,7 @@ const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 44;
 const TILES_PER_PERK_ZONE = 480;
+const METAL_VEIN_GROUPS = 16;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -49,6 +50,12 @@ const TILE_PERK_TYPES = [
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
+const CARDINAL_DIRS = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
 
 function parseArgs(argv) {
   let seed = 1;
@@ -245,6 +252,10 @@ function canPlaceHazardAt(x, y) {
   return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
 }
 
+function canPlaceMetalAt(x, y) {
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+}
+
 function canPlaceGasPocketAt(x, y) {
   return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
 }
@@ -315,6 +326,33 @@ function placeHazardVein(mask, random, blockCount) {
       placed += 1;
     }
     angle += (random() - 0.5) * 0.85;
+    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
+    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
+  }
+}
+
+function placeMetalVein(mask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, random, blockCount) {
+  const origin = getHazardOrigin(random);
+  let x = origin.x;
+  let y = origin.y;
+  let angle = random() * Math.PI * 2;
+  let placed = 0;
+  let attempts = 0;
+
+  while (placed < blockCount && attempts < blockCount * 10) {
+    attempts += 1;
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (canPlaceMetalAt(ix, iy)) {
+      const index = cellIndex(ix, iy);
+      mask[index] = 1;
+      hazardMask[index] = 0;
+      gasPocketMask[index] = 0;
+      steamPocketMask[index] = 0;
+      boulderPocketMask[index] = 0;
+      placed += 1;
+    }
+    angle += (random() - 0.5) * 0.55;
     x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
     y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
   }
@@ -424,6 +462,7 @@ function generateMap(seed) {
   const danger = new Float32Array(GRID_W * GRID_H);
   const hardness = new Uint8Array(GRID_W * GRID_H);
   const hazardMask = new Uint8Array(GRID_W * GRID_H);
+  const metalMask = new Uint8Array(GRID_W * GRID_H);
   const gasPocketMask = new Uint8Array(GRID_W * GRID_H);
   const steamPocketMask = new Uint8Array(GRID_W * GRID_H);
   const boulderPocketMask = new Uint8Array(GRID_W * GRID_H);
@@ -482,6 +521,9 @@ function generateMap(seed) {
   for (let i = 0; i < hazardVeinGroups; i += 1) {
     placeHazardVein(hazardMask, random, 4 + Math.floor(random() * 37));
   }
+  for (let i = 0; i < METAL_VEIN_GROUPS; i += 1) {
+    placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, random, 12 + Math.floor(random() * 22));
+  }
   for (let i = 0; i < GAS_POCKET_GROUPS; i += 1) {
     placeGasPocket(gasPocketMask, hazardMask, random, 4 + Math.floor(random() * 10));
   }
@@ -529,7 +571,7 @@ function generateMap(seed) {
     if (random() > getCenterPerkDensity(x, y)) {
       continue;
     }
-    if (gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) {
+    if (metalMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) {
       continue;
     }
 
@@ -541,9 +583,12 @@ function generateMap(seed) {
   const targetZones = getTargetPerkZoneCount();
   let zoneAttempts = 0;
   while (perkZones.length < targetZones && zoneAttempts < targetZones * 120) {
-    const centerX = 2 + Math.floor(random() * (GRID_W - 4));
-    const centerY = 2 + Math.floor(random() * (GRID_H - 4));
+    const shape = createPerkZoneShape(random);
+    const originX = 1 + Math.floor(random() * Math.max(1, GRID_W - shape.width - 2));
+    const originY = 1 + Math.floor(random() * Math.max(1, GRID_H - shape.height - 2));
     zoneAttempts += 1;
+    const centerX = originX + shape.centerX;
+    const centerY = originY + shape.centerY;
 
     if ((centerX === START_X && centerY === START_Y) || (centerX === base.x && centerY === base.y)) {
       continue;
@@ -553,18 +598,25 @@ function generateMap(seed) {
     }
 
     let overlaps = false;
-    for (let oy = -1; oy <= 1 && !overlaps; oy += 1) {
-      for (let ox = -1; ox <= 1; ox += 1) {
-        const index = cellIndex(centerX + ox, centerY + oy);
-        if (perkZoneMask[index] !== -1) {
-          overlaps = true;
-          break;
-        }
-        if (gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) {
-          overlaps = true;
-          break;
-        }
+    const cells = [];
+    for (let i = 0; i < shape.cells.length; i += 1) {
+      const cell = shape.cells[i];
+      const x = originX + cell.x;
+      const y = originY + cell.y;
+      const index = cellIndex(x, y);
+      if (
+        (x === START_X && y === START_Y) ||
+        (x === base.x && y === base.y) ||
+        perkZoneMask[index] !== -1 ||
+        metalMask[index] ||
+        gasPocketMask[index] ||
+        steamPocketMask[index] ||
+        boulderPocketMask[index]
+      ) {
+        overlaps = true;
+        break;
       }
+      cells.push({ x, y });
     }
     if (overlaps) {
       continue;
@@ -572,17 +624,95 @@ function generateMap(seed) {
 
     const zoneId = perkZones.length;
     const perkType = chooseTilePerkForPosition(random, centerX, centerY);
-    perkZones.push({ x: centerX, y: centerY, perkType });
+    perkZones.push({
+      x: centerX,
+      y: centerY,
+      perkType,
+      cells,
+      iconX: originX + shape.iconX,
+      iconY: originY + shape.iconY,
+    });
     placedZones.push({ x: centerX, y: centerY });
 
-    for (let oy = -1; oy <= 1; oy += 1) {
-      for (let ox = -1; ox <= 1; ox += 1) {
-        perkZoneMask[cellIndex(centerX + ox, centerY + oy)] = zoneId;
-      }
+    for (let i = 0; i < cells.length; i += 1) {
+      perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
     }
   }
 
-  return { hardness, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkMask, perkZones, base };
+  return { hardness, hazardMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkMask, perkZones, base };
+}
+
+function createPerkZoneShape(random) {
+  const targetCells = 6 + Math.floor(random() * 4);
+  const cells = [{ x: 0, y: 0 }];
+  const used = new Set(["0,0"]);
+  let minX = 0;
+  let maxX = 0;
+  let minY = 0;
+  let maxY = 0;
+  let growthAttempts = 0;
+
+  while (cells.length < targetCells && growthAttempts < 80) {
+    const base = cells[Math.floor(random() * cells.length)];
+    const dir = CARDINAL_DIRS[Math.floor(random() * CARDINAL_DIRS.length)];
+    const nextX = base.x + dir.x;
+    const nextY = base.y + dir.y;
+    const key = `${nextX},${nextY}`;
+    growthAttempts += 1;
+
+    if (used.has(key)) {
+      continue;
+    }
+
+    const nextMinX = Math.min(minX, nextX);
+    const nextMaxX = Math.max(maxX, nextX);
+    const nextMinY = Math.min(minY, nextY);
+    const nextMaxY = Math.max(maxY, nextY);
+    if (nextMaxX - nextMinX > 3 || nextMaxY - nextMinY > 3) {
+      continue;
+    }
+
+    used.add(key);
+    cells.push({ x: nextX, y: nextY });
+    minX = nextMinX;
+    maxX = nextMaxX;
+    minY = nextMinY;
+    maxY = nextMaxY;
+  }
+
+  const normalizedCells = [];
+  let sumX = 0;
+  let sumY = 0;
+  for (let i = 0; i < cells.length; i += 1) {
+    const x = cells[i].x - minX;
+    const y = cells[i].y - minY;
+    normalizedCells.push({ x, y });
+    sumX += x;
+    sumY += y;
+  }
+
+  const centroidX = sumX / normalizedCells.length;
+  const centroidY = sumY / normalizedCells.length;
+  let iconCell = normalizedCells[0];
+  let bestDistance = Infinity;
+  for (let i = 0; i < normalizedCells.length; i += 1) {
+    const cell = normalizedCells[i];
+    const dist = Math.hypot(cell.x - centroidX, cell.y - centroidY);
+    if (dist < bestDistance) {
+      bestDistance = dist;
+      iconCell = cell;
+    }
+  }
+
+  return {
+    cells: normalizedCells,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+    centerX: centroidX,
+    centerY: centroidY,
+    iconX: iconCell.x,
+    iconY: iconCell.y,
+  };
 }
 
 function esc(text) {
@@ -616,10 +746,18 @@ function renderSvg(seed, map) {
       const isGasPocket = map.gasPocketMask && map.gasPocketMask[cellIndex(x, y)];
       const isSteamPocket = map.steamPocketMask && map.steamPocketMask[cellIndex(x, y)];
       const isBoulderPocket = map.boulderPocketMask && map.boulderPocketMask[cellIndex(x, y)];
+      const isMetal = map.metalMask && map.metalMask[cellIndex(x, y)];
       const isPocket = isGasPocket || isSteamPocket || isBoulderPocket;
-      parts.push(`<rect x="${px}" y="${py}" width="${TILE_PX}" height="${TILE_PX}" fill="${isPocket ? "#19110d" : tile.color}"/>`);
+      parts.push(`<rect x="${px}" y="${py}" width="${TILE_PX}" height="${TILE_PX}" fill="${isMetal ? "#69767e" : isPocket ? "#19110d" : tile.color}"/>`);
       parts.push(`<rect x="${px}" y="${py}" width="${TILE_PX}" height="${TILE_PX}" fill="none" stroke="rgba(255,225,179,0.05)" stroke-width="0.6"/>`);
-      if (isGasPocket) {
+      if (isMetal) {
+        parts.push(`<path d="M ${px - 4} ${py + 1} L ${px + 8} ${py + TILE_PX - 1} M ${px + 6} ${py + 1} L ${px + 18} ${py + TILE_PX - 1} M ${px + TILE_PX - 2} ${py + 1} L ${px + TILE_PX + 10} ${py + TILE_PX - 1}" fill="none" stroke="rgba(230,238,243,0.26)" stroke-width="0.9"/>`);
+        parts.push(`<rect x="${px + 4}" y="${py + 4}" width="${TILE_PX - 8}" height="${TILE_PX - 8}" fill="rgba(29,38,45,0.46)" stroke="rgba(214,225,233,0.3)" stroke-width="0.8"/>`);
+        parts.push(`<circle cx="${px + 8}" cy="${py + 8}" r="1.6" fill="#ced6db"/>`);
+        parts.push(`<circle cx="${px + TILE_PX - 8}" cy="${py + 8}" r="1.6" fill="#ced6db"/>`);
+        parts.push(`<circle cx="${px + 8}" cy="${py + TILE_PX - 8}" r="1.6" fill="#ced6db"/>`);
+        parts.push(`<circle cx="${px + TILE_PX - 8}" cy="${py + TILE_PX - 8}" r="1.6" fill="#ced6db"/>`);
+      } else if (isGasPocket) {
         parts.push(`<rect x="${px + 1.5}" y="${py + 1.5}" width="${TILE_PX - 3}" height="${TILE_PX - 3}" fill="none" stroke="rgba(255,226,184,0.16)" stroke-width="0.8"/>`);
         parts.push(`<circle cx="${px + TILE_PX * 0.38}" cy="${py + TILE_PX * 0.44}" r="${TILE_PX * 0.16}" fill="rgba(158,240,108,0.22)"/>`);
         parts.push(`<circle cx="${px + TILE_PX * 0.6}" cy="${py + TILE_PX * 0.54}" r="${TILE_PX * 0.18}" fill="rgba(158,240,108,0.22)"/>`);
@@ -639,9 +777,9 @@ function renderSvg(seed, map) {
         );
       }
       const hazardType = map.hazardMask[cellIndex(x, y)];
-      if (hazardType === HAZARD_TYPES.SPIKE) {
+      if (!isMetal && hazardType === HAZARD_TYPES.SPIKE) {
         parts.push(`<path d="M ${px + TILE_PX * 0.25} ${py + TILE_PX * 0.78} L ${px + TILE_PX * 0.42} ${py + TILE_PX * 0.28} L ${px + TILE_PX * 0.52} ${py + TILE_PX * 0.62} L ${px + TILE_PX * 0.7} ${py + TILE_PX * 0.2}" fill="none" stroke="${HAZARD_DATA[hazardType].color}" stroke-width="1.5"/>`);
-      } else if (hazardType === HAZARD_TYPES.VOLATILE) {
+      } else if (!isMetal && hazardType === HAZARD_TYPES.VOLATILE) {
         parts.push(`<circle cx="${px + TILE_PX * 0.5}" cy="${py + TILE_PX * 0.5}" r="${TILE_PX * 0.18}" fill="none" stroke="${HAZARD_DATA[hazardType].color}" stroke-width="1.2"/>`);
         parts.push(`<path d="M ${px + TILE_PX * 0.5} ${py + TILE_PX * 0.24} L ${px + TILE_PX * 0.57} ${py + TILE_PX * 0.45} L ${px + TILE_PX * 0.47} ${py + TILE_PX * 0.45} L ${px + TILE_PX * 0.56} ${py + TILE_PX * 0.76}" fill="none" stroke="${HAZARD_DATA[hazardType].color}" stroke-width="1.2"/>`);
       }
@@ -651,11 +789,14 @@ function renderSvg(seed, map) {
   for (let i = 0; i < map.perkZones.length; i += 1) {
     const zone = map.perkZones[i];
     const perk = TILE_PERK_TYPES[zone.perkType];
-    const zx = (zone.x - 1) * TILE_PX;
-    const zy = (zone.y - 1) * TILE_PX;
-    parts.push(`<rect x="${zx}" y="${zy}" width="${3 * TILE_PX}" height="${3 * TILE_PX}" fill="${perk.color}" fill-opacity="0.08" stroke="${perk.color}" stroke-opacity="0.7" stroke-width="1.5"/>`);
-    parts.push(`<rect x="${zx + 2}" y="${zy + 2}" width="${3 * TILE_PX - 4}" height="${3 * TILE_PX - 4}" fill="none" stroke="${perk.color}" stroke-opacity="0.35" stroke-width="1"/>`);
-    parts.push(`<text x="${zone.x * TILE_PX + TILE_PX * 0.5}" y="${zone.y * TILE_PX + TILE_PX * 0.62}" fill="${perk.color}" font-size="${Math.max(10, TILE_PX)}" text-anchor="middle" font-family="monospace" font-weight="700">${esc(perk.icon)}</text>`);
+    for (let j = 0; j < zone.cells.length; j += 1) {
+      const cell = zone.cells[j];
+      const zx = cell.x * TILE_PX;
+      const zy = cell.y * TILE_PX;
+      parts.push(`<rect x="${zx}" y="${zy}" width="${TILE_PX}" height="${TILE_PX}" fill="${perk.color}" fill-opacity="0.08"/>`);
+      parts.push(`<rect x="${zx + 2}" y="${zy + 2}" width="${TILE_PX - 4}" height="${TILE_PX - 4}" fill="none" stroke="${perk.color}" stroke-opacity="0.35" stroke-width="1"/>`);
+    }
+    parts.push(`<text x="${(zone.iconX + 0.5) * TILE_PX}" y="${(zone.iconY + 0.62) * TILE_PX}" fill="${perk.color}" font-size="${Math.max(10, TILE_PX)}" text-anchor="middle" font-family="monospace" font-weight="700">${esc(perk.icon)}</text>`);
   }
 
   for (let y = 0; y < GRID_H; y += 1) {
@@ -709,6 +850,11 @@ function renderSvg(seed, map) {
     );
     legendY += 20;
   }
+
+  legendY += 12;
+  parts.push(`<rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="#69767e"/>`);
+  parts.push(`<text x="${legendX + 22}" y="${legendY + 1}" fill="#f7ebd4" font-size="12" font-family="Georgia, serif">Metal Vein</text>`);
+  legendY += 20;
 
   legendY += 12;
   for (const hazardType of [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE]) {
