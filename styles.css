@@ -627,6 +627,41 @@ strong {
   gap: 8px;
 }
 
+.perk-option__title {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.perk-option__icon {
+  flex: 0 0 auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid rgba(215, 159, 73, 0.28);
+  border-radius: 999px;
+  color: rgba(255, 234, 203, 0.96);
+  background: rgba(50, 28, 16, 0.42);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 239, 205, 0.08),
+    0 0 0 1px rgba(22, 12, 8, 0.2);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.perk-option__icon-svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
 .perk-option__name {
   display: block;
   flex: 1 1 auto;
@@ -666,6 +701,34 @@ strong {
 .perk-option__delta {
   color: #7fe082;
   font-weight: 700;
+}
+
+.debug-perk-menu__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  margin-right: 8px;
+  border: 1px solid rgba(215, 159, 73, 0.26);
+  border-radius: 999px;
+  background: rgba(49, 29, 18, 0.42);
+  color: rgba(255, 234, 203, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 239, 205, 0.08),
+    0 0 0 1px rgba(22, 12, 8, 0.2);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.debug-perk-menu__icon-svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 @media (max-width: 700px) {

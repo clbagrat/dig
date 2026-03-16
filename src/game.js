@@ -90,36 +90,36 @@ const TILE_PERK_TYPES = [
 
 const SCRAP_PERK_TYPES = [
   null,
-  { name: "Боковые буры", desc: "Удар также бьет по двум боковым клеткам" },
-  { name: "Прыжковый привод", desc: "Каждые 10 блоков дает рывок, повторный выбор увеличивает дальность" },
-  { name: "Длинный бур", desc: "Бьет следующий тайл вперед, повторно усиливает дальний удар" },
-  { name: "Диагональные буры", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
-  { name: "Контурный заряд", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
-  { name: "Форсаж на нуле", desc: "Чем меньше топлива, тем быстрее следующий удар" },
-  { name: "Саперный заряд", desc: "Каждые N сломанных буром блоков кидает ракету с малым радиусом на дистанцию 1" },
-  { name: "Топливный контур", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
-  { name: "Линза обзора", desc: "+1 к радиусу обзора, до максимума 9" },
-  { name: "Радарный модуль", desc: "+2 шага от радара" },
-  { name: "Ломосбор", desc: "+2 скрапа за каждый разрушенный блок" },
-  { name: "Топлорециркулятор", desc: "+2 топлива за каждый разрушенный блок" },
-  { name: "Перегрузка", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
-  { name: "Усиленный корпус", desc: "+1 к максимуму HP и лечит на 2" },
-  { name: "Перелив адреналина", desc: "Overheal дает 3 секунды бафа, потом растет до максимума 7" },
-  { name: "Контурный трофей", desc: "Большой контур может создать случайный перк внутри" },
-  { name: "Автоконтур", desc: "-1 сек к задержке автозамыкания контура, до минимума 1" },
-  { name: "Кристальный катализатор", desc: "Кристаллы начинают давать scrap, потом fuel и HP" },
-  { name: "Шиповой форсаж", desc: "Разбитые шипы дают overdrive-баф на 5/7/10 секунд" },
-  { name: "Термозаряд", desc: "Усиливает урон и радиус взрыва от перегрева" },
-  { name: "Терморасширение", desc: "Скрыто: слито в Термозаряд" },
-  { name: "Теплоотвод", desc: "Повышает предел нагрева до перегрева" },
-  { name: "Накал бура", desc: "Повышает урон бура в зависимости от нагрева" },
-  { name: "Импульс остывания", desc: "В момент начала остывания дает шаги радара" },
-  { name: "Разгонные демпферы", desc: "Сокращают оглушение и ускоряют набор heat" },
-  { name: "Контурный резонанс", desc: "+1% урона за каждую единицу длины контура до капа уровня" },
-  { name: "Охлаждающие ракеты", desc: "За каждые N остывшего heat выпускают ракету с малым радиусом на дистанцию 1-3" },
-  { name: "Рекуперация контура", desc: "Возврат по своему контуру дает топливо за шаг" },
-  { name: "Терморакеты", desc: "Перегрев выпускает ракеты с малым радиусом на дистанцию 1-3" },
-  { name: "Усиленный бак", desc: "Бак дает больше топлива, но растет расход в секунду" },
+  { name: "Боковые буры", icon: "⫼", desc: "Удар также бьет по двум боковым клеткам" },
+  { name: "Прыжковый привод", icon: "↠", desc: "Каждые 10 блоков дает рывок, повторный выбор увеличивает дальность" },
+  { name: "Длинный бур", icon: "⇢", desc: "Бьет следующий тайл вперед, повторно усиливает дальний удар" },
+  { name: "Диагональные буры", icon: "✣", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
+  { name: "Контурный заряд", icon: "⬡", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
+  { name: "Форсаж на нуле", icon: "⏚", desc: "Чем меньше топлива, тем быстрее следующий удар" },
+  { name: "Саперный заряд", icon: "✦", desc: "Каждые N сломанных буром блоков кидает ракету с малым радиусом на дистанцию 1" },
+  { name: "Топливный контур", icon: "⛽", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
+  { name: "Линза обзора", icon: "◉", desc: "+1 к радиусу обзора, до максимума 9" },
+  { name: "Радарный модуль", icon: "⌖", desc: "+2 шага от радара" },
+  { name: "Ломосбор", icon: "⛭", desc: "+2 скрапа за каждый разрушенный блок" },
+  { name: "Топлорециркулятор", icon: "♲", desc: "+2 топлива за каждый разрушенный блок" },
+  { name: "Перегрузка", icon: "⚡", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
+  { name: "Усиленный корпус", icon: "✚", desc: "+1 к максимуму HP и лечит на 2" },
+  { name: "Перелив адреналина", icon: "❤", desc: "Overheal дает 3 секунды бафа, потом растет до максимума 7" },
+  { name: "Контурный трофей", icon: "◈", desc: "Большой контур может создать случайный перк внутри" },
+  { name: "Автоконтур", icon: "◎", desc: "-1 сек к задержке автозамыкания контура, до минимума 1" },
+  { name: "Кристальный катализатор", icon: "✧", desc: "Кристаллы начинают давать scrap, потом fuel и HP" },
+  { name: "Шиповой форсаж", icon: "✹", desc: "Разбитые шипы дают overdrive-баф на 5/7/10 секунд" },
+  { name: "Термозаряд", icon: "☇", desc: "Усиливает урон и радиус взрыва от перегрева" },
+  { name: "Терморасширение", icon: "☍", desc: "Скрыто: слито в Термозаряд" },
+  { name: "Теплоотвод", icon: "⬢", desc: "Повышает предел нагрева до перегрева" },
+  { name: "Накал бура", icon: "❉", desc: "Повышает урон бура в зависимости от нагрева" },
+  { name: "Импульс остывания", icon: "⌁", desc: "В момент начала остывания дает шаги радара" },
+  { name: "Разгонные демпферы", icon: "◍", desc: "Сокращают оглушение и ускоряют набор heat" },
+  { name: "Контурный резонанс", icon: "⟲", desc: "+1% урона за каждую единицу длины контура до капа уровня" },
+  { name: "Охлаждающие ракеты", icon: "❄", desc: "За каждые N остывшего heat выпускают ракету с малым радиусом на дистанцию 1-3" },
+  { name: "Рекуперация контура", icon: "↺", desc: "Возврат по своему контуру дает топливо за шаг" },
+  { name: "Терморакеты", icon: "☄", desc: "Перегрев выпускает ракеты с малым радиусом на дистанцию 1-3" },
+  { name: "Усиленный бак", icon: "◌", desc: "Бак дает больше топлива, но растет расход в секунду" },
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
@@ -2488,7 +2488,7 @@ function buildDebugPerkButtons() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
-    button.innerHTML = `<span class="debug-perk-menu__button-name">${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
+    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon" style="--perk-icon:${JSON.stringify(perk.color)}">${perk.icon}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
     button.addEventListener("click", () => {
       if (state.debugPerkSelection !== key) {
         state.debugPerkSelection = key;
@@ -2513,7 +2513,7 @@ function buildDebugPerkButtons() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
-    button.innerHTML = `<span class="debug-perk-menu__button-name">${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
+    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon">${getScrapPerkIconMarkup(i, "debug-perk-menu__icon-svg")}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
     button.addEventListener("click", () => {
       if (state.debugPerkSelection !== key) {
         state.debugPerkSelection = key;
@@ -3145,6 +3145,73 @@ function formatSignedNumber(value, suffix = "") {
   return suffix ? `${text}${suffix}` : text;
 }
 
+function getScrapPerkIconMarkup(perkType, className = "") {
+  const cls = className ? ` class="${className}"` : "";
+  const stroke = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"';
+  switch (perkType) {
+    case 1:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M4 7v10M20 7v10M8 12h8"/><path ${stroke} d="M10 9l-3 3 3 3M14 9l3 3-3 3"/></svg>`;
+    case 2:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M4 12h11"/><path ${stroke} d="M11 7l6 5-6 5"/><path ${stroke} d="M18 8v8"/></svg>`;
+    case 3:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M4 12h12"/><path ${stroke} d="M12 8l6 4-6 4"/><path ${stroke} d="M18 9l2 3-2 3"/></svg>`;
+    case 4:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M6 6l12 12M18 6L6 18"/><path ${stroke} d="M9 6h3v3M15 18h-3v-3M18 9h-3V6M6 15h3v3"/></svg>`;
+    case 5:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M8 4h8l4 8-4 8H8l-4-8 4-8z"/><path ${stroke} d="M9 12h6"/></svg>`;
+    case 6:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M6 16.5A6.5 6.5 0 0 1 12.5 10"/><path ${stroke} d="M13 6l-2 5h3l-2 7 5-8h-3l2-4"/></svg>`;
+    case 7:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M6 16l6-8 6 8"/><path ${stroke} d="M12 8V4M9 18h6"/><path ${stroke} d="M7 11l-2 1M17 11l2 1"/></svg>`;
+    case 8:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M7 8h9l1 3v5H7z"/><path ${stroke} d="M10 8V5h4v3M9 13h6"/><path ${stroke} d="M5 12l-2 2 2 2"/></svg>`;
+    case 9:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M3 12s3-5 9-5 9 5 9 5-3 5-9 5-9-5-9-5z"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>`;
+    case 10:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"/><path ${stroke} d="M12 6a6 6 0 0 1 6 6M12 3a9 9 0 0 1 9 9"/><path ${stroke} d="M12 18a6 6 0 0 0 6-6"/></svg>`;
+    case 11:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M12 4l1.5 2.2 2.7.4-1.9 2 0.5 2.8-2.8-1.1-2.8 1.1 0.5-2.8-1.9-2 2.7-.4z"/><path ${stroke} d="M6 14l2 2M16 14l2 2M9 18h6"/></svg>`;
+    case 12:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M8 7h8l1 3v6H7V10z"/><path ${stroke} d="M10 7V4h4v3"/><path ${stroke} d="M5 15c1 2 3 3 5 3M19 9c-1-2-3-3-5-3"/></svg>`;
+    case 13:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" ${stroke}/><path ${stroke} d="M13 5l-3 7h3l-2 7 5-8h-3l2-6"/></svg>`;
+    case 14:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M12 5v14M5 12h14"/><path ${stroke} d="M7 7h10v10H7z"/></svg>`;
+    case 15:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 5.6-7 10-7 10z"/><path ${stroke} d="M12 7v5M9.5 9.5h5"/></svg>`;
+    case 16:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M12 4l6 4v8l-6 4-6-4V8z"/><path ${stroke} d="M12 8l2 4-2 4-2-4z"/></svg>`;
+    case 17:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" ${stroke}/><path ${stroke} d="M12 8v4l3 2"/><path ${stroke} d="M7 5l-2 2M17 5l2 2"/></svg>`;
+    case 18:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M12 4l4 4-1 6-3 4-3-4-1-6z"/><path ${stroke} d="M6 18l2-2M18 18l-2-2"/></svg>`;
+    case 19:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M12 4l1.6 4.4 4.4 1.6-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z"/><path ${stroke} d="M18 6l2 2M4 18l2 2"/></svg>`;
+    case 20:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor"/><path ${stroke} d="M12 3v3M12 18v3M3 12h3M18 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>`;
+    case 22:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M10 5a2 2 0 1 1 4 0v7.2a4 4 0 1 1-4 0z"/><path ${stroke} d="M12 9v5"/></svg>`;
+    case 23:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M13 4c2 3-1 4.5-1 7a3 3 0 0 0 6 0c0-2-1.3-3.2-2.8-4.7M12 20c-3.3 0-6-2.2-6-5.5 0-3.5 2.8-4.6 4.8-7.5 1.7 2.3 2.2 3.7 2.2 5.5"/></svg>`;
+    case 24:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M6 9c2 0 2 2 4 2s2-2 4-2 2 2 4 2"/><path ${stroke} d="M6 15c2 0 2-2 4-2s2 2 4 2 2-2 4-2"/><path ${stroke} d="M12 5v14"/></svg>`;
+    case 25:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M8 5v4l2 2-2 2 2 2-2 2v2M16 5v4l-2 2 2 2-2 2 2 2v2"/><path ${stroke} d="M5 12h14"/></svg>`;
+    case 26:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M7 7h10v10H7z"/><path ${stroke} d="M12 4v3M20 12h-3M12 20v-3M4 12h3"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`;
+    case 27:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M8 6l1.5 2.5L12 7l-1 3 2.5 1.5L10 12l1 3-2.5-1.5L7 16l.5-3L5 12l2.5-1.5L7 7z"/><path ${stroke} d="M15 17l4-5"/></svg>`;
+    case 28:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M8 8H6a4 4 0 0 0 0 8h8"/><path ${stroke} d="M11 19l3-3-3-3"/><path ${stroke} d="M16 6c1 1.5 1 3.5 0 5"/></svg>`;
+    case 29:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M6 16l6-8 6 8"/><path ${stroke} d="M9 19h6"/><path ${stroke} d="M12 4c1.5 1.3 1.8 2.8.7 4.5"/></svg>`;
+    case 30:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M6 8h10l2 4v5H6z"/><path ${stroke} d="M10 8V5h4v3"/><path ${stroke} d="M12 11v4M10 13h4"/></svg>`;
+    default:
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" ${stroke}/></svg>`;
+  }
+}
+
 function getCoolingRocketThreshold() {
   const thresholds = [0, 50, 40, 30];
   return thresholds[state.coolingRocketLevel] || 50;
@@ -3225,6 +3292,73 @@ function getScrapPerkNextLevel(perkType) {
       return Math.min(3, state.tankBoostLevel + 1);
     default:
       return 1;
+  }
+}
+
+function getScrapPerkCurrentLevel(perkType) {
+  switch (perkType) {
+    case 1:
+      return state.sideDrills;
+    case 2:
+      return state.jumpDrive ? Math.max(1, state.jumpRange - 1) : 0;
+    case 3:
+      return Math.round(state.longDrillPower / 0.1);
+    case 4:
+      return Math.round(state.diagonalDrillPower / 0.05);
+    case 5:
+      return state.loopChargeLevel;
+    case 6:
+      return Math.round(state.lowFuelSpeedBonus / 0.35);
+    case 7:
+      return state.remoteBombLevel;
+    case 8:
+      return Math.round(state.perkFuelBonus / 50);
+    case 9:
+      return Math.max(0, state.visionRadius - VISION_RADIUS);
+    case 10:
+      return Math.round(state.radarBonus / 2);
+    case 11:
+      return Math.round(state.scrapBonus / 2);
+    case 12:
+      return Math.round(state.fuelOnBreak / 2);
+    case 13:
+      return state.overflowBomb ? 1 : 0;
+    case 14:
+      return Math.max(0, state.maxHp - START_HP);
+    case 15:
+      return state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration - 2 : 0;
+    case 16:
+      return state.loopPerkLevel;
+    case 17:
+      return Math.max(0, IDLE_AUTO_CLOSE_DELAY - state.idleAutoCloseDelay);
+    case 18:
+      return state.crystalCatalystLevel;
+    case 19:
+      return state.spikeOverdriveLevel;
+    case 20:
+      return Math.round(state.heatExplosionDamageBonus);
+    case 21:
+      return 0;
+    case 22:
+      return Math.max(0, Math.round((state.maxHeat - MAX_HEAT) / 20));
+    case 23:
+      return Math.round(state.heatDamageBonus / 0.2);
+    case 24:
+      return state.heatCoolingRewardLevel;
+    case 25:
+      return Math.round(state.stunReduction / 0.4);
+    case 26:
+      return state.contourLengthDamageLevel;
+    case 27:
+      return state.coolingRocketLevel;
+    case 28:
+      return state.contourReturnFuelLevel;
+    case 29:
+      return state.heatOverloadRocketLevel;
+    case 30:
+      return state.tankBoostLevel;
+    default:
+      return 0;
   }
 }
 
@@ -3499,7 +3633,7 @@ function syncPerkChoiceOverlay() {
       continue;
     }
     const preview = getScrapPerkPreview(perkType);
-    button.innerHTML = `<span class="perk-option__top"><span class="perk-option__name">${SCRAP_PERK_TYPES[perkType].name}</span><span class="perk-option__level">Лвл ${getScrapPerkNextLevel(perkType)}</span></span><span class="perk-option__effect">${preview.effect}</span><span class="perk-option__compare">${preview.compare}</span>`;
+    button.innerHTML = `<span class="perk-option__top"><span class="perk-option__title"><span class="perk-option__icon">${getScrapPerkIconMarkup(perkType, "perk-option__icon-svg")}</span><span class="perk-option__name">${SCRAP_PERK_TYPES[perkType].name}</span></span><span class="perk-option__level">Лвл ${getScrapPerkNextLevel(perkType)}</span></span><span class="perk-option__effect">${preview.effect}</span><span class="perk-option__compare">${preview.compare}</span>`;
   }
 }
 
@@ -5867,6 +6001,10 @@ function renderHud() {
   ctx.textAlign = "right";
   ctx.fillText(String(state.worldSeed), seedLeft + seedWidth - 10, recipeTop + 16);
   ctx.restore();
+
+  const detailTop = recipeTop + 40;
+  renderHudCoreStats(left, detailTop, panelWidth, "СТАТЫ");
+  renderHudPerkColumn(left + panelWidth + gap, detailTop, panelWidth, "ПЕРКИ");
 }
 
 function drawHudBar(x, y, width, height, label, value, ratio, colors) {
@@ -5900,6 +6038,159 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
     ctx.fillStyle = gradient;
     drawRoundedRectPath(trackX, trackY, trackWidth * ratio, trackHeight, 999);
     ctx.fill();
+  }
+  ctx.restore();
+}
+
+function renderHudInfoColumn(x, y, width, rows, title) {
+  const ctx = state.ctx;
+  const rowHeight = 16;
+  const panelHeight = 24 + rows.length * rowHeight + 8;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(31, 18, 12, 0.78)";
+  ctx.strokeStyle = "rgba(220, 169, 93, 0.24)";
+  ctx.lineWidth = 1;
+  drawRoundedRectPath(x, y, width, panelHeight, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#c6ab84";
+  ctx.font = `700 10px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(title, x + 10, y + 14);
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const rowY = y + 30 + i * rowHeight;
+    const row = rows[i];
+    ctx.fillStyle = "rgba(214, 188, 150, 0.78)";
+    ctx.font = `700 10px ${HUD_FONT}`;
+    ctx.fillText(row.label, x + 10, rowY);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#f1dfb6";
+    ctx.font = `700 11px ${HUD_FONT}`;
+    ctx.fillText(row.value, x + width - 10, rowY);
+    ctx.textAlign = "left";
+  }
+  ctx.restore();
+}
+
+function renderHudMiniPerkIcon(perkType, x, y, size) {
+  const perk = TILE_PERK_TYPES[perkType];
+  if (!perk) {
+    return;
+  }
+  const ctx = state.ctx;
+  const half = size * 0.5;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = `${perk.color}28`;
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = perk.color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -half + 2);
+  ctx.lineTo(half - 2, 0);
+  ctx.lineTo(0, half - 2);
+  ctx.lineTo(-half + 2, 0);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = "#2b1b14";
+  ctx.font = `700 ${Math.max(8, size * 0.38)}px ${HUD_FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(perk.icon, 0, 0.5);
+  ctx.restore();
+}
+
+function renderHudCoreStats(x, y, width, title) {
+  const ctx = state.ctx;
+  const rows = [
+    { perkType: 3, value: formatPerkNumber(state.drillPower) },
+    { perkType: 5, value: formatPerkPercent(state.strikeSpeed - 1) },
+  ];
+  const rowHeight = 22;
+
+  ctx.save();
+  ctx.textBaseline = "middle";
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const rowY = y + 8 + i * rowHeight;
+    renderHudMiniPerkIcon(rows[i].perkType, x + 20, rowY, 18);
+    ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
+    ctx.lineWidth = 3;
+    ctx.font = `700 11px ${HUD_FONT}`;
+    ctx.textAlign = "left";
+    ctx.strokeText(rows[i].value, x + 36, rowY);
+    ctx.fillStyle = "#f1dfb6";
+    ctx.fillText(rows[i].value, x + 36, rowY);
+  }
+  ctx.restore();
+}
+
+function renderHudPerkColumn(x, y, width, title) {
+  const ctx = state.ctx;
+  const perkRows = [];
+  for (let i = 1; i < SCRAP_PERK_TYPES.length; i += 1) {
+    if (i === 21) {
+      continue;
+    }
+    const level = getScrapPerkCurrentLevel(i);
+    if (level <= 0) {
+      continue;
+    }
+    perkRows.push({
+      perkType: i,
+      icon: SCRAP_PERK_TYPES[i].icon || "?",
+      name: SCRAP_PERK_TYPES[i].name,
+      level,
+    });
+  }
+
+  const iconsPerRow = 9;
+  const iconSize = 18;
+  const gap = 6;
+  const rowHeight = 22;
+  const startRight = x + width - 10;
+
+  ctx.save();
+  ctx.textBaseline = "middle";
+
+  for (let i = 0; i < perkRows.length; i += 1) {
+    const rowIndex = Math.floor(i / iconsPerRow);
+    const colIndex = i % iconsPerRow;
+    const cx = startRight - colIndex * (iconSize + gap) - iconSize * 0.5;
+    const cy = y + 8 + rowIndex * rowHeight;
+    const perkType = perkRows[i].perkType;
+
+    ctx.fillStyle = "rgba(50, 28, 16, 0.42)";
+    ctx.strokeStyle = "rgba(215, 159, 73, 0.24)";
+    ctx.lineWidth = 1;
+    drawRoundedRectPath(cx - iconSize * 0.5, cy - iconSize * 0.5, iconSize, iconSize, 7);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffeacb";
+    ctx.font = `700 10px ${HUD_FONT}`;
+    ctx.textAlign = "center";
+    ctx.fillText(SCRAP_PERK_TYPES[perkType].icon || "?", cx, cy + 0.5);
+
+    if (perkRows[i].level >= 2) {
+      const badgeText = String(perkRows[i].level);
+      const badgeX = cx + iconSize * 0.35;
+      const badgeY = cy - iconSize * 0.35;
+      ctx.fillStyle = "rgba(36, 20, 12, 0.92)";
+      ctx.strokeStyle = "rgba(255, 207, 122, 0.45)";
+      ctx.lineWidth = 1;
+      drawRoundedRectPath(badgeX - 5, badgeY - 5, 10, 10, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ffcf7a";
+      ctx.font = `700 8px ${HUD_FONT}`;
+      ctx.fillText(badgeText, badgeX, badgeY + 0.5);
+    }
   }
   ctx.restore();
 }
