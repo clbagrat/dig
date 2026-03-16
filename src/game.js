@@ -24,6 +24,8 @@ const SCRAP_PERK_COST_MULTIPLIER = 1.35;
 const SCRAP_PERK_POPUP_DELAY = 0.5;
 const BASE_MOVE_INTERVAL = 3;
 const BASE_MOVE_AWAY_CHANCE = 0.5;
+const IDLE_AUTO_CLOSE_DELAY = 4;
+const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -96,6 +98,7 @@ const SCRAP_PERK_TYPES = [
   { name: "Усиленный корпус", desc: "+1 к максимуму HP и лечит на 2" },
   { name: "Перелив адреналина", desc: "Overheal дает 3 секунды бафа, потом растет до максимума 7" },
   { name: "Контурный трофей", desc: "Большой контур может создать случайный перк внутри" },
+  { name: "Автоконтур", desc: "-1 сек к задержке автозамыкания контура, до минимума 1" },
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
@@ -215,6 +218,9 @@ const state = {
   overhealOverdrive: false,
   overhealOverdriveDuration: 0,
   overhealDrillTimer: 0,
+  idleTime: 0,
+  idleAutoCloseTriggered: false,
+  idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
   playerMoveProgress: 0,
   perkToast: {
     text: "",
@@ -1396,6 +1402,9 @@ function setupField() {
   state.overhealOverdrive = false;
   state.overhealOverdriveDuration = 0;
   state.overhealDrillTimer = 0;
+  state.idleTime = 0;
+  state.idleAutoCloseTriggered = false;
+  state.idleAutoCloseDelay = IDLE_AUTO_CLOSE_DELAY;
   state.playerMoveProgress = 0;
   state.perkToast.text = "";
   state.perkToast.time = 0;
@@ -1929,6 +1938,10 @@ function applyScrapPerk(perkType) {
       state.loopPerkChance = Math.min(0.5, state.loopPerkChance > 0 ? state.loopPerkChance + 0.25 : 0.25);
       state.perkText = "Контурный трофей";
       break;
+    case 17:
+      state.idleAutoCloseDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
+      state.perkText = "Автоконтур";
+      break;
     default:
       break;
   }
@@ -2268,6 +2281,9 @@ function prepareScrapPerkChoices() {
   if (state.loopPerkChance < 0.5) {
     bag.push(16);
   }
+  if (state.idleAutoCloseDelay > IDLE_AUTO_CLOSE_MIN_DELAY) {
+    bag.push(17);
+  }
   for (let i = bag.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = bag[i];
@@ -2500,6 +2516,15 @@ function getScrapPerkPreview(perkType) {
             ? `Сейчас: ${formatPerkPercent(state.loopPerkChance)} на перк из большого контура`
             : "Сейчас: трофеи из контура еще не выпадают",
         next: `После выбора: ${formatPerkPercent(nextChance)} шанс на перк`,
+      };
+    }
+    case 17: {
+      const level = IDLE_AUTO_CLOSE_DELAY - state.idleAutoCloseDelay;
+      const nextDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
+      return {
+        level,
+        current: `Сейчас: автозамыкание через ${state.idleAutoCloseDelay} сек`,
+        next: `После выбора: через ${nextDelay} сек`,
       };
     }
     default:
@@ -3101,6 +3126,115 @@ function removePathTile(x, y) {
   rebuildPathIndex();
 }
 
+function tryAutoCloseContour() {
+  if (state.pathTiles.length < 4) {
+    return false;
+  }
+
+  const current = state.pathTiles[state.pathTiles.length - 1];
+  const heroX = state.drill.x;
+  const heroY = state.drill.y;
+  const candidates = [];
+  for (let i = 0; i < state.pathTiles.length - 1; i += 1) {
+    const point = state.pathTiles[i];
+    const sameRow = point.y === current.y && point.x !== current.x;
+    const sameCol = point.x === current.x && point.y !== current.y;
+    if (!sameRow && !sameCol) {
+      continue;
+    }
+    candidates.push({
+      targetX: point.x,
+      targetY: point.y,
+      targetIndex: i,
+      distance: Math.abs(point.x - current.x) + Math.abs(point.y - current.y),
+    });
+  }
+
+  candidates.sort((a, b) => a.distance - b.distance);
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    const stepX = Math.sign(candidate.targetX - current.x);
+    const stepY = Math.sign(candidate.targetY - current.y);
+    let x = current.x;
+    let y = current.y;
+    let blocked = false;
+
+    while (x !== candidate.targetX || y !== candidate.targetY) {
+      x += stepX;
+      y += stepY;
+      const index = cellIndex(x, y);
+      const isTarget = x === candidate.targetX && y === candidate.targetY;
+      if (!isTarget && state.pathIndexByCell[index] !== -1) {
+        blocked = true;
+        break;
+      }
+    }
+
+    if (blocked) {
+      continue;
+    }
+
+    const loopPath = state.pathTiles.slice(candidate.targetIndex);
+    if (loopPath.length < 3) {
+      continue;
+    }
+    const polygon = [];
+    for (let j = 0; j < loopPath.length; j += 1) {
+      polygon.push({
+        x: loopPath[j].x + 0.5,
+        y: loopPath[j].y + 0.5,
+      });
+    }
+    polygon.push({ x: candidate.targetX + 0.5, y: candidate.targetY + 0.5 });
+
+    let minX = GRID_W;
+    let maxX = 0;
+    let minY = GRID_H;
+    let maxY = 0;
+    for (let j = 0; j < loopPath.length; j += 1) {
+      minX = Math.min(minX, loopPath[j].x);
+      maxX = Math.max(maxX, loopPath[j].x);
+      minY = Math.min(minY, loopPath[j].y);
+      maxY = Math.max(maxY, loopPath[j].y);
+    }
+    minX = clamp(minX, 1, GRID_W - 2);
+    maxX = clamp(maxX, 1, GRID_W - 2);
+    minY = clamp(minY, 1, GRID_H - 2);
+    maxY = clamp(maxY, 1, GRID_H - 2);
+    if (maxX - minX < 1 || maxY - minY < 1) {
+      continue;
+    }
+
+    x = current.x;
+    y = current.y;
+    while (x !== candidate.targetX || y !== candidate.targetY) {
+      x += stepX;
+      y += stepY;
+      const index = cellIndex(x, y);
+      if (!state.tunnelMask[index]) {
+        damageCell(x, y, EXPLOSION_BREAK_DAMAGE, {
+          ignoreHazardEffect: true,
+          allowHazardChain: true,
+          cause: "explosion",
+        });
+      }
+      extendPath(x, y);
+      if (state.pathTiles.length === 1 && state.pathTiles[0].x === x && state.pathTiles[0].y === y) {
+        state.pathTiles[0] = { x: heroX, y: heroY };
+        rebuildPathIndex();
+        return true;
+      }
+    }
+    if (blocked) {
+      continue;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 function tryJumpMove(dx, dy) {
   if (!state.jumpDrive || state.jumpCharges <= 0 || state.jumpRange <= 1) {
     return false;
@@ -3179,11 +3313,21 @@ function updateDrill(dt) {
   }
 
   if (!dx && !dy) {
+    state.idleTime += dt;
+    if (!state.idleAutoCloseTriggered && state.idleTime >= state.idleAutoCloseDelay) {
+      state.idleAutoCloseTriggered = true;
+      if (!tryAutoCloseContour()) {
+        showPerkToast("Контур не найден");
+      }
+    }
     state.drill.progress = 0;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 5);
     state.drill.strikeLatch = false;
     return;
   }
+
+  state.idleTime = 0;
+  state.idleAutoCloseTriggered = false;
 
   const targetX = clamp(state.drill.x + dx, 1, GRID_W - 2);
   const targetY = clamp(state.drill.y + dy, 1, GRID_H - 2);
@@ -3328,10 +3472,16 @@ function extendPath(x, y) {
 
   const existingIndex = state.pathIndexByCell[cellIndex(x, y)];
   if (existingIndex !== -1) {
-    triggerPathLoop(existingIndex, x, y);
-    state.pathTiles.length = 0;
-    state.pathTiles.push({ x, y });
-    rebuildPathIndex();
+    if (existingIndex === state.pathTiles.length - 2) {
+      state.pathTiles.length = existingIndex + 1;
+      rebuildPathIndex();
+      return;
+    }
+    if (triggerPathLoop(existingIndex, x, y)) {
+      state.pathTiles.length = 0;
+      state.pathTiles.push({ x, y });
+      rebuildPathIndex();
+    }
     return;
   }
 
@@ -3343,7 +3493,7 @@ function extendPath(x, y) {
 function triggerPathLoop(loopStartIndex, targetX, targetY) {
   const loopPath = state.pathTiles.slice(loopStartIndex);
   if (loopPath.length < 3) {
-    return;
+    return false;
   }
 
   const polygon = [];
@@ -3371,7 +3521,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   maxY = clamp(maxY, 1, GRID_H - 2);
 
   if (maxX - minX < 1 || maxY - minY < 1) {
-    return;
+    return false;
   }
 
   const affectedCells = [];
@@ -3399,6 +3549,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   activateLoopCharge(interiorCells.length);
   maybeSpawnLoopPerk(interiorCells);
   spawnLoopFieldEffect(loopPath, affectedCells);
+  return true;
 }
 
 function activateLoopCharge(cellCount) {
@@ -4059,6 +4210,7 @@ function renderDrill(camera) {
   const ctx = state.ctx;
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
   const thrust = strikeWave * state.drill.strikeEnergy;
+  const idleCharge = clamp(state.idleTime / Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay), 0, 1);
   const idleBob = Math.sin(state.drill.strikePhase * 0.5) * 0.7;
   const bodyOffsetX = -state.drill.facingX * thrust * 2.2;
   const bodyOffsetY = -state.drill.facingY * thrust * 2.2 + idleBob;
@@ -4070,6 +4222,28 @@ function renderDrill(camera) {
   const angle = state.drill.facingX > 0 ? Math.PI * 0.5 : state.drill.facingX < 0 ? -Math.PI * 0.5 : state.drill.facingY < 0 ? Math.PI : 0;
   ctx.save();
   ctx.translate(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.5);
+  if (idleCharge > 0.01) {
+    const pulse = 0.55 + Math.sin((state.lastTs || 0) * 0.012) * 0.15;
+    ctx.fillStyle = `rgba(109, 239, 255, ${0.08 + idleCharge * 0.14 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, TILE_SIZE * (0.34 + idleCharge * 0.24), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(132, 241, 255, ${0.22 + idleCharge * 0.5})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, TILE_SIZE * (0.28 + idleCharge * 0.18), 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 3; i += 1) {
+      const angle = (state.lastTs || 0) * 0.01 + i * ((Math.PI * 2) / 3);
+      const radius = TILE_SIZE * (0.18 + idleCharge * 0.22);
+      const sx = Math.cos(angle) * radius;
+      const sy = Math.sin(angle) * radius;
+      ctx.fillStyle = `rgba(187, 247, 255, ${0.35 + idleCharge * 0.45})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.7 + idleCharge * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.rotate(angle);
   ctx.drawImage(state.sprites.drillFrames[frame], -TILE_SIZE * 0.5, -TILE_SIZE * 0.5, TILE_SIZE, TILE_SIZE);
   ctx.restore();
