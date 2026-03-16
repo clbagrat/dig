@@ -8,9 +8,10 @@ const GRID_H = 220;
 const START_X = Math.floor(GRID_W / 2);
 const START_Y = Math.floor(GRID_H / 2);
 const BASE_MIN_DISTANCE = 50;
+const START_EASY_RADIUS = 5;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
-const TILES_PER_PERK_TILE = 34;
+const TILES_PER_PERK_TILE = 26;
 const TILES_PER_PERK_ZONE = 370;
 const METAL_VEIN_GROUPS = 16;
 const GAS_POCKET_GROUPS = 10;
@@ -42,7 +43,7 @@ const BLOCK_TYPES = [
 const TILE_PERK_TYPES = [
   null,
   { name: "Bak", icon: "F", color: "#ffcf7a" },
-  { name: "Radar", icon: "R", color: "#8ef0cb" },
+  { name: "Radar", icon: "R", color: "#f2ede2" },
   { name: "Bur", icon: "D", color: "#ff9f6b" },
   { name: "Bomba", icon: "*", color: "#c796ff" },
   { name: "Skorost", icon: "S", color: "#9fd7ff" },
@@ -53,11 +54,11 @@ const TILE_PERK_TYPES = [
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
 const CRYSTAL_TYPES = [
   null,
-  { name: "Red", color: "#ff6b5e" },
+  { name: "Red", color: "#ff4747" },
   { name: "Yellow", color: "#ffd166" },
-  { name: "Blue", color: "#72b7ff" },
+  { name: "Pale", color: "#f2ede2" },
   { name: "Green", color: "#73e58f" },
-  { name: "Violet", color: "#c796ff" },
+  { name: "Blue", color: "#72b7ff" },
 ];
 const CARDINAL_DIRS = [
   { x: 1, y: 0 },
@@ -118,6 +119,10 @@ function clamp(value, min, max) {
 
 function cellIndex(x, y) {
   return y * GRID_W + x;
+}
+
+function isInStartEasyRadius(x, y) {
+  return Math.hypot(x - START_X, y - START_Y) <= START_EASY_RADIUS;
 }
 
 function chooseWeightedPerk(random, weights) {
@@ -256,7 +261,7 @@ function addDangerVein(random, field, startX, startY, length, radius, strength) 
 function chooseHazardType(random, x, y) {
   const centerRatio = clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.4);
   const roll = random() + centerRatio * 0.2;
-  if (roll > 1.0) {
+  if (roll > 0.8) {
     return HAZARD_TYPES.VOLATILE;
   }
   return HAZARD_TYPES.SPIKE;
@@ -276,23 +281,23 @@ function getHazardOrigin(random) {
 }
 
 function canPlaceHazardAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function canPlaceMetalAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function canPlaceGasPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function canPlaceSteamPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function canPlaceBoulderPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function placeHazardBlob(mask, random, blockCount) {
@@ -512,19 +517,19 @@ function generateMap(seed) {
   for (let y = 0; y < GRID_H; y += 1) {
     for (let x = 0; x < GRID_W; x += 1) {
       const distanceRatio = clamp(Math.hypot(x - START_X, y - START_Y) / 95, 0, 1);
-      danger[cellIndex(x, y)] = 1 + distanceRatio * 5.6;
+      danger[cellIndex(x, y)] = 1 + distanceRatio * 4.9;
     }
   }
 
   const area = GRID_W * GRID_H;
-  const blobCount = Math.max(18, Math.round(area / 1500));
+  const blobCount = Math.max(24, Math.round(area / 1200));
   for (let i = 0; i < blobCount; i += 1) {
     addDangerBlob(
       danger,
       2 + random() * (GRID_W - 4),
       2 + random() * (GRID_H - 4),
-      8 + random() * 20,
-      -1.2 + random() * 2.5,
+      10 + random() * 24,
+      -1.6 + random() * 3.2,
     );
   }
 
@@ -545,8 +550,11 @@ function generateMap(seed) {
   for (let y = 0; y < GRID_H; y += 1) {
     for (let x = 0; x < GRID_W; x += 1) {
       const index = cellIndex(x, y);
-      const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.08;
+      const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.16;
       hardness[index] = clamp(Math.round(danger[index] + microNoise), 1, 7);
+      if (isInStartEasyRadius(x, y)) {
+        hardness[index] = 1;
+      }
       hazardMask[index] = 0;
     }
   }
@@ -899,7 +907,7 @@ function renderSvg(seed, map) {
       const cx = px + TILE_PX * 0.5;
       const cy = py + TILE_PX * 0.5;
       parts.push(`<circle cx="${cx}" cy="${cy}" r="${TILE_PX * 0.22}" fill="${crystal.color}" fill-opacity="0.2"/>`);
-      parts.push(`<path d="M ${cx} ${py + TILE_PX * 0.14} L ${px + TILE_PX * 0.82} ${py + TILE_PX * 0.38} L ${px + TILE_PX * 0.62} ${py + TILE_PX * 0.82} L ${px + TILE_PX * 0.38} ${py + TILE_PX * 0.82} L ${px + TILE_PX * 0.18} ${py + TILE_PX * 0.38} Z" fill="${crystal.color}" stroke="rgba(255,255,255,0.32)" stroke-width="0.8"/>`);
+      parts.push(`<path d="M ${cx} ${py + TILE_PX * 0.14} L ${px + TILE_PX * 0.82} ${py + TILE_PX * 0.38} L ${px + TILE_PX * 0.62} ${py + TILE_PX * 0.82} L ${px + TILE_PX * 0.38} ${py + TILE_PX * 0.82} L ${px + TILE_PX * 0.18} ${py + TILE_PX * 0.38} Z" fill="${crystal.color}" stroke="rgba(38,24,16,0.72)" stroke-width="0.8"/>`);
     }
   }
 

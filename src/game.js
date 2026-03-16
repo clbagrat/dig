@@ -19,6 +19,7 @@ const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 26;
 const TILES_PER_PERK_ZONE = 370;
 const BASE_MIN_DISTANCE = 50;
+const START_EASY_RADIUS = 5;
 const RADAR_BASE_CHARGES = 10;
 const SCRAP_PERK_BASE_COST = 30;
 const SCRAP_PERK_COST_MULTIPLIER = 1.35;
@@ -79,7 +80,7 @@ const BLOCK_TYPES = [
 const TILE_PERK_TYPES = [
   null,
   { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+120 топлива прямо сейчас" },
-  { name: "Радар", icon: "R", color: "#8ef0cb", desc: "+5 сигналов hotter/colder" },
+  { name: "Радар", icon: "R", color: "#f2ede2", desc: "+5 сигналов hotter/colder" },
   { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.35 к силе удара бура" },
   { name: "Бомба", icon: "*", color: "#c796ff", desc: "Взрыв в радиусе 2 тайлов с уроном x10" },
   { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+15% к скорости нового удара" },
@@ -95,7 +96,7 @@ const SCRAP_PERK_TYPES = [
   { name: "Диагональные буры", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
   { name: "Контурный заряд", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
   { name: "Форсаж на нуле", desc: "Чем меньше топлива, тем быстрее следующий удар" },
-  { name: "Саперный заряд", desc: "Каждые N сломанных буром блоков кидает ракету со взрывом r1 на дистанцию 1" },
+  { name: "Саперный заряд", desc: "Каждые N сломанных буром блоков кидает ракету с малым радиусом на дистанцию 1" },
   { name: "Топливный контур", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
   { name: "Линза обзора", desc: "+1 к радиусу обзора, до максимума 9" },
   { name: "Радарный модуль", desc: "+2 шага от радара" },
@@ -115,21 +116,22 @@ const SCRAP_PERK_TYPES = [
   { name: "Импульс остывания", desc: "В момент начала остывания дает шаги радара" },
   { name: "Разгонные демпферы", desc: "Сокращают оглушение и ускоряют набор heat" },
   { name: "Контурный резонанс", desc: "+1% урона за каждую единицу длины контура до капа уровня" },
-  { name: "Охлаждающие ракеты", desc: "За каждые N остывшего heat выпускают ракету со взрывом r1 на дистанцию 1-3" },
+  { name: "Охлаждающие ракеты", desc: "За каждые N остывшего heat выпускают ракету с малым радиусом на дистанцию 1-3" },
   { name: "Рекуперация контура", desc: "Возврат по своему контуру дает топливо за шаг" },
-  { name: "Терморакеты", desc: "Перегрев выпускает ракеты со взрывом r1 на дистанцию 1-3" },
+  { name: "Терморакеты", desc: "Перегрев выпускает ракеты с малым радиусом на дистанцию 1-3" },
+  { name: "Усиленный бак", desc: "Бак дает больше топлива, но растет расход в секунду" },
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
 const CRYSTAL_TYPES = [
   null,
-  { name: "Красный", color: "#ff6b5e", glow: "rgba(255,107,94,0.22)" },
+  { name: "Красный", color: "#ff4747", glow: "rgba(255,71,71,0.24)" },
   { name: "Желтый", color: "#ffd166", glow: "rgba(255,209,102,0.22)" },
-  { name: "Синий", color: "#72b7ff", glow: "rgba(114,183,255,0.22)" },
+  { name: "Светлый", color: "#f2ede2", glow: "rgba(242,237,226,0.24)" },
   { name: "Зеленый", color: "#73e58f", glow: "rgba(115,229,143,0.22)" },
-  { name: "Фиолетовый", color: "#c796ff", glow: "rgba(199,150,255,0.22)" },
+  { name: "Синий", color: "#72b7ff", glow: "rgba(114,183,255,0.22)" },
 ];
-const CRYSTAL_REWARD_TILE_PERKS = [0, 3, 1, 2, 6, 4];
+const CRYSTAL_REWARD_TILE_PERKS = [0, 3, 1, 2, 6, 5];
 const TILES_PER_CRYSTAL_TILE = 32;
 const CRYSTAL_MIN_DISTANCE = 3;
 const CRYSTAL_RECIPE_LENGTH = 3;
@@ -252,7 +254,7 @@ const state = {
   loopChargeDuration: 0,
   loopChargeDamageBonus: 0,
   contourLengthDamageLevel: 0,
-  loopPerkChance: 0,
+  loopPerkLevel: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
   remoteBombInterval: 0,
@@ -275,6 +277,7 @@ const state = {
   coolingRocketCharge: 0,
   contourReturnFuelLevel: 0,
   heatOverloadRocketLevel: 0,
+  tankBoostLevel: 0,
   playerMoveProgress: 0,
   perkToast: {
     text: "",
@@ -325,6 +328,10 @@ const state = {
 
 function cellIndex(x, y) {
   return y * GRID_W + x;
+}
+
+function isInStartEasyRadius(x, y) {
+  return Math.hypot(x - START_X, y - START_Y) <= START_EASY_RADIUS;
 }
 
 function clamp(value, min, max) {
@@ -778,7 +785,26 @@ function getScrapPerkCost(level) {
 }
 
 function getIdleFuelDrain() {
-  return IDLE_FUEL_DRAIN + Math.floor(state.scrapPerkLevel / 3);
+  const baseDrain = IDLE_FUEL_DRAIN + Math.floor(state.scrapPerkLevel / 3);
+  const tankPenalty = state.tankBoostLevel > 0 ? Math.max(1, baseDrain * 0.1) * state.tankBoostLevel : 0;
+  return baseDrain + tankPenalty;
+}
+
+function getTankFuelMultiplier(level = state.tankBoostLevel) {
+  if (level <= 0) {
+    return 1;
+  }
+  if (level === 1) {
+    return 1.5;
+  }
+  if (level === 2) {
+    return 1.75;
+  }
+  return 2;
+}
+
+function getTankFuelDelta() {
+  return Math.round(120 * getTankFuelMultiplier()) - state.perkFuelBonus;
 }
 
 function getTargetPerkTileCount() {
@@ -924,11 +950,11 @@ function getHazardOrigin(random) {
 }
 
 function canPlaceHazardAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function canPlaceMetalAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y);
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function placeHazardBlob(random, blockCount) {
@@ -1022,15 +1048,15 @@ function placeMetalVein(random, blockCount) {
 }
 
 function canPlaceGasPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function canPlaceSteamPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function canPlaceBoulderPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y);
+  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
 function placeGasPocket(random, cellCount) {
@@ -1308,19 +1334,19 @@ function generateHardnessMap(random) {
   for (let y = 0; y < GRID_H; y += 1) {
     for (let x = 0; x < GRID_W; x += 1) {
       const distanceRatio = clamp(Math.hypot(x - START_X, y - START_Y) / 95, 0, 1);
-      danger[cellIndex(x, y)] = 1 + distanceRatio * 5.6;
+      danger[cellIndex(x, y)] = 1 + distanceRatio * 4.9;
     }
   }
 
   const area = GRID_W * GRID_H;
-  const blobCount = Math.max(18, Math.round(area / 1500));
+  const blobCount = Math.max(24, Math.round(area / 1200));
   for (let i = 0; i < blobCount; i += 1) {
     addDangerBlob(
       danger,
       2 + random() * (GRID_W - 4),
       2 + random() * (GRID_H - 4),
-      8 + random() * 20,
-      -1.2 + random() * 2.5,
+      10 + random() * 24,
+      -1.6 + random() * 3.2,
     );
   }
 
@@ -1367,8 +1393,11 @@ function generateHardnessMap(random) {
   for (let y = 0; y < GRID_H; y += 1) {
     for (let x = 0; x < GRID_W; x += 1) {
       const index = cellIndex(x, y);
-      const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.08;
+      const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.16;
       state.hardness[index] = clamp(Math.round(danger[index] + microNoise), 1, 7);
+      if (isInStartEasyRadius(x, y)) {
+        state.hardness[index] = 1;
+      }
       state.health[index] = BLOCK_TYPES[state.hardness[index]].hp;
       state.tunnelMask[index] = 0;
       state.hazardMask[index] = 0;
@@ -1497,6 +1526,7 @@ function setupField() {
   state.loopChargeDuration = 0;
   state.loopChargeDamageBonus = 0;
   state.contourLengthDamageLevel = 0;
+  state.loopPerkLevel = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
   state.remoteBombInterval = 0;
@@ -1517,6 +1547,9 @@ function setupField() {
   state.heatCoolingPeak = 0;
   state.coolingRocketLevel = 0;
   state.coolingRocketCharge = 0;
+  state.contourReturnFuelLevel = 0;
+  state.heatOverloadRocketLevel = 0;
+  state.tankBoostLevel = 0;
   state.playerMoveProgress = 0;
   state.perkToast.text = "";
   state.perkToast.time = 0;
@@ -2024,7 +2057,7 @@ function updatePerkZones(dt) {
 function applyTilePerk(perkType, x, y, showToast = true) {
   switch (perkType) {
     case 1: {
-      const fuelDelta = 120 - state.perkFuelBonus;
+      const fuelDelta = getTankFuelDelta();
       if (fuelDelta >= 0) {
         addFuel(fuelDelta, x, y);
       } else {
@@ -2141,7 +2174,7 @@ function applyScrapPerk(perkType) {
       state.perkText = "Перелив адреналина";
       break;
     case 16:
-      state.loopPerkChance = Math.min(0.5, state.loopPerkChance > 0 ? state.loopPerkChance + 0.25 : 0.25);
+      state.loopPerkLevel = Math.min(2, state.loopPerkLevel + 1);
       state.perkText = "Контурный трофей";
       break;
     case 17:
@@ -2195,6 +2228,10 @@ function applyScrapPerk(perkType) {
     case 29:
       state.heatOverloadRocketLevel = Math.min(3, state.heatOverloadRocketLevel + 1);
       state.perkText = "Терморакеты";
+      break;
+    case 30:
+      state.tankBoostLevel = Math.min(3, state.tankBoostLevel + 1);
+      state.perkText = "Усиленный бак";
       break;
     default:
       break;
@@ -2917,6 +2954,9 @@ function prepareScrapPerkChoices() {
   if (state.heatOverloadRocketLevel < 3) {
     bag.push(29);
   }
+  if (state.tankBoostLevel < 3) {
+    bag.push(30);
+  }
   if (state.loopChargeLevel >= 4) {
     const idx = bag.indexOf(5);
     if (idx !== -1) {
@@ -2935,7 +2975,7 @@ function prepareScrapPerkChoices() {
   if (state.overhealOverdriveDuration < 7) {
     bag.push(15);
   }
-  if (state.loopPerkChance < 0.5) {
+  if (state.loopPerkLevel < 2) {
     bag.push(16);
   }
   if (state.idleAutoCloseDelay > IDLE_AUTO_CLOSE_MIN_DELAY) {
@@ -3100,327 +3140,332 @@ function formatPerkNumber(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function formatSignedNumber(value, suffix = "") {
+  const text = `${value >= 0 ? "+" : ""}${formatPerkNumber(value)}`;
+  return suffix ? `${text}${suffix}` : text;
+}
+
 function getCoolingRocketThreshold() {
   const thresholds = [0, 50, 40, 30];
   return thresholds[state.coolingRocketLevel] || 50;
 }
 
+function getLoopPerkChance(cellCount, level = state.loopPerkLevel) {
+  if (level <= 0) {
+    return 0;
+  }
+  const largeLoop = cellCount >= 9;
+  if (level === 1) {
+    return largeLoop ? 0.35 : 0.15;
+  }
+  return largeLoop ? 0.75 : 0.4;
+}
+
+function getScrapPerkNextLevel(perkType) {
+  switch (perkType) {
+    case 1:
+      return state.sideDrills + 1;
+    case 2:
+      return Math.max(1, state.jumpRange);
+    case 3:
+      return Math.round(state.longDrillPower / 0.1) + 1;
+    case 4:
+      return Math.round(state.diagonalDrillPower / 0.05) + 1;
+    case 5:
+      return Math.min(4, state.loopChargeLevel + 1);
+    case 6:
+      return Math.round(state.lowFuelSpeedBonus / 0.35) + 1;
+    case 7:
+      return state.remoteBombLevel + 1;
+    case 8:
+      return Math.round(state.perkFuelBonus / 50) + 1;
+    case 9:
+      return Math.max(1, state.visionRadius - VISION_RADIUS + 1);
+    case 10:
+      return Math.round(state.radarBonus / 2) + 1;
+    case 11:
+      return Math.round(state.scrapBonus / 2) + 1;
+    case 12:
+      return Math.round(state.fuelOnBreak / 2) + 1;
+    case 13:
+      return 1;
+    case 14:
+      return state.maxHp - START_HP + 1;
+    case 15:
+      return Math.max(1, state.overhealOverdriveDuration - 1);
+    case 16:
+      return Math.min(2, state.loopPerkLevel + 1);
+    case 17:
+      return IDLE_AUTO_CLOSE_DELAY - Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
+    case 18:
+      return Math.min(3, state.crystalCatalystLevel + 1);
+    case 19:
+      return Math.min(3, state.spikeOverdriveLevel + 1);
+    case 20:
+      return Math.round(state.heatExplosionDamageBonus) + 1;
+    case 21:
+      return 0;
+    case 22:
+      return Math.round((state.maxHeat - MAX_HEAT) / 20) + 1;
+    case 23:
+      return Math.round(state.heatDamageBonus / 0.2) + 1;
+    case 24:
+      return state.heatCoolingRewardLevel + 1;
+    case 25:
+      return Math.round(state.stunReduction / 0.4) + 1;
+    case 26:
+      return Math.min(4, state.contourLengthDamageLevel + 1);
+    case 27:
+      return Math.min(3, state.coolingRocketLevel + 1);
+    case 28:
+      return Math.min(3, state.contourReturnFuelLevel + 1);
+    case 29:
+      return Math.min(3, state.heatOverloadRocketLevel + 1);
+    case 30:
+      return Math.min(3, state.tankBoostLevel + 1);
+    default:
+      return 1;
+  }
+}
+
 function getScrapPerkPreview(perkType) {
   switch (perkType) {
     case 1: {
-      const level = state.sideDrills;
       const currentPower = 0.5 + state.sideDrills * 0.25;
       const nextPower = 0.5 + (state.sideDrills + 1) * 0.25;
       return {
-        level,
-        current: `Сейчас: боковой удар ${formatPerkPercent(currentPower)} от силы бура`,
-        next: `После выбора: ${formatPerkPercent(nextPower)} от силы бура`,
+        effect: "Бьет слева и справа от героя",
+        compare: `Урон ${formatPerkPercent(currentPower)} → ${formatPerkPercent(nextPower)}`,
       };
     }
     case 2: {
-      const level = state.jumpDrive ? Math.max(1, state.jumpRange - 1) : 0;
       const currentRange = state.jumpDrive ? state.jumpRange : 0;
       const nextRange = Math.max(2, state.jumpRange + 1);
       return {
-        level,
-        current: currentRange > 0 ? `Сейчас: рывок на ${currentRange} клетки` : "Сейчас: рывка еще нет",
-        next: `После выбора: рывок на ${nextRange} клетки`,
+        effect: "Рывок после каждых 10 шагов",
+        compare: `Дальность ${currentRange} → ${nextRange}`,
       };
     }
     case 3: {
-      const level = Math.round(state.longDrillPower / 0.1);
       const currentPower = state.longDrillPower > 0 ? 0.1 + state.longDrillPower : 0;
       const nextPower = 0.1 + state.longDrillPower + 0.1;
       return {
-        level,
-        current: currentPower > 0 ? `Сейчас: дальний удар ${formatPerkPercent(currentPower)}` : "Сейчас: дальнего удара еще нет",
-        next: `После выбора: дальний удар ${formatPerkPercent(nextPower)}`,
+        effect: "Бьет следующий тайл по прямой",
+        compare: `Урон ${formatPerkPercent(currentPower)} → ${formatPerkPercent(nextPower)}`,
       };
     }
     case 4: {
-      const level = Math.round(state.diagonalDrillPower / 0.05);
       const currentPower = state.diagonalDrillPower > 0 ? 0.15 + state.diagonalDrillPower : 0;
       const nextPower = 0.15 + state.diagonalDrillPower + 0.05;
       return {
-        level,
-        current: currentPower > 0 ? `Сейчас: диагональный удар ${formatPerkPercent(currentPower)}` : "Сейчас: диагональных ударов еще нет",
-        next: `После выбора: диагональный удар ${formatPerkPercent(nextPower)}`,
+        effect: "Бьет две диагонали вперед",
+        compare: `Урон ${formatPerkPercent(currentPower)} → ${formatPerkPercent(nextPower)}`,
       };
     }
     case 5: {
-      const level = state.loopChargeLevel;
       const nextLevel = Math.min(4, state.loopChargeLevel + 1);
       const currentDuration = state.loopChargeDuration || 0;
       const nextDuration = 2 + nextLevel;
       return {
-        level,
-        current:
-          level > 0
-            ? `Сейчас: замыкание дает +5% урона за клетку внутри на ${currentDuration} сек`
-            : "Сейчас: контурный заряд еще не активен",
-        next: `После выбора: баф будет длиться ${nextDuration} сек`,
+        effect: "+5% урона за клетку в контуре",
+        compare: `Длительность ${currentDuration} → ${nextDuration} сек`,
       };
     }
     case 6: {
-      const level = Math.round(state.lowFuelSpeedBonus / 0.35);
       return {
-        level,
-        current: `Сейчас: максимум ${formatPerkPercent(state.lowFuelSpeedBonus)} ускорения на низком топливе`,
-        next: `После выбора: максимум ${formatPerkPercent(state.lowFuelSpeedBonus + 0.35)}`,
+        effect: "Ускоряет бур при низком топливе",
+        compare: `Бонус ${formatPerkPercent(state.lowFuelSpeedBonus)} → ${formatPerkPercent(state.lowFuelSpeedBonus + 0.35)}`,
       };
     }
     case 7: {
-      const level = state.remoteBombLevel;
-      const nextInterval = Math.max(15, state.remoteBombInterval > 0 ? state.remoteBombInterval - 5 : 30);
+      const currentInterval = state.remoteBombInterval || 0;
+      const nextInterval = Math.max(15, currentInterval > 0 ? currentInterval - 5 : 30);
       return {
-        level,
-        current:
-          state.remoteBombInterval > 0
-            ? `Сейчас: каждые ${state.remoteBombInterval} <span class="perk-option__delta">(${nextInterval})</span> блоков, сломанных буром, летит ракета со взрывом r1 на дистанцию 1`
-            : `Сейчас: саперный заряд еще не активен`,
-        next:
-          state.remoteBombInterval > 0
-            ? "После выбора: интервал станет меньше"
-            : `После выбора: ракета со взрывом r1 начнет срабатывать каждые <span class="perk-option__delta">(30)</span> блоков`,
+        effect: "Ракета за сломанные буром блоки",
+        compare: `Интервал ${currentInterval || 30} → ${nextInterval}`,
       };
     }
     case 8: {
-      const level = Math.round(state.perkFuelBonus / 50);
       const currentTankDelta = 120 - state.perkFuelBonus;
       const nextFuelBonus = state.perkFuelBonus + 50;
       const nextTankDelta = 120 - nextFuelBonus;
       return {
-        level,
-        current: `Сейчас: любой перк +${state.perkFuelBonus} топлива, Бак ${currentTankDelta >= 0 ? `+${currentTankDelta}` : currentTankDelta}`,
-        next: `После выбора: любой перк +${nextFuelBonus}, Бак ${nextTankDelta >= 0 ? `+${nextTankDelta}` : nextTankDelta}`,
+        effect: "Все перки дают топливо, Бак слабеет",
+        compare: `Бак ${formatSignedNumber(currentTankDelta)} → ${formatSignedNumber(nextTankDelta)}`,
       };
     }
     case 9: {
-      const level = Math.max(0, state.visionRadius - VISION_RADIUS);
       const nextRadius = Math.min(9, state.visionRadius + 1);
       return {
-        level,
-        current: `Сейчас: радиус видимости ${state.visionRadius}`,
-        next: `После выбора: радиус ${nextRadius}`,
+        effect: "+1 радиус (макс. 9)",
+        compare: `Радиус ${state.visionRadius} → ${nextRadius}`,
       };
     }
     case 10: {
-      const level = Math.round(state.radarBonus / 2);
       return {
-        level,
-        current: `Сейчас: радар дает +${state.radarBonus} шагов`,
-        next: `После выбора: +${state.radarBonus + 2} шагов`,
+        effect: "+2 шага после подбора радара",
+        compare: `${state.radarBonus} → ${state.radarBonus + 2}`,
       };
     }
     case 11: {
-      const level = Math.round(state.scrapBonus / 2);
       return {
-        level,
-        current: `Сейчас: +${state.scrapBonus} scrap за блок`,
-        next: `После выбора: +${state.scrapBonus + 2} scrap за блок`,
+        effect: "+2 scrap за каждый блок",
+        compare: `${state.scrapBonus} → ${state.scrapBonus + 2}`,
       };
     }
     case 12: {
-      const level = Math.round(state.fuelOnBreak / 2);
       return {
-        level,
-        current: `Сейчас: +${state.fuelOnBreak} топлива за блок`,
-        next: `После выбора: +${state.fuelOnBreak + 2} топлива за блок`,
+        effect: "+2 топлива за каждый блок",
+        compare: `${state.fuelOnBreak} → ${state.fuelOnBreak + 2}`,
       };
     }
     case 13: {
       return {
-        level: state.overflowBomb ? 1 : 0,
-        current: state.overflowBomb
-          ? `Сейчас: бак ${state.maxFuel}, overflow дает 3 сек форсажа`
-          : `Сейчас: бак ${state.maxFuel}, переполнения нет`,
-        next: `После выбора: бак ${Math.max(100, state.maxFuel - 150)}, +50 к топливу, 3 сек форсажа, потом взрыв r2 и стан 3 сек`,
+        effect: "Переполнение дает форсаж, потом взрыв",
+        compare: `Бак ${state.maxFuel} → ${Math.max(100, state.maxFuel - 150)}`,
       };
     }
     case 14: {
-      const level = Math.max(0, state.maxHp - START_HP);
       return {
-        level,
-        current: `Сейчас: HP ${state.hp}/${state.maxHp}`,
-        next: `После выбора: максимум ${state.maxHp + 1}, лечение на 2`,
+        effect: "+1 макс HP, +2 лечение",
+        compare: `Макс HP ${state.maxHp} → ${state.maxHp + 1}`,
       };
     }
     case 15: {
-      const level = Math.max(0, state.overhealOverdriveDuration - 2);
       const nextDuration = Math.min(7, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 1 : 3);
       return {
-        level,
-        current:
-          state.overhealOverdriveDuration > 0
-            ? `Сейчас: баф длится ${state.overhealOverdriveDuration} сек`
-            : "Сейчас: overheal-бафа еще нет",
-        next: `После выбора: баф ${nextDuration} сек без траты топлива на бурение`,
+        effect: "Лишнее лечение включает форсаж",
+        compare: `Длительность ${state.overhealOverdriveDuration || 0} → ${nextDuration} сек`,
       };
     }
     case 16: {
-      const level = Math.round(state.loopPerkChance / 0.25);
-      const nextChance = Math.min(0.5, state.loopPerkChance > 0 ? state.loopPerkChance + 0.25 : 0.25);
+      const currentSmall = getLoopPerkChance(0);
+      const currentLarge = getLoopPerkChance(9);
+      const nextSmall = getLoopPerkChance(0, Math.min(2, state.loopPerkLevel + 1));
+      const nextLarge = getLoopPerkChance(9, Math.min(2, state.loopPerkLevel + 1));
       return {
-        level,
-        current:
-          state.loopPerkChance > 0
-            ? `Сейчас: ${formatPerkPercent(state.loopPerkChance)} на перк из большого контура`
-            : "Сейчас: трофеи из контура еще не выпадают",
-        next: `После выбора: ${formatPerkPercent(nextChance)} шанс на перк`,
+        effect: "Малый и большой контур могут дать тайловый перк",
+        compare: `${formatPerkPercent(currentSmall)}/${formatPerkPercent(currentLarge)} → ${formatPerkPercent(nextSmall)}/${formatPerkPercent(nextLarge)}`,
       };
     }
     case 17: {
-      const level = IDLE_AUTO_CLOSE_DELAY - state.idleAutoCloseDelay;
       const nextDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
       return {
-        level,
-        current: `Сейчас: автозамыкание через ${state.idleAutoCloseDelay} сек`,
-        next: `После выбора: через ${nextDelay} сек`,
+        effect: "Контур дорисовывается сам в простое",
+        compare: `${state.idleAutoCloseDelay} → ${nextDelay} сек`,
       };
     }
     case 18: {
       const level = state.crystalCatalystLevel;
-      let current = "Сейчас: кристаллы без бонуса";
-      let next = "После выбора: +30 scrap за кристалл";
+      let effect = "Бонусы за кристаллы";
+      let compare = "0 → +30 scrap";
       if (level === 1) {
-        current = "Сейчас: +30 scrap за кристалл";
-        next = "После выбора: +30 scrap и +40 fuel";
+        compare = "+30 scrap → +40 fuel";
       } else if (level === 2) {
-        current = "Сейчас: +30 scrap и +40 fuel";
-        next = "После выбора: +30 scrap, +40 fuel и +1 HP";
+        compare = "+40 fuel → +1 HP";
       } else if (level >= 3) {
-        current = "Сейчас: +30 scrap, +40 fuel и +1 HP";
-        next = "После выбора: максимум уже достигнут";
+        compare = "Макс.";
       }
-      return { level, current, next };
+      return { effect, compare };
     }
     case 19: {
-      const level = state.spikeOverdriveLevel;
       const durations = [0, 5, 7, 10];
-      const currentDuration = durations[level] || 0;
-      const nextDuration = durations[Math.min(3, level + 1)] || 10;
+      const currentDuration = durations[state.spikeOverdriveLevel] || 0;
+      const nextDuration = durations[Math.min(3, state.spikeOverdriveLevel + 1)] || 10;
       return {
-        level,
-        current: level > 0 ? `Сейчас: шипы дают overdrive на ${currentDuration} сек` : "Сейчас: шиповой форсаж еще не активен",
-        next: `После выбора: будет ${nextDuration} сек`,
+        effect: "Разбитые шипы дают форсаж",
+        compare: `${currentDuration} → ${nextDuration} сек`,
       };
     }
     case 20: {
-      const level = Math.round(state.heatExplosionDamageBonus);
       return {
-        level,
-        current: `Сейчас: взрыв x${formatPerkNumber(1 + state.heatExplosionDamageBonus)}, радиус ${formatPerkNumber(1 + state.heatExplosionRadiusBonus)}`,
-        next: `После выбора: x${formatPerkNumber(2 + state.heatExplosionDamageBonus)}, радиус ${formatPerkNumber(1.5 + state.heatExplosionRadiusBonus)}`,
+        effect: "Усиляет взрыв от перегрева",
+        compare: `x${formatPerkNumber(1 + state.heatExplosionDamageBonus)} r${formatPerkNumber(1 + state.heatExplosionRadiusBonus)} → x${formatPerkNumber(2 + state.heatExplosionDamageBonus)} r${formatPerkNumber(1.5 + state.heatExplosionRadiusBonus)}`,
       };
     }
     case 21: {
       return {
-        level: 0,
-        current: "Сейчас: слито в Термозаряд",
-        next: "После выбора: не предлагается",
+        effect: "Слит в Термозаряд",
+        compare: "—",
       };
     }
     case 22: {
-      const level = Math.round((state.maxHeat - MAX_HEAT) / 20);
       return {
-        level,
-        current: `Сейчас: перегрев на ${state.maxHeat} heat`,
-        next: `После выбора: ${state.maxHeat + 20} heat`,
+        effect: "+20 к лимиту перегрева",
+        compare: `${state.maxHeat} → ${state.maxHeat + 20}`,
       };
     }
     case 23: {
-      const level = Math.round(state.heatDamageBonus / 0.2);
       return {
-        level,
-        current: `Сейчас: до ${formatPerkPercent(state.heatDamageBonus)} урона на полном нагреве`,
-        next: `После выбора: до ${formatPerkPercent(state.heatDamageBonus + 0.2)}`,
+        effect: "Чем выше нагрев, тем выше урон",
+        compare: `${formatPerkPercent(state.heatDamageBonus)} → ${formatPerkPercent(state.heatDamageBonus + 0.2)}`,
       };
     }
     case 24: {
-      const level = state.heatCoolingRewardLevel;
       return {
-        level,
-        current:
-          level > 0
-            ? `Сейчас: полное остывание после 50+ heat дает +${level * 2} шагов радара`
-            : "Сейчас: полное остывание не дает радара",
-        next: `После выбора: +${(level + 1) * 2} шагов после полного остывания`,
+        effect: "Полное остывание дает шаги радара",
+        compare: `${state.heatCoolingRewardLevel * 2} → ${(state.heatCoolingRewardLevel + 1) * 2}`,
       };
     }
     case 25: {
-      const level = Math.round(state.stunReduction / 0.4);
       return {
-        level,
-        current:
-          level > 0
-            ? `Сейчас: стан короче на ${formatPerkNumber(state.stunReduction)} сек, heat за удар ${HEAT_PER_STRIKE + state.heatGainBonus}`
-            : `Сейчас: стан без сокращения, heat за удар ${HEAT_PER_STRIKE}`,
-        next: `После выбора: стан -${formatPerkNumber(state.stunReduction + 0.4)} сек, heat ${HEAT_PER_STRIKE + state.heatGainBonus + 1}`,
+        effect: "Меньше стан, но быстрее перегрев",
+        compare: `${HEAT_PER_STRIKE + state.heatGainBonus} → ${HEAT_PER_STRIKE + state.heatGainBonus + 1} heat`,
       };
     }
     case 26: {
       const caps = [0, 15, 30, 50, 100];
-      const level = state.contourLengthDamageLevel;
       const contourLength = Math.max(0, state.pathTiles.length - 1);
-      const currentBonus = Math.min(caps[level] || 0, contourLength);
-      const nextCap = caps[Math.min(4, level + 1)] || 100;
+      const currentBonus = Math.min(caps[state.contourLengthDamageLevel] || 0, contourLength);
+      const nextCap = caps[Math.min(4, state.contourLengthDamageLevel + 1)] || 100;
       return {
-        level,
-        current:
-          level > 0
-            ? `Сейчас: +${currentBonus}% от длины контура, кап ${caps[level]}%`
-            : "Сейчас: бонуса от длины контура еще нет",
-        next: `После выбора: кап станет ${nextCap}%`,
+        effect: `+1% урона за длину контура (макс. ${nextCap}%)`,
+        compare: `${currentBonus}% → ${Math.min(nextCap, contourLength)}%`,
       };
     }
     case 27: {
-      const level = state.coolingRocketLevel;
       const thresholds = [0, 50, 40, 30];
-      const currentThreshold = thresholds[level] || 50;
-      const nextThreshold = thresholds[Math.min(3, level + 1)] || 30;
+      const currentThreshold = thresholds[state.coolingRocketLevel] || 50;
+      const nextThreshold = thresholds[Math.min(3, state.coolingRocketLevel + 1)] || 30;
       return {
-        level,
-        current:
-          level > 0
-            ? `Сейчас: каждые ${currentThreshold} остывшего heat дают ракету со взрывом r1`
-            : "Сейчас: охлаждение не выпускает ракеты",
-        next:
-          level > 0
-            ? `После выбора: каждые ${nextThreshold} heat`
-            : "После выбора: каждые 50 остывшего heat будет ракета со взрывом r1 на дистанцию 1-3",
+        effect: "Остывание выпускает ракету малого радиуса",
+        compare: `${currentThreshold} → ${nextThreshold} heat`,
       };
     }
     case 28: {
-      const level = state.contourReturnFuelLevel;
       const gains = [0, 3, 4, 5];
-      const currentGain = gains[level] || 0;
-      const nextGain = gains[Math.min(3, level + 1)] || 5;
+      const currentGain = gains[state.contourReturnFuelLevel] || 0;
+      const nextGain = gains[Math.min(3, state.contourReturnFuelLevel + 1)] || 5;
       return {
-        level,
-        current:
-          level > 0
-            ? `Сейчас: шаг назад по контуру дает +${currentGain} топлива`
-            : "Сейчас: возврат по контуру не дает топлива",
-        next: `После выбора: +${nextGain} топлива за такой шаг`,
+        effect: "Шаг назад по контуру дает топливо",
+        compare: `${currentGain} → ${nextGain}`,
       };
     }
     case 29: {
-      const level = state.heatOverloadRocketLevel;
-      const nextCount = Math.min(3, level + 1);
+      const currentCount = state.heatOverloadRocketLevel;
+      const nextCount = Math.min(3, currentCount + 1);
       return {
-        level,
-        current:
-          level > 0
-            ? `Сейчас: перегрев выпускает ${level} ${level === 1 ? "ракету" : level < 5 ? "ракеты" : "ракет"}`
-            : "Сейчас: перегрев не выпускает ракеты",
-        next: `После выбора: ${nextCount} ${nextCount === 1 ? "ракета" : nextCount < 5 ? "ракеты" : "ракет"} со взрывом r1`,
+        effect: "Перегрев выпускает ракеты малого радиуса",
+        compare: `${currentCount} → ${nextCount}`,
+      };
+    }
+    case 30: {
+      const currentMultiplier = getTankFuelMultiplier();
+      const nextMultiplier = getTankFuelMultiplier(Math.min(3, state.tankBoostLevel + 1));
+      const currentTank = Math.round(120 * currentMultiplier) - state.perkFuelBonus;
+      const nextTank = Math.round(120 * nextMultiplier) - state.perkFuelBonus;
+      const currentDrain = getIdleFuelDrain();
+      const nextBaseDrain = IDLE_FUEL_DRAIN + Math.floor(state.scrapPerkLevel / 3);
+      const nextDrain = nextBaseDrain + Math.max(1, nextBaseDrain * 0.1) * Math.min(3, state.tankBoostLevel + 1);
+      return {
+        effect: "Бак сильнее, но растет расход в секунду",
+        compare: `Бак ${formatSignedNumber(currentTank)} / ${formatPerkNumber(currentDrain)} → ${formatSignedNumber(nextTank)} / ${formatPerkNumber(nextDrain)}`,
       };
     }
     default:
       return {
-        level: 0,
-        current: "Сейчас: без данных",
-        next: "После выбора: без данных",
+        effect: "Без данных",
+        compare: "—",
       };
   }
 }
@@ -3432,13 +3477,17 @@ function syncPerkChoiceOverlay() {
   }
 
   overlay.hidden = !state.isChoosingPerk;
+  const subtitle = overlay.querySelector(".perk-choice__subtitle");
   const rerollButton = document.getElementById("perkReroll");
   const rerollCount = document.getElementById("perkRerollCount");
+  if (subtitle) {
+    subtitle.textContent = `Апгрейд за ${getScrapPerkCost(state.scrapPerkLevel)} скрапа`;
+  }
   if (rerollButton) {
     rerollButton.disabled = !state.isChoosingPerk || state.perkRerolls <= 0;
   }
   if (rerollCount) {
-    rerollCount.textContent = `Рероллы: ${state.perkRerolls} (за рецепты)`;
+    rerollCount.textContent = `Рероллы ${state.perkRerolls}`;
   }
   syncDebugPerkOverlay();
   const buttons = document.querySelectorAll("[data-perk-slot]");
@@ -3449,9 +3498,8 @@ function syncPerkChoiceOverlay() {
       button.innerHTML = "";
       continue;
     }
-    const perk = SCRAP_PERK_TYPES[perkType];
     const preview = getScrapPerkPreview(perkType);
-    button.innerHTML = `<span class="perk-option__name">${perk.name}</span><span class="perk-option__meta">Уровень: ${preview.level}</span><span class="perk-option__desc">${perk.desc}</span><span class="perk-option__stat">${preview.current}</span><span class="perk-option__next">${preview.next}</span>`;
+    button.innerHTML = `<span class="perk-option__top"><span class="perk-option__name">${SCRAP_PERK_TYPES[perkType].name}</span><span class="perk-option__level">Лвл ${getScrapPerkNextLevel(perkType)}</span></span><span class="perk-option__effect">${preview.effect}</span><span class="perk-option__compare">${preview.compare}</span>`;
   }
 }
 
@@ -4599,7 +4647,8 @@ function getLoopPerkBlockHardness(x, y) {
 }
 
 function maybeSpawnLoopPerk(interiorCells) {
-  if (state.loopPerkChance <= 0 || interiorCells.length < 9 || state.worldRandom() >= state.loopPerkChance) {
+  const chance = getLoopPerkChance(interiorCells.length);
+  if (chance <= 0 || state.worldRandom() >= chance) {
     return;
   }
 
@@ -5184,7 +5233,7 @@ function renderCrystalTile(x, y, sx, sy) {
   ctx.lineTo(sx + 10, sy + TILE_SIZE * 0.38);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.36)";
+  ctx.strokeStyle = "rgba(38,24,16,0.72)";
   ctx.lineWidth = 1.2;
   ctx.stroke();
   ctx.beginPath();
@@ -5458,18 +5507,18 @@ function renderSignalStatus(camera) {
   const width = Math.max(74, ctx.measureText(text).width + 18);
   const barRatio = state.signalMovesMax > 0 ? clamp(state.signalMovesLeft / state.signalMovesMax, 0, 1) : 0;
   ctx.fillStyle = "rgba(23, 14, 9, 0.82)";
-  ctx.strokeStyle = "rgba(196, 240, 255, 0.36)";
+  ctx.strokeStyle = "rgba(242, 237, 226, 0.42)";
   ctx.lineWidth = 1.5;
   buildRoundedRectPath(ctx, x - width * 0.5, y - 18, width, 30, 10);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#c4f0ff";
+  ctx.fillStyle = "#fffaf1";
   ctx.fillText(text, x, y - 1);
   ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
   buildRoundedRectPath(ctx, x - width * 0.5 + 8, y + 2, width - 16, 4, 3);
   ctx.fill();
   if (barRatio > 0) {
-    ctx.fillStyle = "#8ef0cb";
+    ctx.fillStyle = "#f2ede2";
     buildRoundedRectPath(ctx, x - width * 0.5 + 8, y + 2, (width - 16) * barRatio, 4, 3);
     ctx.fill();
   }
