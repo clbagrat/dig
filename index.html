@@ -21,10 +21,33 @@
         <div class="perk-choice__panel">
           <div class="perk-choice__title">Выбери апгрейд</div>
           <div class="perk-choice__subtitle">Мощный апгрейд за каждые 30 скрапа</div>
+          <div class="perk-choice__actions">
+            <button id="perkReroll" class="perk-choice__reroll" type="button">Реролл</button>
+            <span id="perkRerollCount" class="perk-choice__reroll-count">0</span>
+          </div>
           <div class="perk-choice__options">
             <button class="perk-option" data-perk-slot="0"></button>
             <button class="perk-option" data-perk-slot="1"></button>
             <button class="perk-option" data-perk-slot="2"></button>
+          </div>
+        </div>
+      </div>
+      <div id="debugPerkMenu" class="debug-perk-menu" hidden>
+        <div class="debug-perk-menu__panel">
+          <div class="debug-perk-menu__head">
+            <div>
+              <div class="debug-perk-menu__title">Debug Perks</div>
+              <div class="debug-perk-menu__subtitle">Тап по SEED открывает это меню</div>
+            </div>
+            <button id="debugPerkClose" class="debug-perk-menu__close" type="button">Закрыть</button>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Tile Perks</div>
+            <div id="debugTilePerks" class="debug-perk-menu__grid"></div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Scrap Perks</div>
+            <div id="debugScrapPerks" class="debug-perk-menu__grid"></div>
           </div>
         </div>
       </div>

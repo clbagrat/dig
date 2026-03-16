@@ -10,8 +10,8 @@ const START_Y = Math.floor(GRID_H / 2);
 const BASE_MIN_DISTANCE = 50;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
-const TILES_PER_PERK_TILE = 44;
-const TILES_PER_PERK_ZONE = 480;
+const TILES_PER_PERK_TILE = 34;
+const TILES_PER_PERK_ZONE = 370;
 const METAL_VEIN_GROUPS = 16;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
@@ -44,12 +44,13 @@ const TILE_PERK_TYPES = [
   { name: "Bak", icon: "F", color: "#ffcf7a" },
   { name: "Radar", icon: "R", color: "#8ef0cb" },
   { name: "Bur", icon: "D", color: "#ff9f6b" },
-  { name: "Bomba", icon: "*", color: "#ff7c5f" },
+  { name: "Bomba", icon: "*", color: "#c796ff" },
   { name: "Skorost", icon: "S", color: "#9fd7ff" },
-  { name: "HP+", icon: "H", color: "#ff8f8f" },
+  { name: "HP+", icon: "H", color: "#73e58f" },
+  { name: "Armor", icon: "A", color: "#b4d7ff" },
 ];
 
-const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
+const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
 const CRYSTAL_TYPES = [
   null,
   { name: "Red", color: "#ff6b5e" },
@@ -64,7 +65,7 @@ const CARDINAL_DIRS = [
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ];
-const TILES_PER_CRYSTAL_TILE = 94;
+const TILES_PER_CRYSTAL_TILE = 32;
 const CRYSTAL_MIN_DISTANCE = 3;
 
 function parseArgs(argv) {

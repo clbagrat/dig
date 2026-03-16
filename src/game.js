@@ -9,13 +9,14 @@ const START_X = Math.floor(GRID_W / 2);
 const START_Y = Math.floor(GRID_H / 2);
 const START_FUEL = 420;
 const START_HP = 7;
+const MAX_HEAT = 100;
 const IDLE_FUEL_DRAIN = 0.8;
 const MOVE_FUEL_COST = 1.8;
 const STRIKE_FUEL_COST = 4.5;
 const STRIKE_CYCLE_SPEED = 8;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
-const TILES_PER_PERK_TILE = 34;
+const TILES_PER_PERK_TILE = 26;
 const TILES_PER_PERK_ZONE = 370;
 const BASE_MIN_DISTANCE = 50;
 const RADAR_BASE_CHARGES = 10;
@@ -43,8 +44,13 @@ const STEAM_LIFETIME = 3;
 const STEAM_DAMAGE = 1;
 const STEAM_RANGE = 99;
 const EXPLOSION_BREAK_DAMAGE = 9999;
+const OVERFLOW_OVERDRIVE_DURATION = 3;
+const OVERFLOW_STUN_DURATION = 3;
+const HEAT_PER_STRIKE = 3;
+const HEAT_COOL_RATE = 8;
+const HEAT_STUN_DURATION = 3;
 const FUEL_DEPLETION_HP_COST = 1;
-const FUEL_DEPLETION_RECOVERY = 50;
+const FUEL_DEPLETION_RECOVERY = 100;
 const IMPACT_EFFECT_DURATION = 0.22;
 const BREAK_EFFECT_DURATION = 0.42;
 const EXPLOSION_EFFECT_DURATION = 0.48;
@@ -64,19 +70,19 @@ const BLOCK_TYPES = [
   { hp: 9, color: "#715337", scrap: 4, vein: "#c59a5c" },
   { hp: 12, color: "#6a4f37", scrap: 6, vein: "#d0a66a" },
   { hp: 15, color: "#6f4f40", scrap: 8, vein: "#b66e3b" },
-  { hp: 18, color: "#60473f", scrap: 11, vein: "#a57f58" },
-  { hp: 21, color: "#4f3d36", scrap: 14, vein: "#9cb1b7" },
-  { hp: 27, color: "#3e3236", scrap: 18, vein: "#d6d9df" },
+  { hp: 22, color: "#60473f", scrap: 11, vein: "#a57f58" },
+  { hp: 26, color: "#4f3d36", scrap: 14, vein: "#9cb1b7" },
+  { hp: 34, color: "#3e3236", scrap: 18, vein: "#d6d9df" },
 ];
 
 const TILE_PERK_TYPES = [
   null,
-  { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+90 топлива прямо сейчас" },
+  { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+120 топлива прямо сейчас" },
   { name: "Радар", icon: "R", color: "#8ef0cb", desc: "+5 сигналов hotter/colder" },
-  { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.5 к силе удара бура" },
-  { name: "Бомба", icon: "*", color: "#ff7c5f", desc: "Взрыв в радиусе 2 тайлов с уроном x10" },
+  { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.35 к силе удара бура" },
+  { name: "Бомба", icon: "*", color: "#c796ff", desc: "Взрыв в радиусе 2 тайлов с уроном x10" },
   { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+15% к скорости нового удара" },
-  { name: "HP+", icon: "H", color: "#ff8f8f", desc: "+1 к текущему здоровью" },
+  { name: "HP+", icon: "H", color: "#73e58f", desc: "+1 к текущему здоровью" },
   { name: "Броня", icon: "A", color: "#b4d7ff", desc: "+1 брони против внешней опасности" },
 ];
 
@@ -88,17 +94,29 @@ const SCRAP_PERK_TYPES = [
   { name: "Диагональные буры", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
   { name: "Контурный заряд", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
   { name: "Форсаж на нуле", desc: "Чем меньше топлива, тем быстрее следующий удар" },
-  { name: "Саперный заряд", desc: "Каждые N сломанных буром блоков кидает бомбу 2x2 на дистанцию 1" },
+  { name: "Саперный заряд", desc: "Каждые N сломанных буром блоков кидает ракету со взрывом r1 на дистанцию 1" },
   { name: "Топливный контур", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
   { name: "Линза обзора", desc: "+1 к радиусу обзора, до максимума 9" },
   { name: "Радарный модуль", desc: "+2 шага от радара" },
   { name: "Ломосбор", desc: "+2 скрапа за каждый разрушенный блок" },
   { name: "Топлорециркулятор", desc: "+2 топлива за каждый разрушенный блок" },
-  { name: "Перегрузка", desc: "Переполнение топлива запускает дальнюю бомбу, бак -150, топлива +50" },
+  { name: "Перегрузка", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
   { name: "Усиленный корпус", desc: "+1 к максимуму HP и лечит на 2" },
   { name: "Перелив адреналина", desc: "Overheal дает 3 секунды бафа, потом растет до максимума 7" },
   { name: "Контурный трофей", desc: "Большой контур может создать случайный перк внутри" },
   { name: "Автоконтур", desc: "-1 сек к задержке автозамыкания контура, до минимума 1" },
+  { name: "Кристальный катализатор", desc: "Кристаллы начинают давать scrap, потом fuel и HP" },
+  { name: "Шиповой форсаж", desc: "Разбитые шипы дают overdrive-баф на 5/7/10 секунд" },
+  { name: "Термозаряд", desc: "Усиливает урон и радиус взрыва от перегрева" },
+  { name: "Терморасширение", desc: "Скрыто: слито в Термозаряд" },
+  { name: "Теплоотвод", desc: "Повышает предел нагрева до перегрева" },
+  { name: "Накал бура", desc: "Повышает урон бура в зависимости от нагрева" },
+  { name: "Импульс остывания", desc: "В момент начала остывания дает шаги радара" },
+  { name: "Разгонные демпферы", desc: "Сокращают оглушение и ускоряют набор heat" },
+  { name: "Контурный резонанс", desc: "+1% урона за каждую единицу длины контура до капа уровня" },
+  { name: "Охлаждающие ракеты", desc: "За каждые N остывшего heat выпускают ракету со взрывом r1 на дистанцию 1-3" },
+  { name: "Рекуперация контура", desc: "Возврат по своему контуру дает топливо за шаг" },
+  { name: "Терморакеты", desc: "Перегрев выпускает ракеты со взрывом r1 на дистанцию 1-3" },
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
@@ -110,9 +128,10 @@ const CRYSTAL_TYPES = [
   { name: "Зеленый", color: "#73e58f", glow: "rgba(115,229,143,0.22)" },
   { name: "Фиолетовый", color: "#c796ff", glow: "rgba(199,150,255,0.22)" },
 ];
-const TILES_PER_CRYSTAL_TILE = 94;
+const CRYSTAL_REWARD_TILE_PERKS = [0, 3, 1, 2, 6, 4];
+const TILES_PER_CRYSTAL_TILE = 32;
 const CRYSTAL_MIN_DISTANCE = 3;
-const CRYSTAL_RECIPE_LENGTH = 4;
+const CRYSTAL_RECIPE_LENGTH = 3;
 const CARDINAL_DIRS = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
@@ -134,6 +153,11 @@ const state = {
   maxFuel: START_FUEL,
   hp: START_HP,
   maxHp: START_HP,
+  heat: 0,
+  maxHeat: MAX_HEAT,
+  heatExplosionDamageBonus: 0,
+  heatExplosionRadiusBonus: 0,
+  heatDamageBonus: 0,
   armor: 0,
   depth: 0,
   scrap: 0,
@@ -150,6 +174,9 @@ const state = {
   pendingPerkChoice: false,
   pendingPerkDelay: 0,
   bonusPerkChoices: 0,
+  perkRerolls: 0,
+  debugPerkMenuOpen: false,
+  debugPerkSelection: "",
   nextScrapPerkAt: SCRAP_PERK_BASE_COST,
   scrapPerkLevel: 0,
   perkChoices: [],
@@ -173,7 +200,7 @@ const state = {
   boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
   boulders: [],
   health: new Float32Array(GRID_W * GRID_H),
-  loopScrapMask: new Uint8Array(GRID_W * GRID_H),
+  loopScrapMask: new Float32Array(GRID_W * GRID_H),
   visibleMask: new Uint8Array(GRID_W * GRID_H),
   signalMovesLeft: 0,
   signalMovesMax: 0,
@@ -197,6 +224,11 @@ const state = {
   fuelEventDepth: 0,
   overflowTriggeredInEvent: false,
   resolvingOverflowBomb: false,
+  overflowOverdriveTimer: 0,
+  stunTimer: 0,
+  stunDisplayDuration: 0,
+  stunReduction: 0,
+  heatGainBonus: 0,
   radarBonus: 0,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
@@ -211,6 +243,7 @@ const state = {
   loopChargeTimer: 0,
   loopChargeDuration: 0,
   loopChargeDamageBonus: 0,
+  contourLengthDamageLevel: 0,
   loopPerkChance: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
@@ -218,9 +251,22 @@ const state = {
   overhealOverdrive: false,
   overhealOverdriveDuration: 0,
   overhealDrillTimer: 0,
+  overdriveDisplayDuration: 0,
   idleTime: 0,
   idleAutoCloseTriggered: false,
   idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
+  crystalCatalystLevel: 0,
+  spikeOverdriveLevel: 0,
+  struckThisFrame: false,
+  drillIdleFrame: false,
+  heatCooldownTime: 0,
+  heatCoolingRewardLevel: 0,
+  heatCoolingRewardArmed: false,
+  heatCoolingPeak: 0,
+  coolingRocketLevel: 0,
+  coolingRocketCharge: 0,
+  contourReturnFuelLevel: 0,
+  heatOverloadRocketLevel: 0,
   playerMoveProgress: 0,
   perkToast: {
     text: "",
@@ -240,6 +286,7 @@ const state = {
   },
   damageFlash: 0,
   fatalErrorText: "",
+  seedHitRect: null,
   sprites: null,
   effects: [],
   base: {
@@ -662,6 +709,22 @@ function spawnExplosionEffect(x, y, radius) {
     time: EXPLOSION_EFFECT_DURATION,
     duration: EXPLOSION_EFFECT_DURATION,
     seed: (x * 7219 + y * 3571 + Math.round(radius * 10)) % 1000,
+  });
+}
+
+function spawnDamageNumberEffect(x, y, value) {
+  if (value <= 0) {
+    return;
+  }
+
+  state.effects.push({
+    kind: "damageNumber",
+    x,
+    y,
+    value,
+    time: 0.55,
+    duration: 0.55,
+    seed: (x * 1877 + y * 3541 + Math.round(value * 10)) % 1000,
   });
 }
 
@@ -1350,6 +1413,11 @@ function setupField() {
   state.maxFuel = START_FUEL;
   state.hp = START_HP;
   state.maxHp = START_HP;
+  state.heat = 0;
+  state.maxHeat = MAX_HEAT;
+  state.heatExplosionDamageBonus = 0;
+  state.heatExplosionRadiusBonus = 0;
+  state.heatDamageBonus = 0;
   state.armor = 0;
   state.scrap = 0;
   state.depth = 0;
@@ -1363,6 +1431,9 @@ function setupField() {
   state.pendingPerkChoice = false;
   state.pendingPerkDelay = 0;
   state.bonusPerkChoices = 0;
+  state.perkRerolls = 0;
+  state.debugPerkMenuOpen = false;
+  state.debugPerkSelection = "";
   state.nextScrapPerkAt = SCRAP_PERK_BASE_COST;
   state.scrapPerkLevel = 0;
   state.perkChoices = [];
@@ -1382,6 +1453,11 @@ function setupField() {
   state.fuelEventDepth = 0;
   state.overflowTriggeredInEvent = false;
   state.resolvingOverflowBomb = false;
+  state.overflowOverdriveTimer = 0;
+  state.stunTimer = 0;
+  state.stunDisplayDuration = 0;
+  state.stunReduction = 0;
+  state.heatGainBonus = 0;
   state.radarBonus = 0;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
@@ -1396,15 +1472,27 @@ function setupField() {
   state.loopChargeTimer = 0;
   state.loopChargeDuration = 0;
   state.loopChargeDamageBonus = 0;
+  state.contourLengthDamageLevel = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
   state.remoteBombInterval = 0;
   state.overhealOverdrive = false;
   state.overhealOverdriveDuration = 0;
   state.overhealDrillTimer = 0;
+  state.overdriveDisplayDuration = 0;
   state.idleTime = 0;
   state.idleAutoCloseTriggered = false;
   state.idleAutoCloseDelay = IDLE_AUTO_CLOSE_DELAY;
+  state.crystalCatalystLevel = 0;
+  state.spikeOverdriveLevel = 0;
+  state.struckThisFrame = false;
+  state.drillIdleFrame = false;
+  state.heatCooldownTime = 0;
+  state.heatCoolingRewardLevel = 0;
+  state.heatCoolingRewardArmed = false;
+  state.heatCoolingPeak = 0;
+  state.coolingRocketLevel = 0;
+  state.coolingRocketCharge = 0;
   state.playerMoveProgress = 0;
   state.perkToast.text = "";
   state.perkToast.time = 0;
@@ -1415,6 +1503,7 @@ function setupField() {
   state.scrapToast.value = 0;
   state.scrapToast.time = 0;
   state.damageFlash = 0;
+  state.seedHitRect = null;
   state.effects.length = 0;
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
@@ -1435,6 +1524,7 @@ function setupField() {
   placePerkZones();
   clearCrystalRecipe();
   rebuildVisibilityMask();
+  syncDebugPerkOverlay();
 }
 
 function placeHiddenBase() {
@@ -1703,8 +1793,32 @@ function awardBonusScrapPerkChoice() {
   syncPerkChoiceOverlay();
 }
 
+function grantCrystalRecipeReward(firstCrystalType, x, y) {
+  const perkType = CRYSTAL_REWARD_TILE_PERKS[firstCrystalType] || 1;
+  state.perkRerolls += 1;
+  runFuelEvent(() => applyTilePerk(perkType, x, y, false));
+  showPerkToast(`Кристалл: ${TILE_PERK_TYPES[perkType].name}`);
+}
+
+function applyCrystalCatalystBonus(x, y) {
+  if (state.crystalCatalystLevel <= 0) {
+    return;
+  }
+
+  state.scrap += 30;
+  showScrapToast(30);
+
+  if (state.crystalCatalystLevel >= 2) {
+    addFuel(40, x, y);
+  }
+  if (state.crystalCatalystLevel >= 3) {
+    healPlayer(1, "Кристальный катализатор");
+  }
+}
+
 function collectCrystalTile(x, y, index, crystalType) {
   state.crystalMask[index] = 0;
+  runFuelEvent(() => applyCrystalCatalystBonus(x, y));
   if (state.crystalRecipe.length === 0) {
     startCrystalRecipe(crystalType);
     showPerkToast(state.crystalStatusText);
@@ -1724,9 +1838,10 @@ function collectCrystalTile(x, y, index, crystalType) {
     state.crystalStatusText = `${CRYSTAL_TYPES[crystalType].name}: ${state.crystalProgress}/${state.crystalRecipe.length}`;
     showPerkToast(state.crystalStatusText);
     if (state.crystalProgress >= state.crystalRecipe.length) {
+      const firstCrystalType = state.crystalRecipe[0];
       showPerkToast("Кристаллы собраны");
       clearCrystalRecipe();
-      awardBonusScrapPerkChoice();
+      grantCrystalRecipeReward(firstCrystalType, x, y);
     }
     return;
   }
@@ -1804,7 +1919,7 @@ function collectPerkZone(zone) {
   showPerkToast(state.perkText);
 
   if (zone.perkType === 4) {
-    explodeAt(zone.x, zone.y, state.drillPower * 10, 3);
+    explodeAt(zone.x, zone.y, state.drillPower * 10, 6);
     return;
   }
 
@@ -1818,7 +1933,7 @@ function collectPerkZone(zone) {
 function applyTilePerk(perkType, x, y, showToast = true) {
   switch (perkType) {
     case 1: {
-      const fuelDelta = 90 - state.perkFuelBonus;
+      const fuelDelta = 120 - state.perkFuelBonus;
       if (fuelDelta >= 0) {
         addFuel(fuelDelta, x, y);
       } else {
@@ -1834,7 +1949,7 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       state.perkText = `Радар: ${consumeSignalMove(state.signalPrevX, state.signalPrevY, x, y)}`;
       break;
     case 3:
-      state.drillPower += 0.5;
+      state.drillPower += 0.35;
       state.perkText = "Бур";
       break;
     case 4:
@@ -1941,6 +2056,54 @@ function applyScrapPerk(perkType) {
     case 17:
       state.idleAutoCloseDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
       state.perkText = "Автоконтур";
+      break;
+    case 18:
+      state.crystalCatalystLevel = Math.min(3, state.crystalCatalystLevel + 1);
+      state.perkText = "Кристальный катализатор";
+      break;
+    case 19:
+      state.spikeOverdriveLevel = Math.min(3, state.spikeOverdriveLevel + 1);
+      state.perkText = "Шиповой форсаж";
+      break;
+    case 20:
+      state.heatExplosionDamageBonus += 1;
+      state.heatExplosionRadiusBonus += 0.5;
+      state.perkText = "Термозаряд";
+      break;
+    case 21:
+      break;
+    case 22:
+      state.maxHeat += 20;
+      state.perkText = "Теплоотвод";
+      break;
+    case 23:
+      state.heatDamageBonus += 0.2;
+      state.perkText = "Накал бура";
+      break;
+    case 24:
+      state.heatCoolingRewardLevel += 1;
+      state.perkText = "Импульс остывания";
+      break;
+    case 25:
+      state.stunReduction += 0.4;
+      state.heatGainBonus += 1;
+      state.perkText = "Разгонные демпферы";
+      break;
+    case 26:
+      state.contourLengthDamageLevel = Math.min(4, state.contourLengthDamageLevel + 1);
+      state.perkText = "Контурный резонанс";
+      break;
+    case 27:
+      state.coolingRocketLevel = Math.min(3, state.coolingRocketLevel + 1);
+      state.perkText = "Охлаждающие ракеты";
+      break;
+    case 28:
+      state.contourReturnFuelLevel = Math.min(3, state.contourReturnFuelLevel + 1);
+      state.perkText = "Рекуперация контура";
+      break;
+    case 29:
+      state.heatOverloadRocketLevel = Math.min(3, state.heatOverloadRocketLevel + 1);
+      state.perkText = "Терморакеты";
       break;
     default:
       break;
@@ -2061,10 +2224,29 @@ function bindUi() {
   const pad = document.getElementById("movePad");
   const stick = document.getElementById("moveStick");
   const perkButtons = document.querySelectorAll("[data-perk-slot]");
+  const rerollButton = document.getElementById("perkReroll");
+  const debugClose = document.getElementById("debugPerkClose");
+  const debugOverlay = document.getElementById("debugPerkMenu");
+  const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
 
   window.addEventListener("resize", resize);
 
   zone.addEventListener("pointerdown", (event) => {
+    if (state.debugPerkMenuOpen) {
+      return;
+    }
+    if (state.seedHitRect && isPointInsideRect(event.clientX, event.clientY, state.seedHitRect)) {
+      state.dragId = null;
+      state.moveAimX = 0;
+      state.moveAimY = 0;
+      pad.classList.remove("move-pad--active");
+      stick.style.transform = "translate(0px, 0px)";
+      state.debugPerkMenuOpen = true;
+      state.debugPerkSelection = "";
+      showPerkToast("Debug");
+      syncDebugPerkOverlay();
+      return;
+    }
     if (state.dragId !== null) {
       return;
     }
@@ -2096,6 +2278,136 @@ function bindUi() {
     perkButtons[i].addEventListener("click", () => {
       chooseScrapPerk(i);
     });
+  }
+
+  if (rerollButton) {
+    rerollButton.addEventListener("click", () => {
+      rerollPerkChoices();
+    });
+  }
+
+  if (debugClose) {
+    debugClose.addEventListener("click", () => {
+      resetPad();
+      state.debugPerkMenuOpen = false;
+      state.debugPerkSelection = "";
+      syncDebugPerkOverlay();
+    });
+  }
+
+  if (debugOverlay) {
+    debugOverlay.addEventListener("click", (event) => {
+      if (event.target !== debugOverlay) {
+        return;
+      }
+      resetPad();
+      state.debugPerkMenuOpen = false;
+      state.debugPerkSelection = "";
+      syncDebugPerkOverlay();
+    });
+  }
+
+  if (debugPanel) {
+    debugPanel.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    debugPanel.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+  }
+
+  buildDebugPerkButtons();
+  syncDebugPerkOverlay();
+}
+
+function isPointInsideRect(x, y, rect) {
+  return !!rect && x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+}
+
+function buildDebugPerkButtons() {
+  const tileRoot = document.getElementById("debugTilePerks");
+  const scrapRoot = document.getElementById("debugScrapPerks");
+  if (!tileRoot || !scrapRoot) {
+    return;
+  }
+
+  tileRoot.innerHTML = "";
+  for (let i = 1; i < TILE_PERK_TYPES.length; i += 1) {
+    const perk = TILE_PERK_TYPES[i];
+    const key = `tile:${i}`;
+    const isSelected = state.debugPerkSelection === key;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
+    button.innerHTML = `<span class="debug-perk-menu__button-name">${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
+    button.addEventListener("click", () => {
+      if (state.debugPerkSelection !== key) {
+        state.debugPerkSelection = key;
+        buildDebugPerkButtons();
+        return;
+      }
+      applyTilePerk(i, state.drill.x, state.drill.y, true);
+      state.debugPerkSelection = "";
+      syncDebugPerkOverlay();
+    });
+    tileRoot.appendChild(button);
+  }
+
+  scrapRoot.innerHTML = "";
+  for (let i = 1; i < SCRAP_PERK_TYPES.length; i += 1) {
+    if (i === 21) {
+      continue;
+    }
+    const perk = SCRAP_PERK_TYPES[i];
+    const key = `scrap:${i}`;
+    const isSelected = state.debugPerkSelection === key;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
+    button.innerHTML = `<span class="debug-perk-menu__button-name">${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
+    button.addEventListener("click", () => {
+      if (state.debugPerkSelection !== key) {
+        state.debugPerkSelection = key;
+        buildDebugPerkButtons();
+        return;
+      }
+      runFuelEvent(() => applyScrapPerk(i));
+      state.debugPerkSelection = "";
+      syncDebugPerkOverlay();
+    });
+    scrapRoot.appendChild(button);
+  }
+}
+
+function syncDebugPerkOverlay() {
+  const overlay = document.getElementById("debugPerkMenu");
+  const touchZones = document.querySelector(".touch-zones");
+  if (!overlay) {
+    return;
+  }
+  if (state.debugPerkMenuOpen) {
+    overlay.hidden = false;
+    overlay.removeAttribute("hidden");
+    overlay.style.cssText = [
+      "position:absolute",
+      "inset:0",
+      "z-index:9999",
+      "display:flex",
+      "visibility:visible",
+      "pointer-events:auto",
+      "opacity:1",
+      "align-items:center",
+      "justify-content:center",
+      "padding:20px",
+      "background:rgba(20,8,6,0.88)",
+      "backdrop-filter:blur(6px)",
+    ].join(";");
+  } else {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+  }
+  if (touchZones) {
+    touchZones.style.pointerEvents = state.isChoosingPerk || state.debugPerkMenuOpen ? "none" : "auto";
   }
 }
 
@@ -2157,6 +2469,8 @@ function update(dt) {
   state.fuel = Math.max(0, state.fuel - getIdleFuelDrain() * dt);
   state.fuel = Math.min(state.maxFuel, state.fuel);
   consumeFuelEmergency();
+  state.struckThisFrame = false;
+  state.drillIdleFrame = false;
   updateDrill(dt);
   updateGas(dt);
   updateSteam(dt);
@@ -2166,6 +2480,51 @@ function update(dt) {
   updateDiscovery();
   updateCameraShake(dt);
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
+  if (state.overhealDrillTimer === 0) {
+    state.overdriveDisplayDuration = 0;
+  }
+  const hadOverflowSurge = state.overflowOverdriveTimer > 0;
+  state.overflowOverdriveTimer = Math.max(0, state.overflowOverdriveTimer - dt);
+  if (hadOverflowSurge && state.overflowOverdriveTimer === 0 && !state.dead) {
+    explodeAt(state.drill.x, state.drill.y, EXPLOSION_BREAK_DAMAGE, 2);
+    applyStun(OVERFLOW_STUN_DURATION, "Оглушение");
+    state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 2.4);
+    state.damageFlash = Math.min(1, state.damageFlash + 0.65);
+  }
+  state.stunTimer = Math.max(0, state.stunTimer - dt);
+  if (state.stunTimer === 0) {
+    state.stunDisplayDuration = 0;
+  }
+  if (!state.struckThisFrame && state.drillIdleFrame) {
+    state.heatCooldownTime += dt;
+    const cooldownBoost = 1 + state.heatCooldownTime * state.heatCooldownTime * 0.65;
+    const speedCoolingBoost = 1 + Math.max(0, state.strikeSpeed - 1) * 0.7;
+    const prevHeat = state.heat;
+    state.heat = Math.max(0, state.heat - HEAT_COOL_RATE * cooldownBoost * speedCoolingBoost * dt);
+    const cooledHeat = Math.max(0, prevHeat - state.heat);
+    if (state.coolingRocketLevel > 0 && cooledHeat > 0) {
+      state.coolingRocketCharge += cooledHeat;
+      const coolingRocketThreshold = getCoolingRocketThreshold();
+      while (state.coolingRocketCharge >= coolingRocketThreshold) {
+        state.coolingRocketCharge -= coolingRocketThreshold;
+        triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
+      }
+    }
+    if (state.heat === 0 && state.heatCoolingRewardArmed) {
+      state.heatCoolingRewardArmed = false;
+      if (state.heatCoolingRewardLevel > 0 && state.heatCoolingPeak >= 50) {
+        state.signalMovesLeft += state.heatCoolingRewardLevel * 2;
+        state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
+        if (state.signalText === "Сигнал пуст" || state.signalText === "Старт") {
+          state.signalText = "Горячо";
+        }
+        showPerkToast("Импульс остывания");
+      }
+      state.heatCoolingPeak = 0;
+    }
+  } else {
+    state.heatCooldownTime = 0;
+  }
   state.loopChargeTimer = Math.max(0, state.loopChargeTimer - dt);
   if (state.loopChargeTimer === 0) {
     state.loopChargeDamageBonus = 0;
@@ -2197,6 +2556,9 @@ function updateEffects(dt) {
     const effect = state.effects[i];
     effect.time -= dt;
     if (effect.time <= 0) {
+      if (effect.kind === "rocket") {
+        detonateRocketEffect(effect);
+      }
       state.effects.splice(i, 1);
     }
   }
@@ -2259,7 +2621,19 @@ function rebuildVisibilityMask() {
 }
 
 function prepareScrapPerkChoices() {
-  const bag = [1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 14, 15];
+  const bag = [1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 14, 15, 20, 22, 23, 24, 25];
+  if (state.contourLengthDamageLevel < 4) {
+    bag.push(26);
+  }
+  if (state.coolingRocketLevel < 3) {
+    bag.push(27);
+  }
+  if (state.contourReturnFuelLevel < 3) {
+    bag.push(28);
+  }
+  if (state.heatOverloadRocketLevel < 3) {
+    bag.push(29);
+  }
   if (state.loopChargeLevel >= 4) {
     const idx = bag.indexOf(5);
     if (idx !== -1) {
@@ -2283,6 +2657,12 @@ function prepareScrapPerkChoices() {
   }
   if (state.idleAutoCloseDelay > IDLE_AUTO_CLOSE_MIN_DELAY) {
     bag.push(17);
+  }
+  if (state.crystalCatalystLevel < 3) {
+    bag.push(18);
+  }
+  if (state.spikeOverdriveLevel < 3) {
+    bag.push(19);
   }
   for (let i = bag.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -2309,9 +2689,72 @@ function checkScrapPerkUnlock() {
   state.nextScrapPerkAt += getScrapPerkCost(state.scrapPerkLevel);
 }
 
+function activateDrillOverdrive(duration, toastText = "") {
+  if (duration <= 0) {
+    return;
+  }
+  state.overhealDrillTimer = Math.max(state.overhealDrillTimer, duration);
+  state.overdriveDisplayDuration = Math.max(state.overdriveDisplayDuration, duration);
+  if (toastText) {
+    showPerkToast(toastText);
+  }
+}
+
+function applyStun(duration, toastText = "") {
+  if (duration <= 0) {
+    return;
+  }
+  const actualDuration = Math.max(0.5, duration - state.stunReduction);
+  state.stunTimer = Math.max(state.stunTimer, actualDuration);
+  state.stunDisplayDuration = Math.max(state.stunDisplayDuration, actualDuration);
+  if (toastText) {
+    showPerkToast(toastText);
+  }
+}
+
+function triggerOverflowSurge() {
+  state.resolvingOverflowBomb = true;
+  try {
+    activateDrillOverdrive(OVERFLOW_OVERDRIVE_DURATION, "Перегрузка");
+    state.overflowOverdriveTimer = OVERFLOW_OVERDRIVE_DURATION;
+  } finally {
+    state.resolvingOverflowBomb = false;
+  }
+}
+
 function activateOverhealDrillBoost() {
-  state.overhealDrillTimer = state.overhealOverdriveDuration || 3;
-  showPerkToast("Перелив адреналина");
+  activateDrillOverdrive(state.overhealOverdriveDuration || 3, "Перелив адреналина");
+}
+
+function triggerHeatOverload() {
+  const damageMultiplier = 1 + state.heatExplosionDamageBonus;
+  const radius = 1 + state.heatExplosionRadiusBonus;
+  state.heat = 0;
+  state.heatCoolingRewardArmed = false;
+  state.heatCoolingPeak = 0;
+  explodeAt(state.drill.x, state.drill.y, getStrikeDamage() * damageMultiplier, radius, { guaranteedBreak: false });
+  for (let i = 0; i < state.heatOverloadRocketLevel; i += 1) {
+    triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
+  }
+  applyStun(HEAT_STUN_DURATION, "Перегрев");
+  state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 2.8);
+  state.damageFlash = Math.min(1, state.damageFlash + 0.75);
+}
+
+function addHeatOnStrike(amount) {
+  if (amount <= 0 || state.dead) {
+    return;
+  }
+  if (state.overhealDrillTimer > 0) {
+    return;
+  }
+  state.heat = Math.min(state.maxHeat, state.heat + amount);
+  state.struckThisFrame = true;
+  state.heatCoolingRewardArmed = state.heat > 0;
+  state.heatCoolingPeak = Math.max(state.heatCoolingPeak, state.heat);
+  if (state.heat >= state.maxHeat) {
+    triggerHeatOverload();
+  }
 }
 
 function healPlayer(amount, sourceText = "") {
@@ -2350,8 +2793,30 @@ function chooseScrapPerk(slotIndex) {
   syncPerkChoiceOverlay();
 }
 
+function rerollPerkChoices() {
+  if (!state.isChoosingPerk || state.perkRerolls <= 0) {
+    return;
+  }
+
+  if (!prepareScrapPerkChoices()) {
+    return;
+  }
+
+  state.perkRerolls -= 1;
+  syncPerkChoiceOverlay();
+}
+
 function formatPerkPercent(value) {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatPerkNumber(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function getCoolingRocketThreshold() {
+  const thresholds = [0, 50, 40, 30];
+  return thresholds[state.coolingRocketLevel] || 50;
 }
 
 function getScrapPerkPreview(perkType) {
@@ -2405,7 +2870,7 @@ function getScrapPerkPreview(perkType) {
         level,
         current:
           level > 0
-            ? `Сейчас: замыкание дает +10% урона за клетку внутри на ${currentDuration} сек`
+            ? `Сейчас: замыкание дает +5% урона за клетку внутри на ${currentDuration} сек`
             : "Сейчас: контурный заряд еще не активен",
         next: `После выбора: баф будет длиться ${nextDuration} сек`,
       };
@@ -2425,19 +2890,19 @@ function getScrapPerkPreview(perkType) {
         level,
         current:
           state.remoteBombInterval > 0
-            ? `Сейчас: каждые ${state.remoteBombInterval} <span class="perk-option__delta">(${nextInterval})</span> блоков, сломанных буром, кидается бомба 2x2 на дистанцию 1`
+            ? `Сейчас: каждые ${state.remoteBombInterval} <span class="perk-option__delta">(${nextInterval})</span> блоков, сломанных буром, летит ракета со взрывом r1 на дистанцию 1`
             : `Сейчас: саперный заряд еще не активен`,
         next:
           state.remoteBombInterval > 0
             ? "После выбора: интервал станет меньше"
-            : `После выбора: бомба 2x2 начнет срабатывать каждые <span class="perk-option__delta">(30)</span> блоков`,
+            : `После выбора: ракета со взрывом r1 начнет срабатывать каждые <span class="perk-option__delta">(30)</span> блоков`,
       };
     }
     case 8: {
       const level = Math.round(state.perkFuelBonus / 50);
-      const currentTankDelta = 90 - state.perkFuelBonus;
+      const currentTankDelta = 120 - state.perkFuelBonus;
       const nextFuelBonus = state.perkFuelBonus + 50;
-      const nextTankDelta = 90 - nextFuelBonus;
+      const nextTankDelta = 120 - nextFuelBonus;
       return {
         level,
         current: `Сейчас: любой перк +${state.perkFuelBonus} топлива, Бак ${currentTankDelta >= 0 ? `+${currentTankDelta}` : currentTankDelta}`,
@@ -2481,9 +2946,9 @@ function getScrapPerkPreview(perkType) {
       return {
         level: state.overflowBomb ? 1 : 0,
         current: state.overflowBomb
-          ? `Сейчас: бак ${state.maxFuel}, переполнение кидает бомбу`
+          ? `Сейчас: бак ${state.maxFuel}, overflow дает 3 сек форсажа`
           : `Сейчас: бак ${state.maxFuel}, переполнения нет`,
-        next: `После выбора: бак ${Math.max(100, state.maxFuel - 150)}, +50 к любому топливу и overflow-бомба`,
+        next: `После выбора: бак ${Math.max(100, state.maxFuel - 150)}, +50 к топливу, 3 сек форсажа, потом взрыв r2 и стан 3 сек`,
       };
     }
     case 14: {
@@ -2527,6 +2992,144 @@ function getScrapPerkPreview(perkType) {
         next: `После выбора: через ${nextDelay} сек`,
       };
     }
+    case 18: {
+      const level = state.crystalCatalystLevel;
+      let current = "Сейчас: кристаллы без бонуса";
+      let next = "После выбора: +30 scrap за кристалл";
+      if (level === 1) {
+        current = "Сейчас: +30 scrap за кристалл";
+        next = "После выбора: +30 scrap и +40 fuel";
+      } else if (level === 2) {
+        current = "Сейчас: +30 scrap и +40 fuel";
+        next = "После выбора: +30 scrap, +40 fuel и +1 HP";
+      } else if (level >= 3) {
+        current = "Сейчас: +30 scrap, +40 fuel и +1 HP";
+        next = "После выбора: максимум уже достигнут";
+      }
+      return { level, current, next };
+    }
+    case 19: {
+      const level = state.spikeOverdriveLevel;
+      const durations = [0, 5, 7, 10];
+      const currentDuration = durations[level] || 0;
+      const nextDuration = durations[Math.min(3, level + 1)] || 10;
+      return {
+        level,
+        current: level > 0 ? `Сейчас: шипы дают overdrive на ${currentDuration} сек` : "Сейчас: шиповой форсаж еще не активен",
+        next: `После выбора: будет ${nextDuration} сек`,
+      };
+    }
+    case 20: {
+      const level = Math.round(state.heatExplosionDamageBonus);
+      return {
+        level,
+        current: `Сейчас: взрыв x${formatPerkNumber(1 + state.heatExplosionDamageBonus)}, радиус ${formatPerkNumber(1 + state.heatExplosionRadiusBonus)}`,
+        next: `После выбора: x${formatPerkNumber(2 + state.heatExplosionDamageBonus)}, радиус ${formatPerkNumber(1.5 + state.heatExplosionRadiusBonus)}`,
+      };
+    }
+    case 21: {
+      return {
+        level: 0,
+        current: "Сейчас: слито в Термозаряд",
+        next: "После выбора: не предлагается",
+      };
+    }
+    case 22: {
+      const level = Math.round((state.maxHeat - MAX_HEAT) / 20);
+      return {
+        level,
+        current: `Сейчас: перегрев на ${state.maxHeat} heat`,
+        next: `После выбора: ${state.maxHeat + 20} heat`,
+      };
+    }
+    case 23: {
+      const level = Math.round(state.heatDamageBonus / 0.2);
+      return {
+        level,
+        current: `Сейчас: до ${formatPerkPercent(state.heatDamageBonus)} урона на полном нагреве`,
+        next: `После выбора: до ${formatPerkPercent(state.heatDamageBonus + 0.2)}`,
+      };
+    }
+    case 24: {
+      const level = state.heatCoolingRewardLevel;
+      return {
+        level,
+        current:
+          level > 0
+            ? `Сейчас: полное остывание после 50+ heat дает +${level * 2} шагов радара`
+            : "Сейчас: полное остывание не дает радара",
+        next: `После выбора: +${(level + 1) * 2} шагов после полного остывания`,
+      };
+    }
+    case 25: {
+      const level = Math.round(state.stunReduction / 0.4);
+      return {
+        level,
+        current:
+          level > 0
+            ? `Сейчас: стан короче на ${formatPerkNumber(state.stunReduction)} сек, heat за удар ${HEAT_PER_STRIKE + state.heatGainBonus}`
+            : `Сейчас: стан без сокращения, heat за удар ${HEAT_PER_STRIKE}`,
+        next: `После выбора: стан -${formatPerkNumber(state.stunReduction + 0.4)} сек, heat ${HEAT_PER_STRIKE + state.heatGainBonus + 1}`,
+      };
+    }
+    case 26: {
+      const caps = [0, 15, 30, 50, 100];
+      const level = state.contourLengthDamageLevel;
+      const contourLength = Math.max(0, state.pathTiles.length - 1);
+      const currentBonus = Math.min(caps[level] || 0, contourLength);
+      const nextCap = caps[Math.min(4, level + 1)] || 100;
+      return {
+        level,
+        current:
+          level > 0
+            ? `Сейчас: +${currentBonus}% от длины контура, кап ${caps[level]}%`
+            : "Сейчас: бонуса от длины контура еще нет",
+        next: `После выбора: кап станет ${nextCap}%`,
+      };
+    }
+    case 27: {
+      const level = state.coolingRocketLevel;
+      const thresholds = [0, 50, 40, 30];
+      const currentThreshold = thresholds[level] || 50;
+      const nextThreshold = thresholds[Math.min(3, level + 1)] || 30;
+      return {
+        level,
+        current:
+          level > 0
+            ? `Сейчас: каждые ${currentThreshold} остывшего heat дают ракету со взрывом r1`
+            : "Сейчас: охлаждение не выпускает ракеты",
+        next:
+          level > 0
+            ? `После выбора: каждые ${nextThreshold} heat`
+            : "После выбора: каждые 50 остывшего heat будет ракета со взрывом r1 на дистанцию 1-3",
+      };
+    }
+    case 28: {
+      const level = state.contourReturnFuelLevel;
+      const gains = [0, 3, 4, 5];
+      const currentGain = gains[level] || 0;
+      const nextGain = gains[Math.min(3, level + 1)] || 5;
+      return {
+        level,
+        current:
+          level > 0
+            ? `Сейчас: шаг назад по контуру дает +${currentGain} топлива`
+            : "Сейчас: возврат по контуру не дает топлива",
+        next: `После выбора: +${nextGain} топлива за такой шаг`,
+      };
+    }
+    case 29: {
+      const level = state.heatOverloadRocketLevel;
+      const nextCount = Math.min(3, level + 1);
+      return {
+        level,
+        current:
+          level > 0
+            ? `Сейчас: перегрев выпускает ${level} ${level === 1 ? "ракету" : level < 5 ? "ракеты" : "ракет"}`
+            : "Сейчас: перегрев не выпускает ракеты",
+        next: `После выбора: ${nextCount} ${nextCount === 1 ? "ракета" : nextCount < 5 ? "ракеты" : "ракет"} со взрывом r1`,
+      };
+    }
     default:
       return {
         level: 0,
@@ -2538,16 +3141,21 @@ function getScrapPerkPreview(perkType) {
 
 function syncPerkChoiceOverlay() {
   const overlay = document.getElementById("perkChoice");
-  const buttons = document.querySelectorAll("[data-perk-slot]");
-  const touchZones = document.querySelector(".touch-zones");
   if (!overlay) {
     return;
   }
 
   overlay.hidden = !state.isChoosingPerk;
-  if (touchZones) {
-    touchZones.style.pointerEvents = state.isChoosingPerk ? "none" : "auto";
+  const rerollButton = document.getElementById("perkReroll");
+  const rerollCount = document.getElementById("perkRerollCount");
+  if (rerollButton) {
+    rerollButton.disabled = !state.isChoosingPerk || state.perkRerolls <= 0;
   }
+  if (rerollCount) {
+    rerollCount.textContent = `Рероллы: ${state.perkRerolls} (за рецепты)`;
+  }
+  syncDebugPerkOverlay();
+  const buttons = document.querySelectorAll("[data-perk-slot]");
   for (let i = 0; i < buttons.length; i += 1) {
     const button = buttons[i];
     const perkType = state.perkChoices[i];
@@ -2563,10 +3171,14 @@ function syncPerkChoiceOverlay() {
 
 function getStrikeDamage() {
   const chargeBoost = state.loopChargeTimer > 0 ? 1 + state.loopChargeDamageBonus : 1;
-  return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * chargeBoost;
+  const heatBoost = 1 + clamp(state.heat / Math.max(1, state.maxHeat), 0, 1) * state.heatDamageBonus;
+  const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
+  const contourLength = Math.max(0, state.pathTiles.length - 1);
+  const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
+  return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * chargeBoost * heatBoost * contourBoost;
 }
 
-function addFuel(amount, originX = state.drill.x, originY = state.drill.y) {
+function addFuel(amount, originX = state.drill.x, originY = state.drill.y, options = {}) {
   if (amount <= 0) {
     return;
   }
@@ -2576,9 +3188,9 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y) {
   const overflow = state.fuel + totalGain - state.maxFuel;
   state.fuel = Math.min(state.maxFuel, state.fuel + totalGain);
 
-  if (state.overflowBomb && overflow > 0 && !state.overflowTriggeredInEvent && !state.resolvingOverflowBomb) {
+  if (!options.preventOverflowTrigger && state.overflowBomb && overflow > 0 && !state.overflowTriggeredInEvent && !state.resolvingOverflowBomb) {
     state.overflowTriggeredInEvent = true;
-    triggerOverflowBomb(originX, originY);
+    triggerOverflowSurge();
   }
 }
 
@@ -2842,6 +3454,8 @@ function damageCell(x, y, damage, options = {}) {
     spawnImpactEffect(x, y, options.dirX ?? state.drill.facingX ?? 0, options.dirY ?? state.drill.facingY ?? 1, state.hardness[index]);
   }
 
+  const actualDamage = Math.min(state.health[index], damage);
+  spawnDamageNumberEffect(x, y, actualDamage);
   state.health[index] -= damage;
   if (state.health[index] > 0) {
     return false;
@@ -2858,15 +3472,20 @@ function breakCell(x, y, index, options = {}) {
     return;
   }
   const hazardType = state.hazardMask[index];
-  const scrapGain = blockType.scrap + state.scrapBonus + state.loopScrapMask[index];
+  const scrapMultiplier = state.loopScrapMask[index] > 0 ? state.loopScrapMask[index] : 1;
+  const scrapGain = Math.max(0, Math.floor((blockType.scrap + state.scrapBonus) * scrapMultiplier));
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   state.hardness[index] = 0;
   state.health[index] = 0;
   state.scrap += scrapGain;
-  runFuelEvent(() => addFuel(state.fuelOnBreak, x, y));
+  runFuelEvent(() => addFuel(state.fuelOnBreak, x, y, { preventOverflowTrigger: true }));
   state.blocksBroken += 1;
   if (options.byDrill) {
     state.drillBrokenBlocks += 1;
+  }
+  if (hazardType === HAZARD_TYPES.SPIKE && state.spikeOverdriveLevel > 0) {
+    const durations = [0, 5, 7, 10];
+    activateDrillOverdrive(durations[state.spikeOverdriveLevel] || 5, "Шиповой форсаж");
   }
   showScrapToast(scrapGain);
   state.hazardMask[index] = 0;
@@ -2907,15 +3526,12 @@ function breakCell(x, y, index, options = {}) {
   }
 }
 
-function explodeAt(x, y, damage, radius = 2) {
+function explodeAt(x, y, damage, radius = 2, options = {}) {
   spawnExplosionEffect(x, y, radius);
-  const breakDamage = Math.max(damage, EXPLOSION_BREAK_DAMAGE);
+  const breakDamage = options.guaranteedBreak === false ? damage : Math.max(damage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(radius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
     for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
-      if (!ox && !oy) {
-        continue;
-      }
       if (Math.hypot(ox, oy) > radius) {
         continue;
       }
@@ -2928,38 +3544,34 @@ function explodeAt(x, y, damage, radius = 2) {
   }
 }
 
-function triggerOverflowBomb(originX, originY) {
-  const directions = [
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 },
-    { x: 1, y: 1 },
-    { x: 1, y: -1 },
-    { x: -1, y: 1 },
-    { x: -1, y: -1 },
-  ];
-  const dir = directions[Math.floor(Math.random() * directions.length)];
-  const centerX = clamp(originX + dir.x, 1, GRID_W - 2);
-  const centerY = clamp(originY + dir.y, 1, GRID_H - 2);
-  const damage = EXPLOSION_BREAK_DAMAGE;
-  const square = [
-    { x: centerX, y: centerY },
-    { x: clamp(centerX + (dir.x >= 0 ? 1 : -1), 1, GRID_W - 2), y: centerY },
-    { x: centerX, y: clamp(centerY + (dir.y >= 0 ? 1 : -1), 1, GRID_H - 2) },
-    {
-      x: clamp(centerX + (dir.x >= 0 ? 1 : -1), 1, GRID_W - 2),
-      y: clamp(centerY + (dir.y >= 0 ? 1 : -1), 1, GRID_H - 2),
-    },
-  ];
+function spawnRocketEffect(fromX, fromY, targetX, targetY, payload) {
+  const dx = targetX - fromX;
+  const dy = targetY - fromY;
+  const distance = Math.hypot(dx, dy);
+  const duration = 0.18 + distance * 0.07;
+  state.effects.push({
+    kind: "rocket",
+    time: duration,
+    duration,
+    fromX,
+    fromY,
+    targetX,
+    targetY,
+    arcHeight: 10 + distance * 4,
+    seed: (state.lastTs || 0) + targetX * 31 + targetY * 17,
+    payload,
+  });
+}
 
-  state.resolvingOverflowBomb = true;
-  try {
-    for (let i = 0; i < square.length; i += 1) {
-      damageCell(square[i].x, square[i].y, damage, { ignoreHazardEffect: true, allowHazardChain: true });
-    }
-  } finally {
-    state.resolvingOverflowBomb = false;
+function detonateRocketEffect(effect) {
+  if (!effect?.payload) {
+    return;
+  }
+
+  if (effect.payload.kind === "radiusBomb") {
+    explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
+      guaranteedBreak: true,
+    });
   }
 }
 
@@ -2977,19 +3589,13 @@ function triggerRemoteBombSquare(originX, originY, distance) {
   const dir = directions[Math.floor(Math.random() * directions.length)];
   const centerX = clamp(originX + dir.x * distance, 1, GRID_W - 2);
   const centerY = clamp(originY + dir.y * distance, 1, GRID_H - 2);
-  const stepX = dir.x === 0 ? 1 : Math.sign(dir.x);
-  const stepY = dir.y === 0 ? 1 : Math.sign(dir.y);
   const damage = EXPLOSION_BREAK_DAMAGE;
-  const square = [
-    { x: centerX, y: centerY },
-    { x: clamp(centerX + stepX, 1, GRID_W - 2), y: centerY },
-    { x: centerX, y: clamp(centerY + stepY, 1, GRID_H - 2) },
-    { x: clamp(centerX + stepX, 1, GRID_W - 2), y: clamp(centerY + stepY, 1, GRID_H - 2) },
-  ];
 
-  for (let i = 0; i < square.length; i += 1) {
-    damageCell(square[i].x, square[i].y, damage, { ignoreHazardEffect: true, allowHazardChain: true });
-  }
+  spawnRocketEffect(originX, originY, centerX, centerY, {
+    kind: "radiusBomb",
+    damage,
+    radius: 1,
+  });
 }
 
 function recordPlayerMove(fromX, fromY, toX, toY) {
@@ -3007,6 +3613,23 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   if (state.playerMoveProgress >= BASE_MOVE_INTERVAL) {
     state.playerMoveProgress -= BASE_MOVE_INTERVAL;
     maybeMoveBase();
+  }
+}
+
+function recordJumpMove(fromX, fromY, toX, toY) {
+  const stepX = Math.sign(toX - fromX);
+  const stepY = Math.sign(toY - fromY);
+  let prevX = fromX;
+  let prevY = fromY;
+  let x = fromX;
+  let y = fromY;
+
+  while (x !== toX || y !== toY) {
+    x += stepX;
+    y += stepY;
+    recordPlayerMove(prevX, prevY, x, y);
+    prevX = x;
+    prevY = y;
   }
 }
 
@@ -3277,7 +3900,7 @@ function tryJumpMove(dx, dy) {
   state.drill.x = jumpX;
   state.drill.y = jumpY;
   carveTunnel(jumpX, jumpY);
-  recordPlayerMove(fromX, fromY, jumpX, jumpY);
+  recordJumpMove(fromX, fromY, jumpX, jumpY);
   state.drill.progress = 0;
   state.drill.strikeEnergy = 0.35;
   return true;
@@ -3290,6 +3913,13 @@ function updateCameraShake(dt) {
 
 function updateDrill(dt) {
   state.drill.actionCooldown = Math.max(0, state.drill.actionCooldown - dt);
+
+  if (state.stunTimer > 0) {
+    state.drill.progress = 0;
+    state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 6);
+    state.drill.strikeLatch = false;
+    return;
+  }
 
   if (state.fuel <= 0) {
     state.fuel = 0;
@@ -3313,6 +3943,7 @@ function updateDrill(dt) {
   }
 
   if (!dx && !dy) {
+    state.drillIdleFrame = true;
     state.idleTime += dt;
     if (!state.idleAutoCloseTriggered && state.idleTime >= state.idleAutoCloseDelay) {
       state.idleAutoCloseTriggered = true;
@@ -3425,6 +4056,8 @@ function updateDrill(dt) {
     damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dx + dy, dirY: dy - dx });
   }
 
+  addHeatOnStrike(HEAT_PER_STRIKE + state.heatGainBonus);
+
   if (state.fuel <= 0 && state.health[targetIndex] > 0) {
     state.fuel = 0;
     return;
@@ -3473,6 +4106,11 @@ function extendPath(x, y) {
   const existingIndex = state.pathIndexByCell[cellIndex(x, y)];
   if (existingIndex !== -1) {
     if (existingIndex === state.pathTiles.length - 2) {
+      const fuelByLevel = [0, 3, 4, 5];
+      const returnFuel = fuelByLevel[state.contourReturnFuelLevel] || 0;
+      if (returnFuel > 0) {
+        addFuel(returnFuel, x, y);
+      }
       state.pathTiles.length = existingIndex + 1;
       rebuildPathIndex();
       return;
@@ -3533,7 +4171,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       }
       interiorCells.push({ x, y });
       const index = cellIndex(x, y);
-      state.loopScrapMask[index] = 1;
+      state.loopScrapMask[index] = 0.5;
       if (state.tunnelMask[index]) {
         continue;
       }
@@ -3558,7 +4196,7 @@ function activateLoopCharge(cellCount) {
   }
   state.loopChargeDuration = Math.max(3, Math.min(6, 2 + state.loopChargeLevel));
   state.loopChargeTimer = state.loopChargeDuration;
-  state.loopChargeDamageBonus = cellCount * 0.1;
+  state.loopChargeDamageBonus = cellCount * 0.05;
   showPerkToast(`Контурный заряд +${Math.round(state.loopChargeDamageBonus * 100)}%`);
 }
 
@@ -3779,6 +4417,61 @@ function renderEffects(camera) {
         ctx.arc(cx + Math.cos(angle) * puffReach, cy + Math.sin(angle) * puffReach, 5 + progress * 9 + puff, 0, Math.PI * 2);
         ctx.fill();
       }
+    } else if (effect.kind === "rocket") {
+      const t = clamp(progress, 0, 1);
+      const startX = effect.fromX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const startY = effect.fromY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      const endX = effect.targetX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const endY = effect.targetY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      const midX = startX + (endX - startX) * t;
+      const midY = startY + (endY - startY) * t - Math.sin(t * Math.PI) * effect.arcHeight;
+      const tailX = startX + (endX - startX) * Math.max(0, t - 0.08);
+      const tailY = startY + (endY - startY) * Math.max(0, t - 0.08) - Math.sin(Math.max(0, t - 0.08) * Math.PI) * effect.arcHeight;
+
+      ctx.strokeStyle = "rgba(255, 213, 155, 0.8)";
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(midX, midY);
+      ctx.stroke();
+
+      const gradient = ctx.createRadialGradient(midX - 1, midY - 1, 1, midX, midY, 8);
+      gradient.addColorStop(0, "rgba(255,248,224,0.95)");
+      gradient.addColorStop(0.45, "rgba(255,172,92,0.85)");
+      gradient.addColorStop(1, "rgba(255,120,32,0)");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(midX, midY, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffd59b";
+      ctx.beginPath();
+      ctx.arc(midX, midY, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255, 238, 196, 0.65)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(midX - 3, midY);
+      ctx.lineTo(midX + 3, midY);
+      ctx.moveTo(midX, midY - 3);
+      ctx.lineTo(midX, midY + 3);
+      ctx.stroke();
+    } else if (effect.kind === "damageNumber") {
+      const alpha = 1 - progress;
+      const driftX = (((effect.seed % 7) - 3) / 3) * 6 * progress;
+      const lift = progress * 18;
+      const text = `${Math.max(1, Math.round(effect.value))}`;
+
+      ctx.globalAlpha = alpha;
+      ctx.font = `700 15px ${HUD_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = "rgba(27, 15, 10, 0.88)";
+      ctx.fillStyle = "#fff7ea";
+      ctx.strokeText(text, cx + driftX, cy - 8 - lift);
+      ctx.fillText(text, cx + driftX, cy - 8 - lift);
     } else if (effect.kind === "loopField") {
       const alpha = 1 - progress;
       ctx.globalAlpha = alpha;
@@ -3944,6 +4637,8 @@ function render() {
   renderPerkToast(camera);
   renderSignalStatus(camera);
   renderOverdriveStatus(camera);
+  renderStunStatus(camera);
+  renderHeatWarningStatus(camera);
   renderLoopChargeStatus(camera);
   renderVisionMask(camera);
   renderHud();
@@ -4210,6 +4905,7 @@ function renderDrill(camera) {
   const ctx = state.ctx;
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
   const thrust = strikeWave * state.drill.strikeEnergy;
+  const heatRatio = clamp(state.heat / Math.max(1, state.maxHeat), 0, 1);
   const idleCharge = clamp(state.idleTime / Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay), 0, 1);
   const idleBob = Math.sin(state.drill.strikePhase * 0.5) * 0.7;
   const bodyOffsetX = -state.drill.facingX * thrust * 2.2;
@@ -4248,6 +4944,23 @@ function renderDrill(camera) {
   ctx.drawImage(state.sprites.drillFrames[frame], -TILE_SIZE * 0.5, -TILE_SIZE * 0.5, TILE_SIZE, TILE_SIZE);
   ctx.restore();
 
+  if (heatRatio > 0.04) {
+    ctx.save();
+    const tipX = px + TILE_SIZE * 0.5 + state.drill.facingX * 10;
+    const tipY = py + TILE_SIZE * 0.5 + state.drill.facingY * 10;
+    const glowRadius = TILE_SIZE * (0.12 + heatRatio * 0.14);
+    ctx.fillStyle = `rgba(255, 98, 58, ${0.08 + heatRatio * 0.18})`;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 175, 92, ${0.18 + heatRatio * 0.4})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, glowRadius + 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   const drillBaseX = px + TILE_SIZE * 0.5;
   const drillBaseY = py + TILE_SIZE * 0.5;
   const drillTipX = drillBaseX + state.drill.facingX * (12 + hammerOffsetX) + (state.drill.facingX === 0 ? hammerOffsetX * 0.25 : 0);
@@ -4264,6 +4977,18 @@ function renderDrill(camera) {
   ctx.moveTo(drillBaseX + state.drill.facingX * 4, drillBaseY + state.drill.facingY * 4);
   ctx.lineTo(drillTipX, drillTipY);
   ctx.stroke();
+  if (heatRatio > 0.02) {
+    ctx.strokeStyle = `rgba(255, 92, 64, ${0.2 + heatRatio * 0.45})`;
+    ctx.lineWidth = 4.4;
+    ctx.beginPath();
+    ctx.moveTo(drillBaseX + state.drill.facingX * 5, drillBaseY + state.drill.facingY * 5);
+    ctx.lineTo(drillTipX, drillTipY);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(255, 164, 98, ${0.18 + heatRatio * 0.35})`;
+    ctx.beginPath();
+    ctx.arc(drillTipX, drillTipY, 2.4 + heatRatio * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   if (state.drill.strikeEnergy > 0.08 && strikeWave > 0.72) {
     ctx.strokeStyle = "rgba(255, 231, 173, 0.85)";
@@ -4324,7 +5049,7 @@ function renderOverdriveStatus(camera) {
   const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
   const y = state.drill.y * TILE_SIZE - camera.y + 20;
   const width = 64;
-  const ratio = clamp(state.overhealDrillTimer / Math.max(1, state.overhealOverdriveDuration || 3), 0, 1);
+  const ratio = clamp(state.overhealDrillTimer / Math.max(1, state.overdriveDisplayDuration || state.overhealOverdriveDuration || 3), 0, 1);
 
   ctx.save();
   ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
@@ -4337,6 +5062,61 @@ function renderOverdriveStatus(camera) {
   buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
   ctx.fill();
   ctx.fillStyle = "#ff9b52";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderStunStatus(camera) {
+  if (state.stunTimer <= 0) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.y * TILE_SIZE - camera.y + 42;
+  const width = 64;
+  const ratio = clamp(state.stunTimer / Math.max(1, state.stunDisplayDuration || 1), 0, 1);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
+  ctx.strokeStyle = "rgba(255, 123, 123, 0.34)";
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = "#ff5f5f";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderHeatWarningStatus(camera) {
+  const threshold = state.maxHeat * 0.8;
+  if (state.heat < threshold) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.y * TILE_SIZE - camera.y + 54;
+  const width = 64;
+  const ratio = clamp(state.heat / Math.max(1, state.maxHeat), 0, 1);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
+  ctx.strokeStyle = "rgba(255, 155, 95, 0.34)";
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = "#ff8f49";
   buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
   ctx.fill();
   ctx.restore();
@@ -4489,22 +5269,23 @@ function renderScrapToast(camera) {
 function renderHud() {
   const fuelRatio = clamp(state.fuel / state.maxFuel, 0, 1);
   const hpRatio = clamp(state.hp / state.maxHp, 0, 1);
+  const heatRatio = clamp(state.heat / state.maxHeat, 0, 1);
   const currentScrapCost = getScrapPerkCost(state.scrapPerkLevel);
   const scrapCycle = state.nextScrapPerkAt - currentScrapCost;
   const scrapProgress = clamp(state.scrap - scrapCycle, 0, currentScrapCost);
   const scrapRatio = clamp(scrapProgress / currentScrapCost, 0, 1);
   const top = 14 + (window.visualViewport?.offsetTop || 0);
   const gap = 10;
-  const totalWidth = Math.min(state.width - 28, 420);
-  const panelWidth = (totalWidth - gap * 2) / 3;
+  const totalWidth = Math.min(state.width - 28, 560);
+  const panelWidth = (totalWidth - gap) / 2;
   const panelHeight = 34;
   const left = state.width - 14 - totalWidth;
+  const secondRowTop = top + panelHeight + 8;
 
   const hpLabel = state.armor > 0 ? `${state.hp}/${state.maxHp} • A:${state.armor}` : `${state.hp}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
-  drawHudBar(left + panelWidth + gap, top, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
   drawHudBar(
-    left + (panelWidth + gap) * 2,
+    left + panelWidth + gap,
     top,
     panelWidth,
     panelHeight,
@@ -4513,12 +5294,29 @@ function renderHud() {
     scrapRatio,
     ["#f0df84", "#d7b548"],
   );
+  drawHudBar(left, secondRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
+  drawHudBar(
+    left + panelWidth + gap,
+    secondRowTop,
+    panelWidth,
+    panelHeight,
+    "HEAT",
+    `${Math.floor(state.heat)}/${state.maxHeat}`,
+    heatRatio,
+    ["#ffb36d", "#ff4c3f"],
+  );
 
   const ctx = state.ctx;
-  const recipeTop = top + panelHeight + 8;
+  const recipeTop = secondRowTop + panelHeight + 8;
   const recipeWidth = 232;
   const seedWidth = 118;
   const seedLeft = left + recipeWidth + 8;
+  state.seedHitRect = {
+    x: seedLeft,
+    y: recipeTop,
+    width: seedWidth,
+    height: 32,
+  };
   ctx.save();
   ctx.fillStyle = "rgba(31, 18, 12, 0.82)";
   ctx.strokeStyle = "rgba(220, 169, 93, 0.28)";
