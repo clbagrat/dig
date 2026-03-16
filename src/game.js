@@ -15,8 +15,8 @@ const STRIKE_FUEL_COST = 4.5;
 const STRIKE_CYCLE_SPEED = 8;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
-const TILES_PER_PERK_TILE = 44;
-const TILES_PER_PERK_ZONE = 480;
+const TILES_PER_PERK_TILE = 34;
+const TILES_PER_PERK_ZONE = 370;
 const BASE_MIN_DISTANCE = 50;
 const RADAR_BASE_CHARGES = 10;
 const SCRAP_PERK_BASE_COST = 30;
@@ -75,6 +75,7 @@ const TILE_PERK_TYPES = [
   { name: "Бомба", icon: "*", color: "#ff7c5f", desc: "Взрыв в радиусе 2 тайлов с уроном x10" },
   { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+15% к скорости нового удара" },
   { name: "HP+", icon: "H", color: "#ff8f8f", desc: "+1 к текущему здоровью" },
+  { name: "Броня", icon: "A", color: "#b4d7ff", desc: "+1 брони против внешней опасности" },
 ];
 
 const SCRAP_PERK_TYPES = [
@@ -83,9 +84,9 @@ const SCRAP_PERK_TYPES = [
   { name: "Прыжковый привод", desc: "Каждые 10 блоков дает рывок, повторный выбор увеличивает дальность" },
   { name: "Длинный бур", desc: "Бьет следующий тайл вперед, повторно усиливает дальний удар" },
   { name: "Диагональные буры", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
-  { name: "Контурный разряд", desc: "+50% к урону от замыкания контура" },
+  { name: "Контурный заряд", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
   { name: "Форсаж на нуле", desc: "Чем меньше топлива, тем быстрее следующий удар" },
-  { name: "Саперный заряд", desc: "Сначала каждые 30 блоков, потом быстрее до предела 15" },
+  { name: "Саперный заряд", desc: "Каждые N сломанных буром блоков кидает бомбу 2x2 на дистанцию 1" },
   { name: "Топливный контур", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
   { name: "Линза обзора", desc: "+1 к радиусу обзора, до максимума 9" },
   { name: "Радарный модуль", desc: "+2 шага от радара" },
@@ -97,7 +98,18 @@ const SCRAP_PERK_TYPES = [
   { name: "Контурный трофей", desc: "Большой контур может создать случайный перк внутри" },
 ];
 
-const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
+const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
+const CRYSTAL_TYPES = [
+  null,
+  { name: "Красный", color: "#ff6b5e", glow: "rgba(255,107,94,0.22)" },
+  { name: "Желтый", color: "#ffd166", glow: "rgba(255,209,102,0.22)" },
+  { name: "Синий", color: "#72b7ff", glow: "rgba(114,183,255,0.22)" },
+  { name: "Зеленый", color: "#73e58f", glow: "rgba(115,229,143,0.22)" },
+  { name: "Фиолетовый", color: "#c796ff", glow: "rgba(199,150,255,0.22)" },
+];
+const TILES_PER_CRYSTAL_TILE = 94;
+const CRYSTAL_MIN_DISTANCE = 3;
+const CRYSTAL_RECIPE_LENGTH = 4;
 const CARDINAL_DIRS = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
@@ -119,6 +131,7 @@ const state = {
   maxFuel: START_FUEL,
   hp: START_HP,
   maxHp: START_HP,
+  armor: 0,
   depth: 0,
   scrap: 0,
   baseFound: false,
@@ -133,6 +146,7 @@ const state = {
   isChoosingPerk: false,
   pendingPerkChoice: false,
   pendingPerkDelay: 0,
+  bonusPerkChoices: 0,
   nextScrapPerkAt: SCRAP_PERK_BASE_COST,
   scrapPerkLevel: 0,
   perkChoices: [],
@@ -140,6 +154,7 @@ const state = {
   pathIndexByCell: new Int16Array(GRID_W * GRID_H),
   tunnelMask: new Uint8Array(GRID_W * GRID_H),
   perkMask: new Uint8Array(GRID_W * GRID_H),
+  crystalMask: new Uint8Array(GRID_W * GRID_H),
   perkZoneMask: new Int16Array(GRID_W * GRID_H),
   perkZones: [],
   hardness: new Uint8Array(GRID_W * GRID_H),
@@ -163,6 +178,10 @@ const state = {
   signalPrevY: START_Y,
   signalText: "Старт",
   perkText: "Нет",
+  crystalRecipe: [],
+  crystalCollected: [0, 0, 0, 0, 0, 0],
+  crystalProgress: 0,
+  crystalStatusText: "",
   moveFuelCost: MOVE_FUEL_COST,
   strikeFuelCost: STRIKE_FUEL_COST,
   strikeSpeed: 1,
@@ -185,7 +204,10 @@ const state = {
   movedTiles: 0,
   longDrillPower: 0,
   diagonalDrillPower: 0,
-  loopDamageBonus: 0,
+  loopChargeLevel: 0,
+  loopChargeTimer: 0,
+  loopChargeDuration: 0,
+  loopChargeDamageBonus: 0,
   loopPerkChance: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
@@ -211,6 +233,7 @@ const state = {
     time: 0,
   },
   damageFlash: 0,
+  fatalErrorText: "",
   sprites: null,
   effects: [],
   base: {
@@ -234,8 +257,7 @@ const state = {
     strikePhase: 0,
     strikeEnergy: 0,
     strikeLatch: false,
-    moveCooldown: 0,
-    strikeCooldown: 0,
+    actionCooldown: 0,
   },
 };
 
@@ -677,12 +699,20 @@ function getScrapPerkCost(level) {
   return Math.round(SCRAP_PERK_BASE_COST * SCRAP_PERK_COST_MULTIPLIER ** level);
 }
 
+function getIdleFuelDrain() {
+  return IDLE_FUEL_DRAIN + Math.floor(state.scrapPerkLevel / 3);
+}
+
 function getTargetPerkTileCount() {
   return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_TILE));
 }
 
 function getTargetPerkZoneCount() {
   return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_ZONE));
+}
+
+function getTargetCrystalTileCount() {
+  return Math.max(4, Math.round((GRID_W * GRID_H) / TILES_PER_CRYSTAL_TILE));
 }
 
 function getCenterDistanceRatio(x, y) {
@@ -700,6 +730,10 @@ function chooseTilePerkForPosition(x, y, random = Math.random) {
   weights[1] += Math.round(centerBias * 6);
   weights[2] += Math.round(centerBias * 4);
   return chooseWeightedPerk(weights, random);
+}
+
+function chooseCrystalType(random = Math.random) {
+  return 1 + Math.floor(random() * 5);
 }
 
 function isFarEnoughFromPlaced(x, y, placed, minDistance) {
@@ -1285,6 +1319,7 @@ function generateHardnessMap(random) {
 function setupField() {
   state.pathIndexByCell.fill(-1);
   state.perkMask.fill(0);
+  state.crystalMask.fill(0);
   state.perkZoneMask.fill(-1);
   state.gasMask.fill(0);
   state.steamMask.fill(0);
@@ -1309,13 +1344,19 @@ function setupField() {
   state.maxFuel = START_FUEL;
   state.hp = START_HP;
   state.maxHp = START_HP;
+  state.armor = 0;
   state.scrap = 0;
   state.depth = 0;
   state.signalText = "Старт";
   state.perkText = "Нет";
+  state.crystalRecipe = [];
+  state.crystalCollected = [0, 0, 0, 0, 0, 0];
+  state.crystalProgress = 0;
+  state.crystalStatusText = "";
   state.isChoosingPerk = false;
   state.pendingPerkChoice = false;
   state.pendingPerkDelay = 0;
+  state.bonusPerkChoices = 0;
   state.nextScrapPerkAt = SCRAP_PERK_BASE_COST;
   state.scrapPerkLevel = 0;
   state.perkChoices = [];
@@ -1345,6 +1386,10 @@ function setupField() {
   state.movedTiles = 0;
   state.longDrillPower = 0;
   state.diagonalDrillPower = 0;
+  state.loopChargeLevel = 0;
+  state.loopChargeTimer = 0;
+  state.loopChargeDuration = 0;
+  state.loopChargeDamageBonus = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
   state.remoteBombInterval = 0;
@@ -1365,8 +1410,7 @@ function setupField() {
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
-  state.drill.moveCooldown = 0;
-  state.drill.strikeCooldown = 0;
+  state.drill.actionCooldown = 0;
   state.worldSeed = newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
 
@@ -1378,7 +1422,9 @@ function setupField() {
 
   placeHiddenBase();
   placePerkTiles();
+  placeCrystalTiles();
   placePerkZones();
+  clearCrystalRecipe();
   rebuildVisibilityMask();
 }
 
@@ -1441,6 +1487,41 @@ function placePerkTiles() {
     }
 
     state.perkMask[index] = chooseTilePerkForPosition(x, y, state.worldRandom);
+    placed.push({ x, y });
+  }
+}
+
+function placeCrystalTiles() {
+  const placed = [];
+  const targetCount = getTargetCrystalTileCount();
+  let attempts = 0;
+
+  while (placed.length < targetCount && attempts < targetCount * 90) {
+    const x = 2 + Math.floor(state.worldRandom() * (GRID_W - 4));
+    const y = 2 + Math.floor(state.worldRandom() * (GRID_H - 4));
+    const index = cellIndex(x, y);
+    attempts += 1;
+
+    if (
+      state.tunnelMask[index] ||
+      state.perkMask[index] > 0 ||
+      state.crystalMask[index] > 0 ||
+      state.perkZoneMask[index] !== -1 ||
+      state.metalMask[index] ||
+      state.gasPocketMask[index] ||
+      state.steamPocketMask[index] ||
+      state.boulderPocketMask[index]
+    ) {
+      continue;
+    }
+    if ((x === state.base.x && y === state.base.y) || (x === START_X && y === START_Y)) {
+      continue;
+    }
+    if (!isFarEnoughFromPlaced(x, y, placed, CRYSTAL_MIN_DISTANCE)) {
+      continue;
+    }
+
+    state.crystalMask[index] = chooseCrystalType(state.worldRandom);
     placed.push({ x, y });
   }
 }
@@ -1583,6 +1664,68 @@ function createPerkZoneShape(random) {
   };
 }
 
+function clearCrystalRecipe() {
+  state.crystalRecipe = [];
+  state.crystalCollected = [0, 0, 0, 0, 0, 0];
+  state.crystalProgress = 0;
+  state.crystalStatusText = "";
+}
+
+function startCrystalRecipe(firstCrystalType) {
+  state.crystalRecipe = [firstCrystalType];
+  for (let i = 1; i < CRYSTAL_RECIPE_LENGTH; i += 1) {
+    state.crystalRecipe.push(chooseCrystalType(state.worldRandom));
+  }
+  state.crystalCollected = [0, 0, 0, 0, 0, 0];
+  state.crystalCollected[firstCrystalType] = 1;
+  state.crystalProgress = 1;
+  state.crystalStatusText = `${CRYSTAL_TYPES[firstCrystalType].name}: 1/${state.crystalRecipe.length}`;
+}
+
+function awardBonusScrapPerkChoice() {
+  if (state.isChoosingPerk || state.pendingPerkChoice) {
+    state.bonusPerkChoices += 1;
+    return;
+  }
+  if (!prepareScrapPerkChoices()) {
+    return;
+  }
+  state.isChoosingPerk = true;
+  syncPerkChoiceOverlay();
+}
+
+function collectCrystalTile(x, y, index, crystalType) {
+  state.crystalMask[index] = 0;
+  if (state.crystalRecipe.length === 0) {
+    startCrystalRecipe(crystalType);
+    showPerkToast(state.crystalStatusText);
+    return;
+  }
+
+  let recipeCount = 0;
+  for (let i = 0; i < state.crystalRecipe.length; i += 1) {
+    if (state.crystalRecipe[i] === crystalType) {
+      recipeCount += 1;
+    }
+  }
+
+  if (recipeCount > 0 && state.crystalCollected[crystalType] < recipeCount) {
+    state.crystalCollected[crystalType] += 1;
+    state.crystalProgress += 1;
+    state.crystalStatusText = `${CRYSTAL_TYPES[crystalType].name}: ${state.crystalProgress}/${state.crystalRecipe.length}`;
+    showPerkToast(state.crystalStatusText);
+    if (state.crystalProgress >= state.crystalRecipe.length) {
+      showPerkToast("Кристаллы собраны");
+      clearCrystalRecipe();
+      awardBonusScrapPerkChoice();
+    }
+    return;
+  }
+
+  showPerkToast("Рецепт сорван");
+  clearCrystalRecipe();
+}
+
 function getDistanceToBase(x, y) {
   return Math.hypot(state.base.x - x, state.base.y - y);
 }
@@ -1590,6 +1733,7 @@ function getDistanceToBase(x, y) {
 function carveTunnel(x, y) {
   const index = cellIndex(x, y);
   const perkType = state.perkMask[index];
+  const crystalType = state.crystalMask[index];
   const zoneId = state.perkZoneMask[index];
   if (!state.tunnelMask[index]) {
     state.tunnelMask[index] = 1;
@@ -1599,6 +1743,10 @@ function carveTunnel(x, y) {
 
   if (perkType > 0) {
     collectPerkTile(x, y, index, perkType);
+  }
+
+  if (crystalType > 0) {
+    collectCrystalTile(x, y, index, crystalType);
   }
 
   if (zoneId !== -1) {
@@ -1692,6 +1840,10 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       healPlayer(1, "HP+");
       state.perkText = "HP+";
       break;
+    case 7:
+      state.armor += 1;
+      state.perkText = "Броня";
+      break;
     default:
       break;
   }
@@ -1723,8 +1875,9 @@ function applyScrapPerk(perkType) {
       state.perkText = "Диагональные буры";
       break;
     case 5:
-      state.loopDamageBonus += 0.5;
-      state.perkText = "Контурный разряд";
+      state.loopChargeLevel = Math.min(4, state.loopChargeLevel + 1);
+      state.loopChargeDuration = 2 + state.loopChargeLevel;
+      state.perkText = "Контурный заряд";
       break;
     case 6:
       state.lowFuelSpeedBonus += 0.35;
@@ -1824,13 +1977,60 @@ function rebuildPathIndex() {
   }
 }
 
+function stringifyFatalReason(reason) {
+  if (reason instanceof Error) {
+    return reason.stack || `${reason.name}: ${reason.message}`;
+  }
+  if (typeof reason === "string") {
+    return reason;
+  }
+  try {
+    return JSON.stringify(reason, null, 2);
+  } catch {
+    return String(reason);
+  }
+}
+
+function syncFatalErrorOverlay() {
+  const overlay = document.getElementById("fatalError");
+  const textNode = document.getElementById("fatalErrorText");
+  if (!overlay || !textNode) {
+    return;
+  }
+  overlay.hidden = !state.fatalErrorText;
+  textNode.textContent = state.fatalErrorText;
+}
+
+function reportFatalError(reason, source = "runtime") {
+  const seedLine = state.worldSeed ? `Seed: ${state.worldSeed}\n` : "";
+  const sourceLine = source ? `Source: ${source}\n` : "";
+  const timeLine = `Time: ${new Date().toISOString()}\n`;
+  state.fatalErrorText = `${sourceLine}${timeLine}${seedLine}\n${stringifyFatalReason(reason)}`;
+  console.error("Fatal game error:", reason);
+  syncFatalErrorOverlay();
+}
+
+function bindFatalErrorHandlers() {
+  window.addEventListener("error", (event) => {
+    reportFatalError(event.error || new Error(event.message || "Unknown runtime error"), "window.error");
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    reportFatalError(event.reason || "Unhandled promise rejection", "unhandledrejection");
+  });
+}
+
 function init() {
-  state.ctx = state.canvas.getContext("2d");
-  state.sprites = createSpriteAtlas();
-  resize();
-  setupField();
-  bindUi();
-  requestAnimationFrame(frame);
+  bindFatalErrorHandlers();
+  try {
+    state.ctx = state.canvas.getContext("2d");
+    state.sprites = createSpriteAtlas();
+    resize();
+    setupField();
+    bindUi();
+    requestAnimationFrame(frame);
+  } catch (error) {
+    reportFatalError(error, "init");
+  }
 }
 
 function resize() {
@@ -1909,22 +2109,31 @@ function updatePad(event, stick) {
 }
 
 function frame(ts) {
-  if (!state.lastTs) {
+  if (state.fatalErrorText) {
+    syncFatalErrorOverlay();
+    return;
+  }
+
+  try {
+    if (!state.lastTs) {
+      state.lastTs = ts;
+    }
+
+    let delta = ts - state.lastTs;
     state.lastTs = ts;
+    delta = Math.min(delta, MAX_FRAME_MS);
+    state.timeAcc += delta;
+
+    while (state.timeAcc >= STEP_MS) {
+      update(STEP_MS / 1000);
+      state.timeAcc -= STEP_MS;
+    }
+
+    render();
+    requestAnimationFrame(frame);
+  } catch (error) {
+    reportFatalError(error, "frame");
   }
-
-  let delta = ts - state.lastTs;
-  state.lastTs = ts;
-  delta = Math.min(delta, MAX_FRAME_MS);
-  state.timeAcc += delta;
-
-  while (state.timeAcc >= STEP_MS) {
-    update(STEP_MS / 1000);
-    state.timeAcc -= STEP_MS;
-  }
-
-  render();
-  requestAnimationFrame(frame);
 }
 
 function update(dt) {
@@ -1932,7 +2141,7 @@ function update(dt) {
     return;
   }
 
-  state.fuel = Math.max(0, state.fuel - IDLE_FUEL_DRAIN * dt);
+  state.fuel = Math.max(0, state.fuel - getIdleFuelDrain() * dt);
   state.fuel = Math.min(state.maxFuel, state.fuel);
   consumeFuelEmergency();
   updateDrill(dt);
@@ -1944,6 +2153,10 @@ function update(dt) {
   updateDiscovery();
   updateCameraShake(dt);
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
+  state.loopChargeTimer = Math.max(0, state.loopChargeTimer - dt);
+  if (state.loopChargeTimer === 0) {
+    state.loopChargeDamageBonus = 0;
+  }
   state.perkToast.time = Math.max(0, state.perkToast.time - dt);
   state.fuelToast.time = Math.max(0, state.fuelToast.time - dt);
   state.hpToast.time = Math.max(0, state.hpToast.time - dt);
@@ -1957,6 +2170,11 @@ function update(dt) {
       syncPerkChoiceOverlay();
       return;
     }
+  }
+  if (!state.isChoosingPerk && !state.pendingPerkChoice && state.bonusPerkChoices > 0) {
+    state.bonusPerkChoices -= 1;
+    awardBonusScrapPerkChoice();
+    return;
   }
   checkScrapPerkUnlock();
 }
@@ -2027,12 +2245,14 @@ function rebuildVisibilityMask() {
   }
 }
 
-function checkScrapPerkUnlock() {
-  if (state.isChoosingPerk || state.pendingPerkChoice || state.scrap < state.nextScrapPerkAt) {
-    return;
-  }
-
+function prepareScrapPerkChoices() {
   const bag = [1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 14, 15];
+  if (state.loopChargeLevel >= 4) {
+    const idx = bag.indexOf(5);
+    if (idx !== -1) {
+      bag.splice(idx, 1);
+    }
+  }
   if (state.remoteBombInterval === 0 || state.remoteBombInterval > 15) {
     bag.push(7);
   }
@@ -2056,6 +2276,17 @@ function checkScrapPerkUnlock() {
   }
 
   state.perkChoices = bag.slice(0, 3);
+  return state.perkChoices.length > 0;
+}
+
+function checkScrapPerkUnlock() {
+  if (state.isChoosingPerk || state.pendingPerkChoice || state.scrap < state.nextScrapPerkAt) {
+    return;
+  }
+
+  if (!prepareScrapPerkChoices()) {
+    return;
+  }
   state.pendingPerkChoice = true;
   state.pendingPerkDelay = SCRAP_PERK_POPUP_DELAY;
   state.scrapPerkLevel += 1;
@@ -2103,6 +2334,183 @@ function chooseScrapPerk(slotIndex) {
   syncPerkChoiceOverlay();
 }
 
+function formatPerkPercent(value) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function getScrapPerkPreview(perkType) {
+  switch (perkType) {
+    case 1: {
+      const level = state.sideDrills;
+      const currentPower = 0.5 + state.sideDrills * 0.25;
+      const nextPower = 0.5 + (state.sideDrills + 1) * 0.25;
+      return {
+        level,
+        current: `Сейчас: боковой удар ${formatPerkPercent(currentPower)} от силы бура`,
+        next: `После выбора: ${formatPerkPercent(nextPower)} от силы бура`,
+      };
+    }
+    case 2: {
+      const level = state.jumpDrive ? Math.max(1, state.jumpRange - 1) : 0;
+      const currentRange = state.jumpDrive ? state.jumpRange : 0;
+      const nextRange = Math.max(2, state.jumpRange + 1);
+      return {
+        level,
+        current: currentRange > 0 ? `Сейчас: рывок на ${currentRange} клетки` : "Сейчас: рывка еще нет",
+        next: `После выбора: рывок на ${nextRange} клетки`,
+      };
+    }
+    case 3: {
+      const level = Math.round(state.longDrillPower / 0.1);
+      const currentPower = state.longDrillPower > 0 ? 0.1 + state.longDrillPower : 0;
+      const nextPower = 0.1 + state.longDrillPower + 0.1;
+      return {
+        level,
+        current: currentPower > 0 ? `Сейчас: дальний удар ${formatPerkPercent(currentPower)}` : "Сейчас: дальнего удара еще нет",
+        next: `После выбора: дальний удар ${formatPerkPercent(nextPower)}`,
+      };
+    }
+    case 4: {
+      const level = Math.round(state.diagonalDrillPower / 0.05);
+      const currentPower = state.diagonalDrillPower > 0 ? 0.15 + state.diagonalDrillPower : 0;
+      const nextPower = 0.15 + state.diagonalDrillPower + 0.05;
+      return {
+        level,
+        current: currentPower > 0 ? `Сейчас: диагональный удар ${formatPerkPercent(currentPower)}` : "Сейчас: диагональных ударов еще нет",
+        next: `После выбора: диагональный удар ${formatPerkPercent(nextPower)}`,
+      };
+    }
+    case 5: {
+      const level = state.loopChargeLevel;
+      const nextLevel = Math.min(4, state.loopChargeLevel + 1);
+      const currentDuration = state.loopChargeDuration || 0;
+      const nextDuration = 2 + nextLevel;
+      return {
+        level,
+        current:
+          level > 0
+            ? `Сейчас: замыкание дает +10% урона за клетку внутри на ${currentDuration} сек`
+            : "Сейчас: контурный заряд еще не активен",
+        next: `После выбора: баф будет длиться ${nextDuration} сек`,
+      };
+    }
+    case 6: {
+      const level = Math.round(state.lowFuelSpeedBonus / 0.35);
+      return {
+        level,
+        current: `Сейчас: максимум ${formatPerkPercent(state.lowFuelSpeedBonus)} ускорения на низком топливе`,
+        next: `После выбора: максимум ${formatPerkPercent(state.lowFuelSpeedBonus + 0.35)}`,
+      };
+    }
+    case 7: {
+      const level = state.remoteBombLevel;
+      const nextInterval = Math.max(15, state.remoteBombInterval > 0 ? state.remoteBombInterval - 5 : 30);
+      return {
+        level,
+        current:
+          state.remoteBombInterval > 0
+            ? `Сейчас: каждые ${state.remoteBombInterval} <span class="perk-option__delta">(${nextInterval})</span> блоков, сломанных буром, кидается бомба 2x2 на дистанцию 1`
+            : `Сейчас: саперный заряд еще не активен`,
+        next:
+          state.remoteBombInterval > 0
+            ? "После выбора: интервал станет меньше"
+            : `После выбора: бомба 2x2 начнет срабатывать каждые <span class="perk-option__delta">(30)</span> блоков`,
+      };
+    }
+    case 8: {
+      const level = Math.round(state.perkFuelBonus / 50);
+      const currentTankDelta = 90 - state.perkFuelBonus;
+      const nextFuelBonus = state.perkFuelBonus + 50;
+      const nextTankDelta = 90 - nextFuelBonus;
+      return {
+        level,
+        current: `Сейчас: любой перк +${state.perkFuelBonus} топлива, Бак ${currentTankDelta >= 0 ? `+${currentTankDelta}` : currentTankDelta}`,
+        next: `После выбора: любой перк +${nextFuelBonus}, Бак ${nextTankDelta >= 0 ? `+${nextTankDelta}` : nextTankDelta}`,
+      };
+    }
+    case 9: {
+      const level = Math.max(0, state.visionRadius - VISION_RADIUS);
+      const nextRadius = Math.min(9, state.visionRadius + 1);
+      return {
+        level,
+        current: `Сейчас: радиус видимости ${state.visionRadius}`,
+        next: `После выбора: радиус ${nextRadius}`,
+      };
+    }
+    case 10: {
+      const level = Math.round(state.radarBonus / 2);
+      return {
+        level,
+        current: `Сейчас: радар дает +${state.radarBonus} шагов`,
+        next: `После выбора: +${state.radarBonus + 2} шагов`,
+      };
+    }
+    case 11: {
+      const level = Math.round(state.scrapBonus / 2);
+      return {
+        level,
+        current: `Сейчас: +${state.scrapBonus} scrap за блок`,
+        next: `После выбора: +${state.scrapBonus + 2} scrap за блок`,
+      };
+    }
+    case 12: {
+      const level = Math.round(state.fuelOnBreak / 2);
+      return {
+        level,
+        current: `Сейчас: +${state.fuelOnBreak} топлива за блок`,
+        next: `После выбора: +${state.fuelOnBreak + 2} топлива за блок`,
+      };
+    }
+    case 13: {
+      return {
+        level: state.overflowBomb ? 1 : 0,
+        current: state.overflowBomb
+          ? `Сейчас: бак ${state.maxFuel}, переполнение кидает бомбу`
+          : `Сейчас: бак ${state.maxFuel}, переполнения нет`,
+        next: `После выбора: бак ${Math.max(100, state.maxFuel - 150)}, +50 к любому топливу и overflow-бомба`,
+      };
+    }
+    case 14: {
+      const level = Math.max(0, state.maxHp - START_HP);
+      return {
+        level,
+        current: `Сейчас: HP ${state.hp}/${state.maxHp}`,
+        next: `После выбора: максимум ${state.maxHp + 1}, лечение на 2`,
+      };
+    }
+    case 15: {
+      const level = Math.max(0, state.overhealOverdriveDuration - 2);
+      const nextDuration = Math.min(7, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 1 : 3);
+      return {
+        level,
+        current:
+          state.overhealOverdriveDuration > 0
+            ? `Сейчас: баф длится ${state.overhealOverdriveDuration} сек`
+            : "Сейчас: overheal-бафа еще нет",
+        next: `После выбора: баф ${nextDuration} сек без траты топлива на бурение`,
+      };
+    }
+    case 16: {
+      const level = Math.round(state.loopPerkChance / 0.25);
+      const nextChance = Math.min(0.5, state.loopPerkChance > 0 ? state.loopPerkChance + 0.25 : 0.25);
+      return {
+        level,
+        current:
+          state.loopPerkChance > 0
+            ? `Сейчас: ${formatPerkPercent(state.loopPerkChance)} на перк из большого контура`
+            : "Сейчас: трофеи из контура еще не выпадают",
+        next: `После выбора: ${formatPerkPercent(nextChance)} шанс на перк`,
+      };
+    }
+    default:
+      return {
+        level: 0,
+        current: "Сейчас: без данных",
+        next: "После выбора: без данных",
+      };
+  }
+}
+
 function syncPerkChoiceOverlay() {
   const overlay = document.getElementById("perkChoice");
   const buttons = document.querySelectorAll("[data-perk-slot]");
@@ -2123,12 +2531,14 @@ function syncPerkChoiceOverlay() {
       continue;
     }
     const perk = SCRAP_PERK_TYPES[perkType];
-    button.innerHTML = `<span class="perk-option__name">${perk.name}</span><span class="perk-option__desc">${perk.desc}</span>`;
+    const preview = getScrapPerkPreview(perkType);
+    button.innerHTML = `<span class="perk-option__name">${perk.name}</span><span class="perk-option__meta">Уровень: ${preview.level}</span><span class="perk-option__desc">${perk.desc}</span><span class="perk-option__stat">${preview.current}</span><span class="perk-option__next">${preview.next}</span>`;
   }
 }
 
 function getStrikeDamage() {
-  return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower;
+  const chargeBoost = state.loopChargeTimer > 0 ? 1 + state.loopChargeDamageBonus : 1;
+  return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * chargeBoost;
 }
 
 function addFuel(amount, originX = state.drill.x, originY = state.drill.y) {
@@ -2147,15 +2557,31 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y) {
   }
 }
 
-function applyHazardDamage(amount) {
+function applyHazardDamage(amount, options = {}) {
   if (amount <= 0 || state.dead) {
     return;
   }
 
-  state.hp = Math.max(0, state.hp - amount);
+  let damageLeft = amount;
+  if (options.affectsArmor !== false && state.armor > 0) {
+    const absorbed = Math.min(state.armor, damageLeft);
+    state.armor -= absorbed;
+    damageLeft -= absorbed;
+    if (absorbed > 0 && damageLeft <= 0) {
+      state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.1);
+      state.damageFlash = Math.min(1, state.damageFlash + 0.45);
+      showPerkToast(`Броня -${absorbed}`);
+      return;
+    }
+    if (absorbed > 0) {
+      showPerkToast(`Броня -${absorbed}`);
+    }
+  }
+
+  state.hp = Math.max(0, state.hp - damageLeft);
   state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
   state.damageFlash = Math.min(1, state.damageFlash + 0.8);
-  showHpToast(amount);
+  showHpToast(damageLeft);
   if (state.hp <= 0) {
     state.dead = true;
   }
@@ -2180,7 +2606,7 @@ function consumeFuelEmergency() {
 
   state.fuel = 0;
   state.outOfFuel = false;
-  applyHazardDamage(FUEL_DEPLETION_HP_COST);
+  applyHazardDamage(FUEL_DEPLETION_HP_COST, { affectsArmor: false });
   if (!state.dead) {
     state.fuel = Math.min(state.maxFuel, state.fuel + FUEL_DEPLETION_RECOVERY);
   }
@@ -2377,6 +2803,9 @@ function damageCell(x, y, damage, options = {}) {
     }
     return false;
   }
+  if (!state.hardness[index]) {
+    return false;
+  }
   const hazardType = state.hazardMask[index];
   const allowHazardChain = options.allowHazardChain && hazardType === HAZARD_TYPES.VOLATILE;
   if ((!options.ignoreHazardEffect || allowHazardChain) && hazardType && !state.hazardTriggeredMask[index]) {
@@ -2399,9 +2828,15 @@ function damageCell(x, y, damage, options = {}) {
 
 function breakCell(x, y, index, options = {}) {
   const hardness = state.hardness[index];
+  const blockType = BLOCK_TYPES[hardness];
+  if (!blockType) {
+    return;
+  }
   const hazardType = state.hazardMask[index];
-  const scrapGain = BLOCK_TYPES[hardness].scrap + state.scrapBonus + state.loopScrapMask[index];
+  const scrapGain = blockType.scrap + state.scrapBonus + state.loopScrapMask[index];
   spawnBreakEffect(x, y, hardness, options.cause || "break");
+  state.hardness[index] = 0;
+  state.health[index] = 0;
   state.scrap += scrapGain;
   runFuelEvent(() => addFuel(state.fuelOnBreak, x, y));
   state.blocksBroken += 1;
@@ -2610,20 +3045,40 @@ function maybeMoveBase() {
   const toY = fromY + dir.y;
   const fromIndex = cellIndex(fromX, fromY);
   const toIndex = cellIndex(toX, toY);
+  const sourceTunnel = state.tunnelMask[fromIndex];
+  const sourceHardness = state.hardness[fromIndex];
+  const sourceHealth = state.health[fromIndex];
+  const sourcePerk = state.perkMask[fromIndex];
+  const sourceCrystal = state.crystalMask[fromIndex];
+  const sourceHazard = state.hazardMask[fromIndex];
+  const sourceHazardTriggered = state.hazardTriggeredMask[fromIndex];
+  const sourceLoopScrap = state.loopScrapMask[fromIndex];
   const targetTunnel = state.tunnelMask[toIndex];
   const targetHardness = state.hardness[toIndex];
   const targetHealth = state.health[toIndex];
   const targetPerk = state.perkMask[toIndex];
+  const targetCrystal = state.crystalMask[toIndex];
+  const targetHazard = state.hazardMask[toIndex];
+  const targetHazardTriggered = state.hazardTriggeredMask[toIndex];
+  const targetLoopScrap = state.loopScrapMask[toIndex];
 
-  state.tunnelMask[toIndex] = 0;
-  state.hardness[toIndex] = 0;
-  state.health[toIndex] = 0;
-  state.perkMask[toIndex] = 0;
+  state.tunnelMask[toIndex] = sourceTunnel;
+  state.hardness[toIndex] = sourceHardness;
+  state.health[toIndex] = sourceHealth;
+  state.perkMask[toIndex] = sourcePerk;
+  state.crystalMask[toIndex] = sourceCrystal;
+  state.hazardMask[toIndex] = sourceHazard;
+  state.hazardTriggeredMask[toIndex] = sourceHazardTriggered;
+  state.loopScrapMask[toIndex] = sourceLoopScrap;
 
   state.tunnelMask[fromIndex] = targetTunnel;
   state.hardness[fromIndex] = targetHardness;
   state.health[fromIndex] = targetHealth;
   state.perkMask[fromIndex] = targetPerk;
+  state.crystalMask[fromIndex] = targetCrystal;
+  state.hazardMask[fromIndex] = targetHazard;
+  state.hazardTriggeredMask[fromIndex] = targetHazardTriggered;
+  state.loopScrapMask[fromIndex] = targetLoopScrap;
   state.base.x = toX;
   state.base.y = toY;
 
@@ -2700,8 +3155,7 @@ function updateCameraShake(dt) {
 }
 
 function updateDrill(dt) {
-  state.drill.moveCooldown = Math.max(0, state.drill.moveCooldown - dt);
-  state.drill.strikeCooldown = Math.max(0, state.drill.strikeCooldown - dt);
+  state.drill.actionCooldown = Math.max(0, state.drill.actionCooldown - dt);
 
   if (state.fuel <= 0) {
     state.fuel = 0;
@@ -2747,13 +3201,13 @@ function updateDrill(dt) {
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
 
   if (state.tunnelMask[targetIndex]) {
-    if (state.drill.moveCooldown > 0) {
+    if (state.drill.actionCooldown > 0) {
       return;
     }
 
     if (tryJumpMove(dx, dy)) {
       state.drill.strikePhase = Math.PI * 0.5;
-      state.drill.moveCooldown = actionInterval;
+      state.drill.actionCooldown = actionInterval;
       return;
     }
 
@@ -2762,7 +3216,7 @@ function updateDrill(dt) {
       return;
     }
     state.drill.strikePhase = Math.PI * 0.5;
-    state.drill.moveCooldown = actionInterval;
+    state.drill.actionCooldown = actionInterval;
     state.fuel -= state.moveFuelCost;
     const fromX = state.drill.x;
     const fromY = state.drill.y;
@@ -2774,13 +3228,13 @@ function updateDrill(dt) {
     return;
   }
 
-  if (state.drill.strikeCooldown > 0) {
+  if (state.drill.actionCooldown > 0) {
     return;
   }
 
   if (tryJumpMove(dx, dy)) {
     state.drill.strikePhase = Math.PI * 0.5;
-    state.drill.moveCooldown = actionInterval;
+    state.drill.actionCooldown = actionInterval;
     return;
   }
 
@@ -2790,7 +3244,7 @@ function updateDrill(dt) {
   }
 
   state.drill.strikePhase = Math.PI * 0.5;
-  state.drill.strikeCooldown = actionInterval;
+  state.drill.actionCooldown = actionInterval;
   if (state.overhealDrillTimer <= 0) {
     state.fuel -= state.strikeFuelCost;
   }
@@ -2920,7 +3374,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     return;
   }
 
-  const loopDamage = state.drillPower * 5 * (1 + state.loopDamageBonus);
   const affectedCells = [];
   const interiorCells = [];
   for (let y = minY; y <= maxY; y += 1) {
@@ -2935,7 +3388,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         continue;
       }
       affectedCells.push({ x, y });
-      damageCell(x, y, loopDamage, {
+      damageCell(x, y, EXPLOSION_BREAK_DAMAGE, {
         ignoreHazardEffect: true,
         allowHazardChain: true,
         cause: "explosion",
@@ -2943,8 +3396,41 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     }
   }
 
+  activateLoopCharge(interiorCells.length);
   maybeSpawnLoopPerk(interiorCells);
   spawnLoopFieldEffect(loopPath, affectedCells);
+}
+
+function activateLoopCharge(cellCount) {
+  if (state.loopChargeLevel <= 0 || cellCount <= 0) {
+    return;
+  }
+  state.loopChargeDuration = Math.max(3, Math.min(6, 2 + state.loopChargeLevel));
+  state.loopChargeTimer = state.loopChargeDuration;
+  state.loopChargeDamageBonus = cellCount * 0.1;
+  showPerkToast(`Контурный заряд +${Math.round(state.loopChargeDamageBonus * 100)}%`);
+}
+
+function getLoopPerkBlockHardness(x, y) {
+  let total = 0;
+  let count = 0;
+  for (let i = 0; i < CARDINAL_DIRS.length; i += 1) {
+    const nx = x + CARDINAL_DIRS[i].x;
+    const ny = y + CARDINAL_DIRS[i].y;
+    if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
+      continue;
+    }
+    const neighborHardness = state.hardness[cellIndex(nx, ny)];
+    if (neighborHardness > 0) {
+      total += neighborHardness;
+      count += 1;
+    }
+  }
+  if (count > 0) {
+    return clamp(Math.round(total / count), 1, BLOCK_TYPES.length - 1);
+  }
+  const centerRatio = clamp(getCenterDistanceRatio(x, y), 0, 1.8);
+  return clamp(1 + Math.round(centerRatio * 2 + state.worldRandom() * 2), 1, BLOCK_TYPES.length - 1);
 }
 
 function maybeSpawnLoopPerk(interiorCells) {
@@ -2976,7 +3462,15 @@ function maybeSpawnLoopPerk(interiorCells) {
   }
 
   const cell = candidates[Math.floor(state.worldRandom() * candidates.length)];
-  state.perkMask[cellIndex(cell.x, cell.y)] = chooseTilePerkForPosition(cell.x, cell.y, state.worldRandom);
+  const index = cellIndex(cell.x, cell.y);
+  const hardness = getLoopPerkBlockHardness(cell.x, cell.y);
+  state.tunnelMask[index] = 0;
+  state.hardness[index] = hardness;
+  state.health[index] = BLOCK_TYPES[hardness].hp;
+  state.hazardMask[index] = 0;
+  state.hazardTriggeredMask[index] = 0;
+  state.loopScrapMask[index] = 0;
+  state.perkMask[index] = chooseTilePerkForPosition(cell.x, cell.y, state.worldRandom);
   showPerkToast("Контурный трофей");
 }
 
@@ -3284,6 +3778,7 @@ function render() {
 
       renderPerkZoneTile(x, y, sx, sy);
       renderPerkTile(x, y, sx, sy);
+      renderCrystalTile(x, y, sx, sy);
     }
   }
 
@@ -3298,6 +3793,7 @@ function render() {
   renderPerkToast(camera);
   renderSignalStatus(camera);
   renderOverdriveStatus(camera);
+  renderLoopChargeStatus(camera);
   renderVisionMask(camera);
   renderHud();
 
@@ -3440,6 +3936,39 @@ function renderPerkTile(x, y, sx, sy) {
   ctx.font = `700 9px ${HUD_FONT}`;
   ctx.textAlign = "center";
   ctx.fillText(perk.icon, sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.58);
+  ctx.restore();
+}
+
+function renderCrystalTile(x, y, sx, sy) {
+  const ctx = state.ctx;
+  const crystalType = state.crystalMask[cellIndex(x, y)];
+  if (!crystalType) {
+    return;
+  }
+
+  const crystal = CRYSTAL_TYPES[crystalType];
+  ctx.save();
+  ctx.fillStyle = crystal.glow;
+  ctx.beginPath();
+  ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, TILE_SIZE * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = crystal.color;
+  ctx.beginPath();
+  ctx.moveTo(sx + TILE_SIZE * 0.5, sy + 7);
+  ctx.lineTo(sx + TILE_SIZE - 10, sy + TILE_SIZE * 0.38);
+  ctx.lineTo(sx + TILE_SIZE * 0.62, sy + TILE_SIZE - 8);
+  ctx.lineTo(sx + TILE_SIZE * 0.38, sy + TILE_SIZE - 8);
+  ctx.lineTo(sx + 10, sy + TILE_SIZE * 0.38);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.36)";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(sx + TILE_SIZE * 0.5, sy + 10);
+  ctx.lineTo(sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.48);
+  ctx.lineTo(sx + TILE_SIZE * 0.45, sy + TILE_SIZE - 9);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -3639,6 +4168,39 @@ function renderOverdriveStatus(camera) {
   ctx.restore();
 }
 
+function renderLoopChargeStatus(camera) {
+  if (state.loopChargeTimer <= 0 || state.loopChargeDamageBonus <= 0) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.y * TILE_SIZE - camera.y + 31;
+  const width = 76;
+  const ratio = clamp(state.loopChargeTimer / Math.max(1, state.loopChargeDuration || 3), 0, 1);
+  const text = `+${Math.round(state.loopChargeDamageBonus * 100)}%`;
+
+  ctx.save();
+  ctx.font = `700 11px ${HUD_FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillStyle = "#a9f5ff";
+  ctx.fillText(text, x, y - 6);
+  ctx.fillStyle = "rgba(18, 16, 24, 0.8)";
+  ctx.strokeStyle = "rgba(109, 235, 255, 0.38)";
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = "#6defff";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
+  ctx.restore();
+}
+
 function renderPerkToast(camera) {
   if (state.perkToast.time <= 0 || !state.perkToast.text) {
     return;
@@ -3764,7 +4326,8 @@ function renderHud() {
   const panelHeight = 34;
   const left = state.width - 14 - totalWidth;
 
-  drawHudBar(left, top, panelWidth, panelHeight, "HP", `${state.hp}/${state.maxHp}`, hpRatio, ["#ff9d7a", "#ff5c5c"]);
+  const hpLabel = state.armor > 0 ? `${state.hp}/${state.maxHp} • A:${state.armor}` : `${state.hp}/${state.maxHp}`;
+  drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
   drawHudBar(left + panelWidth + gap, top, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
   drawHudBar(
     left + (panelWidth + gap) * 2,
@@ -3778,26 +4341,82 @@ function renderHud() {
   );
 
   const ctx = state.ctx;
+  const recipeTop = top + panelHeight + 8;
+  const recipeWidth = 232;
+  const seedWidth = 118;
+  const seedLeft = left + recipeWidth + 8;
   ctx.save();
   ctx.fillStyle = "rgba(31, 18, 12, 0.82)";
   ctx.strokeStyle = "rgba(220, 169, 93, 0.28)";
   ctx.lineWidth = 1;
-  drawRoundedRectPath(left, top + panelHeight + 8, 150, 24, 10);
+  drawRoundedRectPath(left, recipeTop, recipeWidth, 32, 10);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#c6ab84";
   ctx.font = `700 10px ${HUD_FONT}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(`SEED ${state.worldSeed}  •  Опасности: шипы, взрыв, газ, пар, валун`, left + 10, top + panelHeight + 20);
+  ctx.fillText("CRYSTAL RECIPE", left + 10, recipeTop + 16);
+  if (state.crystalRecipe.length === 0) {
+    ctx.restore();
+  } else {
+    const usedCounts = [0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < state.crystalRecipe.length; i += 1) {
+      const crystalType = state.crystalRecipe[i];
+      const crystal = CRYSTAL_TYPES[crystalType];
+      const cx = left + 118 + i * 26;
+      const cy = recipeTop + 16;
+      const completed = usedCounts[crystalType] < state.crystalCollected[crystalType];
+      if (completed) {
+        usedCounts[crystalType] += 1;
+      }
+      ctx.globalAlpha = completed ? 1 : 0.82;
+      ctx.fillStyle = crystal.glow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = crystal.color;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 9);
+      ctx.lineTo(cx + 7, cy - 2);
+      ctx.lineTo(cx + 4, cy + 8);
+      ctx.lineTo(cx - 4, cy + 8);
+      ctx.lineTo(cx - 7, cy - 2);
+      ctx.closePath();
+      ctx.fill();
+      if (completed) {
+        ctx.strokeStyle = "rgba(255, 244, 214, 0.9)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 11, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.fillStyle = "rgba(31, 18, 12, 0.82)";
+  ctx.strokeStyle = "rgba(220, 169, 93, 0.28)";
+  ctx.lineWidth = 1;
+  drawRoundedRectPath(seedLeft, recipeTop, seedWidth, 32, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#c6ab84";
+  ctx.font = `700 10px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("SEED", seedLeft + 10, recipeTop + 16);
+  ctx.textAlign = "right";
+  ctx.fillText(String(state.worldSeed), seedLeft + seedWidth - 10, recipeTop + 16);
   ctx.restore();
 }
 
 function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   const ctx = state.ctx;
-  const trackX = x + 54;
+  const trackX = x + 72;
   const trackY = y + 12;
-  const trackWidth = Math.max(36, width - 104);
+  const trackWidth = Math.max(44, width - 106);
   const trackHeight = 10;
 
   drawHudPanel(x, y, width, height);
@@ -3807,7 +4426,11 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   ctx.fillStyle = "#c6ab84";
   ctx.font = `700 10px ${HUD_FONT}`;
   ctx.textAlign = "left";
-  ctx.fillText(label, x + 10, y + 15);
+  ctx.fillText(label, x + 10, y + 13);
+
+  ctx.fillStyle = "#f7ebd4";
+  ctx.font = `700 11px ${HUD_FONT}`;
+  ctx.fillText(value, x + 10, y + 27);
 
   ctx.fillStyle = "rgba(255, 240, 214, 0.08)";
   drawRoundedRectPath(trackX, trackY, trackWidth, trackHeight, 999);
@@ -3821,11 +4444,6 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
     drawRoundedRectPath(trackX, trackY, trackWidth * ratio, trackHeight, 999);
     ctx.fill();
   }
-
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#f7ebd4";
-  ctx.font = `700 11px ${HUD_FONT}`;
-  ctx.fillText(value, x + width - 10, y + 15);
   ctx.restore();
 }
 

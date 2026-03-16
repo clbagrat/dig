@@ -50,12 +50,22 @@ const TILE_PERK_TYPES = [
 ];
 
 const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2];
+const CRYSTAL_TYPES = [
+  null,
+  { name: "Red", color: "#ff6b5e" },
+  { name: "Yellow", color: "#ffd166" },
+  { name: "Blue", color: "#72b7ff" },
+  { name: "Green", color: "#73e58f" },
+  { name: "Violet", color: "#c796ff" },
+];
 const CARDINAL_DIRS = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ];
+const TILES_PER_CRYSTAL_TILE = 94;
+const CRYSTAL_MIN_DISTANCE = 3;
 
 function parseArgs(argv) {
   let seed = 1;
@@ -133,6 +143,10 @@ function getTargetPerkZoneCount() {
   return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_ZONE));
 }
 
+function getTargetCrystalTileCount() {
+  return Math.max(4, Math.round((GRID_W * GRID_H) / TILES_PER_CRYSTAL_TILE));
+}
+
 function getCenterDistanceRatio(x, y) {
   return clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.8);
 }
@@ -148,6 +162,10 @@ function chooseTilePerkForPosition(random, x, y) {
   weights[1] += Math.round(centerBias * 6);
   weights[2] += Math.round(centerBias * 4);
   return chooseWeightedPerk(random, weights);
+}
+
+function chooseCrystalType(random) {
+  return 1 + Math.floor(random() * 5);
 }
 
 function isFarEnoughFromPlaced(x, y, placed, minDistance) {
@@ -477,6 +495,7 @@ function generateMap(seed) {
   const steamPocketMask = new Uint8Array(GRID_W * GRID_H);
   const boulderPocketMask = new Uint8Array(GRID_W * GRID_H);
   const perkMask = new Uint8Array(GRID_W * GRID_H);
+  const crystalMask = new Uint8Array(GRID_W * GRID_H);
   const perkZoneMask = new Int32Array(GRID_W * GRID_H);
   perkZoneMask.fill(-1);
   const perkZones = [];
@@ -589,6 +608,36 @@ function generateMap(seed) {
     placedPerks.push({ x, y });
   }
 
+  const placedCrystals = [];
+  const targetCrystals = getTargetCrystalTileCount();
+  let crystalAttempts = 0;
+  while (placedCrystals.length < targetCrystals && crystalAttempts < targetCrystals * 90) {
+    const x = 2 + Math.floor(random() * (GRID_W - 4));
+    const y = 2 + Math.floor(random() * (GRID_H - 4));
+    const index = cellIndex(x, y);
+    crystalAttempts += 1;
+
+    if (
+      (x === START_X && y === START_Y) ||
+      (x === base.x && y === base.y) ||
+      perkMask[index] > 0 ||
+      crystalMask[index] > 0 ||
+      perkZoneMask[index] !== -1 ||
+      metalMask[index] ||
+      gasPocketMask[index] ||
+      steamPocketMask[index] ||
+      boulderPocketMask[index]
+    ) {
+      continue;
+    }
+    if (!isFarEnoughFromPlaced(x, y, placedCrystals, CRYSTAL_MIN_DISTANCE)) {
+      continue;
+    }
+
+    crystalMask[index] = chooseCrystalType(random);
+    placedCrystals.push({ x, y });
+  }
+
   const placedZones = [];
   const targetZones = getTargetPerkZoneCount();
   let zoneAttempts = 0;
@@ -649,7 +698,7 @@ function generateMap(seed) {
     }
   }
 
-  return { hardness, hazardMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkMask, perkZones, base };
+  return { hardness, hazardMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkMask, crystalMask, perkZones, base };
 }
 
 function createPerkZoneShape(random) {
@@ -826,6 +875,22 @@ function renderSvg(seed, map) {
     }
   }
 
+  for (let y = 0; y < GRID_H; y += 1) {
+    for (let x = 0; x < GRID_W; x += 1) {
+      const crystalType = map.crystalMask[cellIndex(x, y)];
+      if (!crystalType) {
+        continue;
+      }
+      const crystal = CRYSTAL_TYPES[crystalType];
+      const px = x * TILE_PX;
+      const py = y * TILE_PX;
+      const cx = px + TILE_PX * 0.5;
+      const cy = py + TILE_PX * 0.5;
+      parts.push(`<circle cx="${cx}" cy="${cy}" r="${TILE_PX * 0.22}" fill="${crystal.color}" fill-opacity="0.2"/>`);
+      parts.push(`<path d="M ${cx} ${py + TILE_PX * 0.14} L ${px + TILE_PX * 0.82} ${py + TILE_PX * 0.38} L ${px + TILE_PX * 0.62} ${py + TILE_PX * 0.82} L ${px + TILE_PX * 0.38} ${py + TILE_PX * 0.82} L ${px + TILE_PX * 0.18} ${py + TILE_PX * 0.38} Z" fill="${crystal.color}" stroke="rgba(255,255,255,0.32)" stroke-width="0.8"/>`);
+    }
+  }
+
   const startPx = START_X * TILE_PX;
   const startPy = START_Y * TILE_PX;
   parts.push(`<rect x="${startPx + TILE_PX * 0.16}" y="${startPy + TILE_PX * 0.2}" width="${TILE_PX * 0.68}" height="${TILE_PX * 0.48}" fill="#d3a15a"/>`);
@@ -851,6 +916,7 @@ function renderSvg(seed, map) {
   parts.push(`<text x="${legendX}" y="64" fill="#c6ab84" font-size="12" font-family="Georgia, serif">size: ${GRID_W} x ${GRID_H}</text>`);
   parts.push(`<text x="${legendX}" y="80" fill="#c6ab84" font-size="12" font-family="Georgia, serif">tile perks: ~${getTargetPerkTileCount()}</text>`);
   parts.push(`<text x="${legendX}" y="96" fill="#c6ab84" font-size="12" font-family="Georgia, serif">perk zones: ~${getTargetPerkZoneCount()}</text>`);
+  parts.push(`<text x="${legendX}" y="112" fill="#c6ab84" font-size="12" font-family="Georgia, serif">crystals: ~${getTargetCrystalTileCount()}</text>`);
 
   let legendY = 128;
   for (let i = 1; i < BLOCK_TYPES.length; i += 1) {
