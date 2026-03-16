@@ -220,6 +220,156 @@ strong {
   display: none;
 }
 
+.crystal-reward {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(7, 4, 3, 0.68);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.crystal-reward[hidden] {
+  display: none;
+}
+
+.crystal-reward__panel {
+  width: min(100%, 560px);
+  border: 1px solid var(--panel-border);
+  border-radius: 22px;
+  padding: 20px;
+  background:
+    linear-gradient(180deg, rgba(93, 57, 27, 0.22), rgba(18, 10, 7, 0.08)),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 179, 0.08),
+    0 18px 42px var(--shadow);
+}
+
+.crystal-reward__title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.crystal-reward__subtitle {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.crystal-reward__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.crystal-reward__card {
+  min-height: 188px;
+  border: 1px solid rgba(215, 159, 73, 0.3);
+  border-radius: 18px;
+  padding: 14px 12px;
+  background:
+    linear-gradient(180deg, rgba(93, 57, 27, 0.16), rgba(18, 10, 7, 0.04)),
+    rgba(22, 12, 8, 0.76);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.crystal-reward__tile {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+}
+
+.crystal-reward__tile::before,
+.crystal-reward__tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: rotate(45deg);
+  border-radius: 14px;
+}
+
+.crystal-reward__tile::before {
+  background: rgba(255, 231, 188, 0.08);
+  box-shadow: 0 0 24px var(--perk-color);
+}
+
+.crystal-reward__tile::after {
+  inset: 8px;
+  border: 2px solid var(--perk-color);
+  background: rgba(255, 231, 188, 0.04);
+}
+
+.crystal-reward__tile-icon {
+  position: relative;
+  z-index: 1;
+  font-size: 22px;
+  font-weight: 700;
+  color: #2b1b14;
+}
+
+.crystal-reward__name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.crystal-reward__desc {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.crystal-reward__card--shuffling .crystal-reward__tile {
+  animation: crystal-reward-spin 0.12s linear infinite;
+}
+
+.crystal-reward__placeholder {
+  color: rgba(255, 231, 188, 0.55);
+  font-size: 22px;
+  letter-spacing: 0.12em;
+}
+
+.crystal-reward__close {
+  margin-top: 18px;
+  width: 100%;
+  border: 1px solid rgba(215, 159, 73, 0.34);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(93, 57, 27, 0.18), rgba(18, 10, 7, 0.04)),
+    var(--panel);
+  color: var(--text);
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+
+.crystal-reward__close:disabled {
+  opacity: 0.45;
+}
+
+@keyframes crystal-reward-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(45deg);
+  }
+}
+
 .debug-perk-menu {
   position: absolute;
   inset: 0;

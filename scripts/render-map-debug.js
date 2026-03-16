@@ -154,14 +154,22 @@ function getCenterDistanceRatio(x, y) {
 
 function getCenterPerkDensity(x, y) {
   const ratio = getCenterDistanceRatio(x, y);
-  return clamp(1.28 - ratio * 0.48, 0.32, 1.28);
+  return clamp(0.72 + ratio * 0.42, 0.5, 1.45);
+}
+
+function getPerkZoneDensity(x, y) {
+  const ratio = getCenterDistanceRatio(x, y);
+  return clamp(0.6 + ratio * 0.5, 0.45, 1.5);
 }
 
 function chooseTilePerkForPosition(random, x, y) {
-  const centerBias = 1 - clamp(getCenterDistanceRatio(x, y), 0, 1);
+  const ratio = clamp(getCenterDistanceRatio(x, y), 0, 1.2);
+  const farBias = ratio;
+  const centerBias = 1.2 - ratio;
   const weights = TILE_PERK_WEIGHTS.slice();
-  weights[1] += Math.round(centerBias * 6);
-  weights[2] += Math.round(centerBias * 4);
+  weights[2] += Math.round(farBias * 7);
+  weights[3] += Math.round(centerBias * 5);
+  weights[5] += Math.round(centerBias * 4);
   return chooseWeightedPerk(random, weights);
 }
 
@@ -654,6 +662,9 @@ function generateMap(seed) {
       continue;
     }
     if (!isFarEnoughFromPlaced(centerX, centerY, placedZones, PERK_ZONE_MIN_DISTANCE)) {
+      continue;
+    }
+    if (random() > getPerkZoneDensity(centerX, centerY)) {
       continue;
     }
 

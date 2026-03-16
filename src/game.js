@@ -23,7 +23,6 @@ const RADAR_BASE_CHARGES = 10;
 const SCRAP_PERK_BASE_COST = 30;
 const SCRAP_PERK_COST_MULTIPLIER = 1.35;
 const SCRAP_PERK_POPUP_DELAY = 0.5;
-const BASE_MOVE_INTERVAL = 3;
 const BASE_MOVE_AWAY_CHANCE = 0.5;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
@@ -55,6 +54,8 @@ const IMPACT_EFFECT_DURATION = 0.22;
 const BREAK_EFFECT_DURATION = 0.42;
 const EXPLOSION_EFFECT_DURATION = 0.48;
 const LOOP_FIELD_EFFECT_DURATION = 0.52;
+const CHAIN_EXPLOSION_DELAY = 0.14;
+const PERK_ZONE_CHARGE_DELAY = 1;
 const HAZARD_TYPES = {
   SPIKE: 1,
   VOLATILE: 2,
@@ -66,13 +67,13 @@ const HAZARD_DATA = {
 
 const BLOCK_TYPES = [
   { hp: 0, color: "#1a1410", scrap: 0, vein: "#3c2d22" },
-  { hp: 6, color: "#5f4631", scrap: 2, vein: "#9b7a4a" },
-  { hp: 9, color: "#715337", scrap: 4, vein: "#c59a5c" },
-  { hp: 12, color: "#6a4f37", scrap: 6, vein: "#d0a66a" },
-  { hp: 15, color: "#6f4f40", scrap: 8, vein: "#b66e3b" },
-  { hp: 22, color: "#60473f", scrap: 11, vein: "#a57f58" },
-  { hp: 26, color: "#4f3d36", scrap: 14, vein: "#9cb1b7" },
-  { hp: 34, color: "#3e3236", scrap: 18, vein: "#d6d9df" },
+  { hp: 60, color: "#5f4631", scrap: 2, vein: "#9b7a4a" },
+  { hp: 90, color: "#715337", scrap: 4, vein: "#c59a5c" },
+  { hp: 120, color: "#6a4f37", scrap: 6, vein: "#d0a66a" },
+  { hp: 180, color: "#6f4f40", scrap: 8, vein: "#b66e3b" },
+  { hp: 300, color: "#60473f", scrap: 11, vein: "#a57f58" },
+  { hp: 420, color: "#4f3d36", scrap: 14, vein: "#9cb1b7" },
+  { hp: 600, color: "#3e3236", scrap: 18, vein: "#d6d9df" },
 ];
 
 const TILE_PERK_TYPES = [
@@ -177,6 +178,13 @@ const state = {
   perkRerolls: 0,
   debugPerkMenuOpen: false,
   debugPerkSelection: "",
+  crystalRewardModalOpen: false,
+  crystalRewardCloseReady: false,
+  crystalRewardRevealStage: 0,
+  crystalRewardAnimTimer: 0,
+  crystalRewardShuffleTick: 0,
+  crystalRewardPreviewPerks: [0, 0],
+  crystalRewardPerks: [0, 0],
   nextScrapPerkAt: SCRAP_PERK_BASE_COST,
   scrapPerkLevel: 0,
   perkChoices: [],
@@ -289,6 +297,7 @@ const state = {
   seedHitRect: null,
   sprites: null,
   effects: [],
+  chainExplosions: [],
   base: {
     x: 0,
     y: 0,
@@ -790,14 +799,22 @@ function getCenterDistanceRatio(x, y) {
 
 function getCenterPerkDensity(x, y) {
   const ratio = getCenterDistanceRatio(x, y);
-  return clamp(1.28 - ratio * 0.48, 0.32, 1.28);
+  return clamp(0.72 + ratio * 0.42, 0.5, 1.45);
+}
+
+function getPerkZoneDensity(x, y) {
+  const ratio = getCenterDistanceRatio(x, y);
+  return clamp(0.6 + ratio * 0.5, 0.45, 1.5);
 }
 
 function chooseTilePerkForPosition(x, y, random = Math.random) {
-  const centerBias = 1 - clamp(getCenterDistanceRatio(x, y), 0, 1);
+  const ratio = clamp(getCenterDistanceRatio(x, y), 0, 1.2);
+  const farBias = ratio;
+  const centerBias = 1.2 - ratio;
   const weights = TILE_PERK_WEIGHTS.slice();
-  weights[1] += Math.round(centerBias * 6);
-  weights[2] += Math.round(centerBias * 4);
+  weights[2] += Math.round(farBias * 7);
+  weights[3] += Math.round(centerBias * 5);
+  weights[5] += Math.round(centerBias * 4);
   return chooseWeightedPerk(weights, random);
 }
 
@@ -1434,6 +1451,13 @@ function setupField() {
   state.perkRerolls = 0;
   state.debugPerkMenuOpen = false;
   state.debugPerkSelection = "";
+  state.crystalRewardModalOpen = false;
+  state.crystalRewardCloseReady = false;
+  state.crystalRewardRevealStage = 0;
+  state.crystalRewardAnimTimer = 0;
+  state.crystalRewardShuffleTick = 0;
+  state.crystalRewardPreviewPerks = [0, 0];
+  state.crystalRewardPerks = [0, 0];
   state.nextScrapPerkAt = SCRAP_PERK_BASE_COST;
   state.scrapPerkLevel = 0;
   state.perkChoices = [];
@@ -1505,6 +1529,7 @@ function setupField() {
   state.damageFlash = 0;
   state.seedHitRect = null;
   state.effects.length = 0;
+  state.chainExplosions.length = 0;
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
@@ -1522,6 +1547,7 @@ function setupField() {
   placePerkTiles();
   placeCrystalTiles();
   placePerkZones();
+  // placeDebugStartPerkZone();
   clearCrystalRecipe();
   rebuildVisibilityMask();
   syncDebugPerkOverlay();
@@ -1642,6 +1668,9 @@ function placePerkZones() {
     if (!isFarEnoughFromPlaced(centerX, centerY, placed, PERK_ZONE_MIN_DISTANCE)) {
       continue;
     }
+    if (state.worldRandom() > getPerkZoneDensity(centerX, centerY)) {
+      continue;
+    }
 
     let blocked = false;
     const cells = [];
@@ -1680,6 +1709,8 @@ function placePerkZones() {
       perkType,
       openedCount: 0,
       openedMask: 0,
+      arming: false,
+      armingTimer: 0,
       collected: false,
     });
     placed.push({ x: centerX, y: centerY });
@@ -1688,6 +1719,46 @@ function placePerkZones() {
       state.perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
     }
   }
+}
+
+function placeDebugStartPerkZone() {
+  const cells = [
+    { x: START_X, y: START_Y },
+    { x: START_X - 1, y: START_Y },
+    { x: START_X + 1, y: START_Y },
+    { x: START_X, y: START_Y - 1 },
+    { x: START_X, y: START_Y + 1 },
+  ];
+  const zoneId = state.perkZones.length;
+  const perkType = chooseTilePerkForPosition(START_X, START_Y, state.worldRandom);
+  let openedMask = 0;
+  let openedCount = 0;
+
+  for (let i = 0; i < cells.length; i += 1) {
+    const cell = cells[i];
+    const index = cellIndex(cell.x, cell.y);
+    state.perkZoneMask[index] = zoneId;
+    state.perkMask[index] = 0;
+    state.crystalMask[index] = 0;
+    if (state.tunnelMask[index]) {
+      openedMask |= 1 << i;
+      openedCount += 1;
+    }
+  }
+
+  state.perkZones.push({
+    x: START_X,
+    y: START_Y,
+    cells,
+    iconX: START_X,
+    iconY: START_Y,
+    perkType,
+    openedCount,
+    openedMask,
+    arming: false,
+    armingTimer: 0,
+    collected: false,
+  });
 }
 
 function createPerkZoneShape(random) {
@@ -1794,10 +1865,14 @@ function awardBonusScrapPerkChoice() {
 }
 
 function grantCrystalRecipeReward(firstCrystalType, x, y) {
-  const perkType = CRYSTAL_REWARD_TILE_PERKS[firstCrystalType] || 1;
+  const firstPerkType = CRYSTAL_REWARD_TILE_PERKS[firstCrystalType] || 1;
+  const secondPerkType = getRandomTilePerkExcluding([firstPerkType]);
   state.perkRerolls += 1;
-  runFuelEvent(() => applyTilePerk(perkType, x, y, false));
-  showPerkToast(`Кристалл: ${TILE_PERK_TYPES[perkType].name}`);
+  runFuelEvent(() => {
+    applyTilePerk(firstPerkType, x, y, false);
+    applyTilePerk(secondPerkType, x, y, false);
+  });
+  openCrystalRewardModal(firstPerkType, secondPerkType);
 }
 
 function applyCrystalCatalystBonus(x, y) {
@@ -1886,7 +1961,7 @@ function collectPerkTile(x, y, index, perkType) {
 
 function revealPerkZoneCell(zoneId, x, y) {
   const zone = state.perkZones[zoneId];
-  if (!zone || zone.collected) {
+  if (!zone || zone.collected || zone.arming) {
     return;
   }
 
@@ -1909,11 +1984,14 @@ function revealPerkZoneCell(zoneId, x, y) {
   zone.openedMask |= bit;
   zone.openedCount += 1;
   if (zone.openedCount === zone.cells.length) {
-    collectPerkZone(zone);
+    zone.arming = true;
+    zone.armingTimer = PERK_ZONE_CHARGE_DELAY;
   }
 }
 
 function collectPerkZone(zone) {
+  zone.arming = false;
+  zone.armingTimer = 0;
   zone.collected = true;
   state.perkText = `${TILE_PERK_TYPES[zone.perkType].name} x3`;
   showPerkToast(state.perkText);
@@ -1928,6 +2006,19 @@ function collectPerkZone(zone) {
       applyTilePerk(zone.perkType, zone.x, zone.y, false);
     }
   });
+}
+
+function updatePerkZones(dt) {
+  for (let i = 0; i < state.perkZones.length; i += 1) {
+    const zone = state.perkZones[i];
+    if (!zone || zone.collected || !zone.arming) {
+      continue;
+    }
+    zone.armingTimer = Math.max(0, zone.armingTimer - dt);
+    if (zone.armingTimer === 0) {
+      collectPerkZone(zone);
+    }
+  }
 }
 
 function applyTilePerk(perkType, x, y, showToast = true) {
@@ -2228,6 +2319,8 @@ function bindUi() {
   const debugClose = document.getElementById("debugPerkClose");
   const debugOverlay = document.getElementById("debugPerkMenu");
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
+  const crystalRewardOverlay = document.getElementById("crystalReward");
+  const crystalRewardClose = document.getElementById("crystalRewardClose");
 
   window.addEventListener("resize", resize);
 
@@ -2316,8 +2409,27 @@ function bindUi() {
     });
   }
 
+  if (crystalRewardClose) {
+    crystalRewardClose.addEventListener("click", () => {
+      if (!state.crystalRewardCloseReady) {
+        return;
+      }
+      closeCrystalRewardModal();
+    });
+  }
+
+  if (crystalRewardOverlay) {
+    crystalRewardOverlay.addEventListener("click", (event) => {
+      if (event.target !== crystalRewardOverlay || !state.crystalRewardCloseReady) {
+        return;
+      }
+      closeCrystalRewardModal();
+    });
+  }
+
   buildDebugPerkButtons();
   syncDebugPerkOverlay();
+  syncCrystalRewardOverlay();
 }
 
 function isPointInsideRect(x, y, rect) {
@@ -2407,8 +2519,129 @@ function syncDebugPerkOverlay() {
     overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
   }
   if (touchZones) {
-    touchZones.style.pointerEvents = state.isChoosingPerk || state.debugPerkMenuOpen ? "none" : "auto";
+    touchZones.style.pointerEvents = state.isChoosingPerk || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
   }
+}
+
+function getRandomTilePerkExcluding(excluded = []) {
+  const options = [];
+  for (let i = 1; i < TILE_PERK_TYPES.length; i += 1) {
+    if (excluded.includes(i)) {
+      continue;
+    }
+    options.push(i);
+  }
+  return options[Math.floor(state.worldRandom() * options.length)] || 1;
+}
+
+function buildCrystalRewardCard(perkType, isRevealed, isShuffling) {
+  if (!perkType) {
+    return `<div class="crystal-reward__placeholder">...</div>`;
+  }
+  const perk = TILE_PERK_TYPES[perkType];
+  return `<div class="crystal-reward__tile" style="--perk-color:${perk.color}"><span class="crystal-reward__tile-icon">${perk.icon}</span></div><div class="crystal-reward__name">${isRevealed ? perk.name : "???"}</div><div class="crystal-reward__desc">${isRevealed ? perk.desc : "Перемешивание..."}</div>`;
+}
+
+function syncCrystalRewardOverlay() {
+  const overlay = document.getElementById("crystalReward");
+  const closeButton = document.getElementById("crystalRewardClose");
+  const card0 = document.getElementById("crystalRewardCard0");
+  const card1 = document.getElementById("crystalRewardCard1");
+  const touchZones = document.querySelector(".touch-zones");
+  if (!overlay || !card0 || !card1 || !closeButton) {
+    return;
+  }
+
+  if (state.crystalRewardModalOpen) {
+    overlay.hidden = false;
+    overlay.removeAttribute("hidden");
+    overlay.style.cssText = [
+      "position:absolute",
+      "inset:0",
+      "z-index:9998",
+      "display:flex",
+      "visibility:visible",
+      "pointer-events:auto",
+      "opacity:1",
+      "align-items:center",
+      "justify-content:center",
+      "padding:20px",
+      "background:rgba(20,8,6,0.78)",
+      "backdrop-filter:blur(8px)",
+    ].join(";");
+  } else {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+  }
+  closeButton.disabled = !state.crystalRewardCloseReady;
+  if (!state.crystalRewardModalOpen) {
+    card0.className = "crystal-reward__card";
+    card1.className = "crystal-reward__card";
+    card0.innerHTML = "";
+    card1.innerHTML = "";
+  } else {
+    const previewA = state.crystalRewardRevealStage >= 1 ? state.crystalRewardPerks[0] : state.crystalRewardPreviewPerks[0];
+    const previewB = state.crystalRewardRevealStage >= 2 ? state.crystalRewardPerks[1] : state.crystalRewardPreviewPerks[1];
+    card0.className = `crystal-reward__card${state.crystalRewardRevealStage < 1 ? " crystal-reward__card--shuffling" : ""}`;
+    card1.className = `crystal-reward__card${state.crystalRewardRevealStage < 2 ? " crystal-reward__card--shuffling" : ""}`;
+    card0.innerHTML = buildCrystalRewardCard(previewA, state.crystalRewardRevealStage >= 1, state.crystalRewardRevealStage < 1);
+    card1.innerHTML = buildCrystalRewardCard(previewB, state.crystalRewardRevealStage >= 2, state.crystalRewardRevealStage < 2);
+  }
+  if (touchZones) {
+    touchZones.style.pointerEvents = state.isChoosingPerk || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
+  }
+}
+
+function closeCrystalRewardModal() {
+  state.crystalRewardModalOpen = false;
+  state.crystalRewardCloseReady = false;
+  state.crystalRewardRevealStage = 0;
+  state.crystalRewardAnimTimer = 0;
+  state.crystalRewardShuffleTick = 0;
+  state.crystalRewardPreviewPerks = [0, 0];
+  state.crystalRewardPerks = [0, 0];
+  syncCrystalRewardOverlay();
+}
+
+function openCrystalRewardModal(firstPerkType, secondPerkType) {
+  state.crystalRewardModalOpen = true;
+  state.crystalRewardCloseReady = false;
+  state.crystalRewardRevealStage = 0;
+  state.crystalRewardAnimTimer = 1.4;
+  state.crystalRewardShuffleTick = 0;
+  state.crystalRewardPerks = [firstPerkType, secondPerkType];
+  state.crystalRewardPreviewPerks = [getRandomTilePerkExcluding([]), getRandomTilePerkExcluding([])];
+  syncCrystalRewardOverlay();
+}
+
+function updateCrystalRewardModal(dt) {
+  if (!state.crystalRewardModalOpen) {
+    return;
+  }
+
+  state.crystalRewardShuffleTick += dt;
+  while (state.crystalRewardShuffleTick >= 0.08) {
+    state.crystalRewardShuffleTick -= 0.08;
+    if (state.crystalRewardRevealStage < 1) {
+      state.crystalRewardPreviewPerks[0] = getRandomTilePerkExcluding([]);
+    }
+    if (state.crystalRewardRevealStage < 2) {
+      state.crystalRewardPreviewPerks[1] = getRandomTilePerkExcluding([state.crystalRewardPreviewPerks[0]]);
+    }
+  }
+
+  const prevTime = state.crystalRewardAnimTimer;
+  state.crystalRewardAnimTimer = Math.max(0, state.crystalRewardAnimTimer - dt);
+  if (prevTime > 0.8 && state.crystalRewardAnimTimer <= 0.8) {
+    state.crystalRewardRevealStage = 1;
+  }
+  if (prevTime > 0.35 && state.crystalRewardAnimTimer <= 0.35) {
+    state.crystalRewardRevealStage = 2;
+  }
+  if (state.crystalRewardAnimTimer === 0) {
+    state.crystalRewardCloseReady = true;
+  }
+  syncCrystalRewardOverlay();
 }
 
 function showPadAt(x, y, pad, stick) {
@@ -2462,7 +2695,16 @@ function frame(ts) {
 }
 
 function update(dt) {
-  if (state.isChoosingPerk || state.dead) {
+  if (state.dead) {
+    return;
+  }
+
+  if (state.crystalRewardModalOpen) {
+    updateCrystalRewardModal(dt);
+    return;
+  }
+
+  if (state.isChoosingPerk) {
     return;
   }
 
@@ -2475,6 +2717,8 @@ function update(dt) {
   updateGas(dt);
   updateSteam(dt);
   updateBoulders(dt);
+  updatePerkZones(dt);
+  updateChainExplosions(dt);
   updateEffects(dt);
   rebuildVisibilityMask();
   updateDiscovery();
@@ -2560,6 +2804,45 @@ function updateEffects(dt) {
         detonateRocketEffect(effect);
       }
       state.effects.splice(i, 1);
+    }
+  }
+}
+
+function scheduleChainExplosion(task) {
+  for (let i = 0; i < state.chainExplosions.length; i += 1) {
+    const queued = state.chainExplosions[i];
+    if (queued.kind === task.kind && queued.x === task.x && queued.y === task.y) {
+      return;
+    }
+  }
+  state.chainExplosions.push({
+    delay: CHAIN_EXPLOSION_DELAY,
+    ...task,
+  });
+}
+
+function updateChainExplosions(dt) {
+  for (let i = state.chainExplosions.length - 1; i >= 0; i -= 1) {
+    const task = state.chainExplosions[i];
+    task.delay -= dt;
+    if (task.delay > 0) {
+      continue;
+    }
+
+    state.chainExplosions.splice(i, 1);
+    if (task.kind === "volatile") {
+      explodeAt(task.x, task.y, task.damage, task.radius, { cause: "explosion" });
+    } else if (task.kind === "gas") {
+      removeGasCell(task.x, task.y);
+      explodeAt(task.x, task.y, EXPLOSION_BREAK_DAMAGE, 2, {
+        cause: "explosion",
+        triggerGas: true,
+      });
+    } else if (task.kind === "spike") {
+      damageCell(task.x, task.y, EXPLOSION_BREAK_DAMAGE, {
+        ignoreHazardEffect: true,
+        cause: "explosion",
+      });
     }
   }
 }
@@ -2732,7 +3015,10 @@ function triggerHeatOverload() {
   state.heat = 0;
   state.heatCoolingRewardArmed = false;
   state.heatCoolingPeak = 0;
-  explodeAt(state.drill.x, state.drill.y, getStrikeDamage() * damageMultiplier, radius, { guaranteedBreak: false });
+  explodeAt(state.drill.x, state.drill.y, getStrikeDamage() * damageMultiplier, radius, {
+    guaranteedBreak: false,
+    cause: "explosion",
+  });
   for (let i = 0; i < state.heatOverloadRocketLevel; i += 1) {
     triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
   }
@@ -3175,7 +3461,7 @@ function getStrikeDamage() {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
-  return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * chargeBoost * heatBoost * contourBoost;
+  return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * 10 * chargeBoost * heatBoost * contourBoost;
 }
 
 function addFuel(amount, originX = state.drill.x, originY = state.drill.y, options = {}) {
@@ -3258,6 +3544,25 @@ function applyGasContactDamage() {
 function dissipateGasCloud(cloud) {
   for (let i = 0; i < cloud.cells.length; i += 1) {
     state.gasMask[cellIndex(cloud.cells[i].x, cloud.cells[i].y)] = 0;
+  }
+}
+
+function removeGasCell(x, y) {
+  const index = cellIndex(x, y);
+  if (!state.gasMask[index]) {
+    return;
+  }
+
+  state.gasMask[index] = 0;
+  const key = `${x},${y}`;
+  for (let i = state.gasClouds.length - 1; i >= 0; i -= 1) {
+    const cloud = state.gasClouds[i];
+    cloud.cells = cloud.cells.filter((cell) => !(cell.x === x && cell.y === y));
+    cloud.frontier = cloud.frontier.filter((cell) => !(cell.x === x && cell.y === y));
+    cloud.visited.delete(key);
+    if (cloud.cells.length === 0) {
+      state.gasClouds.splice(i, 1);
+    }
   }
 }
 
@@ -3421,7 +3726,17 @@ function triggerHazardEffect(hazardType, x, y, options = {}) {
   }
 
   if (hazardType === HAZARD_TYPES.VOLATILE) {
-    explodeAt(x, y, Math.max(1, state.drillPower * 3), 1.25);
+    if (options.delayedChain) {
+      scheduleChainExplosion({
+        kind: "volatile",
+        x,
+        y,
+        damage: Math.max(1, state.drillPower * 3),
+        radius: 1.25,
+      });
+    } else {
+      explodeAt(x, y, Math.max(1, state.drillPower * 3), 1.25, { cause: "explosion" });
+    }
   }
 }
 
@@ -3445,24 +3760,52 @@ function damageCell(x, y, damage, options = {}) {
   }
   const hazardType = state.hazardMask[index];
   const allowHazardChain = options.allowHazardChain && hazardType === HAZARD_TYPES.VOLATILE;
+  const spikeExplosion = hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion";
   if ((!options.ignoreHazardEffect || allowHazardChain) && hazardType && !state.hazardTriggeredMask[index]) {
     state.hazardTriggeredMask[index] = 1;
-    triggerHazardEffect(hazardType, x, y, { suppressPlayerDamage: !!options.allowHazardChain });
+    triggerHazardEffect(hazardType, x, y, {
+      suppressPlayerDamage: !!options.allowHazardChain,
+      delayedChain: allowHazardChain,
+    });
   }
 
   if (options.byDrill) {
     spawnImpactEffect(x, y, options.dirX ?? state.drill.facingX ?? 0, options.dirY ?? state.drill.facingY ?? 1, state.hardness[index]);
   }
 
-  const actualDamage = Math.min(state.health[index], damage);
+  const actualDamage = spikeExplosion ? state.health[index] : Math.min(state.health[index], damage);
   spawnDamageNumberEffect(x, y, actualDamage);
-  state.health[index] -= damage;
+  state.health[index] -= spikeExplosion ? actualDamage : damage;
   if (state.health[index] > 0) {
     return false;
   }
 
   breakCell(x, y, index, options);
   return true;
+}
+
+function triggerSpikeChain(x, y) {
+  for (let oy = -1; oy <= 1; oy += 1) {
+    for (let ox = -1; ox <= 1; ox += 1) {
+      if (ox === 0 && oy === 0) {
+        continue;
+      }
+      const nx = x + ox;
+      const ny = y + oy;
+      if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
+        continue;
+      }
+      const index = cellIndex(nx, ny);
+      if (state.hazardMask[index] !== HAZARD_TYPES.SPIKE || !state.hardness[index]) {
+        continue;
+      }
+      scheduleChainExplosion({
+        kind: "spike",
+        x: nx,
+        y: ny,
+      });
+    }
+  }
 }
 
 function breakCell(x, y, index, options = {}) {
@@ -3473,7 +3816,10 @@ function breakCell(x, y, index, options = {}) {
   }
   const hazardType = state.hazardMask[index];
   const scrapMultiplier = state.loopScrapMask[index] > 0 ? state.loopScrapMask[index] : 1;
-  const scrapGain = Math.max(0, Math.floor((blockType.scrap + state.scrapBonus) * scrapMultiplier));
+  const scrapGain =
+    hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion"
+      ? 1
+      : Math.max(0, Math.floor((blockType.scrap + state.scrapBonus) * scrapMultiplier));
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   state.hardness[index] = 0;
   state.health[index] = 0;
@@ -3491,6 +3837,9 @@ function breakCell(x, y, index, options = {}) {
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
   state.loopScrapMask[index] = 0;
+  if (hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion") {
+    triggerSpikeChain(x, y);
+  }
   if (state.remoteBombInterval > 0 && options.byDrill && state.drillBrokenBlocks % state.remoteBombInterval === 0) {
     triggerRemoteBombSquare(x, y, 1);
   }
@@ -3535,7 +3884,16 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
       if (Math.hypot(ox, oy) > radius) {
         continue;
       }
-      damageCell(x + ox, y + oy, breakDamage, {
+      const tx = x + ox;
+      const ty = y + oy;
+      if (options.triggerGas !== false && tx >= 1 && ty >= 1 && tx < GRID_W - 1 && ty < GRID_H - 1 && state.gasMask[cellIndex(tx, ty)]) {
+        scheduleChainExplosion({
+          kind: "gas",
+          x: tx,
+          y: ty,
+        });
+      }
+      damageCell(tx, ty, breakDamage, {
         ignoreHazardEffect: true,
         allowHazardChain: true,
         cause: "explosion",
@@ -3610,8 +3968,9 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
     state.jumpCharges += 1;
   }
   state.playerMoveProgress += 1;
-  if (state.playerMoveProgress >= BASE_MOVE_INTERVAL) {
-    state.playerMoveProgress -= BASE_MOVE_INTERVAL;
+  const baseMoveInterval = getBaseMoveInterval();
+  if (state.playerMoveProgress >= baseMoveInterval) {
+    state.playerMoveProgress -= baseMoveInterval;
     maybeMoveBase();
   }
 }
@@ -3670,6 +4029,23 @@ function getBaseMoveDirections(awayFromHero) {
   }
 
   return candidates;
+}
+
+function getBaseMoveInterval() {
+  const distance = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
+  if (distance <= 6) {
+    return 1;
+  }
+  if (distance <= 10) {
+    return 2;
+  }
+  if (distance <= 16) {
+    return 3;
+  }
+  if (distance <= 24) {
+    return 5;
+  }
+  return 8;
 }
 
 function maybeMoveBase() {
@@ -4627,6 +5003,7 @@ function render() {
   }
 
   renderPath(camera);
+  renderSteamJets(camera);
   renderEffects(camera);
   renderBase(camera);
   renderBoulders(camera);
@@ -4831,6 +5208,7 @@ function renderPerkZoneTile(x, y, sx, sy) {
 
   const perk = TILE_PERK_TYPES[zone.perkType];
   const ctx = state.ctx;
+  const chargeRatio = zone.arming ? 1 - zone.armingTimer / PERK_ZONE_CHARGE_DELAY : 0;
   const isZoneCell = (tx, ty) => {
     if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) {
       return false;
@@ -4839,7 +5217,16 @@ function renderPerkZoneTile(x, y, sx, sy) {
   };
 
   ctx.save();
-  ctx.strokeStyle = `${perk.color}66`;
+  if (zone.arming) {
+    const pulse = 0.45 + (Math.sin((state.lastTs || 0) * 0.018) * 0.5 + 0.5) * 0.55;
+    ctx.fillStyle = `${perk.color}${Math.round((0x20 + chargeRatio * 80 * pulse)).toString(16).padStart(2, "0")}`;
+    ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    ctx.strokeStyle = `${perk.color}cc`;
+    ctx.shadowColor = perk.color;
+    ctx.shadowBlur = 10 + pulse * 10;
+  } else {
+    ctx.strokeStyle = `${perk.color}66`;
+  }
   ctx.lineWidth = 2;
   ctx.fillStyle = `${perk.color}18`;
   ctx.fillRect(sx + 5, sy + 5, TILE_SIZE - 10, TILE_SIZE - 10);
@@ -4870,6 +5257,55 @@ function renderPerkZoneTile(x, y, sx, sy) {
     ctx.fillText(perk.icon, sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 + 1);
   }
 
+  ctx.restore();
+}
+
+function renderSteamJets(camera) {
+  const ctx = state.ctx;
+  const time = (state.lastTs || 0) * 0.01;
+
+  ctx.save();
+  for (let i = 0; i < state.steamJets.length; i += 1) {
+    const jet = state.steamJets[i];
+    if (!jet.released || jet.cells.length === 0) {
+      continue;
+    }
+
+    const dirLength = Math.hypot(jet.dirX, jet.dirY) || 1;
+    const dirX = jet.dirX / dirLength;
+    const dirY = jet.dirY / dirLength;
+    const perpX = -dirY;
+    const perpY = dirX;
+    const lifeRatio = clamp(jet.lifetime / Math.max(0.001, STEAM_LIFETIME), 0, 1);
+
+    for (let c = 0; c < jet.cells.length; c += 1) {
+      const cell = jet.cells[c];
+      const cx = cell.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const cy = cell.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+
+      for (let s = 0; s < 3; s += 1) {
+        const wave = (time * 2.6 + c * 0.37 + s * 0.22) % 1;
+        const offset = (wave - 0.5) * TILE_SIZE * 0.78;
+        const side = (s - 1) * 4.5;
+        const sx = cx + dirX * offset + perpX * side;
+        const sy = cy + dirY * offset + perpY * side;
+        const ex = sx + dirX * (10 + s * 2);
+        const ey = sy + dirY * (10 + s * 2);
+
+        ctx.strokeStyle = `rgba(255, 242, 214, ${0.24 + lifeRatio * 0.3})`;
+        ctx.lineWidth = 1.4 + s * 0.35;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = `rgba(255, 220, 170, ${0.06 + lifeRatio * 0.08})`;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, TILE_SIZE * 0.34, TILE_SIZE * 0.18, Math.atan2(dirY, dirX), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
