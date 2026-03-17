@@ -12,9 +12,25 @@
   <body>
     <div class="app-shell">
       <canvas id="game"></canvas>
+      <button id="manualOpen" class="manual-link" type="button" aria-label="Открыть руководство">?</button>
       <div class="touch-zones">
         <div id="movePad" class="move-pad">
           <div id="moveStick" class="move-stick"></div>
+        </div>
+      </div>
+      <div id="manualModal" class="manual-modal" hidden>
+        <div class="manual-modal__panel">
+          <div class="manual-modal__head">
+            <div class="manual-modal__title">Руководство</div>
+            <button id="manualClose" class="manual-modal__close" type="button">Закрыть</button>
+          </div>
+          <iframe
+            id="manualFrame"
+            class="manual-modal__frame"
+            src="./manual.html"
+            title="Руководство по игре"
+            loading="lazy"
+          ></iframe>
         </div>
       </div>
       <div id="perkChoice" class="perk-choice" hidden>

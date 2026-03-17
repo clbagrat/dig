@@ -1,0 +1,237 @@
+:root {
+  color-scheme: dark;
+  --bg-top: #2b1b12;
+  --bg-bottom: #0f0907;
+  --panel: rgba(31, 18, 12, 0.82);
+  --panel-border: rgba(220, 169, 93, 0.24);
+  --text: #f7ebd4;
+  --muted: #c6ab84;
+  --accent: #d79f49;
+  --shadow: rgba(0, 0, 0, 0.34);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top, rgba(219, 159, 73, 0.18), transparent 34%),
+    radial-gradient(circle at 20% 30%, rgba(92, 48, 21, 0.24), transparent 30%),
+    linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+  color: var(--text);
+  font-family: Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+.manual {
+  width: min(1100px, calc(100vw - 28px));
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 0 calc(env(safe-area-inset-bottom, 0px) + 40px);
+}
+
+.hero {
+  position: relative;
+  margin-bottom: 30px;
+  padding: 24px 22px 22px;
+  border: 1px solid var(--panel-border);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 80% 10%, rgba(232, 180, 96, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(93, 57, 27, 0.2), rgba(18, 10, 7, 0.06)),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 179, 0.08),
+    0 20px 46px var(--shadow);
+}
+
+.hero__back {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  padding: 9px 12px;
+  border: 1px solid rgba(220, 169, 93, 0.3);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+  background: rgba(45, 27, 17, 0.44);
+}
+
+.hero__eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(34px, 6vw, 62px);
+  line-height: 0.95;
+}
+
+.hero__lead {
+  max-width: 720px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.section {
+  margin-top: 26px;
+}
+
+.section h2 {
+  margin: 0 0 12px;
+  font-size: 24px;
+}
+
+.cards {
+  display: grid;
+  gap: 12px;
+}
+
+.cards--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cards--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.card,
+.mini-card {
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(93, 57, 27, 0.14), rgba(18, 10, 7, 0.04)),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 179, 0.08),
+    0 14px 30px var(--shadow);
+}
+
+.card {
+  padding: 16px 16px 15px;
+}
+
+.card h3,
+.mini-card h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.card p,
+.mini-card p,
+.legend span:last-child {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mini-card {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.legend + .legend {
+  margin-top: 10px;
+}
+
+.tile,
+.chip,
+.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(220, 169, 93, 0.22);
+  background: rgba(45, 27, 17, 0.48);
+  font-weight: 700;
+}
+
+.tile--fuel { color: #ffcf7a; }
+.tile--radar { color: #f2ede2; }
+.tile--drill { color: #ff9f6b; }
+.tile--speed { color: #9fd7ff; }
+.tile--hp { color: #73e58f; }
+.tile--armor { color: #b4d7ff; }
+.tile--bomb { color: #c796ff; }
+
+.chip {
+  min-width: 56px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(220, 169, 93, 0.2);
+  background: rgba(45, 27, 17, 0.48);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chip--hp { color: #ff9d7a; }
+.chip--fuel { color: #ffbf62; }
+.chip--scrap { color: #f0df84; }
+.chip--heat { color: #ff8c69; }
+.chip--radar { color: #f2ede2; }
+.chip--armor { color: #b4d7ff; }
+
+.danger {
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+  border-radius: 4px;
+}
+
+.danger--spike { background: #ff6b48; }
+.danger--volatile { background: #ffd166; }
+.danger--gas { background: #82d18a; }
+.danger--steam { background: #d8e3ea; }
+.danger--boulder { background: #9b7a4a; }
+.danger--metal { background: #9cb1b7; }
+
+@media (max-width: 860px) {
+  .cards--two,
+  .cards--three,
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    padding-top: 62px;
+  }
+
+  .hero__back {
+    left: 18px;
+    right: auto;
+  }
+}

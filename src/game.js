@@ -178,6 +178,7 @@ const state = {
   pendingPerkDelay: 0,
   bonusPerkChoices: 0,
   perkRerolls: 0,
+  manualModalOpen: false,
   debugPerkMenuOpen: false,
   debugPerkSelection: "",
   crystalRewardModalOpen: false,
@@ -297,7 +298,7 @@ const state = {
   },
   damageFlash: 0,
   fatalErrorText: "",
-  seedHitRect: null,
+  scrapHitRect: null,
   sprites: null,
   effects: [],
   chainExplosions: [],
@@ -1478,6 +1479,7 @@ function setupField() {
   state.pendingPerkDelay = 0;
   state.bonusPerkChoices = 0;
   state.perkRerolls = 0;
+  state.manualModalOpen = false;
   state.debugPerkMenuOpen = false;
   state.debugPerkSelection = "";
   state.crystalRewardModalOpen = false;
@@ -1560,7 +1562,7 @@ function setupField() {
   state.scrapToast.value = 0;
   state.scrapToast.time = 0;
   state.damageFlash = 0;
-  state.seedHitRect = null;
+  state.scrapHitRect = null;
   state.effects.length = 0;
   state.chainExplosions.length = 0;
   state.drill.strikePhase = 0;
@@ -2354,6 +2356,10 @@ function bindUi() {
   const stick = document.getElementById("moveStick");
   const perkButtons = document.querySelectorAll("[data-perk-slot]");
   const rerollButton = document.getElementById("perkReroll");
+  const manualOpen = document.getElementById("manualOpen");
+  const manualClose = document.getElementById("manualClose");
+  const manualOverlay = document.getElementById("manualModal");
+  const manualPanel = manualOverlay?.querySelector(".manual-modal__panel");
   const debugClose = document.getElementById("debugPerkClose");
   const debugOverlay = document.getElementById("debugPerkMenu");
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
@@ -2364,10 +2370,10 @@ function bindUi() {
   window.visualViewport?.addEventListener("resize", resize);
 
   zone.addEventListener("pointerdown", (event) => {
-    if (state.debugPerkMenuOpen) {
+    if (state.debugPerkMenuOpen || state.manualModalOpen) {
       return;
     }
-    if (state.seedHitRect && isPointInsideRect(event.clientX, event.clientY, state.seedHitRect)) {
+    if (state.scrapHitRect && isPointInsideRect(event.clientX, event.clientY, state.scrapHitRect)) {
       state.dragId = null;
       state.moveAimX = 0;
       state.moveAimY = 0;
@@ -2415,6 +2421,44 @@ function bindUi() {
   if (rerollButton) {
     rerollButton.addEventListener("click", () => {
       rerollPerkChoices();
+    });
+  }
+
+  if (manualOpen) {
+    manualOpen.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetPad();
+      state.manualModalOpen = true;
+      syncManualModal();
+    });
+  }
+
+  if (manualClose) {
+    manualClose.addEventListener("click", () => {
+      resetPad();
+      state.manualModalOpen = false;
+      syncManualModal();
+    });
+  }
+
+  if (manualOverlay) {
+    manualOverlay.addEventListener("click", (event) => {
+      if (event.target !== manualOverlay) {
+        return;
+      }
+      resetPad();
+      state.manualModalOpen = false;
+      syncManualModal();
+    });
+  }
+
+  if (manualPanel) {
+    manualPanel.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    manualPanel.addEventListener("click", (event) => {
+      event.stopPropagation();
     });
   }
 
@@ -2467,6 +2511,7 @@ function bindUi() {
   }
 
   buildDebugPerkButtons();
+  syncManualModal();
   syncDebugPerkOverlay();
   syncCrystalRewardOverlay();
 }
@@ -2530,9 +2575,43 @@ function buildDebugPerkButtons() {
   }
 }
 
+function syncTouchZonesInteractivity() {
+  const touchZones = document.querySelector(".touch-zones");
+  if (!touchZones) {
+    return;
+  }
+  touchZones.style.pointerEvents =
+    state.isChoosingPerk || state.manualModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
+}
+
+function syncManualModal() {
+  const overlay = document.getElementById("manualModal");
+  if (!overlay) {
+    return;
+  }
+  if (state.manualModalOpen) {
+    overlay.hidden = false;
+    overlay.removeAttribute("hidden");
+    overlay.style.cssText = [
+      "position:absolute",
+      "inset:0",
+      "z-index:9997",
+      "display:flex",
+      "visibility:visible",
+      "pointer-events:auto",
+      "opacity:1",
+      "align-items:center",
+      "justify-content:center",
+    ].join(";");
+  } else {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+  }
+  syncTouchZonesInteractivity();
+}
+
 function syncDebugPerkOverlay() {
   const overlay = document.getElementById("debugPerkMenu");
-  const touchZones = document.querySelector(".touch-zones");
   if (!overlay) {
     return;
   }
@@ -2557,9 +2636,7 @@ function syncDebugPerkOverlay() {
     overlay.hidden = true;
     overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
   }
-  if (touchZones) {
-    touchZones.style.pointerEvents = state.isChoosingPerk || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
-  }
+  syncTouchZonesInteractivity();
 }
 
 function getRandomTilePerkExcluding(excluded = []) {
@@ -2586,7 +2663,6 @@ function syncCrystalRewardOverlay() {
   const closeButton = document.getElementById("crystalRewardClose");
   const card0 = document.getElementById("crystalRewardCard0");
   const card1 = document.getElementById("crystalRewardCard1");
-  const touchZones = document.querySelector(".touch-zones");
   if (!overlay || !card0 || !card1 || !closeButton) {
     return;
   }
@@ -2626,9 +2702,7 @@ function syncCrystalRewardOverlay() {
     card0.innerHTML = buildCrystalRewardCard(previewA, state.crystalRewardRevealStage >= 1, state.crystalRewardRevealStage < 1);
     card1.innerHTML = buildCrystalRewardCard(previewB, state.crystalRewardRevealStage >= 2, state.crystalRewardRevealStage < 2);
   }
-  if (touchZones) {
-    touchZones.style.pointerEvents = state.isChoosingPerk || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
-  }
+  syncTouchZonesInteractivity();
 }
 
 function closeCrystalRewardModal() {
@@ -5909,6 +5983,12 @@ function renderHud() {
     scrapRatio,
     ["#f0df84", "#d7b548"],
   );
+  state.scrapHitRect = {
+    x: left + panelWidth + gap,
+    y: top,
+    width: panelWidth,
+    height: panelHeight,
+  };
   drawHudBar(left, secondRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
   drawHudBar(
     left + panelWidth + gap,
@@ -5924,14 +6004,12 @@ function renderHud() {
   const ctx = state.ctx;
   const recipeTop = secondRowTop + panelHeight + 8;
   const recipeWidth = 232;
-  const seedWidth = 118;
-  const seedLeft = left + recipeWidth + 8;
-  state.seedHitRect = {
-    x: seedLeft,
-    y: recipeTop,
-    width: seedWidth,
-    height: 32,
-  };
+  const manualButton = document.getElementById("manualOpen");
+  if (manualButton) {
+    manualButton.style.top = `${recipeTop - 1}px`;
+    manualButton.style.left = `${left + recipeWidth + 8}px`;
+    manualButton.style.right = "auto";
+  }
   ctx.save();
   ctx.fillStyle = "rgba(31, 18, 12, 0.82)";
   ctx.strokeStyle = "rgba(220, 169, 93, 0.28)";
@@ -5981,22 +6059,6 @@ function renderHud() {
     }
     ctx.restore();
   }
-
-  ctx.save();
-  ctx.fillStyle = "rgba(31, 18, 12, 0.82)";
-  ctx.strokeStyle = "rgba(220, 169, 93, 0.28)";
-  ctx.lineWidth = 1;
-  drawRoundedRectPath(seedLeft, recipeTop, seedWidth, 32, 10);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#c6ab84";
-  ctx.font = `700 10px ${HUD_FONT}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText("SEED", seedLeft + 10, recipeTop + 16);
-  ctx.textAlign = "right";
-  ctx.fillText(String(state.worldSeed), seedLeft + seedWidth - 10, recipeTop + 16);
-  ctx.restore();
 
   const detailTop = recipeTop + 40;
   renderHudCoreStats(left, detailTop, panelWidth, "СТАТЫ");

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Dig Manual</title>
+    <link rel="stylesheet" href="./manual.css" />
+  </head>
+  <body>
+    <main class="manual">
+      <header class="hero">
+        <a class="hero__back" href="./index.html">Играть</a>
+        <p class="hero__eyebrow">Field Guide</p>
+        <h1>Как играть в Dig</h1>
+        <p class="hero__lead">
+          Ты бурильщик. Ищешь скрытую базу, держишь под контролем топливо и нагрев, собираешь перки и
+          пытаешься не умереть от собственных решений.
+        </p>
+      </header>
+
+      <section class="section">
+        <h2>Цель</h2>
+        <div class="cards cards--two">
+          <article class="card">
+            <h3>Найти базу</h3>
+            <p>База спрятана на карте и может убегать. Победа только когда бур реально встает на ее клетку.</p>
+          </article>
+          <article class="card">
+            <h3>Дожить до встречи</h3>
+            <p>Топливо, нагрев, опасности и маршрут важны не меньше, чем скорость копания.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Ресурсы и шкалы</h2>
+        <div class="cards cards--two">
+          <article class="card">
+            <div class="legend">
+              <span class="chip chip--hp">HP</span>
+              <span>Жизни. Кончаются от опасностей и от истощения, если топлива нет.</span>
+            </div>
+            <div class="legend">
+              <span class="chip chip--fuel">Fuel</span>
+              <span>Тратится на шаги, удары и пассивно по времени.</span>
+            </div>
+            <div class="legend">
+              <span class="chip chip--scrap">Scrap</span>
+              <span>Валюта для сильных апгрейдов.</span>
+            </div>
+          </article>
+          <article class="card">
+            <div class="legend">
+              <span class="chip chip--heat">Heat</span>
+              <span>Растет от ударов. На максимуме бур перегревается, взрывается и оглушает тебя.</span>
+            </div>
+            <div class="legend">
+              <span class="chip chip--radar">Radar</span>
+              <span>Показывает горячо или холодно по отношению к базе и дает ограниченное число шагов.</span>
+            </div>
+            <div class="legend">
+              <span class="chip chip--armor">Armor</span>
+              <span>Дополнительный слой защиты только от внешних опасностей.</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Что лежит на карте</h2>
+        <div class="cards cards--three">
+          <article class="card">
+            <h3>Порода</h3>
+            <p>Чем дальше от старта, тем чаще тяжелые tier-блоки. Металл не бурится и режет видимость.</p>
+          </article>
+          <article class="card">
+            <h3>Кристаллы</h3>
+            <p>Собирай рецепт. За готовый рецепт получаешь реролл и два тайловых перка.</p>
+          </article>
+          <article class="card">
+            <h3>Перк-зоны</h3>
+            <p>Открой всю форму, подожди зарядку зоны и получишь усиленную награду этого перка.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Тайловые бафы</h2>
+        <div class="grid">
+          <article class="mini-card">
+            <span class="tile tile--fuel">F</span>
+            <div>
+              <h3>Бак</h3>
+              <p>Мгновенно пополняет топливо.</p>
+            </div>
+          </article>
+          <article class="mini-card">
+            <span class="tile tile--radar">R</span>
+            <div>
+              <h3>Радар</h3>
+              <p>Сразу дает сигнал и запас радарных шагов.</p>
+            </div>
+          </article>
+          <article class="mini-card">
+            <span class="tile tile--drill">D</span>
+            <div>
+              <h3>Бур</h3>
+              <p>Увеличивает силу удара.</p>
+            </div>
+          </article>
+          <article class="mini-card">
+            <span class="tile tile--speed">S</span>
+            <div>
+              <h3>Скорость</h3>
+              <p>Ускоряет цикл следующего удара.</p>
+            </div>
+          </article>
+          <article class="mini-card">
+            <span class="tile tile--hp">H</span>
+            <div>
+              <h3>HP+</h3>
+              <p>Лечит на 1.</p>
+            </div>
+          </article>
+          <article class="mini-card">
+            <span class="tile tile--armor">A</span>
+            <div>
+              <h3>Броня</h3>
+              <p>Дает 1 armor против внешних угроз.</p>
+            </div>
+          </article>
+          <article class="mini-card">
+            <span class="tile tile--bomb">*</span>
+            <div>
+              <h3>Бомба</h3>
+              <p>Мгновенный взрыв вокруг себя.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Опасности</h2>
+        <div class="cards cards--two">
+          <article class="card">
+            <div class="legend">
+              <span class="danger danger--spike"></span>
+              <span><strong>Шипы</strong> бьют сразу при первом касании буром. Взрыв может пустить цепь по соседним шипам.</span>
+            </div>
+            <div class="legend">
+              <span class="danger danger--volatile"></span>
+              <span><strong>Взрывной блок</strong> взрывается при первом касании и может поджечь соседние взрывные блоки.</span>
+            </div>
+            <div class="legend">
+              <span class="danger danger--gas"></span>
+              <span><strong>Газовый карман</strong> существует заранее. Вскрыл стенку — газ пошел по тоннелям.</span>
+            </div>
+          </article>
+          <article class="card">
+            <div class="legend">
+              <span class="danger danger--steam"></span>
+              <span><strong>Паровой карман</strong> ждет, потом выбрасывает струю по прямой и держится несколько секунд.</span>
+            </div>
+            <div class="legend">
+              <span class="danger danger--boulder"></span>
+              <span><strong>Валун</strong> вырывается из кармана, катится по линии, пробивает блоки и очень больно бьет.</span>
+            </div>
+            <div class="legend">
+              <span class="danger danger--metal"></span>
+              <span><strong>Металл</strong> не копается, режет обзор и ломает удобные маршруты.</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Продвинутые механики</h2>
+        <div class="cards cards--three">
+          <article class="card">
+            <h3>Контур</h3>
+            <p>Оставляешь провод. Замкнул контур — все блоки внутри уничтожаются, а некоторые перки усиливают этот эффект.</p>
+          </article>
+          <article class="card">
+            <h3>Автоконтур</h3>
+            <p>Если стоишь без движения, бур может сам дорисовать контур до подходящей точки.</p>
+          </article>
+          <article class="card">
+            <h3>Нагрев</h3>
+            <p>Сильные heat-билды могут специально играть от перегрева, взрыва и связанных с ним перков.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

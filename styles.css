@@ -50,6 +50,120 @@ body {
   height: 100%;
 }
 
+.manual-link {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: 12px;
+  z-index: 3;
+  min-width: 38px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  text-decoration: none;
+  font: 700 16px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 228, 181, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(93, 57, 27, 0.22), rgba(18, 10, 7, 0.1)),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 179, 0.08),
+    0 10px 24px var(--shadow);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.manual-link::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(222, 172, 105, 0.14);
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+.manual-link:active {
+  transform: scale(0.96);
+}
+
+.manual-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 14px)
+    14px
+    calc(env(safe-area-inset-bottom, 0px) + 14px);
+  background: rgba(12, 6, 4, 0.76);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.manual-modal[hidden] {
+  display: none;
+}
+
+.manual-modal__panel {
+  width: min(100%, 980px);
+  height: min(100%, 880px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(93, 57, 27, 0.24), rgba(18, 10, 7, 0.08)),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 179, 0.08),
+    0 18px 42px var(--shadow);
+  touch-action: none;
+}
+
+.manual-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(215, 159, 73, 0.18);
+  background: rgba(30, 16, 11, 0.58);
+}
+
+.manual-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.manual-modal__close {
+  border: 1px solid rgba(215, 159, 73, 0.34);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(93, 57, 27, 0.18), rgba(18, 10, 7, 0.04)),
+    var(--panel);
+  color: var(--text);
+  padding: 10px 14px;
+  font: inherit;
+  touch-action: manipulation;
+}
+
+.manual-modal__frame {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: #100907;
+}
+
 .hud {
   position: absolute;
   top: env(safe-area-inset-top, 0);
