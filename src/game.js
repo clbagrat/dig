@@ -174,6 +174,10 @@ const state = {
   dragId: null,
   padCenterX: 0,
   padCenterY: 0,
+  touchAimX: 0,
+  touchAimY: 0,
+  keyAimX: 0,
+  keyAimY: 0,
   moveAimX: 0,
   moveAimY: 0,
   isChoosingPerk: false,
@@ -2570,9 +2574,27 @@ function bindUi() {
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
   const crystalRewardOverlay = document.getElementById("crystalReward");
   const crystalRewardClose = document.getElementById("crystalRewardClose");
+  const keysDown = new Set();
 
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
+
+  const syncKeyboardAim = () => {
+    const left = keysDown.has("arrowleft") || keysDown.has("a");
+    const right = keysDown.has("arrowright") || keysDown.has("d");
+    const up = keysDown.has("arrowup") || keysDown.has("w");
+    const down = keysDown.has("arrowdown") || keysDown.has("s");
+    let x = (right ? 1 : 0) - (left ? 1 : 0);
+    let y = (down ? 1 : 0) - (up ? 1 : 0);
+    if (x !== 0 || y !== 0) {
+      const length = Math.hypot(x, y) || 1;
+      x /= length;
+      y /= length;
+    }
+    state.keyAimX = x;
+    state.keyAimY = y;
+    syncMoveAim();
+  };
 
   zone.addEventListener("pointerdown", (event) => {
     if (state.debugPerkMenuOpen || state.manualModalOpen) {
@@ -2580,10 +2602,11 @@ function bindUi() {
     }
     if (state.scrapHitRect && isPointInsideRect(event.clientX, event.clientY, state.scrapHitRect)) {
       state.dragId = null;
-      state.moveAimX = 0;
-      state.moveAimY = 0;
+      state.touchAimX = 0;
+      state.touchAimY = 0;
       pad.classList.remove("move-pad--active");
       stick.style.transform = "translate(0px, 0px)";
+      syncMoveAim();
       state.debugPerkMenuOpen = true;
       state.debugPerkSelection = "";
       showPerkToast("Debug");
@@ -2608,14 +2631,34 @@ function bindUi() {
 
   const resetPad = () => {
     state.dragId = null;
-    state.moveAimX = 0;
-    state.moveAimY = 0;
+    state.touchAimX = 0;
+    state.touchAimY = 0;
     pad.classList.remove("move-pad--active");
     stick.style.transform = "translate(0px, 0px)";
+    syncMoveAim();
   };
 
   zone.addEventListener("pointerup", resetPad);
   zone.addEventListener("pointercancel", resetPad);
+
+  window.addEventListener("keydown", (event) => {
+    const key = event.key.toLowerCase();
+    if (!["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(key)) {
+      return;
+    }
+    event.preventDefault();
+    keysDown.add(key);
+    syncKeyboardAim();
+  });
+
+  window.addEventListener("keyup", (event) => {
+    const key = event.key.toLowerCase();
+    if (!["arrowleft", "arrowright", "arrowup", "arrowdown", "w", "a", "s", "d"].includes(key)) {
+      return;
+    }
+    keysDown.delete(key);
+    syncKeyboardAim();
+  });
 
   for (let i = 0; i < perkButtons.length; i += 1) {
     perkButtons[i].addEventListener("click", () => {
@@ -2787,6 +2830,7 @@ function syncTouchZonesInteractivity() {
   }
   touchZones.style.pointerEvents =
     state.isChoosingPerk || state.manualModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
+  syncMoveAim();
 }
 
 function syncManualModal() {
@@ -2971,6 +3015,21 @@ function showPadAt(x, y, pad, stick) {
   stick.style.transform = "translate(0px, 0px)";
 }
 
+function syncMoveAim() {
+  if (state.manualModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.isChoosingPerk) {
+    state.moveAimX = 0;
+    state.moveAimY = 0;
+    return;
+  }
+  if (state.dragId !== null) {
+    state.moveAimX = state.touchAimX;
+    state.moveAimY = state.touchAimY;
+    return;
+  }
+  state.moveAimX = state.keyAimX;
+  state.moveAimY = state.keyAimY;
+}
+
 function updatePad(event, stick) {
   const dx = event.clientX - state.padCenterX;
   const dy = event.clientY - state.padCenterY;
@@ -2979,8 +3038,9 @@ function updatePad(event, stick) {
   const limited = Math.min(maxRadius, length);
   const nx = dx / length;
   const ny = dy / length;
-  state.moveAimX = nx * (limited / maxRadius);
-  state.moveAimY = ny * (limited / maxRadius);
+  state.touchAimX = nx * (limited / maxRadius);
+  state.touchAimY = ny * (limited / maxRadius);
+  syncMoveAim();
   stick.style.transform = `translate(${nx * limited}px, ${ny * limited}px)`;
 }
 
