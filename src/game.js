@@ -4670,6 +4670,8 @@ function getAutoCloseContourCandidate() {
   }
 
   const current = state.pathTiles[state.pathTiles.length - 1];
+  let bestVisibleCandidate = null;
+  let bestAnyCandidate = null;
   const candidates = [];
   for (let i = 0; i < state.pathTiles.length - 1; i += 1) {
     const point = state.pathTiles[i];
@@ -4685,8 +4687,6 @@ function getAutoCloseContourCandidate() {
       distance: Math.abs(point.x - current.x) + Math.abs(point.y - current.y),
     });
   }
-
-  candidates.sort((a, b) => a.distance - b.distance);
 
   for (let i = 0; i < candidates.length; i += 1) {
     const candidate = candidates[i];
@@ -4748,7 +4748,20 @@ function getAutoCloseContourCandidate() {
     if (maxX - minX < 1 || maxY - minY < 1) {
       continue;
     }
-    return {
+
+    let enclosedCells = 0;
+    for (let py = minY; py <= maxY; py += 1) {
+      for (let px = minX; px <= maxX; px += 1) {
+        if (isPointInPolygon(px + 0.5, py + 0.5, polygon)) {
+          enclosedCells += 1;
+        }
+      }
+    }
+    if (enclosedCells <= 0) {
+      continue;
+    }
+
+    const resolvedCandidate = {
       currentX: current.x,
       currentY: current.y,
       targetX: candidate.targetX,
@@ -4757,10 +4770,29 @@ function getAutoCloseContourCandidate() {
       stepY,
       allVisible,
       previewTo,
+      enclosedCells,
+      distance: candidate.distance,
     };
+
+    if (
+      !bestAnyCandidate ||
+      resolvedCandidate.enclosedCells > bestAnyCandidate.enclosedCells ||
+      (resolvedCandidate.enclosedCells === bestAnyCandidate.enclosedCells && resolvedCandidate.distance < bestAnyCandidate.distance)
+    ) {
+      bestAnyCandidate = resolvedCandidate;
+    }
+
+    if (
+      resolvedCandidate.allVisible &&
+      (!bestVisibleCandidate ||
+        resolvedCandidate.enclosedCells > bestVisibleCandidate.enclosedCells ||
+        (resolvedCandidate.enclosedCells === bestVisibleCandidate.enclosedCells && resolvedCandidate.distance < bestVisibleCandidate.distance))
+    ) {
+      bestVisibleCandidate = resolvedCandidate;
+    }
   }
 
-  return null;
+  return bestVisibleCandidate || bestAnyCandidate;
 }
 
 function tryAutoCloseContour() {
