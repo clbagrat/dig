@@ -101,7 +101,7 @@ const SCRAP_PERK_TYPES = [
   { name: "Линза обзора", icon: "◉", desc: "+1 к радиусу обзора, до максимума 9" },
   { name: "Радарный модуль", icon: "⌖", desc: "+2 шага от радара" },
   { name: "Ломосбор", icon: "⛭", desc: "+2 скрапа за каждый разрушенный блок" },
-  { name: "Топлорециркулятор", icon: "♲", desc: "+2 топлива за каждый разрушенный блок" },
+  { name: "Топлорециркулятор", icon: "♲", desc: "+1 топлива за каждый разрушенный блок, до +2" },
   { name: "Перегрузка", icon: "⚡", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
   { name: "Усиленный корпус", icon: "✚", desc: "+1 к максимуму HP и лечит на 2" },
   { name: "Перелив адреналина", icon: "❤", desc: "Overheal дает 3 секунды бафа, потом растет до максимума 7" },
@@ -2153,7 +2153,7 @@ function applyScrapPerk(perkType) {
       state.perkText = "Ломосбор";
       break;
     case 12:
-      state.fuelOnBreak += 2;
+      state.fuelOnBreak = Math.min(2, state.fuelOnBreak + 1);
       state.perkText = "Топлорециркулятор";
       break;
     case 13:
@@ -2969,6 +2969,9 @@ function prepareScrapPerkChoices() {
   if (state.visionRadius < 9) {
     bag.push(9);
   }
+  if (state.fuelOnBreak < 2) {
+    bag.push(12);
+  }
   if (!state.overflowBomb) {
     bag.push(13);
   }
@@ -3253,7 +3256,7 @@ function getScrapPerkNextLevel(perkType) {
     case 11:
       return Math.round(state.scrapBonus / 2) + 1;
     case 12:
-      return Math.round(state.fuelOnBreak / 2) + 1;
+      return Math.min(2, state.fuelOnBreak + 1);
     case 13:
       return 1;
     case 14:
@@ -3320,7 +3323,7 @@ function getScrapPerkCurrentLevel(perkType) {
     case 11:
       return Math.round(state.scrapBonus / 2);
     case 12:
-      return Math.round(state.fuelOnBreak / 2);
+      return state.fuelOnBreak;
     case 13:
       return state.overflowBomb ? 1 : 0;
     case 14:
@@ -3449,8 +3452,8 @@ function getScrapPerkPreview(perkType) {
     }
     case 12: {
       return {
-        effect: "+2 топлива за каждый блок",
-        compare: `${state.fuelOnBreak} → ${state.fuelOnBreak + 2}`,
+        effect: "+1 топливо за каждый блок (макс. 2)",
+        compare: `${state.fuelOnBreak} → ${Math.min(2, state.fuelOnBreak + 1)}`,
       };
     }
     case 13: {
