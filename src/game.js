@@ -2339,9 +2339,10 @@ function init() {
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const viewport = window.visualViewport;
   state.dpr = dpr;
-  state.width = window.innerWidth;
-  state.height = window.innerHeight;
+  state.width = Math.round(viewport?.width || window.innerWidth);
+  state.height = Math.round(viewport?.height || window.innerHeight);
   state.canvas.width = Math.floor(state.width * dpr);
   state.canvas.height = Math.floor(state.height * dpr);
   state.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2360,6 +2361,7 @@ function bindUi() {
   const crystalRewardClose = document.getElementById("crystalRewardClose");
 
   window.addEventListener("resize", resize);
+  window.visualViewport?.addEventListener("resize", resize);
 
   zone.addEventListener("pointerdown", (event) => {
     if (state.debugPerkMenuOpen) {
@@ -4218,17 +4220,8 @@ function getBaseMoveDirections(awayFromHero) {
 
 function getBaseMoveInterval() {
   const distance = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
-  if (distance <= 6) {
-    return 1;
-  }
-  if (distance <= 10) {
-    return 2;
-  }
-  if (distance <= 16) {
+  if (distance <= 5) {
     return 3;
-  }
-  if (distance <= 24) {
-    return 5;
   }
   return 8;
 }
@@ -5896,7 +5889,7 @@ function renderHud() {
   const scrapCycle = state.nextScrapPerkAt - currentScrapCost;
   const scrapProgress = clamp(state.scrap - scrapCycle, 0, currentScrapCost);
   const scrapRatio = clamp(scrapProgress / currentScrapCost, 0, 1);
-  const top = 14 + (window.visualViewport?.offsetTop || 0);
+  const top = 14;
   const gap = 10;
   const totalWidth = Math.min(state.width - 28, 560);
   const panelWidth = (totalWidth - gap) / 2;
