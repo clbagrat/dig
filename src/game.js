@@ -27,6 +27,8 @@ const SCRAP_PERK_POPUP_DELAY = 0.5;
 const BASE_MOVE_AWAY_CHANCE = 0.5;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
+const IDLE_AUTO_CLOSE_PREVIEW_DELAY = 0.5;
+const IDLE_AUTO_CLOSE_PREVIEW_RETURN_DURATION = 0.24;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -273,6 +275,9 @@ const state = {
   idleTime: 0,
   idleAutoCloseTriggered: false,
   idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
+  autoClosePreview: null,
+  autoClosePreviewReturnTimer: 0,
+  autoClosePreviewFailed: false,
   crystalCatalystLevel: 0,
   spikeOverdriveLevel: 0,
   struckThisFrame: false,
@@ -1571,6 +1576,9 @@ function setupField() {
   state.idleTime = 0;
   state.idleAutoCloseTriggered = false;
   state.idleAutoCloseDelay = IDLE_AUTO_CLOSE_DELAY;
+  state.autoClosePreview = null;
+  state.autoClosePreviewReturnTimer = 0;
+  state.autoClosePreviewFailed = false;
   state.crystalCatalystLevel = 0;
   state.spikeOverdriveLevel = 0;
   state.struckThisFrame = false;
@@ -3075,6 +3083,13 @@ function frame(ts) {
 function update(dt) {
   if (state.dead) {
     return;
+  }
+
+  if (state.autoClosePreviewReturnTimer > 0) {
+    state.autoClosePreviewReturnTimer = Math.max(0, state.autoClosePreviewReturnTimer - dt);
+    if (state.autoClosePreviewReturnTimer === 0 && state.idleTime < IDLE_AUTO_CLOSE_PREVIEW_DELAY) {
+      state.autoClosePreview = null;
+    }
   }
 
   updateMovementAnimations(dt);
@@ -4649,14 +4664,12 @@ function removePathTile(x, y) {
   rebuildPathIndex();
 }
 
-function tryAutoCloseContour() {
+function getAutoCloseContourCandidate() {
   if (state.pathTiles.length < 4) {
-    return false;
+    return null;
   }
 
   const current = state.pathTiles[state.pathTiles.length - 1];
-  const heroX = state.drill.x;
-  const heroY = state.drill.y;
   const candidates = [];
   for (let i = 0; i < state.pathTiles.length - 1; i += 1) {
     const point = state.pathTiles[i];
@@ -4682,12 +4695,19 @@ function tryAutoCloseContour() {
     let x = current.x;
     let y = current.y;
     let blocked = false;
+    let allVisible = true;
+    let previewTo = null;
 
     while (x !== candidate.targetX || y !== candidate.targetY) {
       x += stepX;
       y += stepY;
       const index = cellIndex(x, y);
       const isTarget = x === candidate.targetX && y === candidate.targetY;
+      if (isVisibleCell(x, y)) {
+        previewTo = { x, y };
+      } else {
+        allVisible = false;
+      }
       if (!isTarget && state.pathIndexByCell[index] !== -1) {
         blocked = true;
         break;
@@ -4728,34 +4748,51 @@ function tryAutoCloseContour() {
     if (maxX - minX < 1 || maxY - minY < 1) {
       continue;
     }
-
-    x = current.x;
-    y = current.y;
-    while (x !== candidate.targetX || y !== candidate.targetY) {
-      x += stepX;
-      y += stepY;
-      const index = cellIndex(x, y);
-      if (!state.tunnelMask[index]) {
-        damageCell(x, y, EXPLOSION_BREAK_DAMAGE, {
-          ignoreHazardEffect: true,
-          allowHazardChain: true,
-          cause: "explosion",
-        });
-      }
-      extendPath(x, y);
-      if (state.pathTiles.length === 1 && state.pathTiles[0].x === x && state.pathTiles[0].y === y) {
-        state.pathTiles[0] = { x: heroX, y: heroY };
-        rebuildPathIndex();
-        return true;
-      }
-    }
-    if (blocked) {
-      continue;
-    }
-    return true;
+    return {
+      currentX: current.x,
+      currentY: current.y,
+      targetX: candidate.targetX,
+      targetY: candidate.targetY,
+      stepX,
+      stepY,
+      allVisible,
+      previewTo,
+    };
   }
 
-  return false;
+  return null;
+}
+
+function tryAutoCloseContour() {
+  const candidate = getAutoCloseContourCandidate();
+  if (!candidate || !candidate.allVisible) {
+    return false;
+  }
+
+  const heroX = state.drill.x;
+  const heroY = state.drill.y;
+  let x = candidate.currentX;
+  let y = candidate.currentY;
+  while (x !== candidate.targetX || y !== candidate.targetY) {
+    x += candidate.stepX;
+    y += candidate.stepY;
+    const index = cellIndex(x, y);
+    if (!state.tunnelMask[index]) {
+      damageCell(x, y, EXPLOSION_BREAK_DAMAGE, {
+        ignoreHazardEffect: true,
+        allowHazardChain: true,
+        cause: "explosion",
+      });
+    }
+    extendPath(x, y);
+    if (state.pathTiles.length === 1 && state.pathTiles[0].x === x && state.pathTiles[0].y === y) {
+      state.pathTiles[0] = { x: heroX, y: heroY };
+      rebuildPathIndex();
+      return true;
+    }
+  }
+
+  return true;
 }
 
 function tryJumpMove(dx, dy) {
@@ -4862,10 +4899,23 @@ function updateDrill(dt) {
   if (!dx && !dy) {
     state.drillIdleFrame = true;
     state.idleTime += dt;
+    if (state.autoClosePreviewReturnTimer > 0) {
+      // Keep the last preview alive while it retracts.
+    } else if (!state.autoClosePreviewFailed && state.idleTime >= IDLE_AUTO_CLOSE_PREVIEW_DELAY) {
+      state.autoClosePreview = getAutoCloseContourCandidate();
+    } else {
+      state.autoClosePreview = null;
+    }
     if (!state.idleAutoCloseTriggered && state.idleTime >= state.idleAutoCloseDelay) {
       state.idleAutoCloseTriggered = true;
       if (!tryAutoCloseContour()) {
+        state.autoClosePreviewFailed = true;
+        state.autoClosePreviewReturnTimer = IDLE_AUTO_CLOSE_PREVIEW_RETURN_DURATION;
         showPerkToast("Контур не найден");
+      } else {
+        state.autoClosePreview = null;
+        state.autoClosePreviewReturnTimer = 0;
+        state.autoClosePreviewFailed = false;
       }
     }
     state.drill.progress = 0;
@@ -4876,6 +4926,9 @@ function updateDrill(dt) {
 
   state.idleTime = 0;
   state.idleAutoCloseTriggered = false;
+  state.autoClosePreview = null;
+  state.autoClosePreviewReturnTimer = 0;
+  state.autoClosePreviewFailed = false;
 
   const targetX = clamp(state.drill.x + dx, 1, GRID_W - 2);
   const targetY = clamp(state.drill.y + dy, 1, GRID_H - 2);
@@ -5720,6 +5773,60 @@ function renderPath(camera) {
     ctx.arc(tile.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x, tile.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y, 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  renderAutoClosePreview(camera);
+}
+
+function renderAutoClosePreview(camera) {
+  const preview = state.autoClosePreview;
+  if (!preview?.previewTo) {
+    return;
+  }
+
+  let reveal = 0;
+  if (state.autoClosePreviewReturnTimer > 0) {
+    reveal = clamp(state.autoClosePreviewReturnTimer / IDLE_AUTO_CLOSE_PREVIEW_RETURN_DURATION, 0, 1);
+  } else {
+    if (state.idleTime < IDLE_AUTO_CLOSE_PREVIEW_DELAY) {
+      return;
+    }
+    const duration = Math.max(0.01, state.idleAutoCloseDelay - IDLE_AUTO_CLOSE_PREVIEW_DELAY);
+    reveal = clamp((state.idleTime - IDLE_AUTO_CLOSE_PREVIEW_DELAY) / duration, 0, 1);
+  }
+  if (reveal <= 0) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const fromX = preview.currentX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const fromY = preview.currentY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+  const fullToX = preview.previewTo.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const fullToY = preview.previewTo.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+  const toX = fromX + (fullToX - fromX) * reveal;
+  const toY = fromY + (fullToY - fromY) * reveal;
+  const pulse = 0.45 + (Math.sin((state.lastTs || 0) * 0.012) * 0.5 + 0.5) * 0.55;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = `rgba(132, 210, 255, ${0.18 + pulse * 0.18})`;
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(168, 232, 255, ${0.38 + pulse * 0.28})`;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(210, 245, 255, ${0.38 + pulse * 0.22})`;
+  ctx.beginPath();
+  ctx.arc(toX, toY, 3 + pulse * 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function renderBase(camera) {
