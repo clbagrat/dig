@@ -57,6 +57,9 @@ const EXPLOSION_EFFECT_DURATION = 0.48;
 const LOOP_FIELD_EFFECT_DURATION = 0.52;
 const CHAIN_EXPLOSION_DELAY = 0.14;
 const PERK_ZONE_CHARGE_DELAY = 1;
+const MOVE_ANIMATION_DURATION = 0.14;
+const BASE_MOVE_ANIMATION_DURATION = 0.18;
+const TILE_SWAP_ANIMATION_DURATION = 0.18;
 const HAZARD_TYPES = {
   SPIKE: 1,
   VOLATILE: 2,
@@ -301,11 +304,24 @@ const state = {
   scrapHitRect: null,
   sprites: null,
   effects: [],
+  tileAnimations: [],
   chainExplosions: [],
   base: {
     x: 0,
     y: 0,
     visible: false,
+    renderX: 0,
+    renderY: 0,
+    animFromX: 0,
+    animFromY: 0,
+    animToX: 0,
+    animToY: 0,
+    animTimer: 0,
+    animDuration: 0,
+  },
+  camera: {
+    x: 0,
+    y: 0,
   },
   cameraShake: {
     time: 0,
@@ -314,6 +330,14 @@ const state = {
   drill: {
     x: START_X,
     y: START_Y,
+    renderX: START_X,
+    renderY: START_Y,
+    animFromX: START_X,
+    animFromY: START_Y,
+    animToX: START_X,
+    animToY: START_Y,
+    animTimer: 0,
+    animDuration: 0,
     px: 0,
     py: 0,
     facingX: 0,
@@ -337,6 +361,10 @@ function isInStartEasyRadius(x, y) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function easeOutCubic(t) {
+  return 1 - (1 - t) ** 3;
 }
 
 function makeSpriteCanvas(size = TILE_SIZE) {
@@ -1564,7 +1592,24 @@ function setupField() {
   state.damageFlash = 0;
   state.scrapHitRect = null;
   state.effects.length = 0;
+  state.tileAnimations.length = 0;
   state.chainExplosions.length = 0;
+  state.base.renderX = 0;
+  state.base.renderY = 0;
+  state.base.animFromX = 0;
+  state.base.animFromY = 0;
+  state.base.animToX = 0;
+  state.base.animToY = 0;
+  state.base.animTimer = 0;
+  state.base.animDuration = 0;
+  state.drill.renderX = state.drill.x;
+  state.drill.renderY = state.drill.y;
+  state.drill.animFromX = state.drill.x;
+  state.drill.animFromY = state.drill.y;
+  state.drill.animToX = state.drill.x;
+  state.drill.animToY = state.drill.y;
+  state.drill.animTimer = 0;
+  state.drill.animDuration = 0;
   state.drill.strikePhase = 0;
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
@@ -1579,6 +1624,14 @@ function setupField() {
   extendPath(state.drill.x, state.drill.y);
 
   placeHiddenBase();
+  state.base.renderX = state.base.x;
+  state.base.renderY = state.base.y;
+  state.base.animFromX = state.base.x;
+  state.base.animFromY = state.base.y;
+  state.base.animToX = state.base.x;
+  state.base.animToY = state.base.y;
+  state.camera.x = state.drill.x * TILE_SIZE - state.width * 0.5;
+  state.camera.y = state.drill.y * TILE_SIZE - state.height * 0.56;
   placePerkTiles();
   placeCrystalTiles();
   placePerkZones();
@@ -2275,11 +2328,163 @@ function runFuelEvent(callback) {
   }
 }
 
+function getAnimatedPosition(renderX, renderY, animFromX, animFromY, animToX, animToY, animTimer, animDuration) {
+  if (animTimer <= 0 || animDuration <= 0) {
+    return { x: renderX, y: renderY };
+  }
+  const t = easeOutCubic(clamp(1 - animTimer / animDuration, 0, 1));
+  return {
+    x: animFromX + (animToX - animFromX) * t,
+    y: animFromY + (animToY - animFromY) * t,
+  };
+}
+
+function getCurrentDrillRenderPosition() {
+  return getAnimatedPosition(
+    state.drill.renderX,
+    state.drill.renderY,
+    state.drill.animFromX,
+    state.drill.animFromY,
+    state.drill.animToX,
+    state.drill.animToY,
+    state.drill.animTimer,
+    state.drill.animDuration,
+  );
+}
+
+function getCurrentBaseRenderPosition() {
+  return getAnimatedPosition(
+    state.base.renderX,
+    state.base.renderY,
+    state.base.animFromX,
+    state.base.animFromY,
+    state.base.animToX,
+    state.base.animToY,
+    state.base.animTimer,
+    state.base.animDuration,
+  );
+}
+
+function startDrillMoveAnimation(toX, toY, duration = MOVE_ANIMATION_DURATION) {
+  const current = getCurrentDrillRenderPosition();
+  state.drill.renderX = current.x;
+  state.drill.renderY = current.y;
+  state.drill.animFromX = current.x;
+  state.drill.animFromY = current.y;
+  state.drill.animToX = toX;
+  state.drill.animToY = toY;
+  state.drill.animTimer = duration;
+  state.drill.animDuration = duration;
+}
+
+function startBaseMoveAnimation(toX, toY, duration = BASE_MOVE_ANIMATION_DURATION) {
+  const current = getCurrentBaseRenderPosition();
+  state.base.renderX = current.x;
+  state.base.renderY = current.y;
+  state.base.animFromX = current.x;
+  state.base.animFromY = current.y;
+  state.base.animToX = toX;
+  state.base.animToY = toY;
+  state.base.animTimer = duration;
+  state.base.animDuration = duration;
+}
+
+function captureCellVisualData(index) {
+  return {
+    tunnel: state.tunnelMask[index],
+    hardness: state.hardness[index],
+    perk: state.perkMask[index],
+    crystal: state.crystalMask[index],
+    hazard: state.hazardMask[index],
+    metal: state.metalMask[index],
+    gasPocket: state.gasPocketMask[index],
+    steamPocket: state.steamPocketMask[index],
+    boulderPocket: state.boulderPocketMask[index],
+    gas: state.gasMask[index],
+    steam: state.steamMask[index],
+  };
+}
+
+function hasCellVisualData(content) {
+  return (
+    content &&
+    (content.tunnel ||
+      content.hardness ||
+      content.perk ||
+      content.crystal ||
+      content.hazard ||
+      content.metal ||
+      content.gasPocket ||
+      content.steamPocket ||
+      content.boulderPocket ||
+      content.gas ||
+      content.steam)
+  );
+}
+
+function startTileMoveAnimation(content, fromX, fromY, toX, toY, duration = TILE_SWAP_ANIMATION_DURATION) {
+  if (!hasCellVisualData(content)) {
+    return;
+  }
+  state.tileAnimations.push({
+    content,
+    fromX,
+    fromY,
+    toX,
+    toY,
+    renderX: fromX,
+    renderY: fromY,
+    timer: duration,
+    duration,
+  });
+}
+
 function rebuildPathIndex() {
   state.pathIndexByCell.fill(-1);
   for (let i = 0; i < state.pathTiles.length; i += 1) {
     const tile = state.pathTiles[i];
     state.pathIndexByCell[cellIndex(tile.x, tile.y)] = i;
+  }
+}
+
+function updateMovementAnimations(dt) {
+  if (state.drill.animTimer > 0 && state.drill.animDuration > 0) {
+    state.drill.animTimer = Math.max(0, state.drill.animTimer - dt);
+    const current = getCurrentDrillRenderPosition();
+    state.drill.renderX = current.x;
+    state.drill.renderY = current.y;
+    if (state.drill.animTimer === 0) {
+      state.drill.renderX = state.drill.animToX;
+      state.drill.renderY = state.drill.animToY;
+    }
+  } else {
+    state.drill.renderX = state.drill.x;
+    state.drill.renderY = state.drill.y;
+  }
+
+  if (state.base.animTimer > 0 && state.base.animDuration > 0) {
+    state.base.animTimer = Math.max(0, state.base.animTimer - dt);
+    const current = getCurrentBaseRenderPosition();
+    state.base.renderX = current.x;
+    state.base.renderY = current.y;
+    if (state.base.animTimer === 0) {
+      state.base.renderX = state.base.animToX;
+      state.base.renderY = state.base.animToY;
+    }
+  } else {
+    state.base.renderX = state.base.x;
+    state.base.renderY = state.base.y;
+  }
+
+  for (let i = state.tileAnimations.length - 1; i >= 0; i -= 1) {
+    const anim = state.tileAnimations[i];
+    anim.timer = Math.max(0, anim.timer - dt);
+    const t = easeOutCubic(clamp(1 - anim.timer / anim.duration, 0, 1));
+    anim.renderX = anim.fromX + (anim.toX - anim.fromX) * t;
+    anim.renderY = anim.fromY + (anim.toY - anim.fromY) * t;
+    if (anim.timer === 0) {
+      state.tileAnimations.splice(i, 1);
+    }
   }
 }
 
@@ -2812,6 +3017,8 @@ function update(dt) {
     return;
   }
 
+  updateMovementAnimations(dt);
+
   if (state.crystalRewardModalOpen) {
     updateCrystalRewardModal(dt);
     return;
@@ -2835,6 +3042,7 @@ function update(dt) {
   updateEffects(dt);
   rebuildVisibilityMask();
   updateDiscovery();
+  updateCamera(dt);
   updateCameraShake(dt);
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
   if (state.overhealDrillTimer === 0) {
@@ -4130,6 +4338,7 @@ function breakCell(x, y, index, options = {}) {
   }
 
   if (options.moveDrill) {
+    startDrillMoveAnimation(x, y);
     state.drill.x = x;
     state.drill.y = y;
     recordPlayerMove(options.fromX, options.fromY, x, y);
@@ -4329,6 +4538,7 @@ function maybeMoveBase() {
   const sourceHazard = state.hazardMask[fromIndex];
   const sourceHazardTriggered = state.hazardTriggeredMask[fromIndex];
   const sourceLoopScrap = state.loopScrapMask[fromIndex];
+  const targetVisual = captureCellVisualData(toIndex);
   const targetTunnel = state.tunnelMask[toIndex];
   const targetHardness = state.hardness[toIndex];
   const targetHealth = state.health[toIndex];
@@ -4355,6 +4565,8 @@ function maybeMoveBase() {
   state.hazardMask[fromIndex] = targetHazard;
   state.hazardTriggeredMask[fromIndex] = targetHazardTriggered;
   state.loopScrapMask[fromIndex] = targetLoopScrap;
+  startBaseMoveAnimation(toX, toY);
+  startTileMoveAnimation(targetVisual, toX, toY, fromX, fromY, BASE_MOVE_ANIMATION_DURATION);
   state.base.x = toX;
   state.base.y = toY;
 
@@ -4513,6 +4725,7 @@ function tryJumpMove(dx, dy) {
   const targetWasTunnel = state.tunnelMask[targetIndex] === 1;
   const targetHardness = state.hardness[targetIndex];
   const targetHealth = state.health[targetIndex];
+  const targetVisual = captureCellVisualData(targetIndex);
 
   state.fuel -= moveCost;
   state.jumpCharges -= 1;
@@ -4525,9 +4738,13 @@ function tryJumpMove(dx, dy) {
     removePathTile(fromX, fromY);
   }
 
+  startDrillMoveAnimation(jumpX, jumpY, MOVE_ANIMATION_DURATION + Math.max(Math.abs(jumpX - fromX), Math.abs(jumpY - fromY)) * 0.04);
   state.drill.x = jumpX;
   state.drill.y = jumpY;
   carveTunnel(jumpX, jumpY);
+  if (!targetWasTunnel) {
+    startTileMoveAnimation(targetVisual, jumpX, jumpY, fromX, fromY, TILE_SWAP_ANIMATION_DURATION + Math.max(Math.abs(jumpX - fromX), Math.abs(jumpY - fromY)) * 0.04);
+  }
   recordJumpMove(fromX, fromY, jumpX, jumpY);
   state.drill.progress = 0;
   state.drill.strikeEnergy = 0.35;
@@ -4537,6 +4754,18 @@ function tryJumpMove(dx, dy) {
 function updateCameraShake(dt) {
   state.cameraShake.time += dt * 24;
   state.cameraShake.amplitude = Math.max(0, state.cameraShake.amplitude - dt * 18);
+}
+
+function updateCamera(dt) {
+  const targetX = state.drill.renderX * TILE_SIZE - state.width * 0.5;
+  const targetY = state.drill.renderY * TILE_SIZE - state.height * 0.56;
+  const maxX = GRID_W * TILE_SIZE - state.width;
+  const maxY = GRID_H * TILE_SIZE - state.height;
+  const clampedTargetX = clamp(targetX, 0, Math.max(0, maxX));
+  const clampedTargetY = clamp(targetY, 0, Math.max(0, maxY));
+  const follow = 1 - Math.exp(-dt * 10);
+  state.camera.x += (clampedTargetX - state.camera.x) * follow;
+  state.camera.y += (clampedTargetY - state.camera.y) * follow;
 }
 
 function updateDrill(dt) {
@@ -4623,6 +4852,7 @@ function updateDrill(dt) {
     state.fuel -= state.moveFuelCost;
     const fromX = state.drill.x;
     const fromY = state.drill.y;
+    startDrillMoveAnimation(targetX, targetY);
     state.drill.x = targetX;
     state.drill.y = targetY;
     state.drill.progress = 0;
@@ -4938,15 +5168,11 @@ function isVisibleCell(x, y) {
 }
 
 function getCamera() {
-  const cameraX = state.drill.x * TILE_SIZE - state.width * 0.5;
-  const cameraY = state.drill.y * TILE_SIZE - state.height * 0.56;
-  const maxX = GRID_W * TILE_SIZE - state.width;
-  const maxY = GRID_H * TILE_SIZE - state.height;
   const shakeX = Math.sin(state.cameraShake.time * 1.7) * state.cameraShake.amplitude;
   const shakeY = Math.cos(state.cameraShake.time * 2.3) * state.cameraShake.amplitude * 0.7;
   return {
-    x: clamp(cameraX + shakeX, 0, Math.max(0, maxX)),
-    y: clamp(cameraY + shakeY, 0, Math.max(0, maxY)),
+    x: state.camera.x + shakeX,
+    y: state.camera.y + shakeY,
   };
 }
 
@@ -5171,6 +5397,11 @@ function render() {
       const sx = x * TILE_SIZE - camera.x;
       const sy = y * TILE_SIZE - camera.y;
       const visible = isVisibleCell(x, y);
+      const hiddenByAnim = isAnimatedTileDestination(x, y);
+
+      if (hiddenByAnim) {
+        continue;
+      }
 
       if (!visible) {
         ctx.save();
@@ -5256,6 +5487,7 @@ function render() {
   }
 
   renderPath(camera);
+  renderMovingTiles(camera);
   renderSteamJets(camera);
   renderEffects(camera);
   renderBase(camera);
@@ -5327,6 +5559,78 @@ function renderBoulders(camera) {
   ctx.restore();
 }
 
+function isAnimatedTileDestination(x, y) {
+  for (let i = 0; i < state.tileAnimations.length; i += 1) {
+    const anim = state.tileAnimations[i];
+    if (anim.toX === x && anim.toY === y) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function drawCellVisualContent(content, sx, sy) {
+  if (content.tunnel) {
+    drawTileSprite(state.sprites.tunnel, sx, sy);
+  } else if (content.metal) {
+    drawTileSprite(state.sprites.metal, sx, sy);
+  } else if (content.gasPocket) {
+    drawTileSprite(state.sprites.gasPocket, sx, sy);
+  } else if (content.steamPocket) {
+    drawTileSprite(state.sprites.steamPocket, sx, sy);
+  } else if (content.boulderPocket) {
+    drawTileSprite(state.sprites.boulderPocket, sx, sy);
+  } else {
+    drawTileSprite(state.sprites.blocks[content.hardness], sx, sy);
+  }
+
+  const ctx = state.ctx;
+  ctx.strokeStyle = "rgba(255, 225, 179, 0.05)";
+  ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
+
+  if (content.gas && !content.gasPocket) {
+    const alpha = 0.22;
+    ctx.fillStyle = `rgba(158, 240, 108, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(sx + TILE_SIZE * 0.38, sy + TILE_SIZE * 0.44, 7, 0, Math.PI * 2);
+    ctx.arc(sx + TILE_SIZE * 0.6, sy + TILE_SIZE * 0.54, 8, 0, Math.PI * 2);
+    ctx.arc(sx + TILE_SIZE * 0.46, sy + TILE_SIZE * 0.7, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (content.steam && !content.steamPocket) {
+    const alpha = 0.22;
+    ctx.fillStyle = `rgba(255, 207, 122, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(sx + TILE_SIZE * 0.36, sy + TILE_SIZE * 0.48, 6, 0, Math.PI * 2);
+    ctx.arc(sx + TILE_SIZE * 0.58, sy + TILE_SIZE * 0.38, 7, 0, Math.PI * 2);
+    ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.68, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (!content.tunnel && !content.metal && !content.gasPocket && !content.steamPocket && !content.boulderPocket && content.hazard) {
+    drawTileSprite(state.sprites.hazards[content.hazard], sx, sy);
+  }
+
+  if (content.perk) {
+    renderPerkTileAt(content.perk, sx, sy);
+  }
+  if (content.crystal) {
+    renderCrystalTileAt(content.crystal, sx, sy);
+  }
+}
+
+function renderMovingTiles(camera) {
+  const ctx = state.ctx;
+  ctx.save();
+  for (let i = 0; i < state.tileAnimations.length; i += 1) {
+    const anim = state.tileAnimations[i];
+    const sx = anim.renderX * TILE_SIZE - camera.x;
+    const sy = anim.renderY * TILE_SIZE - camera.y;
+    drawCellVisualContent(anim.content, sx, sy);
+  }
+  ctx.restore();
+}
+
 function renderPath(camera) {
   const ctx = state.ctx;
   ctx.lineWidth = 8;
@@ -5364,8 +5668,8 @@ function renderBase(camera) {
     return;
   }
 
-  const x = state.base.x * TILE_SIZE - camera.x;
-  const y = state.base.y * TILE_SIZE - camera.y;
+  const x = state.base.renderX * TILE_SIZE - camera.x;
+  const y = state.base.renderY * TILE_SIZE - camera.y;
   const frame = Math.floor((state.lastTs || 0) / 220) % state.sprites.baseFrames.length;
   ctx.save();
   ctx.fillStyle = "rgba(105, 210, 255, 0.14)";
@@ -5379,13 +5683,17 @@ function renderBase(camera) {
 }
 
 function renderPerkTile(x, y, sx, sy) {
-  const ctx = state.ctx;
   const index = cellIndex(x, y);
   const perkType = state.perkMask[index];
   if (!perkType) {
     return;
   }
 
+  renderPerkTileAt(perkType, sx, sy);
+}
+
+function renderPerkTileAt(perkType, sx, sy) {
+  const ctx = state.ctx;
   const perk = TILE_PERK_TYPES[perkType];
   ctx.save();
   ctx.fillStyle = `${perk.color}28`;
@@ -5416,12 +5724,16 @@ function renderPerkTile(x, y, sx, sy) {
 }
 
 function renderCrystalTile(x, y, sx, sy) {
-  const ctx = state.ctx;
   const crystalType = state.crystalMask[cellIndex(x, y)];
   if (!crystalType) {
     return;
   }
 
+  renderCrystalTileAt(crystalType, sx, sy);
+}
+
+function renderCrystalTileAt(crystalType, sx, sy) {
+  const ctx = state.ctx;
   const crystal = CRYSTAL_TYPES[crystalType];
   ctx.save();
   ctx.fillStyle = crystal.glow;
@@ -5601,8 +5913,8 @@ function renderDrill(camera) {
   const bodyOffsetY = -state.drill.facingY * thrust * 2.2 + idleBob;
   const hammerOffsetX = state.drill.facingX * thrust * 7;
   const hammerOffsetY = state.drill.facingY * thrust * 7;
-  const px = state.drill.x * TILE_SIZE - camera.x + bodyOffsetX;
-  const py = state.drill.y * TILE_SIZE - camera.y + bodyOffsetY;
+  const px = state.drill.renderX * TILE_SIZE - camera.x + bodyOffsetX;
+  const py = state.drill.renderY * TILE_SIZE - camera.y + bodyOffsetY;
   const frame = strikeWave > 0.78 ? 2 + (Math.floor((state.lastTs || 0) / 50) % 2) : Math.floor((state.lastTs || 0) / 160) % 2;
   const angle = state.drill.facingX > 0 ? Math.PI * 0.5 : state.drill.facingX < 0 ? -Math.PI * 0.5 : state.drill.facingY < 0 ? Math.PI : 0;
   ctx.save();
@@ -5701,8 +6013,8 @@ function renderSignalStatus(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.y * TILE_SIZE - camera.y - 14;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y - 14;
   const text = state.signalText;
 
   ctx.save();
@@ -5735,8 +6047,8 @@ function renderOverdriveStatus(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.y * TILE_SIZE - camera.y + 20;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y + 20;
   const width = 64;
   const ratio = clamp(state.overhealDrillTimer / Math.max(1, state.overdriveDisplayDuration || state.overhealOverdriveDuration || 3), 0, 1);
 
@@ -5762,8 +6074,8 @@ function renderStunStatus(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.y * TILE_SIZE - camera.y + 42;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y + 42;
   const width = 64;
   const ratio = clamp(state.stunTimer / Math.max(1, state.stunDisplayDuration || 1), 0, 1);
 
@@ -5790,8 +6102,8 @@ function renderHeatWarningStatus(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.y * TILE_SIZE - camera.y + 54;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y + 54;
   const width = 64;
   const ratio = clamp(state.heat / Math.max(1, state.maxHeat), 0, 1);
 
@@ -5817,8 +6129,8 @@ function renderLoopChargeStatus(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.y * TILE_SIZE - camera.y + 31;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y + 31;
   const width = 76;
   const ratio = clamp(state.loopChargeTimer / Math.max(1, state.loopChargeDuration || 3), 0, 1);
   const text = `+${Math.round(state.loopChargeDamageBonus * 100)}%`;
@@ -5850,9 +6162,9 @@ function renderPerkToast(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
   const lift = (1.2 - state.perkToast.time) * 18;
-  const y = state.drill.y * TILE_SIZE - camera.y - 34 - lift;
+  const y = state.drill.renderY * TILE_SIZE - camera.y - 34 - lift;
   const alpha = clamp(state.perkToast.time / 1.2, 0, 1);
   const text = `+ ${state.perkToast.text}`;
 
@@ -5879,9 +6191,9 @@ function renderFuelToast(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
   const lift = (0.9 - state.fuelToast.time) * 22;
-  const y = state.drill.y * TILE_SIZE - camera.y - 78 - lift;
+  const y = state.drill.renderY * TILE_SIZE - camera.y - 78 - lift;
   const alpha = clamp(state.fuelToast.time / 0.9, 0, 1);
   const text = `${state.fuelToast.value > 0 ? "+" : ""}${state.fuelToast.value} fuel`;
 
@@ -5908,8 +6220,8 @@ function renderHpToast(camera) {
   }
 
   const ctx = state.ctx;
-  const sx = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const sy = state.drill.y * TILE_SIZE - camera.y;
+  const sx = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const sy = state.drill.renderY * TILE_SIZE - camera.y;
   const lift = (0.9 - state.hpToast.time) * 24;
   const alpha = clamp(state.hpToast.time / 0.9, 0, 1);
   const text = `-${state.hpToast.value} HP`;
@@ -5932,9 +6244,9 @@ function renderScrapToast(camera) {
   }
 
   const ctx = state.ctx;
-  const x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
   const lift = (0.9 - state.scrapToast.time) * 22;
-  const y = state.drill.y * TILE_SIZE - camera.y - 56 - lift;
+  const y = state.drill.renderY * TILE_SIZE - camera.y - 56 - lift;
   const alpha = clamp(state.scrapToast.time / 0.9, 0, 1);
   const text = `+${state.scrapToast.value} scrap`;
 
@@ -6279,8 +6591,8 @@ function drawRoundedRectPath(x, y, width, height, radius) {
 
 function renderVisionMask(camera) {
   const ctx = state.ctx;
-  const centerX = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const centerY = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+  const centerX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const centerY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
   const radius = state.visionRadius * TILE_SIZE;
   const facingX = state.drill.facingX ?? 0;
   const facingY = state.drill.facingY ?? 1;
