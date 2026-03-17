@@ -107,14 +107,14 @@ const SCRAP_PERK_TYPES = [
   { name: "Линза обзора", icon: "◉", desc: "+1 к радиусу обзора, до максимума 9" },
   { name: "Радарный модуль", icon: "⌖", desc: "Отмечает ближайшие кристаллы на радаре" },
   { name: "Ломосбор", icon: "⛭", desc: "+2 скрапа за каждый разрушенный блок" },
-  { name: "Топлорециркулятор", icon: "♲", desc: "+1 топлива за каждый разрушенный блок, до +2" },
+  null,
   { name: "Перегрузка", icon: "⚡", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
   { name: "Усиленный корпус", icon: "✚", desc: "+1 к максимуму HP и лечит на 2" },
-  { name: "Перелив адреналина", icon: "❤", desc: "Overheal дает 3 секунды бафа, потом растет до максимума 7" },
+  { name: "Перелив адреналина", icon: "❤", desc: "Overheal дает 4 секунды бафа, потом растет до максимума 10" },
   { name: "Контурный трофей", icon: "◈", desc: "Большой контур может создать случайный перк внутри" },
   { name: "Автоконтур", icon: "◎", desc: "-1 сек к задержке автозамыкания контура, до минимума 1" },
   { name: "Кристальный катализатор", icon: "✧", desc: "Кристаллы начинают давать scrap, потом fuel и HP" },
-  { name: "Шиповой форсаж", icon: "✹", desc: "Разбитые шипы дают overdrive-баф на 5/7/10 секунд" },
+  { name: "Шиповой форсаж", icon: "✹", desc: "Разбитые шипы дают overdrive-баф на 6/9/12 секунд" },
   { name: "Термозаряд", icon: "☇", desc: "Усиливает урон и радиус взрыва от перегрева" },
   { name: "Терморасширение", icon: "☍", desc: "Скрыто: слито в Термозаряд" },
   { name: "Теплоотвод", icon: "⬢", desc: "Повышает предел нагрева до перегрева" },
@@ -239,7 +239,6 @@ const state = {
   strikeSpeed: 1,
   drillPower: 1,
   scrapBonus: 0,
-  fuelOnBreak: 0,
   fuelPickupBonus: 0,
   perkFuelBonus: 0,
   overflowBomb: false,
@@ -1542,7 +1541,6 @@ function setupField() {
   state.strikeSpeed = 1;
   state.drillPower = 1;
   state.scrapBonus = 0;
-  state.fuelOnBreak = 0;
   state.fuelPickupBonus = 0;
   state.perkFuelBonus = 0;
   state.overflowBomb = false;
@@ -2232,10 +2230,6 @@ function applyScrapPerk(perkType) {
       state.scrapBonus += 2;
       state.perkText = "Ломосбор";
       break;
-    case 12:
-      state.fuelOnBreak = Math.min(2, state.fuelOnBreak + 1);
-      state.perkText = "Топлорециркулятор";
-      break;
     case 13:
       state.overflowBomb = true;
       state.fuelPickupBonus += 50;
@@ -2250,7 +2244,7 @@ function applyScrapPerk(perkType) {
       break;
     case 15:
       state.overhealOverdrive = true;
-      state.overhealOverdriveDuration = Math.min(7, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 1 : 3);
+      state.overhealOverdriveDuration = Math.min(10, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 2 : 4);
       state.perkText = "Перелив адреналина";
       break;
     case 16:
@@ -2590,6 +2584,7 @@ function bindUi() {
   const manualClose = document.getElementById("manualClose");
   const manualOverlay = document.getElementById("manualModal");
   const manualPanel = manualOverlay?.querySelector(".manual-modal__panel");
+  const manualFrame = document.getElementById("manualFrame");
   const debugClose = document.getElementById("debugPerkClose");
   const debugOverlay = document.getElementById("debugPerkMenu");
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
@@ -2698,6 +2693,9 @@ function bindUi() {
       event.preventDefault();
       event.stopPropagation();
       resetPad();
+      if (manualFrame) {
+        manualFrame.src = `./manual.html?v=${Date.now()}`;
+      }
       state.manualModalOpen = true;
       syncManualModal();
     });
@@ -2821,6 +2819,9 @@ function buildDebugPerkButtons() {
   scrapRoot.innerHTML = "";
   for (let i = 1; i < SCRAP_PERK_TYPES.length; i += 1) {
     if (i === 21) {
+      continue;
+    }
+    if (!SCRAP_PERK_TYPES[i]) {
       continue;
     }
     const perk = SCRAP_PERK_TYPES[i];
@@ -3319,7 +3320,7 @@ function rebuildVisibilityMask() {
 }
 
 function prepareScrapPerkChoices() {
-  const bag = [1, 2, 3, 4, 5, 6, 8, 11, 12, 14, 15, 20, 22, 23, 24, 25];
+  const bag = [1, 2, 3, 4, 5, 6, 8, 11, 14, 15, 20, 22, 23, 24, 25];
   if (state.contourLengthDamageLevel < 4) {
     bag.push(26);
   }
@@ -3350,13 +3351,10 @@ function prepareScrapPerkChoices() {
   if (!state.radarCrystalModule) {
     bag.push(10);
   }
-  if (state.fuelOnBreak < 2) {
-    bag.push(12);
-  }
   if (!state.overflowBomb) {
     bag.push(13);
   }
-  if (state.overhealOverdriveDuration < 7) {
+  if (state.overhealOverdriveDuration < 10) {
     bag.push(15);
   }
   if (state.loopPerkLevel < 2) {
@@ -3430,7 +3428,7 @@ function triggerOverflowSurge() {
 }
 
 function activateOverhealDrillBoost() {
-  activateDrillOverdrive(state.overhealOverdriveDuration || 3, "Перелив адреналина");
+  activateDrillOverdrive(state.overhealOverdriveDuration || 4, "Перелив адреналина");
 }
 
 function triggerHeatOverload() {
@@ -3555,8 +3553,6 @@ function getScrapPerkIconMarkup(perkType, className = "") {
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor"/><path ${stroke} d="M12 6a6 6 0 0 1 6 6M12 3a9 9 0 0 1 9 9"/><path ${stroke} d="M12 18a6 6 0 0 0 6-6"/></svg>`;
     case 11:
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M12 4l1.5 2.2 2.7.4-1.9 2 0.5 2.8-2.8-1.1-2.8 1.1 0.5-2.8-1.9-2 2.7-.4z"/><path ${stroke} d="M6 14l2 2M16 14l2 2M9 18h6"/></svg>`;
-    case 12:
-      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path ${stroke} d="M8 7h8l1 3v6H7V10z"/><path ${stroke} d="M10 7V4h4v3"/><path ${stroke} d="M5 15c1 2 3 3 5 3M19 9c-1-2-3-3-5-3"/></svg>`;
     case 13:
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" ${stroke}/><path ${stroke} d="M13 5l-3 7h3l-2 7 5-8h-3l2-6"/></svg>`;
     case 14:
@@ -3636,14 +3632,12 @@ function getScrapPerkNextLevel(perkType) {
       return 1;
     case 11:
       return Math.round(state.scrapBonus / 2) + 1;
-    case 12:
-      return Math.min(2, state.fuelOnBreak + 1);
     case 13:
       return 1;
     case 14:
       return state.maxHp - START_HP + 1;
     case 15:
-      return Math.max(1, state.overhealOverdriveDuration - 1);
+      return Math.max(1, Math.floor(Math.max(0, state.overhealOverdriveDuration - 2) / 2) + 1);
     case 16:
       return Math.min(2, state.loopPerkLevel + 1);
     case 17:
@@ -3703,14 +3697,12 @@ function getScrapPerkCurrentLevel(perkType) {
       return state.radarCrystalModule ? 1 : 0;
     case 11:
       return Math.round(state.scrapBonus / 2);
-    case 12:
-      return state.fuelOnBreak;
     case 13:
       return state.overflowBomb ? 1 : 0;
     case 14:
       return Math.max(0, state.maxHp - START_HP);
     case 15:
-      return state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration - 2 : 0;
+      return state.overhealOverdriveDuration > 0 ? Math.floor(Math.max(0, state.overhealOverdriveDuration - 2) / 2) : 0;
     case 16:
       return state.loopPerkLevel;
     case 17:
@@ -3831,12 +3823,6 @@ function getScrapPerkPreview(perkType) {
         compare: `${state.scrapBonus} → ${state.scrapBonus + 2}`,
       };
     }
-    case 12: {
-      return {
-        effect: "+1 топливо за каждый блок (макс. 2)",
-        compare: `${state.fuelOnBreak} → ${Math.min(2, state.fuelOnBreak + 1)}`,
-      };
-    }
     case 13: {
       return {
         effect: "Переполнение дает форсаж, потом взрыв",
@@ -3850,7 +3836,7 @@ function getScrapPerkPreview(perkType) {
       };
     }
     case 15: {
-      const nextDuration = Math.min(7, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 1 : 3);
+      const nextDuration = Math.min(10, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 2 : 4);
       return {
         effect: "Лишнее лечение включает форсаж",
         compare: `Длительность ${state.overhealOverdriveDuration || 0} → ${nextDuration} сек`,
@@ -3887,9 +3873,9 @@ function getScrapPerkPreview(perkType) {
       return { effect, compare };
     }
     case 19: {
-      const durations = [0, 5, 7, 10];
+      const durations = [0, 6, 9, 12];
       const currentDuration = durations[state.spikeOverdriveLevel] || 0;
-      const nextDuration = durations[Math.min(3, state.spikeOverdriveLevel + 1)] || 10;
+      const nextDuration = durations[Math.min(3, state.spikeOverdriveLevel + 1)] || 12;
       return {
         effect: "Разбитые шипы дают форсаж",
         compare: `${currentDuration} → ${nextDuration} сек`,
@@ -4390,14 +4376,13 @@ function breakCell(x, y, index, options = {}) {
   state.hardness[index] = 0;
   state.health[index] = 0;
   state.scrap += scrapGain;
-  runFuelEvent(() => addFuel(state.fuelOnBreak, x, y, { preventOverflowTrigger: true }));
   state.blocksBroken += 1;
   if (options.byDrill) {
     state.drillBrokenBlocks += 1;
   }
   if (hazardType === HAZARD_TYPES.SPIKE && state.spikeOverdriveLevel > 0) {
-    const durations = [0, 5, 7, 10];
-    activateDrillOverdrive(durations[state.spikeOverdriveLevel] || 5, "Шиповой форсаж");
+    const durations = [0, 6, 9, 12];
+    activateDrillOverdrive(durations[state.spikeOverdriveLevel] || 6, "Шиповой форсаж");
   }
   showScrapToast(scrapGain);
   state.hazardMask[index] = 0;
@@ -6791,6 +6776,9 @@ function renderHudPerkColumn(x, y, width, title) {
   const perkRows = [];
   for (let i = 1; i < SCRAP_PERK_TYPES.length; i += 1) {
     if (i === 21) {
+      continue;
+    }
+    if (!SCRAP_PERK_TYPES[i]) {
       continue;
     }
     const level = getScrapPerkCurrentLevel(i);
