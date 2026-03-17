@@ -20,9 +20,10 @@ const TILES_PER_PERK_TILE = 26;
 const TILES_PER_PERK_ZONE = 370;
 const BASE_MIN_DISTANCE = 50;
 const START_EASY_RADIUS = 5;
-const RADAR_BASE_CHARGES = 10;
+const RADAR_BASE_DURATION = 10;
 const SCRAP_PERK_BASE_COST = 30;
 const SCRAP_PERK_COST_MULTIPLIER = 1.35;
+const SCRAP_PERK_LEVEL_MULTIPLIER_STEP = 0.05;
 const SCRAP_PERK_POPUP_DELAY = 0.5;
 const BASE_MOVE_AWAY_CHANCE = 0.5;
 const IDLE_AUTO_CLOSE_DELAY = 4;
@@ -85,7 +86,7 @@ const BLOCK_TYPES = [
 const TILE_PERK_TYPES = [
   null,
   { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+120 топлива прямо сейчас" },
-  { name: "Радар", icon: "R", color: "#f2ede2", desc: "+5 сигналов hotter/colder" },
+  { name: "Радар", icon: "R", color: "#f2ede2", desc: "+10 сек направляющего радара" },
   { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.35 к силе удара бура" },
   { name: "Бомба", icon: "*", color: "#c796ff", desc: "Взрыв в радиусе 2 тайлов с уроном x10" },
   { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+15% к скорости нового удара" },
@@ -104,7 +105,7 @@ const SCRAP_PERK_TYPES = [
   { name: "Саперный заряд", icon: "✦", desc: "Каждые N сломанных буром блоков кидает ракету с малым радиусом на дистанцию 1" },
   { name: "Топливный контур", icon: "⛽", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
   { name: "Линза обзора", icon: "◉", desc: "+1 к радиусу обзора, до максимума 9" },
-  { name: "Радарный модуль", icon: "⌖", desc: "+2 шага от радара" },
+  { name: "Радарный модуль", icon: "⌖", desc: "Отмечает ближайшие кристаллы на радаре" },
   { name: "Ломосбор", icon: "⛭", desc: "+2 скрапа за каждый разрушенный блок" },
   { name: "Топлорециркулятор", icon: "♲", desc: "+1 топлива за каждый разрушенный блок, до +2" },
   { name: "Перегрузка", icon: "⚡", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
@@ -118,7 +119,7 @@ const SCRAP_PERK_TYPES = [
   { name: "Терморасширение", icon: "☍", desc: "Скрыто: слито в Термозаряд" },
   { name: "Теплоотвод", icon: "⬢", desc: "Повышает предел нагрева до перегрева" },
   { name: "Накал бура", icon: "❉", desc: "Повышает урон бура в зависимости от нагрева" },
-  { name: "Импульс остывания", icon: "⌁", desc: "В момент начала остывания дает шаги радара" },
+  { name: "Импульс остывания", icon: "⌁", desc: "При полном остывании дает 5 сек радара" },
   { name: "Разгонные демпферы", icon: "◍", desc: "Сокращают оглушение и ускоряют набор heat" },
   { name: "Контурный резонанс", icon: "⟲", desc: "+1% урона за каждую единицу длины контура до капа уровня" },
   { name: "Охлаждающие ракеты", icon: "❄", desc: "За каждые N остывшего heat выпускают ракету с малым радиусом на дистанцию 1-3" },
@@ -226,7 +227,8 @@ const state = {
   signalMovesMax: 0,
   signalPrevX: START_X,
   signalPrevY: START_Y,
-  signalText: "Старт",
+  signalDirX: 0,
+  signalDirY: -1,
   perkText: "Нет",
   crystalRecipe: [],
   crystalCollected: [0, 0, 0, 0, 0, 0],
@@ -249,7 +251,7 @@ const state = {
   stunDisplayDuration: 0,
   stunReduction: 0,
   heatGainBonus: 0,
-  radarBonus: 0,
+  radarCrystalModule: false,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
   sideDrills: 0,
@@ -819,7 +821,8 @@ function chooseWeightedPerk(weights, random = Math.random) {
 }
 
 function getScrapPerkCost(level) {
-  return Math.round(SCRAP_PERK_BASE_COST * SCRAP_PERK_COST_MULTIPLIER ** level);
+  const multiplier = SCRAP_PERK_COST_MULTIPLIER + level * SCRAP_PERK_LEVEL_MULTIPLIER_STEP;
+  return Math.round(SCRAP_PERK_BASE_COST * multiplier ** level);
 }
 
 function getIdleFuelDrain() {
@@ -1505,7 +1508,6 @@ function setupField() {
   state.armor = 0;
   state.scrap = 0;
   state.depth = 0;
-  state.signalText = "Старт";
   state.perkText = "Нет";
   state.crystalRecipe = [];
   state.crystalCollected = [0, 0, 0, 0, 0, 0];
@@ -1515,7 +1517,7 @@ function setupField() {
   state.pendingPerkChoice = false;
   state.pendingPerkDelay = 0;
   state.bonusPerkChoices = 0;
-  state.perkRerolls = 0;
+  state.perkRerolls = 2;
   state.manualModalOpen = false;
   state.debugPerkMenuOpen = false;
   state.debugPerkSelection = "";
@@ -1533,6 +1535,8 @@ function setupField() {
   state.signalMovesMax = 0;
   state.signalPrevX = START_X;
   state.signalPrevY = START_Y;
+  state.signalDirX = 0;
+  state.signalDirY = -1;
   state.moveFuelCost = MOVE_FUEL_COST;
   state.strikeFuelCost = STRIKE_FUEL_COST;
   state.strikeSpeed = 1;
@@ -1550,7 +1554,7 @@ function setupField() {
   state.stunDisplayDuration = 0;
   state.stunReduction = 0;
   state.heatGainBonus = 0;
-  state.radarBonus = 0;
+  state.radarCrystalModule = false;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
   state.sideDrills = 0;
@@ -2029,6 +2033,14 @@ function getDistanceToBase(x, y) {
   return Math.hypot(state.base.x - x, state.base.y - y);
 }
 
+function refreshSignalDirection(fromX = state.drill.x, fromY = state.drill.y) {
+  const dx = state.base.x - fromX;
+  const dy = state.base.y - fromY;
+  const length = Math.hypot(dx, dy) || 1;
+  state.signalDirX = dx / length;
+  state.signalDirY = dy / length;
+}
+
 function carveTunnel(x, y) {
   const index = cellIndex(x, y);
   const perkType = state.perkMask[index];
@@ -2135,9 +2147,10 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       break;
     }
     case 2:
-      state.signalMovesLeft += RADAR_BASE_CHARGES + state.radarBonus;
+      state.signalMovesLeft += RADAR_BASE_DURATION;
       state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
-      state.perkText = `Радар: ${consumeSignalMove(state.signalPrevX, state.signalPrevY, x, y)}`;
+      refreshSignalDirection(x, y);
+      state.perkText = "Радар";
       break;
     case 3:
       state.drillPower += 0.35;
@@ -2212,7 +2225,7 @@ function applyScrapPerk(perkType) {
       state.perkText = "Линза обзора";
       break;
     case 10:
-      state.radarBonus += 2;
+      state.radarCrystalModule = true;
       state.perkText = "Радарный модуль";
       break;
     case 11:
@@ -3103,6 +3116,14 @@ function update(dt) {
     return;
   }
 
+  if (state.signalMovesLeft > 0) {
+    state.signalMovesLeft = Math.max(0, state.signalMovesLeft - dt);
+    refreshSignalDirection();
+    if (state.signalMovesLeft === 0) {
+      state.signalMovesMax = 0;
+    }
+  }
+
   state.fuel = Math.max(0, state.fuel - getIdleFuelDrain() * dt);
   state.fuel = Math.min(state.maxFuel, state.fuel);
   consumeFuelEmergency();
@@ -3152,12 +3173,10 @@ function update(dt) {
     }
     if (state.heat === 0 && state.heatCoolingRewardArmed) {
       state.heatCoolingRewardArmed = false;
-      if (state.heatCoolingRewardLevel > 0 && state.heatCoolingPeak >= 50) {
-        state.signalMovesLeft += state.heatCoolingRewardLevel * 2;
+      if (state.heatCoolingRewardLevel > 0 && state.heatCoolingPeak >= 30) {
+        state.signalMovesLeft = Math.max(state.signalMovesLeft, 5);
         state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
-        if (state.signalText === "Сигнал пуст" || state.signalText === "Старт") {
-          state.signalText = "Горячо";
-        }
+        refreshSignalDirection();
         showPerkToast("Импульс остывания");
       }
       state.heatCoolingPeak = 0;
@@ -3300,7 +3319,7 @@ function rebuildVisibilityMask() {
 }
 
 function prepareScrapPerkChoices() {
-  const bag = [1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 14, 15, 20, 22, 23, 24, 25];
+  const bag = [1, 2, 3, 4, 5, 6, 8, 11, 12, 14, 15, 20, 22, 23, 24, 25];
   if (state.contourLengthDamageLevel < 4) {
     bag.push(26);
   }
@@ -3327,6 +3346,9 @@ function prepareScrapPerkChoices() {
   }
   if (state.visionRadius < 9) {
     bag.push(9);
+  }
+  if (!state.radarCrystalModule) {
+    bag.push(10);
   }
   if (state.fuelOnBreak < 2) {
     bag.push(12);
@@ -3611,7 +3633,7 @@ function getScrapPerkNextLevel(perkType) {
     case 9:
       return Math.max(1, state.visionRadius - VISION_RADIUS + 1);
     case 10:
-      return Math.round(state.radarBonus / 2) + 1;
+      return 1;
     case 11:
       return Math.round(state.scrapBonus / 2) + 1;
     case 12:
@@ -3678,7 +3700,7 @@ function getScrapPerkCurrentLevel(perkType) {
     case 9:
       return Math.max(0, state.visionRadius - VISION_RADIUS);
     case 10:
-      return Math.round(state.radarBonus / 2);
+      return state.radarCrystalModule ? 1 : 0;
     case 11:
       return Math.round(state.scrapBonus / 2);
     case 12:
@@ -3799,8 +3821,8 @@ function getScrapPerkPreview(perkType) {
     }
     case 10: {
       return {
-        effect: "+2 шага после подбора радара",
-        compare: `${state.radarBonus} → ${state.radarBonus + 2}`,
+        effect: "Показывает ближайшие кристаллы на кольце радара",
+        compare: state.radarCrystalModule ? "Уже активно" : "Выкл → Вкл",
       };
     }
     case 11: {
@@ -3899,8 +3921,8 @@ function getScrapPerkPreview(perkType) {
     }
     case 24: {
       return {
-        effect: "Полное остывание дает шаги радара",
-        compare: `${state.heatCoolingRewardLevel * 2} → ${(state.heatCoolingRewardLevel + 1) * 2}`,
+        effect: "После 30+ heat при остывании дает радар",
+        compare: state.heatCoolingRewardLevel > 0 ? "Уже: 5 сек" : "Выкл → 5 сек",
       };
     }
     case 25: {
@@ -5069,28 +5091,11 @@ function updateDrill(dt) {
 
 function consumeSignalMove(fromX, fromY, toX, toY) {
   if (state.signalMovesLeft <= 0) {
-    return "Пусто";
+    return false;
   }
 
-  const previousDistance = getDistanceToBase(fromX, fromY);
-  const currentDistance = getDistanceToBase(toX, toY);
-  const delta = currentDistance - previousDistance;
-  state.signalMovesLeft -= 1;
-  let reading = "Холодно";
-
-  if (delta < 0) {
-    state.signalText = "Горячо";
-    reading = "Горячо";
-  } else {
-    state.signalText = "Холодно";
-    reading = "Холодно";
-  }
-
-  if (state.signalMovesLeft === 0) {
-    state.signalMovesMax = 0;
-    state.signalText = "Сигнал пуст";
-  }
-  return reading;
+  refreshSignalDirection(toX, toY);
+  return true;
 }
 
 function updateDiscovery() {
@@ -6213,31 +6218,112 @@ function renderSignalStatus(camera) {
 
   const ctx = state.ctx;
   const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.renderY * TILE_SIZE - camera.y - 14;
-  const text = state.signalText;
+  const y = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+  const radius = 48;
+  const barWidth = 44;
+  const angle = Math.atan2(state.signalDirY, state.signalDirX);
+  const dotX = x + Math.cos(angle) * radius;
+  const dotY = y + Math.sin(angle) * radius;
+  const pulse = 0.55 + (Math.sin((state.lastTs || 0) * 0.012) * 0.5 + 0.5) * 0.45;
 
   ctx.save();
-  ctx.font = `700 13px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  const width = Math.max(74, ctx.measureText(text).width + 18);
   const barRatio = state.signalMovesMax > 0 ? clamp(state.signalMovesLeft / state.signalMovesMax, 0, 1) : 0;
-  ctx.fillStyle = "rgba(23, 14, 9, 0.82)";
-  ctx.strokeStyle = "rgba(242, 237, 226, 0.42)";
-  ctx.lineWidth = 1.5;
-  buildRoundedRectPath(ctx, x - width * 0.5, y - 18, width, 30, 10);
-  ctx.fill();
+  ctx.strokeStyle = "rgba(242, 237, 226, 0.54)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.stroke();
+
+  ctx.strokeStyle = "rgba(242, 237, 226, 0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, radius - 5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 250, 241, 0.2)";
+  ctx.beginPath();
+  ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(242, 237, 226, 0.22)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(dotX, dotY);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(255, 250, 241, ${0.18 + pulse * 0.18})`;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 5.8 + pulse * 2.6, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.fillStyle = "#fffaf1";
-  ctx.fillText(text, x, y - 1);
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 3.2 + pulse * 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (state.radarCrystalModule) {
+    const crystalTargets = getNearestRadarCrystals();
+    for (let i = 0; i < crystalTargets.length; i += 1) {
+      const crystal = crystalTargets[i];
+      const crystalAngle = Math.atan2(crystal.dirY, crystal.dirX);
+      const crystalX = x + Math.cos(crystalAngle) * radius;
+      const crystalY = y + Math.sin(crystalAngle) * radius;
+      ctx.fillStyle = `${crystal.color}44`;
+      ctx.beginPath();
+      ctx.arc(crystalX, crystalY, 5.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = crystal.color;
+      ctx.beginPath();
+      ctx.arc(crystalX, crystalY, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(38, 24, 16, 0.68)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(crystalX, crystalY, 3.2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
   ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
-  buildRoundedRectPath(ctx, x - width * 0.5 + 8, y + 2, width - 16, 4, 3);
+  buildRoundedRectPath(ctx, x - barWidth * 0.5, y + radius + 12, barWidth, 4, 3);
   ctx.fill();
   if (barRatio > 0) {
     ctx.fillStyle = "#f2ede2";
-    buildRoundedRectPath(ctx, x - width * 0.5 + 8, y + 2, (width - 16) * barRatio, 4, 3);
+    buildRoundedRectPath(ctx, x - barWidth * 0.5, y + radius + 12, barWidth * barRatio, 4, 3);
     ctx.fill();
   }
   ctx.restore();
+}
+
+function getNearestRadarCrystals() {
+  const nearest = [];
+  for (let crystalType = 1; crystalType < CRYSTAL_TYPES.length; crystalType += 1) {
+    let best = null;
+    for (let y = 1; y < GRID_H - 1; y += 1) {
+      for (let x = 1; x < GRID_W - 1; x += 1) {
+        if (state.crystalMask[cellIndex(x, y)] !== crystalType) {
+          continue;
+        }
+        const dx = x - state.drill.x;
+        const dy = y - state.drill.y;
+        const distanceSq = dx * dx + dy * dy;
+        if (!best || distanceSq < best.distanceSq) {
+          const length = Math.hypot(dx, dy) || 1;
+          best = {
+            color: CRYSTAL_TYPES[crystalType].color,
+            distanceSq,
+            dirX: dx / length,
+            dirY: dy / length,
+          };
+        }
+      }
+    }
+    if (best) {
+      nearest.push(best);
+    }
+  }
+  return nearest;
 }
 
 function renderOverdriveStatus(camera) {

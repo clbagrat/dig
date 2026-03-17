@@ -142,22 +142,17 @@ So the sequence is roughly:
 Radar is a tile perk.
 
 Current behavior:
-- on pickup, radar immediately compares the previous player tile and the current tile
-- after that, each next movement compares the previous tile and the new tile
-- it always returns one of two states:
-  - `Горячо`
-  - `Холодно`
+- on pickup, radar immediately points toward the base
+- while radar time remains, a circular marker appears around the driller
+- a bright point on that ring shows the direction to the base
 
-There is no `Ровно`.
-
-Charges:
-- base radar gives `5` charges
-- `Geo Lens` adds extra charges when radar is gained
+Duration:
+- base radar gives `10` seconds
+- `Радарный модуль` marks the nearest crystal of each color on the radar ring
 
 UI:
-- the radar message is shown above the driller
-- remaining charges are shown as a small progress bar under that text
-- charges are no longer shown as numbers in the text itself
+- the direction ring is shown above the driller
+- remaining time is shown as a small progress bar under the ring
 
 ## Tile Perks
 
@@ -189,8 +184,8 @@ Current spatial rules:
 - current raw amount before other fuel systems: `90`
 
 `Радар`
-- grants radar charges
-- immediately evaluates hotter/colder on pickup
+- grants radar time
+- immediately updates the direction ring on pickup
 
 `Бур`
 - `+0.5` drill power
