@@ -867,8 +867,17 @@ strong {
     opacity 90ms ease-out,
     transform 90ms ease-out;
   background:
-    radial-gradient(circle at 50% 45%, rgba(215, 159, 73, 0.12), transparent 48%),
-    linear-gradient(180deg, rgba(83, 51, 26, 0.36), rgba(24, 14, 10, 0.88));
+    radial-gradient(circle at 50% 45%, rgba(215, 159, 73, 0.015), transparent 44%),
+    linear-gradient(180deg, rgba(83, 51, 26, 0.03), rgba(24, 14, 10, 0.06));
+}
+
+.move-pad::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(215, 159, 73, 0.1);
+  box-shadow: inset 0 0 10px rgba(255, 219, 168, 0.015);
 }
 
 .move-pad--active {
@@ -878,17 +887,17 @@ strong {
 
 .move-stick {
   position: absolute;
-  left: 39px;
-  top: 39px;
-  width: 40px;
-  height: 40px;
+  left: 47px;
+  top: 47px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 30%, rgba(255, 228, 181, 0.45), transparent 32%),
-    linear-gradient(180deg, #d9ad63, #87471f);
+    radial-gradient(circle at 35% 30%, rgba(255, 228, 181, 0.32), transparent 32%),
+    linear-gradient(180deg, rgba(217, 173, 99, 0.9), rgba(135, 71, 31, 0.9));
   box-shadow:
-    inset 0 2px 8px rgba(255, 255, 255, 0.22),
-    0 6px 16px rgba(0, 0, 0, 0.28);
+    inset 0 1px 5px rgba(255, 255, 255, 0.16),
+    0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
 @media (max-width: 700px) {

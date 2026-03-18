@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Dig Scrap Perks</title>
+    <link rel="stylesheet" href="./scrap-perks.css" />
+  </head>
+  <body>
+    <main class="manual">
+      <header class="hero">
+        <a class="hero__back" href="./index.html">Играть</a>
+        <a class="hero__subback" href="./manual.html">Мануал</a>
+        <p class="hero__eyebrow">Build Review</p>
+        <h1>Scrap Perks</h1>
+        <p class="hero__lead">
+          Краткий обзор всех scrap-перков: что они делают, как усиливаются и где у них потолок.
+        </p>
+      </header>
+
+      <section class="section section--compact">
+        <h2>Экономика</h2>
+        <div class="perk-grid">
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⛽</span><h3>Топливный контур</h3></div>
+            <p>Каждый полученный перк дает топливо, но `Бак` слабеет.</p>
+            <ul>
+              <li>Топливо: `+50` за уровень.</li>
+              <li>Бак: `120 -> 70 -> 20 -> -30`.</li>
+              <li>Потолка нет.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⛭</span><h3>Ломосбор</h3></div>
+            <p>Увеличивает scrap за каждый разрушенный блок.</p>
+            <ul>
+              <li>`+2 scrap` за уровень.</li>
+              <li>Стакается без потолка.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">✧</span><h3>Кристальный катализатор</h3></div>
+            <p>Усиливает награду за любой кристалл.</p>
+            <ul>
+              <li>Лвл 1: `+30 scrap`.</li>
+              <li>Лвл 2: `+30 scrap`, `+40 fuel`.</li>
+              <li>Лвл 3: `+30 scrap`, `+40 fuel`, `+1 HP`.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">◌</span><h3>Усиленный бак</h3></div>
+            <p>Усиливает только тайловый `Бак`, но поднимает пассивный расход топлива.</p>
+            <ul>
+              <li>Бонус: `+50% / +75% / +100%`.</li>
+              <li>Штраф: `+10%` к drain, минимум `+1` за уровень.</li>
+              <li>Потолок: 3 уровня.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section--compact">
+        <h2>Бур и бой</h2>
+        <div class="perk-grid">
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⫼</span><h3>Боковые буры</h3></div>
+            <p>Основной удар дополнительно бьет слева и справа от героя.</p>
+            <ul>
+              <li>Урон: `50% + 25%` за уровень.</li>
+              <li>Стакается без потолка.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⇢</span><h3>Длинный бур</h3></div>
+            <p>Бьет следующий тайл по прямой после основного.</p>
+            <ul>
+              <li>Старт: `20%` основного урона.</li>
+              <li>Дальше: `+10%` за уровень.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">✣</span><h3>Диагональные буры</h3></div>
+            <p>Бьют по двум диагоналям вперед.</p>
+            <ul>
+              <li>Старт: `20%` основного урона.</li>
+              <li>Дальше: `+5%` за уровень.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⏚</span><h3>Форсаж на нуле</h3></div>
+            <p>Ускоряет цикл удара, когда топливо опускается.</p>
+            <ul>
+              <li>Бонус: `+35%` за уровень на пустом баке.</li>
+              <li>Стакается без потолка.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">❉</span><h3>Накал бура</h3></div>
+            <p>Чем выше heat, тем выше урон бура.</p>
+            <ul>
+              <li>На полном heat: `+20%` за уровень.</li>
+              <li>Стакается без потолка.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⌖</span><h3>Радарный модуль</h3></div>
+            <p>Пока радар активен, на кольце видны ближайшие кристаллы каждого цвета.</p>
+            <ul>
+              <li>По одному ближайшему кристаллу на цвет.</li>
+              <li>Одноразовый перк.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section--compact">
+        <h2>Контур</h2>
+        <div class="perk-grid">
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⬡</span><h3>Контурный заряд</h3></div>
+            <p>После замыкания дает временный бонус к урону бура.</p>
+            <ul>
+              <li>`+5%` урона за каждую клетку внутри контура.</li>
+              <li>Длительность: `3 / 4 / 5 / 6` сек.</li>
+              <li>Потолок: 4 уровня.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">◈</span><h3>Контурный трофей</h3></div>
+            <p>Контур может создать новый тайловый перк внутри области.</p>
+            <ul>
+              <li>Меньше 9 клеток: `15% / 40%`.</li>
+              <li>`9+` клеток: `35% / 75%`.</li>
+              <li>Потолок: 2 уровня.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">◎</span><h3>Автоконтур</h3></div>
+            <p>Снижает задержку автодорисовки контура в простое.</p>
+            <ul>
+              <li>`4 -> 3 -> 2 -> 1` сек.</li>
+              <li>Потолок: 1 секунда.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⟲</span><h3>Контурный резонанс</h3></div>
+            <p>Дает урон за текущую длину живого контура.</p>
+            <ul>
+              <li>`+1%` за каждую единицу длины.</li>
+              <li>Потолки: `15% / 30% / 50% / 100%`.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">↺</span><h3>Рекуперация контура</h3></div>
+            <p>Возврат назад по своему контуру дает топливо.</p>
+            <ul>
+              <li>`3 / 4 / 5` топлива за шаг.</li>
+              <li>Потолок: 3 уровня.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section--compact">
+        <h2>Выживание</h2>
+        <div class="perk-grid">
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">✚</span><h3>Усиленный корпус</h3></div>
+            <p>Поднимает максимум HP и лечит.</p>
+            <ul>
+              <li>`+1 max HP`.</li>
+              <li>`+2` лечения за выбор.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">❤</span><h3>Перелив адреналина</h3></div>
+            <p>Overheal включает overdrive.</p>
+            <ul>
+              <li>Длительность: `4 -> 6 -> 8 -> 10` сек.</li>
+              <li>Во время бафа удары без fuel-cost.</li>
+              <li>Потолок: 10 секунд.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">✹</span><h3>Шиповой форсаж</h3></div>
+            <p>Разбитые шипы дают тот же overdrive-баф.</p>
+            <ul>
+              <li>Длительность: `6 / 9 / 12` сек.</li>
+              <li>Потолок: 3 уровня.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">◍</span><h3>Разгонные демпферы</h3></div>
+            <p>Сокращают оглушение, но ускоряют набор heat.</p>
+            <ul>
+              <li>Стан: `-0.4` сек за уровень.</li>
+              <li>Heat: `+1` за удар за уровень.</li>
+              <li>Минимальный стан: `0.5` сек.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section--compact">
+        <h2>Heat-билд</h2>
+        <div class="perk-grid">
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">☇</span><h3>Термозаряд</h3></div>
+            <p>Усиливает перегревный взрыв и по урону, и по радиусу.</p>
+            <ul>
+              <li>Урон: `x1` базово, потом `+1x` за уровень.</li>
+              <li>Радиус: `+0.5` за уровень.</li>
+              <li>Потолка нет.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⬢</span><h3>Теплоотвод</h3></div>
+            <p>Поднимает предел heat до перегрева.</p>
+            <ul>
+              <li>Базовый лимит: `100`.</li>
+              <li>`+20 heat` за уровень.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⌁</span><h3>Импульс остывания</h3></div>
+            <p>После полного остывания включает радар.</p>
+            <ul>
+              <li>Условие: в серии был хотя бы `30 heat`.</li>
+              <li>Награда: `5 сек` радара.</li>
+              <li>Повторно пока не усиливается.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">❄</span><h3>Охлаждающие ракеты</h3></div>
+            <p>Остывший heat выпускает ракеты.</p>
+            <ul>
+              <li>Пороги: `50 / 40 / 30` heat.</li>
+              <li>Ракета: дистанция `1-3`, малый радиус.</li>
+              <li>Потолок: 3 уровня.</li>
+            </ul>
+          </article>
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">☄</span><h3>Терморакеты</h3></div>
+            <p>Перегрев сам выпускает ракеты после своего взрыва.</p>
+            <ul>
+              <li>`1 / 2 / 3` ракеты.</li>
+              <li>Дистанция `1-3`, малый радиус.</li>
+              <li>Потолок: 3 уровня.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section--compact">
+        <h2>Особые одноразовые</h2>
+        <div class="perk-grid">
+          <article class="perk-card">
+            <div class="perk-card__top"><span class="perk-icon">⚡</span><h3>Перегрузка</h3></div>
+            <p>Переполнение топлива включает форсаж, а потом наказывает.</p>
+            <ul>
+              <li>`+50` ко всем источникам топлива.</li>
+              <li>`-150` к `maxFuel`, но не ниже `100`.</li>
+              <li>При overflow: `3 сек` overdrive, потом взрыв и стан.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
