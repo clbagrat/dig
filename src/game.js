@@ -61,6 +61,8 @@ const LOOP_FIELD_EFFECT_DURATION = 0.52;
 const CHAIN_EXPLOSION_DELAY = 0.14;
 const PERK_ZONE_CHARGE_DELAY = 1;
 const MOVE_ANIMATION_DURATION = 0.14;
+const MOVE_SPEED_TILES = 5;
+const POST_BREAK_MOVE_DELAY = 0.2;
 const BASE_MOVE_ANIMATION_DURATION = 0.18;
 const TILE_SWAP_ANIMATION_DURATION = 0.18;
 const HAZARD_TYPES = {
@@ -97,7 +99,7 @@ const TILE_PERK_TYPES = [
 const SCRAP_PERK_TYPES = [
   null,
   { name: "Боковые буры", icon: "⫼", desc: "Удар также бьет по двум боковым клеткам" },
-  { name: "Прыжковый привод", icon: "↠", desc: "Каждые 10 блоков дает рывок, повторный выбор увеличивает дальность" },
+  null,
   { name: "Длинный бур", icon: "⇢", desc: "Бьет следующий тайл вперед, повторно усиливает дальний удар" },
   { name: "Диагональные буры", icon: "✣", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
   { name: "Контурный заряд", icon: "⬡", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
@@ -254,10 +256,6 @@ const state = {
   blocksBroken: 0,
   drillBrokenBlocks: 0,
   sideDrills: 0,
-  jumpDrive: false,
-  jumpCharges: 0,
-  jumpRange: 0,
-  movedTiles: 0,
   longDrillPower: 0,
   diagonalDrillPower: 0,
   loopChargeLevel: 0,
@@ -358,6 +356,7 @@ const state = {
     strikeEnergy: 0,
     strikeLatch: false,
     actionCooldown: 0,
+    moveResumeTimer: 0,
   },
 };
 
@@ -1556,10 +1555,6 @@ function setupField() {
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
   state.sideDrills = 0;
-  state.jumpDrive = false;
-  state.jumpCharges = 0;
-  state.jumpRange = 0;
-  state.movedTiles = 0;
   state.longDrillPower = 0;
   state.diagonalDrillPower = 0;
   state.loopChargeLevel = 0;
@@ -1628,6 +1623,7 @@ function setupField() {
   state.drill.strikeEnergy = 0;
   state.drill.strikeLatch = false;
   state.drill.actionCooldown = 0;
+  state.drill.moveResumeTimer = 0;
   state.worldSeed = newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
 
@@ -2187,11 +2183,6 @@ function applyScrapPerk(perkType) {
       state.sideDrills += 1;
       state.perkText = "Боковые буры";
       break;
-    case 2:
-      state.jumpDrive = true;
-      state.jumpRange = Math.max(2, state.jumpRange + 1);
-      state.perkText = "Прыжковый привод";
-      break;
     case 3:
       state.longDrillPower += 0.1;
       state.perkText = "Длинный бур";
@@ -2476,9 +2467,6 @@ function updateMovementAnimations(dt) {
       state.drill.renderX = state.drill.animToX;
       state.drill.renderY = state.drill.animToY;
     }
-  } else {
-    state.drill.renderX = state.drill.x;
-    state.drill.renderY = state.drill.y;
   }
 
   if (state.base.animTimer > 0 && state.base.animDuration > 0) {
@@ -3320,7 +3308,7 @@ function rebuildVisibilityMask() {
 }
 
 function prepareScrapPerkChoices() {
-  const bag = [1, 2, 3, 4, 5, 6, 8, 11, 14, 15, 20, 22, 23, 24, 25];
+  const bag = [1, 3, 4, 5, 6, 8, 11, 14, 15, 20, 22, 23, 24, 25];
   if (state.contourLengthDamageLevel < 4) {
     bag.push(26);
   }
@@ -3612,8 +3600,6 @@ function getScrapPerkNextLevel(perkType) {
   switch (perkType) {
     case 1:
       return state.sideDrills + 1;
-    case 2:
-      return Math.max(1, state.jumpRange);
     case 3:
       return Math.round(state.longDrillPower / 0.1) + 1;
     case 4:
@@ -3677,8 +3663,6 @@ function getScrapPerkCurrentLevel(perkType) {
   switch (perkType) {
     case 1:
       return state.sideDrills;
-    case 2:
-      return state.jumpDrive ? Math.max(1, state.jumpRange - 1) : 0;
     case 3:
       return Math.round(state.longDrillPower / 0.1);
     case 4:
@@ -3746,14 +3730,6 @@ function getScrapPerkPreview(perkType) {
       return {
         effect: "Бьет слева и справа от героя",
         compare: `Урон ${formatPerkPercent(currentPower)} → ${formatPerkPercent(nextPower)}`,
-      };
-    }
-    case 2: {
-      const currentRange = state.jumpDrive ? state.jumpRange : 0;
-      const nextRange = Math.max(2, state.jumpRange + 1);
-      return {
-        effect: "Рывок после каждых 10 шагов",
-        compare: `Дальность ${currentRange} → ${nextRange}`,
       };
     }
     case 3: {
@@ -4420,10 +4396,7 @@ function breakCell(x, y, index, options = {}) {
   }
 
   if (options.moveDrill) {
-    startDrillMoveAnimation(x, y);
-    state.drill.x = x;
-    state.drill.y = y;
-    recordPlayerMove(options.fromX, options.fromY, x, y);
+    state.drill.moveResumeTimer = Math.max(state.drill.moveResumeTimer, POST_BREAK_MOVE_DELAY);
   }
 }
 
@@ -4515,32 +4488,11 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   state.signalPrevY = toY;
   applyGasContactDamage();
   applySteamContactDamage();
-  state.movedTiles += 1;
-  if (state.jumpDrive && state.movedTiles % 10 === 0) {
-    state.jumpCharges += 1;
-  }
   state.playerMoveProgress += 1;
   const baseMoveInterval = getBaseMoveInterval();
   if (state.playerMoveProgress >= baseMoveInterval) {
     state.playerMoveProgress -= baseMoveInterval;
     maybeMoveBase();
-  }
-}
-
-function recordJumpMove(fromX, fromY, toX, toY) {
-  const stepX = Math.sign(toX - fromX);
-  const stepY = Math.sign(toY - fromY);
-  let prevX = fromX;
-  let prevY = fromY;
-  let x = fromX;
-  let y = fromY;
-
-  while (x !== toX || y !== toY) {
-    x += stepX;
-    y += stepY;
-    recordPlayerMove(prevX, prevY, x, y);
-    prevX = x;
-    prevY = y;
   }
 }
 
@@ -4589,6 +4541,77 @@ function getBaseMoveInterval() {
     return 3;
   }
   return 8;
+}
+
+function moveDrillFreely(dx, dy, dt) {
+  const currentCellX = state.drill.x;
+  const currentCellY = state.drill.y;
+  let nextX = state.drill.renderX;
+  let nextY = state.drill.renderY;
+  let maxDistance = MOVE_SPEED_TILES * dt;
+
+  if (state.fuel < state.moveFuelCost * maxDistance) {
+    maxDistance = state.moveFuelCost > 0 ? state.fuel / state.moveFuelCost : maxDistance;
+  }
+  if (maxDistance <= 0) {
+    state.fuel = 0;
+    return;
+  }
+
+  if (dx > 0) {
+    nextY = currentCellY;
+    const rightCell = currentCellX + 1 < GRID_W ? cellIndex(currentCellX + 1, currentCellY) : -1;
+    const maxX = rightCell !== -1 && state.tunnelMask[rightCell] ? state.drill.renderX + maxDistance : Math.min(currentCellX + 0.5, state.drill.renderX + maxDistance);
+    nextX = maxX;
+  } else if (dx < 0) {
+    nextY = currentCellY;
+    const leftCell = currentCellX - 1 >= 0 ? cellIndex(currentCellX - 1, currentCellY) : -1;
+    const minX = leftCell !== -1 && state.tunnelMask[leftCell] ? state.drill.renderX - maxDistance : Math.max(currentCellX - 0.5, state.drill.renderX - maxDistance);
+    nextX = minX;
+  } else if (dy > 0) {
+    nextX = currentCellX;
+    const downCell = currentCellY + 1 < GRID_H ? cellIndex(currentCellX, currentCellY + 1) : -1;
+    const maxY = downCell !== -1 && state.tunnelMask[downCell] ? state.drill.renderY + maxDistance : Math.min(currentCellY + 0.5, state.drill.renderY + maxDistance);
+    nextY = maxY;
+  } else if (dy < 0) {
+    nextX = currentCellX;
+    const upCell = currentCellY - 1 >= 0 ? cellIndex(currentCellX, currentCellY - 1) : -1;
+    const minY = upCell !== -1 && state.tunnelMask[upCell] ? state.drill.renderY - maxDistance : Math.max(currentCellY - 0.5, state.drill.renderY - maxDistance);
+    nextY = minY;
+  }
+
+  const movedDistance = Math.hypot(nextX - state.drill.renderX, nextY - state.drill.renderY);
+  if (movedDistance <= 0) {
+    return;
+  }
+
+  state.drill.renderX = nextX;
+  state.drill.renderY = nextY;
+  state.fuel = Math.max(0, state.fuel - state.moveFuelCost * movedDistance);
+
+  const nextCellX = clamp(Math.round(state.drill.renderX), 1, GRID_W - 2);
+  const nextCellY = clamp(Math.round(state.drill.renderY), 1, GRID_H - 2);
+  if (nextCellX !== state.drill.x || nextCellY !== state.drill.y) {
+    const fromX = state.drill.x;
+    const fromY = state.drill.y;
+    state.drill.x = nextCellX;
+    state.drill.y = nextCellY;
+    recordPlayerMove(fromX, fromY, nextCellX, nextCellY);
+  }
+}
+
+function moveDrillRenderToward(targetX, targetY, dt, speed = MOVE_SPEED_TILES) {
+  const dx = targetX - state.drill.renderX;
+  const dy = targetY - state.drill.renderY;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 0.0001) {
+    state.drill.renderX = targetX;
+    state.drill.renderY = targetY;
+    return;
+  }
+  const step = Math.min(distance, speed * dt);
+  state.drill.renderX += (dx / distance) * step;
+  state.drill.renderY += (dy / distance) * step;
 }
 
 function maybeMoveBase() {
@@ -4834,59 +4857,6 @@ function tryAutoCloseContour() {
   return true;
 }
 
-function tryJumpMove(dx, dy) {
-  if (!state.jumpDrive || state.jumpCharges <= 0 || state.jumpRange <= 1) {
-    return false;
-  }
-
-  const jumpX = state.drill.x + dx * state.jumpRange;
-  const jumpY = state.drill.y + dy * state.jumpRange;
-  if (jumpX < 1 || jumpY < 1 || jumpX >= GRID_W - 1 || jumpY >= GRID_H - 1) {
-    return false;
-  }
-
-  const moveCost = state.moveFuelCost * state.jumpRange;
-  if (state.fuel < moveCost) {
-    state.fuel = 0;
-    return true;
-  }
-
-  const fromX = state.drill.x;
-  const fromY = state.drill.y;
-  const fromIndex = cellIndex(fromX, fromY);
-  const targetIndex = cellIndex(jumpX, jumpY);
-  if (state.metalMask[targetIndex]) {
-    return false;
-  }
-  const targetWasTunnel = state.tunnelMask[targetIndex] === 1;
-  const targetHardness = state.hardness[targetIndex];
-  const targetHealth = state.health[targetIndex];
-  const targetVisual = captureCellVisualData(targetIndex);
-
-  state.fuel -= moveCost;
-  state.jumpCharges -= 1;
-
-  if (!targetWasTunnel) {
-    state.tunnelMask[fromIndex] = 0;
-    state.hardness[fromIndex] = targetHardness;
-    state.health[fromIndex] = targetHealth;
-    state.perkMask[fromIndex] = 0;
-    removePathTile(fromX, fromY);
-  }
-
-  startDrillMoveAnimation(jumpX, jumpY, MOVE_ANIMATION_DURATION + Math.max(Math.abs(jumpX - fromX), Math.abs(jumpY - fromY)) * 0.04);
-  state.drill.x = jumpX;
-  state.drill.y = jumpY;
-  carveTunnel(jumpX, jumpY);
-  if (!targetWasTunnel) {
-    startTileMoveAnimation(targetVisual, jumpX, jumpY, fromX, fromY, TILE_SWAP_ANIMATION_DURATION + Math.max(Math.abs(jumpX - fromX), Math.abs(jumpY - fromY)) * 0.04);
-  }
-  recordJumpMove(fromX, fromY, jumpX, jumpY);
-  state.drill.progress = 0;
-  state.drill.strikeEnergy = 0.35;
-  return true;
-}
-
 function updateCameraShake(dt) {
   state.cameraShake.time += dt * 24;
   state.cameraShake.amplitude = Math.max(0, state.cameraShake.amplitude - dt * 18);
@@ -4906,6 +4876,7 @@ function updateCamera(dt) {
 
 function updateDrill(dt) {
   state.drill.actionCooldown = Math.max(0, state.drill.actionCooldown - dt);
+  state.drill.moveResumeTimer = Math.max(0, state.drill.moveResumeTimer - dt);
 
   if (state.stunTimer > 0) {
     state.drill.progress = 0;
@@ -4936,6 +4907,7 @@ function updateDrill(dt) {
   }
 
   if (!dx && !dy) {
+    moveDrillRenderToward(state.drill.x, state.drill.y, dt, MOVE_SPEED_TILES * 1.2);
     state.drillIdleFrame = true;
     state.idleTime += dt;
     if (state.autoClosePreviewReturnTimer > 0) {
@@ -4985,41 +4957,24 @@ function updateDrill(dt) {
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
 
   if (state.tunnelMask[targetIndex]) {
-    if (state.drill.actionCooldown > 0) {
+    if (state.drill.moveResumeTimer > 0) {
+      moveDrillRenderToward(state.drill.x, state.drill.y, dt, MOVE_SPEED_TILES * 1.2);
+      state.drill.progress = 0;
+      state.drill.strikeEnergy = Math.max(0.08, state.drill.strikeEnergy - dt * 4);
       return;
     }
-
-    if (tryJumpMove(dx, dy)) {
-      state.drill.strikePhase = Math.PI * 0.5;
-      state.drill.actionCooldown = actionInterval;
-      return;
-    }
-
-    if (state.fuel < state.moveFuelCost) {
+    if (state.fuel <= 0) {
       state.fuel = 0;
       return;
     }
-    state.drill.strikePhase = Math.PI * 0.5;
-    state.drill.actionCooldown = actionInterval;
-    state.fuel -= state.moveFuelCost;
-    const fromX = state.drill.x;
-    const fromY = state.drill.y;
-    startDrillMoveAnimation(targetX, targetY);
-    state.drill.x = targetX;
-    state.drill.y = targetY;
+    moveDrillFreely(dx, dy, dt);
     state.drill.progress = 0;
-    state.drill.strikeEnergy = 0.35;
-    recordPlayerMove(fromX, fromY, targetX, targetY);
+    state.drill.strikeEnergy = Math.max(0.08, state.drill.strikeEnergy - dt * 4);
     return;
   }
 
   if (state.drill.actionCooldown > 0) {
-    return;
-  }
-
-  if (tryJumpMove(dx, dy)) {
-    state.drill.strikePhase = Math.PI * 0.5;
-    state.drill.actionCooldown = actionInterval;
+    moveDrillRenderToward(state.drill.x, state.drill.y, dt);
     return;
   }
 
@@ -5027,6 +4982,8 @@ function updateDrill(dt) {
     state.fuel = 0;
     return;
   }
+
+  moveDrillRenderToward(state.drill.x, state.drill.y, dt);
 
   state.drill.strikePhase = Math.PI * 0.5;
   state.drill.actionCooldown = actionInterval;

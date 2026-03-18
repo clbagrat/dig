@@ -38,10 +38,9 @@ Base:
 
 Base movement:
 - the base moves after enough player movement progress is accumulated
-- tunnel movement gives `1` progress
-- drilling into a new tile gives `2` progress
-- jump movement gives `2` progress
-- at `10` progress the base attempts to move by `1` tile
+- any player move counts as `1` progress
+- usually the base moves every `8` player moves
+- if the base is within `5` tiles of the player, it moves every `3` player moves
 - with `50%` probability it prefers a direction that increases distance from the player
 - otherwise it picks a random valid direction
 - when moving, it swaps places with the target tile contents
@@ -222,7 +221,6 @@ Scrap upgrades are the stronger progression layer.
 
 Current upgrade pool:
 - `Боковые буры`
-- `Прыжковый привод`
 - `Длинный бур`
 - `Диагональные буры`
 - `Форсаж на нуле`
@@ -236,12 +234,6 @@ Current upgrade pool:
 
 `Боковые буры`
 - each strike also hits the cells left and right of the driller
-
-`Прыжковый привод`
-- every `10` destroyed blocks gives `1` jump charge
-- jump can move into rock
-- the driller swaps with the destination tile
-- repeated upgrade picks increase jump range
 
 `Длинный бур`
 - strikes the next forward tile as well
