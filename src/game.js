@@ -161,6 +161,7 @@ const state = {
   worldRandom: Math.random,
   timeAcc: 0,
   lastTs: 0,
+  fps: 0,
   fuel: START_FUEL,
   maxFuel: START_FUEL,
   hp: START_HP,
@@ -1643,8 +1644,13 @@ function setupField() {
   state.base.animFromY = state.base.y;
   state.base.animToX = state.base.x;
   state.base.animToY = state.base.y;
-  state.camera.x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - state.width * 0.5;
-  state.camera.y = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - state.height * 0.56;
+  {
+    const zoom = getCameraZoom();
+    const viewWidth = state.width / zoom;
+    const viewHeight = state.height / zoom;
+    state.camera.x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - viewWidth * 0.5;
+    state.camera.y = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - viewHeight * 0.56;
+  }
   placePerkTiles();
   placeCrystalTiles();
   placePerkZones();
@@ -3074,6 +3080,8 @@ function frame(ts) {
     let delta = ts - state.lastTs;
     state.lastTs = ts;
     delta = Math.min(delta, MAX_FRAME_MS);
+    const instantFps = delta > 0 ? 1000 / delta : 0;
+    state.fps = state.fps > 0 ? state.fps * 0.88 + instantFps * 0.12 : instantFps;
     state.timeAcc += delta;
 
     while (state.timeAcc >= STEP_MS) {
@@ -4919,10 +4927,13 @@ function updateCameraShake(dt) {
 }
 
 function updateCamera(dt) {
-  const targetX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - state.width * 0.5;
-  const targetY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - state.height * 0.56;
-  const maxX = GRID_W * TILE_SIZE - state.width;
-  const maxY = GRID_H * TILE_SIZE - state.height;
+  const zoom = getCameraZoom();
+  const viewWidth = state.width / zoom;
+  const viewHeight = state.height / zoom;
+  const targetX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - viewWidth * 0.5;
+  const targetY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - viewHeight * 0.56;
+  const maxX = GRID_W * TILE_SIZE - viewWidth;
+  const maxY = GRID_H * TILE_SIZE - viewHeight;
   const clampedTargetX = clamp(targetX, 0, Math.max(0, maxX));
   const clampedTargetY = clamp(targetY, 0, Math.max(0, maxY));
   const follow = 1 - Math.exp(-dt * 10);
@@ -5331,6 +5342,22 @@ function getCamera() {
   };
 }
 
+function getCameraZoom() {
+  if (state.width <= 0 || state.height <= 0) {
+    return 1;
+  }
+
+  const availableWidth = Math.max(240, state.width - 32);
+  const availableHeight = Math.max(240, state.height - 170);
+  const desiredDiameterTiles = state.visionRadius * 2 + 3;
+  const fitZoom = Math.min(
+    availableWidth / (desiredDiameterTiles * TILE_SIZE),
+    availableHeight / (desiredDiameterTiles * TILE_SIZE),
+  );
+
+  return clamp(Math.min(1, fitZoom), 0.72, 1);
+}
+
 function drawTileSprite(sprite, sx, sy) {
   if (!sprite) {
     return;
@@ -5527,10 +5554,13 @@ function renderEffects(camera) {
 function render() {
   const ctx = state.ctx;
   const camera = getCamera();
+  const zoom = getCameraZoom();
+  const viewWidth = state.width / zoom;
+  const viewHeight = state.height / zoom;
   const startX = Math.max(0, Math.floor(camera.x / TILE_SIZE) - 1);
   const startY = Math.max(0, Math.floor(camera.y / TILE_SIZE) - 1);
-  const endX = Math.min(GRID_W, Math.ceil((camera.x + state.width) / TILE_SIZE) + 1);
-  const endY = Math.min(GRID_H, Math.ceil((camera.y + state.height) / TILE_SIZE) + 1);
+  const endX = Math.min(GRID_W, Math.ceil((camera.x + viewWidth) / TILE_SIZE) + 1);
+  const endY = Math.min(GRID_H, Math.ceil((camera.y + viewHeight) / TILE_SIZE) + 1);
 
   ctx.clearRect(0, 0, state.width, state.height);
 
@@ -5545,6 +5575,9 @@ function render() {
   ctx.beginPath();
   ctx.arc(state.width * 0.76, state.height * 0.1, 140, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.save();
+  ctx.scale(zoom, zoom);
 
   for (let y = startY; y < endY; y += 1) {
     for (let x = startX; x < endX; x += 1) {
@@ -5683,6 +5716,7 @@ function render() {
   renderHeatWarningStatus(camera);
   renderLoopChargeStatus(camera);
   renderVisionMask(camera);
+  ctx.restore();
   renderHud();
 
   if (state.damageFlash > 0) {
@@ -6722,6 +6756,14 @@ function renderHud() {
   const detailTop = recipeTop + 40;
   renderHudCoreStats(left, detailTop, panelWidth, "СТАТЫ");
   renderHudPerkColumn(left + panelWidth + gap, detailTop, panelWidth, "ПЕРКИ");
+
+  ctx.save();
+  ctx.fillStyle = "rgba(198, 171, 132, 0.68)";
+  ctx.font = `700 10px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(`FPS ${Math.round(state.fps || 0)}`, left, detailTop + 52);
+  ctx.restore();
 }
 
 function drawHudBar(x, y, width, height, label, value, ratio, colors) {
@@ -6941,6 +6983,9 @@ function drawRoundedRectPath(x, y, width, height, radius) {
 
 function renderVisionMask(camera) {
   const ctx = state.ctx;
+  const zoom = getCameraZoom();
+  const viewWidth = state.width / zoom;
+  const viewHeight = state.height / zoom;
   const centerX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
   const centerY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
   const radius = state.visionRadius * TILE_SIZE;
@@ -6953,7 +6998,7 @@ function renderVisionMask(camera) {
   ctx.save();
   ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
   ctx.beginPath();
-  ctx.rect(0, 0, state.width, state.height);
+  ctx.rect(0, 0, viewWidth, viewHeight);
   ctx.arc(centerX, centerY, radius, 0, Math.PI * 2, true);
   ctx.fill("evenodd");
 
