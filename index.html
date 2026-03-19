@@ -13,6 +13,7 @@
     <div class="app-shell">
       <canvas id="game"></canvas>
       <button id="manualOpen" class="manual-link" type="button" aria-label="Открыть руководство">?</button>
+      <button id="shopOpen" class="shop-link" type="button" aria-label="Открыть магазин">⛏</button>
       <div class="touch-zones">
         <div id="movePad" class="move-pad">
           <div id="moveStick" class="move-stick"></div>
@@ -78,6 +79,8 @@
           </div>
         </div>
       </div>
+      <div id="shopModal" class="shop-modal" hidden></div>
+
       <div id="fatalError" class="fatal-error" hidden>
         <div class="fatal-error__panel">
           <div class="fatal-error__title">Runtime Error</div>

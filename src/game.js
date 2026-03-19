@@ -1,3 +1,5 @@
+import { initShop, openShop, closeShop, renderShop } from "./shop.js";
+
 const TILE_SIZE = 36;
 const GRID_W = 150;
 const GRID_H = 220;
@@ -193,6 +195,7 @@ const state = {
   bonusPerkChoices: 0,
   perkRerolls: 0,
   manualModalOpen: false,
+  shopModalOpen: false,
   debugPerkMenuOpen: false,
   debugPerkSelection: "",
   crystalRewardModalOpen: false,
@@ -2556,6 +2559,7 @@ function init() {
     state.sprites = createSpriteAtlas();
     resize();
     setupField();
+    initShop({ onClose: () => { state.shopModalOpen = false; syncTouchZonesInteractivity(); } });
     bindUi();
     requestAnimationFrame(frame);
   } catch (error) {
@@ -2580,6 +2584,7 @@ function bindUi() {
   const stick = document.getElementById("moveStick");
   const perkButtons = document.querySelectorAll("[data-perk-slot]");
   const rerollButton = document.getElementById("perkReroll");
+  const shopOpenBtn = document.getElementById("shopOpen");
   const manualOpen = document.getElementById("manualOpen");
   const manualClose = document.getElementById("manualClose");
   const manualOverlay = document.getElementById("manualModal");
@@ -2613,7 +2618,7 @@ function bindUi() {
   };
 
   zone.addEventListener("pointerdown", (event) => {
-    if (state.debugPerkMenuOpen || state.manualModalOpen) {
+    if (state.debugPerkMenuOpen || state.manualModalOpen || state.shopModalOpen) {
       return;
     }
     if (state.scrapHitRect && isPointInsideRect(event.clientX, event.clientY, state.scrapHitRect)) {
@@ -2687,6 +2692,23 @@ function bindUi() {
       rerollPerkChoices();
     });
   }
+
+  if (shopOpenBtn) {
+    shopOpenBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetPad();
+      state.shopModalOpen = true;
+      syncTouchZonesInteractivity();
+      openShop(state.scrap);
+    });
+  }
+
+  document.addEventListener("shop:purchase", (e) => {
+    const { cost } = e.detail;
+    state.scrap = Math.max(0, state.scrap - cost);
+    renderShop(state.scrap);
+  });
 
   if (manualOpen) {
     manualOpen.addEventListener("click", (event) => {
@@ -2851,7 +2873,7 @@ function syncTouchZonesInteractivity() {
     return;
   }
   touchZones.style.pointerEvents =
-    state.isChoosingPerk || state.manualModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
+    state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
   syncMoveAim();
 }
 
@@ -3038,7 +3060,7 @@ function showPadAt(x, y, pad, stick) {
 }
 
 function syncMoveAim() {
-  if (state.manualModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.isChoosingPerk) {
+  if (state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.isChoosingPerk) {
     state.moveAimX = 0;
     state.moveAimY = 0;
     return;
