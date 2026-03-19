@@ -1643,8 +1643,8 @@ function setupField() {
   state.base.animFromY = state.base.y;
   state.base.animToX = state.base.x;
   state.base.animToY = state.base.y;
-  state.camera.x = state.drill.x * TILE_SIZE - state.width * 0.5;
-  state.camera.y = state.drill.y * TILE_SIZE - state.height * 0.56;
+  state.camera.x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - state.width * 0.5;
+  state.camera.y = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - state.height * 0.56;
   placePerkTiles();
   placeCrystalTiles();
   placePerkZones();
@@ -4919,8 +4919,8 @@ function updateCameraShake(dt) {
 }
 
 function updateCamera(dt) {
-  const targetX = state.drill.renderX * TILE_SIZE - state.width * 0.5;
-  const targetY = state.drill.renderY * TILE_SIZE - state.height * 0.56;
+  const targetX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - state.width * 0.5;
+  const targetY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - state.height * 0.56;
   const maxX = GRID_W * TILE_SIZE - state.width;
   const maxY = GRID_H * TILE_SIZE - state.height;
   const clampedTargetX = clamp(targetX, 0, Math.max(0, maxX));
