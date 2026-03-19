@@ -36,6 +36,8 @@ const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
 const METAL_VEIN_GROUPS = 16;
+const SCRAP_ORE_GROUPS = 50;
+const SCRAP_ORE_PER_BLOCK = 18;
 const GAS_SPREAD_INTERVAL = 2;
 const GAS_SPREAD_STEPS = 3;
 const GAS_DAMAGE = 1;
@@ -219,6 +221,7 @@ const state = {
   hazardMask: new Uint8Array(GRID_W * GRID_H),
   hazardTriggeredMask: new Uint8Array(GRID_W * GRID_H),
   metalMask: new Uint8Array(GRID_W * GRID_H),
+  scrapOreMask: new Uint8Array(GRID_W * GRID_H),
   gasPocketMask: new Uint8Array(GRID_W * GRID_H),
   gasMask: new Uint8Array(GRID_W * GRID_H),
   gasClouds: [],
@@ -636,6 +639,45 @@ function createMetalSprite() {
   return canvas;
 }
 
+function createScrapOreSprite() {
+  const canvas = makeSpriteCanvas();
+  const ctx = canvas.getContext("2d");
+
+  const clusters = [
+    [TILE_SIZE * 0.26, TILE_SIZE * 0.30, 4.5],
+    [TILE_SIZE * 0.64, TILE_SIZE * 0.44, 4.0],
+    [TILE_SIZE * 0.40, TILE_SIZE * 0.68, 3.8],
+    [TILE_SIZE * 0.74, TILE_SIZE * 0.22, 3.2],
+  ];
+
+  for (const [x, y, r] of clusters) {
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 2.5);
+    glow.addColorStop(0, "rgba(248, 200, 48, 0.32)");
+    glow.addColorStop(1, "rgba(220, 160, 0, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const [x, y, r] of clusters) {
+    ctx.fillStyle = "#c8920a";
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f0c030";
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fae070";
+    ctx.beginPath();
+    ctx.arc(x - r * 0.28, y - r * 0.28, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return canvas;
+}
+
 function createDrillFrame(frame) {
   const canvas = makeSpriteCanvas();
   const ctx = canvas.getContext("2d");
@@ -730,6 +772,7 @@ function createSpriteAtlas() {
     },
     cracks: [null, createCrackSprite(1), createCrackSprite(2), createCrackSprite(3)],
     metal: createMetalSprite(),
+    scrapOre: createScrapOreSprite(),
     drillFrames: [createDrillFrame(0), createDrillFrame(1), createDrillFrame(2), createDrillFrame(3)],
     baseFrames: [createBaseFrame(0), createBaseFrame(1), createBaseFrame(2), createBaseFrame(3)],
   };
@@ -770,6 +813,18 @@ function spawnExplosionEffect(x, y, radius) {
     time: EXPLOSION_EFFECT_DURATION,
     duration: EXPLOSION_EFFECT_DURATION,
     seed: (x * 7219 + y * 3571 + Math.round(radius * 10)) % 1000,
+  });
+}
+
+function spawnScrapOreEffect(x, y, value) {
+  state.effects.push({
+    kind: "scrapOre",
+    x,
+    y,
+    value,
+    time: 0.88,
+    duration: 0.88,
+    seed: (x * 73417 + y * 53923 + value * 131) % 1000,
   });
 }
 
@@ -1001,6 +1056,31 @@ function canPlaceHazardAt(x, y) {
 
 function canPlaceMetalAt(x, y) {
   return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+}
+
+function canPlaceScrapOreAt(x, y) {
+  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+}
+
+function placeScrapOreVein(random, blockCount) {
+  const origin = getHazardOrigin(random);
+  let x = origin.x;
+  let y = origin.y;
+  let angle = random() * Math.PI * 2;
+  let placed = 0;
+  let attempts = 0;
+  while (placed < blockCount && attempts < blockCount * 10) {
+    attempts += 1;
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (canPlaceScrapOreAt(ix, iy)) {
+      state.scrapOreMask[cellIndex(ix, iy)] = 1;
+      placed += 1;
+    }
+    angle += (random() - 0.5) * 0.6;
+    x = clamp(x + Math.cos(angle) * 1.1, 1, GRID_W - 2);
+    y = clamp(y + Math.sin(angle) * 1.1, 1, GRID_H - 2);
+  }
 }
 
 function placeHazardBlob(random, blockCount) {
@@ -1466,6 +1546,9 @@ function generateHardnessMap(random) {
   for (let i = 0; i < METAL_VEIN_GROUPS; i += 1) {
     placeMetalVein(random, 12 + Math.floor(random() * 22));
   }
+  for (let i = 0; i < SCRAP_ORE_GROUPS; i += 1) {
+    placeScrapOreVein(random, 4 + Math.floor(random() * 7));
+  }
   for (let i = 0; i < GAS_POCKET_GROUPS; i += 1) {
     placeGasPocket(random, 4 + Math.floor(random() * 17));
   }
@@ -1487,6 +1570,7 @@ function setupField() {
   state.loopScrapMask.fill(0);
   state.hazardTriggeredMask.fill(0);
   state.metalMask.fill(0);
+  state.scrapOreMask.fill(0);
   state.visibleMask.fill(0);
   state.gasPocketMask.fill(0);
   state.steamPocketMask.fill(0);
@@ -1664,6 +1748,7 @@ function setupField() {
     state.visibleAlpha[i] = state.visibleTargetAlpha[i];
   }
   syncDebugPerkOverlay();
+
 }
 
 function placeHiddenBase() {
@@ -4259,6 +4344,10 @@ function startBoulderRoll(x, y, dirX, dirY) {
   state.boulders.push({
     x,
     y,
+    prevX: x,
+    prevY: y,
+    animTimer: 0,
+    rotation: 0,
     dirX,
     dirY,
     delay: BOULDER_DELAY,
@@ -4270,6 +4359,10 @@ function startBoulderRoll(x, y, dirX, dirY) {
 function updateBoulders(dt) {
   for (let i = state.boulders.length - 1; i >= 0; i -= 1) {
     const boulder = state.boulders[i];
+    if (boulder.animTimer > 0) {
+      boulder.animTimer = Math.max(0, boulder.animTimer - dt);
+    }
+
     if (boulder.delay > 0) {
       boulder.delay -= dt;
       continue;
@@ -4318,8 +4411,12 @@ function updateBoulders(dt) {
       }
     }
 
+    boulder.prevX = boulder.x;
+    boulder.prevY = boulder.y;
     boulder.x = nextX;
     boulder.y = nextY;
+    boulder.animTimer = BOULDER_MOVE_INTERVAL;
+    boulder.rotation += (boulder.dirX !== 0 ? boulder.dirX : boulder.dirY) * (TILE_SIZE / 11);
     state.tunnelMask[nextIndex] = 1;
     state.hardness[nextIndex] = 0;
     state.health[nextIndex] = 0;
@@ -4433,8 +4530,13 @@ function breakCell(x, y, index, options = {}) {
   const scrapGain =
     hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion"
       ? 1
-      : Math.max(0, Math.floor((blockType.scrap + state.scrapBonus) * scrapMultiplier));
+      : state.scrapOreMask[index]
+        ? Math.floor(SCRAP_ORE_PER_BLOCK * scrapMultiplier)
+        : 0;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
+  if (state.scrapOreMask[index]) {
+    spawnScrapOreEffect(x, y, scrapGain);
+  }
   state.hardness[index] = 0;
   state.health[index] = 0;
   state.scrap += scrapGain;
@@ -4450,6 +4552,7 @@ function breakCell(x, y, index, options = {}) {
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
   state.loopScrapMask[index] = 0;
+  state.scrapOreMask[index] = 0;
   if (hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion") {
     triggerSpikeChain(x, y);
   }
@@ -5531,6 +5634,90 @@ function renderEffects(camera) {
       ctx.fillStyle = "#fff7ea";
       ctx.strokeText(text, cx + driftX, cy - 8 - lift);
       ctx.fillText(text, cx + driftX, cy - 8 - lift);
+    } else if (effect.kind === "scrapOre") {
+      const t = progress;
+      const easeOut = 1 - (1 - t) * (1 - t);
+
+      // 1. Initial flash
+      if (t < 0.32) {
+        const ft = t / 0.32;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 4 + ft * 24);
+        grad.addColorStop(0, `rgba(255, 245, 160, ${0.85 * (1 - ft)})`);
+        grad.addColorStop(1, "rgba(240, 180, 0, 0)");
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4 + ft * 24, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 2. Expanding ring
+      if (t < 0.62) {
+        const rt = t / 0.62;
+        ctx.globalAlpha = 0.9 * (1 - rt);
+        ctx.strokeStyle = "#f0c030";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5 + rt * 28, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 3. Star burst lines
+      if (t < 0.28) {
+        const st = t / 0.28;
+        ctx.globalAlpha = 1 - st;
+        ctx.strokeStyle = "#ffe878";
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = "round";
+        for (let s = 0; s < 6; s += 1) {
+          const angle = ((effect.seed * 41 + s * 105) % 628) / 100;
+          const r1 = 6 + st * 3;
+          const r2 = 12 + st * 13;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
+          ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
+          ctx.stroke();
+        }
+      }
+
+      // 4. Gold particles
+      for (let p = 0; p < 10; p += 1) {
+        const pseed = effect.seed + p * 97;
+        const angle = ((pseed * 67) % 628) / 100;
+        const speed = 20 + (pseed % 14);
+        const px = cx + Math.cos(angle) * speed * easeOut;
+        const py = cy + Math.sin(angle) * speed * easeOut + t * t * 16;
+        const palpha = Math.max(0, 1 - t * 1.15);
+        const size = 2.2 + (pseed % 3) * 0.6;
+        ctx.globalAlpha = palpha;
+        ctx.fillStyle = "#c8920a";
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ffe060";
+        ctx.beginPath();
+        ctx.arc(px, py, size * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 5. Floating value text — punchy pop scale
+      const textAlpha = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.25) / 0.75);
+      const scale = t < 0.12 ? 1.5 - (t / 0.12) * 0.5 : 1.0;
+      const lift = easeOut * 28;
+      ctx.globalAlpha = textAlpha;
+      ctx.save();
+      ctx.translate(cx, cy - 10 - lift);
+      ctx.scale(scale, scale);
+      ctx.font = `700 14px ${HUD_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "rgba(16, 8, 2, 0.95)";
+      ctx.fillStyle = "#f8e040";
+      ctx.strokeText(`+${effect.value} ⛭`, 0, 0);
+      ctx.fillText(`+${effect.value} ⛭`, 0, 0);
+      ctx.restore();
+      ctx.globalAlpha = 1;
     } else if (effect.kind === "loopField") {
       const alpha = 1 - progress;
       ctx.globalAlpha = alpha;
@@ -5671,6 +5858,9 @@ function render() {
         drawTileSprite(state.sprites.boulderPocket, sx, sy);
       } else {
         drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
+        if (state.scrapOreMask[index]) {
+          drawTileSprite(state.sprites.scrapOre, sx, sy);
+        }
       }
 
       ctx.strokeStyle = "rgba(255, 225, 179, 0.05)";
@@ -5772,25 +5962,37 @@ function renderBoulders(camera) {
   ctx.save();
   for (let i = 0; i < state.boulders.length; i += 1) {
     const boulder = state.boulders[i];
-    const x = boulder.x * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
-    const y = boulder.y * TILE_SIZE - camera.y + TILE_SIZE * 0.54;
-    const gradient = ctx.createRadialGradient(x - 3, y - 4, 2, x, y, 12);
+
+    // Interpolate position
+    const animT = boulder.animTimer > 0 ? 1 - boulder.animTimer / BOULDER_MOVE_INTERVAL : 1;
+    const eased = easeOutCubic(animT);
+    const rx = (boulder.prevX + (boulder.x - boulder.prevX) * eased) * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
+    const ry = (boulder.prevY + (boulder.y - boulder.prevY) * eased) * TILE_SIZE - camera.y + TILE_SIZE * 0.54;
+
+    // Squash on landing: near end of anim briefly compress vertically
+    const isAnimating = boulder.animTimer > 0;
+    const squashT = isAnimating && animT > 0.75 ? (1 - animT) / 0.25 : 1;
+    const scaleX = 1 + (1 - squashT) * 0.18;
+    const scaleY = 1 - (1 - squashT) * 0.14;
+
+    ctx.save();
+    ctx.translate(rx, ry);
+    ctx.rotate(boulder.rotation);
+    ctx.scale(scaleX, scaleY);
+
+    const gradient = ctx.createRadialGradient(-3, -4, 2, 0, 0, 12);
     gradient.addColorStop(0, "#bcab97");
     gradient.addColorStop(1, "#7d6857");
     ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.arc(x, y, 11, 0, Math.PI * 2);
+    ctx.arc(0, 0, 11, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "#d9c4aa";
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(x - 4, y - 3, 5, 0, Math.PI * 2);
-    ctx.arc(x + 4, y - 4, 4, 0, Math.PI * 2);
-    ctx.stroke();
     ctx.fillStyle = "rgba(255, 240, 220, 0.16)";
     ctx.beginPath();
-    ctx.arc(x - 2, y - 5, 3, 0, Math.PI * 2);
+    ctx.arc(-2, -5, 3, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.restore();
   }
   ctx.restore();
 }
