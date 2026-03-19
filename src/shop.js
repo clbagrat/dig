@@ -23,9 +23,12 @@ export function openShop(currentScrap) {
   currentScrapCache = currentScrap;
   overlay.hidden = false;
   overlay.style.cssText =
-    "position:absolute;inset:0;z-index:9998;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:stretch;justify-content:center;";
+    "position:absolute;inset:0;z-index:9998;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;";
   renderShop(currentScrap);
-  requestAnimationFrame(() => drawAllLines());
+  requestAnimationFrame(() => {
+    drawAllLines();
+    syncTabFromScroll();
+  });
 }
 
 export function closeShop() {
@@ -97,12 +100,20 @@ function buildDOM() {
   const bodyEl = document.getElementById("shopBody");
   SHOP_TREES.forEach((tree, idx) => {
     const section = document.createElement("div");
-    section.className = "shop-tree" + (idx === 0 ? " shop-tree--visible" : "");
+    section.className = "shop-tree";
     section.id = `shopTree_${idx}`;
     section.dataset.treeIdx = idx;
     section.appendChild(buildTreeGrid(tree));
     bodyEl.appendChild(section);
   });
+
+  // Обновляем активный таб при скролле
+  bodyEl.addEventListener("scroll", () => {
+    syncTabFromScroll();
+    // перерисовываем линии только когда скролл остановился
+    clearTimeout(bodyEl._linesTimer);
+    bodyEl._linesTimer = setTimeout(() => drawAllLines(), 80);
+  }, { passive: true });
 }
 
 function buildTreeGrid(tree) {
@@ -228,11 +239,18 @@ function bindEvents() {
 
 function selectTab(idx) {
   deselectNode();
+  const section = document.getElementById(`shopTree_${idx}`);
+  section?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+}
+
+function syncTabFromScroll() {
+  const body = document.getElementById("shopBody");
+  if (!body) return;
+  const scrollLeft = body.scrollLeft;
+  const width = body.clientWidth;
+  const idx = Math.round(scrollLeft / width);
   document.querySelectorAll(".shop-tab").forEach((t, i) =>
     t.classList.toggle("shop-tab--active", i === idx));
-  document.querySelectorAll(".shop-tree").forEach((t, i) =>
-    t.classList.toggle("shop-tree--visible", i === idx));
-  requestAnimationFrame(() => drawAllLines());
 }
 
 // ─── Selection & detail panel ─────────────────────────────────────────────────

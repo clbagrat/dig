@@ -1037,49 +1037,64 @@ strong {
 .shop-close:active { transform: scale(0.93); }
 
 /* Табы */
+/* Табы — индикаторы текущей секции */
 .shop-tabs {
   display: flex;
   border-bottom: 1px solid rgba(215, 159, 73, 0.14);
   flex-shrink: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-
-.shop-tabs::-webkit-scrollbar { display: none; }
 
 .shop-tab {
   flex: 1;
-  padding: 8px 10px;
+  padding: 8px 6px;
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: rgba(198, 171, 132, 0.5);
+  color: rgba(198, 171, 132, 0.45);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.03em;
   white-space: nowrap;
   touch-action: manipulation;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .shop-tab--active {
   color: var(--accent);
   border-bottom-color: var(--accent);
-  background: rgba(215, 159, 73, 0.05);
 }
 
-/* Тело */
+/* Тело — горизонтальный scroll-snap-контейнер */
 .shop-body {
   flex: 1 1 auto;
+  display: flex;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.shop-body::-webkit-scrollbar { display: none; }
+
+.shop-body *,
+.shop-body {
+  touch-action: pan-x pan-y;
+}
+
+/* Каждое дерево — полноразмерная секция */
+.shop-tree {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px 16px 28px;
   scrollbar-width: thin;
   scrollbar-color: rgba(215, 159, 73, 0.15) transparent;
+  display: block;
+  touch-action: pan-x pan-y;
 }
-
-.shop-tree { display: none; }
-.shop-tree--visible { display: block; }
 
 /* ── Сетка ───────────────────────────────────────────────────── */
 
