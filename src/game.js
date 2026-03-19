@@ -46,6 +46,7 @@ const BOULDER_MOVE_INTERVAL = 0.12;
 const BOULDER_BREAK_LIMIT = 20;
 const BOULDER_DAMAGE = 5;
 const BOULDER_MIN_START_DISTANCE = 4;
+const BEACON_DISTANCE = 22;
 const STEAM_RELEASE_DELAY = 2;
 const STEAM_LIFETIME = 3;
 const STEAM_DAMAGE = 1;
@@ -230,6 +231,8 @@ const state = {
   steamJets: [],
   boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
   boulders: [],
+  beaconMask: new Uint8Array(GRID_W * GRID_H),
+  beacon: { x: 0, y: 0, active: false },
   health: new Float32Array(GRID_W * GRID_H),
   loopScrapMask: new Float32Array(GRID_W * GRID_H),
   visibleMask: new Uint8Array(GRID_W * GRID_H),
@@ -1575,6 +1578,8 @@ function setupField() {
   state.gasPocketMask.fill(0);
   state.steamPocketMask.fill(0);
   state.boulderPocketMask.fill(0);
+  state.beaconMask.fill(0);
+  state.beacon.active = false;
   state.perkZones.length = 0;
   state.gasClouds.length = 0;
   state.steamJets.length = 0;
@@ -1725,6 +1730,32 @@ function setupField() {
   extendPath(state.drill.x, state.drill.y);
 
   placeHiddenBase();
+  placeBeacon();
+  // DEBUG: beacon near player
+  state.beaconMask.fill(0);
+  state.beacon.x = START_X + 4;
+  state.beacon.y = START_Y + 4;
+  state.beacon.active = false;
+  for (let dy = 0; dy < 2; dy += 1) {
+    for (let dx = 0; dx < 2; dx += 1) {
+      const idx = cellIndex(state.beacon.x + dx, state.beacon.y + dy);
+      state.beaconMask[idx] = 1;
+      state.hardness[idx] = 0;
+      state.health[idx] = 0;
+    }
+  }
+  for (let dy = -1; dy <= 2; dy += 1) {
+    for (let dx = -1; dx <= 2; dx += 1) {
+      if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) continue;
+      const rx = state.beacon.x + dx;
+      const ry = state.beacon.y + dy;
+      const idx = cellIndex(rx, ry);
+      state.beaconMask[idx] = 2;
+      state.tunnelMask[idx] = 1;
+      state.hardness[idx] = 0;
+      state.health[idx] = 0;
+    }
+  }
   state.base.renderX = state.base.x;
   state.base.renderY = state.base.y;
   state.base.animFromX = state.base.x;
@@ -1780,6 +1811,71 @@ function placeHiddenBase() {
   }
 
   throw new Error("Unable to place base at exact required distance");
+}
+
+function placeBeacon() {
+  const minDist = BEACON_DISTANCE - 3;
+  const maxDist = BEACON_DISTANCE + 3;
+  const offsets = [];
+  for (let dx = -maxDist; dx <= maxDist; dx += 1) {
+    for (let dy = -maxDist; dy <= maxDist; dy += 1) {
+      const d = Math.hypot(dx, dy);
+      if (d >= minDist && d <= maxDist) {
+        offsets.push({ x: dx, y: dy });
+      }
+    }
+  }
+  for (let i = offsets.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(state.worldRandom() * (i + 1));
+    const tmp = offsets[i];
+    offsets[i] = offsets[j];
+    offsets[j] = tmp;
+  }
+
+  for (let i = 0; i < offsets.length; i += 1) {
+    const x = START_X + offsets[i].x;
+    const y = START_Y + offsets[i].y;
+    if (x < 2 || x >= GRID_W - 3 || y < 2 || y >= GRID_H - 3) continue;
+    let clear = true;
+    for (let dy = -1; dy <= 2 && clear; dy += 1) {
+      for (let dx = -1; dx <= 2 && clear; dx += 1) {
+        const idx = cellIndex(x + dx, y + dy);
+        if (state.metalMask[idx] || state.gasPocketMask[idx] || state.steamPocketMask[idx] || state.boulderPocketMask[idx]) {
+          clear = false;
+        }
+      }
+    }
+    if (!clear) continue;
+
+    state.beacon.x = x;
+    state.beacon.y = y;
+
+    // 2x2 core: indestructible, floor-like
+    for (let dy = 0; dy < 2; dy += 1) {
+      for (let dx = 0; dx < 2; dx += 1) {
+        const idx = cellIndex(x + dx, y + dy);
+        state.beaconMask[idx] = 1;
+        state.hardness[idx] = 0;
+        state.health[idx] = 0;
+      }
+    }
+
+    // Ring: pre-cleared, shows pale outline
+    for (let dy = -1; dy <= 2; dy += 1) {
+      for (let dx = -1; dx <= 2; dx += 1) {
+        if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) continue;
+        const rx = x + dx;
+        const ry = y + dy;
+        if (rx < 0 || rx >= GRID_W || ry < 0 || ry >= GRID_H) continue;
+        const idx = cellIndex(rx, ry);
+        state.beaconMask[idx] = 2;
+        state.tunnelMask[idx] = 1;
+        state.hardness[idx] = 0;
+        state.health[idx] = 0;
+      }
+    }
+    return;
+  }
 }
 
 function placePerkTiles() {
@@ -4466,6 +4562,9 @@ function damageCell(x, y, damage, options = {}) {
     }
     return false;
   }
+  if (state.beaconMask[index]) {
+    return false;
+  }
   if (!state.hardness[index]) {
     return false;
   }
@@ -5336,6 +5435,22 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   activateLoopCharge(interiorCells.length);
   maybeSpawnLoopPerk(interiorCells);
   spawnLoopFieldEffect(loopPath, affectedCells);
+
+  if (!state.beacon.active && state.beacon.x > 0) {
+    let allInside = true;
+    for (let dy = 0; dy < 2 && allInside; dy += 1) {
+      for (let dx = 0; dx < 2 && allInside; dx += 1) {
+        if (!isPointInPolygon(state.beacon.x + dx + 0.5, state.beacon.y + dy + 0.5, polygon)) {
+          allInside = false;
+        }
+      }
+    }
+    if (allInside) {
+      state.beacon.active = true;
+      showPerkToast("Маяк активирован!");
+    }
+  }
+
   return true;
 }
 
@@ -5804,7 +5919,7 @@ function render() {
       if (visibleAlpha <= 0.001) {
         ctx.save();
         ctx.globalAlpha = 0.16;
-        if (state.tunnelMask[index]) {
+        if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
         } else if (state.gasPocketMask[index]) {
           drawTileSprite(state.sprites.gasPocket, sx, sy);
@@ -5826,7 +5941,7 @@ function render() {
       if (visibleAlpha < 0.999) {
         ctx.save();
         ctx.globalAlpha = (1 - visibleAlpha) * 0.16;
-        if (state.tunnelMask[index]) {
+        if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
         } else if (state.gasPocketMask[index]) {
           drawTileSprite(state.sprites.gasPocket, sx, sy);
@@ -5847,6 +5962,8 @@ function render() {
       ctx.save();
       ctx.globalAlpha = visibleAlpha;
       if (state.tunnelMask[index]) {
+        drawTileSprite(state.sprites.tunnel, sx, sy);
+      } else if (state.beaconMask[index] === 1) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
       } else if (state.metalMask[index]) {
         drawTileSprite(state.sprites.metal, sx, sy);
@@ -5915,6 +6032,7 @@ function render() {
   renderMovingTiles(camera);
   renderSteamJets(camera);
   renderEffects(camera);
+  renderBeacon(camera);
   renderBase(camera);
   renderBoulders(camera);
   renderDrill(camera);
@@ -5923,6 +6041,7 @@ function render() {
   renderScrapToast(camera);
   renderPerkToast(camera);
   renderSignalStatus(camera);
+  renderBeaconRadar(camera);
   renderOverdriveStatus(camera);
   renderStunStatus(camera);
   renderHeatWarningStatus(camera);
@@ -6183,6 +6302,229 @@ function renderAutoClosePreview(camera) {
   ctx.beginPath();
   ctx.arc(toX, toY, 3 + pulse * 1.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function renderBeacon(camera) {
+  if (!state.beacon.x && !state.beacon.y) return;
+  const ctx = state.ctx;
+  const bx = state.beacon.x;
+  const by = state.beacon.y;
+  const visAlpha = Math.max(
+    state.visibleAlpha[cellIndex(bx, by)],
+    state.visibleAlpha[cellIndex(bx + 1, by)],
+    state.visibleAlpha[cellIndex(bx, by + 1)],
+    state.visibleAlpha[cellIndex(bx + 1, by + 1)],
+  );
+  if (visAlpha <= 0.001) return;
+  const cx = bx * TILE_SIZE - camera.x;
+  const cy = by * TILE_SIZE - camera.y;
+  const w = TILE_SIZE * 2;
+  const h = TILE_SIZE * 2;
+  const t = state.lastTs || 0;
+  const pulse = Math.sin(t * 0.008) * 0.5 + 0.5;
+  const active = state.beacon.active;
+
+  ctx.save();
+  ctx.globalAlpha = visAlpha;
+
+  // Base plate
+  ctx.fillStyle = "#2a2320";
+  buildRoundedRectPath(ctx, cx + 3, cy + 3, w - 6, h - 6, 5);
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = active ? `rgba(120, 190, 230, ${0.5 + pulse * 0.3})` : "rgba(140, 120, 100, 0.5)";
+  ctx.lineWidth = 1.5;
+  buildRoundedRectPath(ctx, cx + 3, cy + 3, w - 6, h - 6, 5);
+  ctx.stroke();
+
+  // Corner bolts
+  const boltPositions = [[cx + 7, cy + 7], [cx + w - 7, cy + 7], [cx + 7, cy + h - 7], [cx + w - 7, cy + h - 7]];
+  for (const [boltX, boltY] of boltPositions) {
+    ctx.fillStyle = active ? "rgba(120, 190, 230, 0.7)" : "rgba(120, 100, 80, 0.7)";
+    ctx.beginPath();
+    ctx.arc(boltX, boltY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Crystal
+  const midX = cx + w * 0.5;
+  const midY = cy + h * 0.5 + 2;
+  const cr = active ? "rgba(160, 220, 255," : "rgba(180, 160, 130,";
+  const glow = 0.25 + pulse * 0.2;
+
+  // Outer glow
+  if (active) {
+    ctx.fillStyle = `rgba(120, 190, 255, ${glow * 0.4})`;
+    ctx.beginPath();
+    ctx.ellipse(midX, midY, 16, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Crystal body — hexagon shape (tall diamond with shoulders)
+  ctx.beginPath();
+  ctx.moveTo(midX,      midY - 22); // tip
+  ctx.lineTo(midX + 10, midY - 8);  // upper right
+  ctx.lineTo(midX + 10, midY + 6);  // lower right
+  ctx.lineTo(midX,      midY + 18); // bottom tip
+  ctx.lineTo(midX - 10, midY + 6);  // lower left
+  ctx.lineTo(midX - 10, midY - 8);  // upper left
+  ctx.closePath();
+  ctx.fillStyle = active ? `rgba(60, 130, 190, ${0.55 + pulse * 0.15})` : "rgba(80, 70, 55, 0.55)";
+  ctx.fill();
+  ctx.strokeStyle = `${cr} 0.85)`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Inner facet lines
+  ctx.strokeStyle = `${cr} 0.35)`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(midX, midY - 22);
+  ctx.lineTo(midX, midY + 18);
+  ctx.moveTo(midX - 10, midY - 1);
+  ctx.lineTo(midX + 10, midY - 1);
+  ctx.stroke();
+
+  // Inner shine
+  ctx.fillStyle = `${cr} ${active ? 0.35 + pulse * 0.2 : 0.12})`;
+  ctx.beginPath();
+  ctx.moveTo(midX - 3, midY - 18);
+  ctx.lineTo(midX - 7, midY - 8);
+  ctx.lineTo(midX - 3, midY - 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Placeholder contour hint (only when not yet activated)
+  if (!active) {
+    const bx = state.beacon.x;
+    const by = state.beacon.y;
+    const ringPath = [
+      { x: bx - 1, y: by - 1 },
+      { x: bx,     y: by - 1 },
+      { x: bx + 1, y: by - 1 },
+      { x: bx + 2, y: by - 1 },
+      { x: bx + 2, y: by     },
+      { x: bx + 2, y: by + 1 },
+      { x: bx + 2, y: by + 2 },
+      { x: bx + 1, y: by + 2 },
+      { x: bx,     y: by + 2 },
+      { x: bx - 1, y: by + 2 },
+      { x: bx - 1, y: by + 1 },
+      { x: bx - 1, y: by     },
+    ];
+    const n = ringPath.length;
+    const speed = 0.00018;
+    const progress = ((state.lastTs || 0) * speed) % 1;
+
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Full opaque outline
+    ctx.beginPath();
+    for (let i = 0; i <= n; i += 1) {
+      const tile = ringPath[i % n];
+      const px = tile.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const py = tile.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = "rgba(60, 42, 22, 0.32)";
+    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(219, 171, 99, 0.25)";
+    ctx.stroke();
+
+    // Single slow spark
+    const fromIdx = Math.floor(progress * n);
+    const from = ringPath[fromIdx];
+    const to = ringPath[(fromIdx + 1) % n];
+    const frac = (progress * n) % 1;
+    const sparkX = (from.x + frac * (to.x - from.x)) * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+    const sparkY = (from.y + frac * (to.y - from.y)) * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+    ctx.fillStyle = "rgba(247, 220, 172, 0.55)";
+    ctx.beginPath();
+    ctx.arc(sparkX, sparkY, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255, 245, 210, 0.25)";
+    ctx.beginPath();
+    ctx.arc(sparkX, sparkY, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dots only at corners (where direction changes)
+    ctx.fillStyle = "rgba(220, 185, 120, 0.2)";
+    for (let i = 0; i < n; i += 1) {
+      const prev = ringPath[(i - 1 + n) % n];
+      const cur = ringPath[i];
+      const next = ringPath[(i + 1) % n];
+      const inDx = cur.x - prev.x;
+      const inDy = cur.y - prev.y;
+      const outDx = next.x - cur.x;
+      const outDy = next.y - cur.y;
+      if (inDx === outDx && inDy === outDy) continue;
+      ctx.beginPath();
+      ctx.arc(cur.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x, cur.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function renderBeaconRadar(camera) {
+  if (!state.beacon.active) return;
+  const ctx = state.ctx;
+  const midX = state.beacon.x * TILE_SIZE + TILE_SIZE - camera.x;
+  const midY = state.beacon.y * TILE_SIZE + TILE_SIZE - camera.y;
+  const radius = 52;
+  const bdx = state.base.x - (state.beacon.x + 0.5);
+  const bdy = state.base.y - (state.beacon.y + 0.5);
+  const blen = Math.hypot(bdx, bdy) || 1;
+  const angle = Math.atan2(bdy / blen, bdx / blen);
+  const dotX = midX + Math.cos(angle) * radius;
+  const dotY = midY + Math.sin(angle) * radius;
+  const pulse = 0.55 + (Math.sin((state.lastTs || 0) * 0.008) * 0.5 + 0.5) * 0.45;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(160, 220, 255, 0.45)";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(midX, midY, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(160, 220, 255, 0.15)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(midX, midY, radius - 5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(200, 240, 255, 0.25)";
+  ctx.beginPath();
+  ctx.arc(midX, midY, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(160, 220, 255, 0.22)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(midX, midY);
+  ctx.lineTo(dotX, dotY);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(180, 230, 255, ${0.18 + pulse * 0.18})`;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 5.8 + pulse * 2.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#c8f0ff";
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 3.2 + pulse * 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 
