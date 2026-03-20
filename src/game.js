@@ -890,7 +890,7 @@ function spawnScrapOreEffect(x, y, value) {
   });
 }
 
-function spawnScrapParticles(tileX, tileY, totalValue) {
+function spawnScrapParticles(tileX, tileY, totalValue, options = {}) {
   if (totalValue <= 0) return;
   const count = Math.min(8, Math.max(3, totalValue));
   const baseValue = Math.floor(totalValue / count);
@@ -902,6 +902,8 @@ function spawnScrapParticles(tileX, tileY, totalValue) {
       tileY: tileY + 0.5,
       value,
       isLast: i === count - 1,
+      toastValue: i === count - 1 ? totalValue : 0,
+      skipArrivalEffect: options.skipArrivalEffect ?? false,
       delay: i * 0.055,
       elapsed: 0,
       duration: 0.38 + (seed % 10) * 0.012,
@@ -2862,7 +2864,7 @@ function updateScrapParticles(dt) {
     // Particle arrived — credit unsafe scrap (unless already credited as deposit)
     if (!p.skipCredit) {
       state.unsafeScrap += p.value;
-      if (p.isLast) showScrapToast(p.value);
+      if (p.isLast && !p.skipArrivalEffect) spawnScrapOreEffect(state.drill.x, state.drill.y, p.toastValue || p.value);
     } else if (p.destTileX !== undefined) {
       state.effects.push({
         kind: "depositArrival",
@@ -3708,6 +3710,8 @@ function dropUnsafeScrap() {
 
   const px = state.drill.x;
   const py = state.drill.y;
+
+  // Collect valid drop candidates: regular block or empty ground, no metal
   const candidates = [];
   for (let dy = -1; dy <= 1; dy += 1) {
     for (let dx = -1; dx <= 1; dx += 1) {
@@ -3715,17 +3719,50 @@ function dropUnsafeScrap() {
       const nx = px + dx;
       const ny = py + dy;
       if (nx < 1 || nx >= GRID_W - 1 || ny < 1 || ny >= GRID_H - 1) continue;
-      candidates.push(cellIndex(nx, ny));
+      const idx = cellIndex(nx, ny);
+      if (state.metalMask[idx]) continue;
+      if (state.beaconMask[idx]) continue;
+      candidates.push({ idx, x: nx, y: ny });
     }
   }
 
-  if (candidates.length > 0) {
-    const perTile = Math.floor(dropAmount / candidates.length);
-    let remainder = dropAmount - perTile * candidates.length;
-    for (const idx of candidates) {
-      const tileValue = perTile + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) remainder -= 1;
-      if (tileValue > 0) state.droppedScrapMask[idx] += tileValue;
+  if (candidates.length === 0) return;
+
+  // Pick 3–5 random targets
+  const targetCount = Math.min(candidates.length, 3 + Math.floor(Math.random() * 3));
+  // Shuffle candidates and take first targetCount
+  for (let i = candidates.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const targets = candidates.slice(0, targetCount);
+
+  const perTarget = Math.floor(dropAmount / targetCount);
+  let remainder = dropAmount - perTarget * targetCount;
+
+  for (let i = 0; i < targets.length; i += 1) {
+    const { idx, x: tx, y: ty } = targets[i];
+    const tileValue = perTarget + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder -= 1;
+    if (tileValue <= 0) continue;
+    state.droppedScrapMask[idx] += tileValue;
+
+    // Visual: particles fly from hero to each target tile
+    const particleCount = Math.max(1, Math.floor(tileValue / 5));
+    for (let p = 0; p < particleCount; p += 1) {
+      state.scrapParticles.push({
+        tileX: 0,
+        tileY: 0,
+        destTileX: tx,
+        destTileY: ty,
+        value: 0,
+        isLast: false,
+        skipCredit: true,
+        delay: p * 0.04 + i * 0.03,
+        elapsed: 0,
+        duration: 0.3,
+        seed: Math.floor(Math.random() * 1000),
+      });
     }
   }
 }
@@ -4090,7 +4127,6 @@ function breakCell(x, y, index, options = {}) {
         : 0;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   if (state.scrapOreMask[index]) {
-    spawnScrapOreEffect(x, y, scrapGain);
     spawnScrapParticles(x, y, scrapGain);
   }
   const embeddedScrap = Math.floor(state.droppedScrapMask[index]);
@@ -4233,6 +4269,12 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   state.visibilityDirty = true;
   consumeSignalMove(fromX, fromY, toX, toY);
   extendPath(toX, toY);
+  const moveIndex = cellIndex(toX, toY);
+  const droppedPickup = Math.floor(state.droppedScrapMask[moveIndex]);
+  if (droppedPickup > 0 && state.tunnelMask[moveIndex]) {
+    state.droppedScrapMask[moveIndex] = 0;
+    spawnScrapParticles(toX, toY, droppedPickup);
+  }
   state.signalPrevX = toX;
   state.signalPrevY = toY;
   applyGasContactDamage();
@@ -4837,7 +4879,17 @@ function tryBeaconContourDeposit(x, y) {
   if (state.unsafeScrap <= 0) return;
   for (const beacon of state.beacons) {
     if (x < beacon.x - 1 || x > beacon.x + 2 || y < beacon.y - 1 || y > beacon.y + 2) continue;
-    const chunk = Math.max(1, Math.floor(state.unsafeScrap / 12));
+    // Count tiles in beacon 4×4 area not yet covered by contour.
+    // The current tile was just added to the path, so add 1 back to get
+    // "uncovered before this step" — that is I in the formula N/I.
+    let uncoveredAfter = 0;
+    for (let ty = beacon.y - 1; ty <= beacon.y + 2; ty++) {
+      for (let tx = beacon.x - 1; tx <= beacon.x + 2; tx++) {
+        if (state.pathIndexByCell[cellIndex(tx, ty)] === -1) uncoveredAfter++;
+      }
+    }
+    const i = uncoveredAfter + 1; // tiles remaining including current step
+    const chunk = Math.max(1, Math.floor(state.unsafeScrap / i));
     state.unsafeScrap = Math.max(0, state.unsafeScrap - chunk);
     state.scrap += chunk;
     // Visual: particles fly from hero to beacon, one per 5 scrap
@@ -5592,6 +5644,24 @@ function render() {
         if (state.scrapOreMask[index]) {
           drawTileSprite(state.sprites.scrapOre, sx, sy);
         }
+        if (state.droppedScrapMask[index] > 0) {
+          const amount = state.droppedScrapMask[index];
+          const pulse = Math.sin((state.lastTs || 0) * 0.004 + x * 1.7 + y * 1.3) * 0.5 + 0.5;
+          const intensity = Math.min(1, amount / 30);
+          const dotCount = 2 + Math.floor(intensity * 4);
+          ctx.globalAlpha = visibleAlpha * (0.55 + pulse * 0.3);
+          ctx.fillStyle = "#f0c040";
+          for (let d = 0; d < dotCount; d += 1) {
+            const seed = index * 7 + d * 13;
+            const fx = sx + 4 + ((seed * 23) % (TILE_SIZE - 8));
+            const fy = sy + 4 + ((seed * 17) % (TILE_SIZE - 8));
+            const r = 1.2 + (seed % 3) * 0.6;
+            ctx.beginPath();
+            ctx.arc(fx, fy, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = visibleAlpha;
+        }
       }
 
       ctx.strokeStyle = "rgba(255, 225, 179, 0.05)";
@@ -6093,6 +6163,41 @@ function renderOneBeacon(camera, beacon) {
       ctx.fill();
     }
 
+    ctx.restore();
+  } else {
+    // Active beacon: draw very faint placeholder contour
+    const ringPath = [
+      { x: bx - 1, y: by - 1 },
+      { x: bx,     y: by - 1 },
+      { x: bx + 1, y: by - 1 },
+      { x: bx + 2, y: by - 1 },
+      { x: bx + 2, y: by     },
+      { x: bx + 2, y: by + 1 },
+      { x: bx + 2, y: by + 2 },
+      { x: bx + 1, y: by + 2 },
+      { x: bx,     y: by + 2 },
+      { x: bx - 1, y: by + 2 },
+      { x: bx - 1, y: by + 1 },
+      { x: bx - 1, y: by     },
+    ];
+    const n = ringPath.length;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (let i = 0; i <= n; i += 1) {
+      const tile = ringPath[i % n];
+      const px = tile.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const py = tile.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgba(60, 42, 22, 0.1)";
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(120, 190, 230, 0.1)";
+    ctx.stroke();
     ctx.restore();
   }
 
