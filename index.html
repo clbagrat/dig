@@ -7,13 +7,12 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <title>Dig Path Prototype</title>
-    <link rel="stylesheet" href="./styles.css?v=20260318-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260320-1" />
   </head>
   <body>
     <div class="app-shell">
       <canvas id="game"></canvas>
       <button id="manualOpen" class="manual-link" type="button" aria-label="Открыть руководство">?</button>
-      <button id="shopOpen" class="shop-link" type="button" aria-label="Открыть магазин">⛏</button>
       <div class="touch-zones">
         <div id="movePad" class="move-pad">
           <div id="moveStick" class="move-stick"></div>
@@ -70,6 +69,13 @@
             <button id="debugPerkClose" class="debug-perk-menu__close" type="button">Закрыть</button>
           </div>
           <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Scrap</div>
+            <div class="debug-perk-menu__grid">
+              <button id="debugAddScrap" type="button" class="debug-perk-menu__button">+100 ⛭</button>
+              <button id="debugAddUnsafeScrap" type="button" class="debug-perk-menu__button">+100 ⚠️⛭</button>
+            </div>
+          </div>
+          <div class="debug-perk-menu__section">
             <div class="debug-perk-menu__label">Tile Perks</div>
             <div id="debugTilePerks" class="debug-perk-menu__grid"></div>
           </div>
@@ -89,6 +95,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js"></script>
+    <script type="module" src="./src/game.js?v=11"></script>
   </body>
 </html>

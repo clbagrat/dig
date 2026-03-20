@@ -352,7 +352,6 @@ function doPurchase(nodeId, treeId) {
 
   levels[nodeId] = cur + 1;
   document.dispatchEvent(new CustomEvent("shop:purchase", { detail: { nodeId, cost, level: levels[nodeId] } }));
-  renderShop(currentScrapCache - cost);
   requestAnimationFrame(() => drawAllLines());
 }
 

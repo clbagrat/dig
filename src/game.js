@@ -189,6 +189,7 @@ const state = {
   armor: 0,
   depth: 0,
   scrap: 0,
+  unsafeScrap: 0,
   scrapParticles: [],
   baseFound: false,
   outOfFuel: false,
@@ -246,6 +247,7 @@ const state = {
   beacons: [],
   health: new Float32Array(GRID_W * GRID_H),
   loopScrapMask: new Float32Array(GRID_W * GRID_H),
+  droppedScrapMask: new Float32Array(GRID_W * GRID_H),
   visibleMask: new Uint8Array(GRID_W * GRID_H),
   visibleAlpha: new Float32Array(GRID_W * GRID_H),
   visibleTargetAlpha: new Float32Array(GRID_W * GRID_H),
@@ -1171,6 +1173,7 @@ function setupField() {
   state.gasMask.fill(0);
   state.steamMask.fill(0);
   state.loopScrapMask.fill(0);
+  state.droppedScrapMask.fill(0);
   state.hazardTriggeredMask.fill(0);
   state.metalMask.fill(0);
   state.scrapOreMask.fill(0);
@@ -1201,6 +1204,7 @@ function setupField() {
   state.heatDamageBonus = 0;
   state.armor = 0;
   state.scrap = 0;
+  state.unsafeScrap = 0;
   state.depth = 0;
   state.perkText = "Нет";
   state.crystalRecipe = [];
@@ -1482,7 +1486,7 @@ function applyCrystalCatalystBonus(x, y) {
     return;
   }
 
-  state.scrap += 30;
+  state.unsafeScrap += 30;
   showScrapToast(30);
 
   if (state.crystalCatalystLevel >= 2) {
@@ -1549,6 +1553,14 @@ function carveTunnel(x, y) {
     state.hardness[index] = 0;
     state.health[index] = 0;
     state.visibilityDirty = true;
+  }
+
+  // Pick up any dropped scrap lying on this tile
+  const droppedPickup = Math.floor(state.droppedScrapMask[index]);
+  if (droppedPickup > 0) {
+    state.droppedScrapMask[index] = 0;
+    state.unsafeScrap += droppedPickup;
+    spawnScrapParticles(x, y, droppedPickup);
   }
 
   if (perkType > 0) {
@@ -1810,6 +1822,84 @@ function applyScrapPerk(perkType) {
     addFuel(state.perkFuelBonus, state.drill.x, state.drill.y);
   }
   showPerkToast(state.perkText);
+}
+
+function applyShopPerk(nodeId, level) {
+  switch (nodeId) {
+    case "drill_power":
+      state.strikeSpeed += 0.15;
+      showPerkToast("Мощность бура");
+      break;
+    case "side_drills":
+      state.sideDrills += 1;
+      showPerkToast("Боковые буры");
+      break;
+    case "long_drill":
+      state.longDrillPower += 0.2;
+      showPerkToast("Длинный бур");
+      break;
+    case "diagonal_drills":
+      state.diagonalDrillPower += 0.2;
+      showPerkToast("Диагональные буры");
+      break;
+    case "sapper_charge":
+      state.remoteBombLevel += 1;
+      state.remoteBombInterval = Math.max(15, state.remoteBombInterval > 0 ? state.remoteBombInterval - 5 : 30);
+      showPerkToast("Саперный заряд");
+      break;
+    case "fuel_tank":
+      state.maxFuel += 60;
+      showPerkToast("Расширенный бак");
+      break;
+    case "fuel_circuit":
+      state.perkFuelBonus += 50;
+      showPerkToast("Топливный контур");
+      break;
+    case "recirculator":
+      state.scrapBonus += 2;
+      state.fuelPickupBonus += 2;
+      showPerkToast("Рециркулятор");
+      break;
+    case "low_fuel_boost":
+      state.lowFuelSpeedBonus += 0.35;
+      showPerkToast("Форсаж на нуле");
+      break;
+    case "overload":
+      state.overflowBomb = true;
+      state.fuelPickupBonus += 50;
+      state.maxFuel = Math.max(100, state.maxFuel - 150);
+      state.fuel = Math.min(state.fuel, state.maxFuel);
+      showPerkToast("Перегрузка");
+      break;
+    case "geo_lens":
+      state.visionRadius = Math.min(12, state.visionRadius + 2);
+      state.visibilityDirty = true;
+      showPerkToast("Гео-линза");
+      break;
+    case "radar_module":
+      state.radarCrystalModule = true;
+      showPerkToast("Радарный модуль");
+      break;
+    case "radar_booster":
+      state.radarBoosterLevel = (state.radarBoosterLevel || 0) + 1;
+      showPerkToast("Усилитель радара");
+      break;
+    default:
+      break;
+  }
+}
+
+function showDebugToast(text) {
+  let el = document.getElementById("debugToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "debugToast";
+    el.style.cssText = "position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#ff0;font:bold 13px monospace;padding:6px 12px;border-radius:6px;z-index:99999;pointer-events:none;white-space:nowrap;";
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ""; }, 4000);
 }
 
 function showPerkToast(text) {
@@ -2197,8 +2287,9 @@ function bindUi() {
   }
 
   document.addEventListener("shop:purchase", (e) => {
-    const { cost } = e.detail;
+    const { cost, nodeId, level } = e.detail;
     state.scrap = Math.max(0, state.scrap - cost);
+    applyShopPerk(nodeId, level);
     renderShop(state.scrap);
   });
 
@@ -2249,6 +2340,21 @@ function bindUi() {
       state.debugPerkMenuOpen = false;
       state.debugPerkSelection = "";
       syncDebugPerkOverlay();
+    });
+  }
+
+  const debugAddScrap = document.getElementById("debugAddScrap");
+  if (debugAddScrap) {
+    debugAddScrap.addEventListener("click", () => {
+      state.scrap += 100;
+      renderShop(state.scrap);
+    });
+  }
+
+  const debugAddUnsafeScrap = document.getElementById("debugAddUnsafeScrap");
+  if (debugAddUnsafeScrap) {
+    debugAddUnsafeScrap.addEventListener("click", () => {
+      state.unsafeScrap += 100;
     });
   }
 
@@ -2731,7 +2837,7 @@ function update(dt) {
     awardBonusScrapPerkChoice();
     return;
   }
-  checkScrapPerkUnlock();
+  // checkScrapPerkUnlock(); // replaced by beacon shop
 }
 
 function updateEffects(dt) {
@@ -2753,9 +2859,20 @@ function updateScrapParticles(dt) {
     p.elapsed += dt;
     const active = p.elapsed - p.delay;
     if (active < p.duration) continue;
-    // Particle arrived — credit scrap
-    state.scrap += p.value;
-    if (p.isLast) showScrapToast(p.value);
+    // Particle arrived — credit unsafe scrap (unless already credited as deposit)
+    if (!p.skipCredit) {
+      state.unsafeScrap += p.value;
+      if (p.isLast) showScrapToast(p.value);
+    } else if (p.destTileX !== undefined) {
+      state.effects.push({
+        kind: "depositArrival",
+        x: p.destTileX,
+        y: p.destTileY,
+        time: 0.35,
+        duration: 0.35,
+        seed: (p.seed * 137) % 360,
+      });
+    }
     state.scrapParticles.splice(i, 1);
   }
 }
@@ -3583,6 +3700,36 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   }
 }
 
+function dropUnsafeScrap() {
+  if (state.unsafeScrap <= 0) return;
+  const total = Math.floor(state.unsafeScrap);
+  state.unsafeScrap = 0;
+  const dropAmount = Math.ceil(total / 2); // half disappears, half drops
+
+  const px = state.drill.x;
+  const py = state.drill.y;
+  const candidates = [];
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = px + dx;
+      const ny = py + dy;
+      if (nx < 1 || nx >= GRID_W - 1 || ny < 1 || ny >= GRID_H - 1) continue;
+      candidates.push(cellIndex(nx, ny));
+    }
+  }
+
+  if (candidates.length > 0) {
+    const perTile = Math.floor(dropAmount / candidates.length);
+    let remainder = dropAmount - perTile * candidates.length;
+    for (const idx of candidates) {
+      const tileValue = perTile + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder -= 1;
+      if (tileValue > 0) state.droppedScrapMask[idx] += tileValue;
+    }
+  }
+}
+
 function applyHazardDamage(amount, options = {}) {
   if (amount <= 0 || state.dead) {
     return;
@@ -3608,6 +3755,7 @@ function applyHazardDamage(amount, options = {}) {
   state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
   state.damageFlash = Math.min(1, state.damageFlash + 0.8);
   showHpToast(damageLeft);
+  dropUnsafeScrap();
   if (state.hp <= 0) {
     state.dead = true;
   }
@@ -3944,6 +4092,11 @@ function breakCell(x, y, index, options = {}) {
   if (state.scrapOreMask[index]) {
     spawnScrapOreEffect(x, y, scrapGain);
     spawnScrapParticles(x, y, scrapGain);
+  }
+  const embeddedScrap = Math.floor(state.droppedScrapMask[index]);
+  if (embeddedScrap > 0) {
+    state.droppedScrapMask[index] = 0;
+    spawnScrapParticles(x, y, embeddedScrap);
   }
   state.hardness[index] = 0;
   state.health[index] = 0;
@@ -4680,6 +4833,34 @@ function updateDiscovery() {
   }
 }
 
+function tryBeaconContourDeposit(x, y) {
+  if (state.unsafeScrap <= 0) return;
+  for (const beacon of state.beacons) {
+    if (x < beacon.x - 1 || x > beacon.x + 2 || y < beacon.y - 1 || y > beacon.y + 2) continue;
+    const chunk = Math.max(1, Math.floor(state.unsafeScrap / 12));
+    state.unsafeScrap = Math.max(0, state.unsafeScrap - chunk);
+    state.scrap += chunk;
+    // Visual: particles fly from hero to beacon, one per 5 scrap
+    const particleCount = Math.max(1, Math.floor(chunk / 5));
+    for (let i = 0; i < particleCount; i += 1) {
+      state.scrapParticles.push({
+        tileX: 0,
+        tileY: 0,
+        destTileX: beacon.x + 0.5,
+        destTileY: beacon.y + 0.5,
+        value: 0,
+        isLast: false,
+        skipCredit: true,
+        delay: i * 0.06,
+        elapsed: 0,
+        duration: 0.4,
+        seed: Math.floor(Math.random() * 1000),
+      });
+    }
+    break;
+  }
+}
+
 function extendPath(x, y) {
   const tail = state.pathTiles[state.pathTiles.length - 1];
   if (tail && tail.x === x && tail.y === y) {
@@ -4709,6 +4890,7 @@ function extendPath(x, y) {
   state.depth = Math.max(state.depth, Math.abs(y - START_Y));
   state.pathTiles.push({ x, y });
   rebuildPathIndex();
+  tryBeaconContourDeposit(x, y);
 }
 
 function triggerPathLoop(loopStartIndex, targetX, targetY) {
@@ -4772,7 +4954,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   spawnLoopFieldEffect(loopPath, affectedCells);
 
   for (const beacon of state.beacons) {
-    if (beacon.active) continue;
     let allInside = true;
     for (let dy = 0; dy < 2 && allInside; dy += 1) {
       for (let dx = 0; dx < 2 && allInside; dx += 1) {
@@ -4791,8 +4972,17 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         cell.y <= beacon.y + 2,
     );
     if (pathWithinBeaconArea) {
+      const wasActive = beacon.active;
       beacon.active = true;
-      showPerkToast("Маяк активирован!");
+      // Deposit any remaining unsafe scrap (most was deposited progressively)
+      if (state.unsafeScrap > 0) {
+        state.scrap += Math.floor(state.unsafeScrap);
+        state.unsafeScrap = 0;
+      }
+      showPerkToast(wasActive ? "Скреп сохранён!" : "Маяк активирован!");
+      state.shopModalOpen = true;
+      syncTouchZonesInteractivity();
+      openShop(state.scrap);
     }
   }
 
@@ -5220,6 +5410,39 @@ function renderEffects(camera) {
   ctx.restore();
 }
 
+function renderDepositArrivals(camera) {
+  const ctx = state.ctx;
+  ctx.save();
+  for (let i = 0; i < state.effects.length; i += 1) {
+    const effect = state.effects[i];
+    if (effect.kind !== "depositArrival") continue;
+    const progress = 1 - effect.time / effect.duration;
+    const cx = effect.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+    const cy = effect.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+    const alpha = 1 - progress;
+    // Expanding ring
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.strokeStyle = "#ffe060";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4 + progress * 14, 0, Math.PI * 2);
+    ctx.stroke();
+    // Sparks
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#ffd030";
+    for (let s = 0; s < 5; s += 1) {
+      const angle = (effect.seed + s * 72) * (Math.PI / 180);
+      const dist = progress * 12;
+      const sx = cx + Math.cos(angle) * dist;
+      const sy = cy + Math.sin(angle) * dist;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.8 * (1 - progress * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function renderScrapParticles(camera) {
   if (state.scrapParticles.length === 0) return;
   const ctx = state.ctx;
@@ -5234,13 +5457,19 @@ function renderScrapParticles(camera) {
     const t = Math.min(1, active / p.duration);
     const easeIn = t * t * (3 - 2 * t); // smoothstep — slow start, fast end
 
-    const startX = p.tileX * TILE_SIZE - camera.x;
-    const startY = p.tileY * TILE_SIZE - camera.y;
+    const tileScreenX = p.tileX * TILE_SIZE - camera.x;
+    const tileScreenY = p.tileY * TILE_SIZE - camera.y;
+
+    // If destTileX/Y set — fly from hero to destination tile, otherwise from tile to hero
+    const startX = p.destTileX !== undefined ? heroX : tileScreenX;
+    const startY = p.destTileX !== undefined ? heroY : tileScreenY;
+    const endX = p.destTileX !== undefined ? p.destTileX * TILE_SIZE - camera.x + TILE_SIZE * 0.5 : heroX;
+    const endY = p.destTileX !== undefined ? p.destTileY * TILE_SIZE - camera.y + TILE_SIZE * 0.5 : heroY;
 
     // Curved arc: bulge perpendicular to flight path
     const perpSign = ((p.seed % 3) - 1) || 1;
-    const dx = heroX - startX;
-    const dy = heroY - startY;
+    const dx = endX - startX;
+    const dy = endY - startY;
     const len = Math.hypot(dx, dy) || 1;
     const bulge = Math.sin(t * Math.PI) * Math.min(28, len * 0.35) * perpSign;
 
@@ -5409,6 +5638,16 @@ function render() {
       renderPerkZoneTile(x, y, sx, sy);
       renderPerkTile(x, y, sx, sy);
       renderCrystalTile(x, y, sx, sy);
+
+      if (state.tunnelMask[index] && state.droppedScrapMask[index] > 0) {
+        const pulse = Math.sin((state.lastTs || 0) * 0.004 + x * 1.3 + y * 0.9) * 0.5 + 0.5;
+        ctx.globalAlpha = visibleAlpha * (0.65 + pulse * 0.35);
+        ctx.fillStyle = "#f0c040";
+        ctx.beginPath();
+        ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       ctx.globalAlpha = 1;
     }
   }
@@ -5417,8 +5656,9 @@ function render() {
   renderMovingTiles(camera);
   renderSteamJets(camera);
   renderEffects(camera);
-  renderScrapParticles(camera);
   renderBeacon(camera);
+  renderScrapParticles(camera);
+  renderDepositArrivals(camera);
   renderBase(camera);
   renderBoulders(camera);
   renderDrill(camera);
@@ -6607,10 +6847,6 @@ function renderHud() {
   const fuelRatio = clamp(state.fuel / state.maxFuel, 0, 1);
   const hpRatio = clamp(state.hp / state.maxHp, 0, 1);
   const heatRatio = clamp(state.heat / state.maxHeat, 0, 1);
-  const currentScrapCost = getScrapPerkCost(state.scrapPerkLevel);
-  const scrapCycle = state.nextScrapPerkAt - currentScrapCost;
-  const scrapProgress = clamp(state.scrap - scrapCycle, 0, currentScrapCost);
-  const scrapRatio = clamp(scrapProgress / currentScrapCost, 0, 1);
   const top = 14;
   const gap = 10;
   const totalWidth = Math.min(state.width - 28, 560);
@@ -6621,16 +6857,7 @@ function renderHud() {
 
   const hpLabel = state.armor > 0 ? `${state.hp}/${state.maxHp} • A:${state.armor}` : `${state.hp}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
-  drawHudBar(
-    left + panelWidth + gap,
-    top,
-    panelWidth,
-    panelHeight,
-    "SCRAP",
-    `${Math.floor(scrapProgress)}/${currentScrapCost}`,
-    scrapRatio,
-    ["#f0df84", "#d7b548"],
-  );
+  drawHudScrapCounter(left + panelWidth + gap, top, panelWidth, panelHeight);
   state.scrapHitRect = {
     x: left + panelWidth + gap,
     y: top,
@@ -6741,6 +6968,28 @@ function renderHud() {
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+function drawHudScrapCounter(x, y, width, height) {
+  const ctx = state.ctx;
+  drawHudPanel(x, y, width, height);
+  ctx.save();
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#c6ab84";
+  ctx.font = `700 10px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  ctx.fillText("SCRAP", x + 10, y + 13);
+  ctx.fillStyle = "#f0df84";
+  ctx.font = `700 13px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  ctx.fillText(`${Math.floor(state.scrap)} ⛭`, x + 10, y + 28);
+  if (state.unsafeScrap > 0) {
+    ctx.fillStyle = "#ff9940";
+    ctx.font = `700 10px ${HUD_FONT}`;
+    ctx.textAlign = "right";
+    ctx.fillText(`+${Math.floor(state.unsafeScrap)}`, x + width - 10, y + 28);
+  }
   ctx.restore();
 }
 
