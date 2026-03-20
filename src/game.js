@@ -170,6 +170,7 @@ const state = {
   timeAcc: 0,
   lastTs: 0,
   fps: 0,
+  fpsHistory: [],
   fuel: START_FUEL,
   maxFuel: START_FUEL,
   hp: START_HP,
@@ -373,6 +374,9 @@ const state = {
     strikeLatch: false,
     actionCooldown: 0,
     moveResumeTimer: 0,
+    digDelayTimer: 0,
+    digDelayDx: 0,
+    digDelayDy: 0,
   },
 };
 
@@ -1287,6 +1291,9 @@ function setupField() {
   state.drill.strikeLatch = false;
   state.drill.actionCooldown = 0;
   state.drill.moveResumeTimer = 0;
+  state.drill.digDelayTimer = 0;
+  state.drill.digDelayDx = 0;
+  state.drill.digDelayDy = 0;
   state.worldSeed = newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
 
@@ -2554,6 +2561,8 @@ function frame(ts) {
     delta = Math.min(delta, MAX_FRAME_MS);
     const instantFps = delta > 0 ? 1000 / delta : 0;
     state.fps = state.fps > 0 ? state.fps * 0.88 + instantFps * 0.12 : instantFps;
+    state.fpsHistory.push(Math.round(instantFps));
+    if (state.fpsHistory.length > 40) state.fpsHistory.shift();
     state.timeAcc += delta;
 
     while (state.timeAcc >= STEP_MS) {
@@ -4500,6 +4509,9 @@ function updateDrill(dt) {
     state.drill.progress = 0;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 5);
     state.drill.strikeLatch = false;
+    state.drill.digDelayTimer = 0;
+    state.drill.digDelayDx = 0;
+    state.drill.digDelayDy = 0;
     return;
   }
 
@@ -4520,12 +4532,10 @@ function updateDrill(dt) {
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
   const actionRate = STRIKE_CYCLE_SPEED * state.strikeSpeed * lowFuelBoost * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
-  state.drill.strikePhase += dt * actionRate;
-  state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
-  const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
 
   if (state.tunnelMask[targetIndex]) {
     if (state.drill.moveResumeTimer > 0) {
+      state.drill.strikePhase += dt * actionRate;
       state.drill.progress = 0;
       state.drill.strikeEnergy = Math.max(0.08, state.drill.strikeEnergy - dt * 4);
       return;
@@ -4535,15 +4545,41 @@ function updateDrill(dt) {
       return;
     }
     moveDrillFreely(dx, dy, dt);
+    state.drill.strikePhase += dt * actionRate;
     state.drill.progress = 0;
     state.drill.strikeEnergy = Math.max(0.08, state.drill.strikeEnergy - dt * 4);
+    state.drill.digDelayTimer = 0;
+    state.drill.digDelayDx = 0;
+    state.drill.digDelayDy = 0;
+    return;
+  }
+
+  // Delay before starting to dig: reset timer if direction changed.
+  // Must run before actionCooldown check so approaching a new block
+  // while cooldown is still active doesn't play the drill animation.
+  if (state.drill.digDelayDx !== dx || state.drill.digDelayDy !== dy) {
+    state.drill.digDelayTimer = 0.18;
+    state.drill.digDelayDx = dx;
+    state.drill.digDelayDy = dy;
+  }
+  if (state.drill.digDelayTimer > 0) {
+    state.drill.digDelayTimer = Math.max(0, state.drill.digDelayTimer - dt);
+    state.drill.strikePhase += dt * actionRate * 0.15;
+    state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 5);
+    moveDrillRenderToward(state.drill.x, state.drill.y, dt);
     return;
   }
 
   if (state.drill.actionCooldown > 0) {
+    state.drill.strikePhase += dt * actionRate;
+    state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
     moveDrillRenderToward(state.drill.x, state.drill.y, dt);
     return;
   }
+
+  state.drill.strikePhase += dt * actionRate;
+  state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
+  const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
 
   if (state.overhealDrillTimer <= 0 && state.fuel < state.strikeFuelCost) {
     state.fuel = 0;
@@ -6060,7 +6096,7 @@ function renderDrill(camera) {
   const hammerOffsetY = state.drill.facingY * thrust * 7;
   const px = state.drill.renderX * TILE_SIZE - camera.x + bodyOffsetX;
   const py = state.drill.renderY * TILE_SIZE - camera.y + bodyOffsetY;
-  const frame = strikeWave > 0.78 ? 2 + (Math.floor((state.lastTs || 0) / 50) % 2) : Math.floor((state.lastTs || 0) / 160) % 2;
+  const frame = strikeWave > 0.78 && state.drill.strikeEnergy > 0.3 ? 2 + (Math.floor((state.lastTs || 0) / 50) % 2) : Math.floor((state.lastTs || 0) / 160) % 2;
   const angle = state.drill.facingX > 0 ? Math.PI * 0.5 : state.drill.facingX < 0 ? -Math.PI * 0.5 : state.drill.facingY < 0 ? Math.PI : 0;
   ctx.save();
   ctx.translate(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.5);
@@ -6608,6 +6644,29 @@ function renderHud() {
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillText(`FPS ${Math.round(state.fps || 0)}`, left, detailTop + 52);
+
+  // FPS sparkline graph
+  const history = state.fpsHistory;
+  if (history.length > 1) {
+    const gx = left + 38;
+    const gy = detailTop + 52;
+    const gw = 44;
+    const gh = 12;
+    const maxFps = 70;
+    ctx.fillStyle = "rgba(198, 171, 132, 0.1)";
+    ctx.fillRect(gx, gy, gw, gh);
+    ctx.beginPath();
+    for (let i = 0; i < history.length; i++) {
+      const x = gx + (i / (history.length - 1)) * gw;
+      const y = gy + gh - clamp(history[i] / maxFps, 0, 1) * gh;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "rgba(198, 171, 132, 0.7)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
