@@ -56,6 +56,18 @@ Current base vision radius:
 The player only sees nearby cells around the driller.
 Everything outside the radius is hidden by fog of war.
 
+## Start Zones
+
+Two concentric zones are guaranteed around the player start:
+
+**Easy zone** (radius `5`):
+- all rock is forced to tier 1
+- no hazards, metal, gas, steam, or boulders spawn here
+
+**Near zone** (radius `7`, ring between 5 and 7):
+- guaranteed `4` scrap ore tiles
+- guaranteed `1` beacon (the closest one in the run)
+
 ## Terrain Generation
 
 Rock is generated from a layered field rather than from independent random cells.
@@ -70,6 +82,18 @@ Design intent:
 - farther from the center is usually harder
 - local routes still contain surprises
 - the field should look geological rather than like pure noise
+
+## Scrap Ore
+
+Scrap ore tiles are scattered across the map in vein groups.
+
+Current generation:
+- `50` vein groups, each `4–10` tiles
+- scrap ore does not spawn inside the easy zone (radius `5`)
+- `4` scrap ore tiles are guaranteed inside the near zone (radius `5–7`)
+
+Effect:
+- picking up a scrap ore tile gives a scrap bonus (exact amount TBD per tile)
 
 ## Rock Tiers
 
@@ -312,6 +336,25 @@ Current visible feedback:
 - floating scrap gain text
 - victory / out-of-fuel overlays
 
+## Beacons
+
+Beacons are fixed landmarks placed on the map during generation.
+
+Structure:
+- each beacon occupies a `2×2` core (hardness `0`, always open)
+- surrounded by a 1-tile ring (also open, becomes tunnel)
+
+Count and placement:
+- `15` beacons total
+- `1` guaranteed in the near zone (radius `5–7` from start)
+- remaining `14` placed randomly at distance `9–60` from start
+- minimum distance between any two beacons: `12` tiles
+- beacons never overlap with metal, hazards, gas, steam, or boulders
+
+Gameplay role (WIP):
+- once activated, a beacon shows the direction to the base (similar to radar)
+- beacons are activated by standing on them (exact mechanic TBD)
+
 ## Debugging
 
 There is a separate debug renderer for full-map inspection:
@@ -324,11 +367,13 @@ node scripts/render-map-debug.js --seed 1 --output debug/map-seed-1.svg
 ```
 
 It renders:
-- full terrain
-- start
-- base
-- tile perks
-- perk zones
+- full terrain with hardness tiers
+- hazards, metal veins, gas/steam/boulder pockets
+- scrap ore tiles
+- beacons (teal diamond)
+- perk zones and tile perks
+- crystals
+- player start (gold circle) and base (blue circle)
 
 ## Current Design Intent
 
