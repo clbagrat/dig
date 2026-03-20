@@ -189,6 +189,7 @@ const state = {
   armor: 0,
   depth: 0,
   scrap: 0,
+  scrapParticles: [],
   baseFound: false,
   outOfFuel: false,
   dead: false,
@@ -887,6 +888,26 @@ function spawnScrapOreEffect(x, y, value) {
   });
 }
 
+function spawnScrapParticles(tileX, tileY, totalValue) {
+  if (totalValue <= 0) return;
+  const count = Math.min(8, Math.max(3, totalValue));
+  const baseValue = Math.floor(totalValue / count);
+  for (let i = 0; i < count; i += 1) {
+    const value = i === count - 1 ? totalValue - baseValue * (count - 1) : baseValue;
+    const seed = (tileX * 73417 + tileY * 53923 + i * 131) % 1000;
+    state.scrapParticles.push({
+      tileX: tileX + 0.5,
+      tileY: tileY + 0.5,
+      value,
+      isLast: i === count - 1,
+      delay: i * 0.055,
+      elapsed: 0,
+      duration: 0.38 + (seed % 10) * 0.012,
+      seed,
+    });
+  }
+}
+
 function spawnDamageNumberEffect(x, y, value) {
   if (value <= 0) {
     return;
@@ -1271,6 +1292,7 @@ function setupField() {
   state.fuelToast.time = 0;
   state.hpToast.value = 0;
   state.hpToast.time = 0;
+  state.scrapParticles.length = 0;
   state.scrapToast.value = 0;
   state.scrapToast.time = 0;
   state.damageFlash = 0;
@@ -2633,6 +2655,7 @@ function update(dt) {
   updatePerkZones(dt);
   updateChainExplosions(dt);
   updateEffects(dt);
+  updateScrapParticles(dt);
   if (state.visibilityDirty) {
     rebuildVisibilityMask();
     state.visibilityDirty = false;
@@ -2721,6 +2744,19 @@ function updateEffects(dt) {
       }
       state.effects.splice(i, 1);
     }
+  }
+}
+
+function updateScrapParticles(dt) {
+  for (let i = state.scrapParticles.length - 1; i >= 0; i -= 1) {
+    const p = state.scrapParticles[i];
+    p.elapsed += dt;
+    const active = p.elapsed - p.delay;
+    if (active < p.duration) continue;
+    // Particle arrived — credit scrap
+    state.scrap += p.value;
+    if (p.isLast) showScrapToast(p.value);
+    state.scrapParticles.splice(i, 1);
   }
 }
 
@@ -3907,10 +3943,10 @@ function breakCell(x, y, index, options = {}) {
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   if (state.scrapOreMask[index]) {
     spawnScrapOreEffect(x, y, scrapGain);
+    spawnScrapParticles(x, y, scrapGain);
   }
   state.hardness[index] = 0;
   state.health[index] = 0;
-  state.scrap += scrapGain;
   state.blocksBroken += 1;
   if (options.byDrill) {
     state.drillBrokenBlocks += 1;
@@ -3919,7 +3955,6 @@ function breakCell(x, y, index, options = {}) {
     const durations = [0, 6, 9, 12];
     activateDrillOverdrive(durations[state.spikeOverdriveLevel] || 6, "Шиповой форсаж");
   }
-  showScrapToast(scrapGain);
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
   state.loopScrapMask[index] = 0;
@@ -5185,6 +5220,49 @@ function renderEffects(camera) {
   ctx.restore();
 }
 
+function renderScrapParticles(camera) {
+  if (state.scrapParticles.length === 0) return;
+  const ctx = state.ctx;
+  const heroX = state.drill.renderX * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
+  const heroY = state.drill.renderY * TILE_SIZE - camera.y + TILE_SIZE * 0.5;
+
+  for (let i = 0; i < state.scrapParticles.length; i += 1) {
+    const p = state.scrapParticles[i];
+    const active = p.elapsed - p.delay;
+    if (active <= 0) continue;
+
+    const t = Math.min(1, active / p.duration);
+    const easeIn = t * t * (3 - 2 * t); // smoothstep — slow start, fast end
+
+    const startX = p.tileX * TILE_SIZE - camera.x;
+    const startY = p.tileY * TILE_SIZE - camera.y;
+
+    // Curved arc: bulge perpendicular to flight path
+    const perpSign = ((p.seed % 3) - 1) || 1;
+    const dx = heroX - startX;
+    const dy = heroY - startY;
+    const len = Math.hypot(dx, dy) || 1;
+    const bulge = Math.sin(t * Math.PI) * Math.min(28, len * 0.35) * perpSign;
+
+    const px = startX + dx * easeIn - (dy / len) * bulge;
+    const py = startY + dy * easeIn + (dx / len) * bulge;
+
+    const alpha = t > 0.85 ? (1 - t) / 0.15 : 1;
+    const size = 3.5 - t * 1.5;
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#c8920a";
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffe060";
+    ctx.beginPath();
+    ctx.arc(px, py, size * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 function render() {
   const ctx = state.ctx;
   const camera = getCamera();
@@ -5339,6 +5417,7 @@ function render() {
   renderMovingTiles(camera);
   renderSteamJets(camera);
   renderEffects(camera);
+  renderScrapParticles(camera);
   renderBeacon(camera);
   renderBase(camera);
   renderBoulders(camera);
