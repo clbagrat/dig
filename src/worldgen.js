@@ -8,7 +8,7 @@ export const START_Y = Math.floor(GRID_H / 2);
 
 const START_EASY_RADIUS = 5;
 const START_NEAR_RADIUS = 7;
-const START_NEAR_SCRAP_COUNT = 4;
+const START_NEAR_GOLD_COUNT = 4;
 const BASE_MIN_DISTANCE = 50;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
@@ -17,7 +17,7 @@ const TILES_PER_PERK_ZONE = 370;
 const TILES_PER_CRYSTAL_TILE = 32;
 const CRYSTAL_MIN_DISTANCE = 3;
 const METAL_VEIN_GROUPS = 16;
-const SCRAP_ORE_GROUPS = 50;
+const GOLD_ORE_GROUPS = 50;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -279,7 +279,7 @@ function canPlaceMetalAt(x, y) {
   return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
-function canPlaceScrapOreAt(x, y) {
+function canPlaceGoldOreAt(x, y) {
   return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
@@ -370,7 +370,7 @@ function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, b
   }
 }
 
-function placeScrapOreVein(scrapOreMask, random, blockCount) {
+function placeGoldOreVein(goldOreMask, random, blockCount) {
   const origin = getHazardOrigin(random);
   let x = origin.x;
   let y = origin.y;
@@ -381,8 +381,8 @@ function placeScrapOreVein(scrapOreMask, random, blockCount) {
     attempts += 1;
     const ix = Math.round(x);
     const iy = Math.round(y);
-    if (canPlaceScrapOreAt(ix, iy)) {
-      scrapOreMask[cellIndex(ix, iy)] = 1;
+    if (canPlaceGoldOreAt(ix, iy)) {
+      goldOreMask[cellIndex(ix, iy)] = 1;
       placed += 1;
     }
     angle += (random() - 0.5) * 0.6;
@@ -542,7 +542,7 @@ function placeNearBeacon(beaconMask, metalMask, hazardMask, gasPocketMask, steam
   }
 }
 
-function placeNearScrap(scrapOreMask, random) {
+function placeNearGold(goldOreMask, random) {
   const candidates = [];
   for (let dx = -(START_NEAR_RADIUS + 1); dx <= START_NEAR_RADIUS + 1; dx += 1) {
     for (let dy = -(START_NEAR_RADIUS + 1); dy <= START_NEAR_RADIUS + 1; dy += 1) {
@@ -556,10 +556,10 @@ function placeNearScrap(scrapOreMask, random) {
   }
   shuffle(candidates, random);
   let placed = 0;
-  for (let i = 0; i < candidates.length && placed < START_NEAR_SCRAP_COUNT; i += 1) {
+  for (let i = 0; i < candidates.length && placed < START_NEAR_GOLD_COUNT; i += 1) {
     const idx = cellIndex(candidates[i].x, candidates[i].y);
-    if (!scrapOreMask[idx]) {
-      scrapOreMask[idx] = 1;
+    if (!goldOreMask[idx]) {
+      goldOreMask[idx] = 1;
       placed += 1;
     }
   }
@@ -711,7 +711,7 @@ export function generateMap(seed) {
   const hardness       = buildHardness(random);
   const hazardMask     = new Uint8Array(GRID_W * GRID_H);
   const metalMask      = new Uint8Array(GRID_W * GRID_H);
-  const scrapOreMask   = new Uint8Array(GRID_W * GRID_H);
+  const goldOreMask   = new Uint8Array(GRID_W * GRID_H);
   const gasPocketMask  = new Uint8Array(GRID_W * GRID_H);
   const steamPocketMask = new Uint8Array(GRID_W * GRID_H);
   const boulderPocketMask = new Uint8Array(GRID_W * GRID_H);
@@ -730,8 +730,8 @@ export function generateMap(seed) {
   for (let i = 0; i < hazardBlobGroups; i += 1) placeHazardBlob(hazardMask, random, 4 + Math.floor(random() * 17));
   for (let i = 0; i < hazardVeinGroups; i += 1)  placeHazardVein(hazardMask, random, 4 + Math.floor(random() * 37));
   for (let i = 0; i < METAL_VEIN_GROUPS;    i += 1) placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, random, 12 + Math.floor(random() * 22));
-  for (let i = 0; i < SCRAP_ORE_GROUPS;     i += 1) placeScrapOreVein(scrapOreMask, random, 4 + Math.floor(random() * 7));
-  placeNearScrap(scrapOreMask, random);
+  for (let i = 0; i < GOLD_ORE_GROUPS;     i += 1) placeGoldOreVein(goldOreMask, random, 4 + Math.floor(random() * 7));
+  placeNearGold(goldOreMask, random);
   for (let i = 0; i < GAS_POCKET_GROUPS;    i += 1) placeGasPocket(gasPocketMask, hazardMask, random, 4 + Math.floor(random() * 17));
   for (let i = 0; i < STEAM_POCKET_GROUPS;  i += 1) placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, random, 3 + Math.floor(random() * 7));
   for (let i = 0; i < BOULDER_POCKET_GROUPS; i += 1) placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, random);
@@ -748,7 +748,7 @@ export function generateMap(seed) {
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
 
   return {
-    hardness, hazardMask, metalMask, scrapOreMask,
+    hardness, hazardMask, metalMask, goldOreMask,
     gasPocketMask, steamPocketMask, boulderPocketMask,
     beaconMask, beacons,
     perkMask, crystalMask, perkZones,

@@ -4,7 +4,7 @@ const levels = {};
 let onCloseCallback = null;
 let selectedNodeId = null;
 let selectedTreeId = null;
-let currentScrapCache = 0;
+let currentGoldCache = 0;
 
 // ─── Public ───────────────────────────────────────────────────────────────────
 
@@ -17,14 +17,14 @@ export function initShop(callbacks = {}) {
   bindEvents();
 }
 
-export function openShop(currentScrap) {
+export function openShop(currentGold) {
   const overlay = document.getElementById("shopModal");
   if (!overlay) return;
-  currentScrapCache = currentScrap;
+  currentGoldCache = currentGold;
   overlay.hidden = false;
   overlay.style.cssText =
     "position:absolute;inset:0;z-index:9998;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;";
-  renderShop(currentScrap);
+  renderShop(currentGold);
   requestAnimationFrame(() => {
     drawAllLines();
     syncTabFromScroll();
@@ -44,13 +44,13 @@ export function getShopLevel(id) {
   return levels[id] ?? 0;
 }
 
-export function renderShop(currentScrap) {
-  currentScrapCache = currentScrap;
-  const scrapEl = document.getElementById("shopScrapValue");
-  if (scrapEl) scrapEl.textContent = Math.floor(currentScrap);
+export function renderShop(currentGold) {
+  currentGoldCache = currentGold;
+  const goldEl = document.getElementById("shopGoldValue");
+  if (goldEl) goldEl.textContent = Math.floor(currentGold);
   for (const tree of SHOP_TREES)
     for (const node of tree.nodes)
-      updateNodeDisplay(node, tree, currentScrap);
+      updateNodeDisplay(node, tree, currentGold);
   if (selectedNodeId) refreshDetailPanel();
 }
 
@@ -64,9 +64,9 @@ function buildDOM() {
     <div class="shop-panel">
       <div class="shop-head">
         <span class="shop-head__title">Прокачка</span>
-        <span class="shop-head__scrap">
-          <span class="shop-head__scrap-icon">⛭</span>
-          <span id="shopScrapValue">0</span>
+        <span class="shop-head__gold">
+          <span class="shop-head__gold-icon"></span>
+          <span id="shopGoldValue">0</span>
         </span>
         <button id="shopClose" class="shop-close" type="button">✕</button>
       </div>
@@ -293,7 +293,7 @@ function refreshDetailPanel() {
   const maxed = cur >= node.maxLevel;
   const unlocked = isUnlocked(node);
   const cost = maxed ? 0 : node.costs[cur];
-  const canAfford = !maxed && currentScrapCache >= cost;
+  const canAfford = !maxed && currentGoldCache >= cost;
 
   document.getElementById("shopDetailIcon").textContent = node.icon;
   document.getElementById("shopDetailName").textContent = node.name;
@@ -326,11 +326,11 @@ function refreshDetailPanel() {
     buyBtn.className = "shop-detail__buy shop-detail__buy--maxed";
     buyBtn.disabled = true;
   } else if (canAfford) {
-    buyBtn.textContent = `Купить — ${cost} ⛭`;
+    buyBtn.textContent = `Купить — ${cost} ●`;
     buyBtn.className = "shop-detail__buy shop-detail__buy--ok";
     buyBtn.disabled = false;
   } else {
-    buyBtn.textContent = `Нужно ${cost} ⛭`;
+    buyBtn.textContent = `Нужно ${cost} ●`;
     buyBtn.className = "shop-detail__buy shop-detail__buy--poor";
     buyBtn.disabled = true;
   }
@@ -348,7 +348,7 @@ function doPurchase(nodeId, treeId) {
   if (cur >= node.maxLevel || !isUnlocked(node)) return;
 
   const cost = node.costs[cur];
-  if (currentScrapCache < cost) return;
+  if (currentGoldCache < cost) return;
 
   levels[nodeId] = cur + 1;
   document.dispatchEvent(new CustomEvent("shop:purchase", { detail: { nodeId, cost, level: levels[nodeId] } }));
@@ -362,7 +362,7 @@ function isUnlocked(node) {
 
 // ─── Node display ─────────────────────────────────────────────────────────────
 
-function updateNodeDisplay(node, tree, currentScrap) {
+function updateNodeDisplay(node, tree, currentGold) {
   const el = document.getElementById(`shopNode_${node.id}`);
   if (!el) return;
 
@@ -370,7 +370,7 @@ function updateNodeDisplay(node, tree, currentScrap) {
   const maxed = cur >= node.maxLevel;
   const unlocked = isUnlocked(node);
   const cost = maxed ? 0 : node.costs[cur];
-  const canAfford = !maxed && currentScrap >= cost;
+  const canAfford = !maxed && currentGold >= cost;
 
   el.classList.remove("shop-node--locked", "shop-node--maxed", "shop-node--can-buy");
   if (!unlocked)      el.classList.add("shop-node--locked");
@@ -393,7 +393,7 @@ function updateNodeDisplay(node, tree, currentScrap) {
       costEl.textContent = "✓";
       costEl.dataset.state = "maxed";
     } else {
-      costEl.textContent = `${cost} ⛭`;
+      costEl.textContent = `${cost} ●`;
       costEl.dataset.state = canAfford ? "ok" : "dim";
     }
   }

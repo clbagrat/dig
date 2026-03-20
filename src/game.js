@@ -1,5 +1,5 @@
-import { initShop, openShop, closeShop, renderShop } from "./shop.js";
-import { generateMap, mulberry32 as _mulberry32 } from "./worldgen.js";
+import { initShop, openShop, closeShop, renderShop } from "./shop.js?v=32";
+import { generateMap, mulberry32 as _mulberry32 } from "./worldgen.js?v=32";
 
 const TILE_SIZE = 36;
 const GRID_W = 150;
@@ -24,10 +24,10 @@ const TILES_PER_PERK_ZONE = 370;
 const BASE_MIN_DISTANCE = 50;
 const START_EASY_RADIUS = 5;
 const RADAR_BASE_DURATION = 10;
-const SCRAP_PERK_BASE_COST = 30;
-const SCRAP_PERK_COST_MULTIPLIER = 1.35;
-const SCRAP_PERK_LEVEL_MULTIPLIER_STEP = 0.05;
-const SCRAP_PERK_POPUP_DELAY = 0.5;
+const GOLD_PERK_BASE_COST = 30;
+const GOLD_PERK_COST_MULTIPLIER = 1.35;
+const GOLD_PERK_LEVEL_MULTIPLIER_STEP = 0.05;
+const GOLD_PERK_POPUP_DELAY = 0.5;
 const BASE_MOVE_AWAY_CHANCE = 0.5;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
@@ -37,8 +37,8 @@ const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
 const METAL_VEIN_GROUPS = 16;
-const SCRAP_ORE_GROUPS = 50;
-const SCRAP_ORE_PER_BLOCK = 18;
+const GOLD_ORE_GROUPS = 50;
+const GOLD_ORE_PER_BLOCK = 18;
 const GAS_SPREAD_INTERVAL = 2;
 const GAS_SPREAD_STEPS = 3;
 const GAS_DAMAGE = 1;
@@ -90,14 +90,14 @@ const HAZARD_DATA = {
 };
 
 const BLOCK_TYPES = [
-  { hp: 0, color: "#1a1410", scrap: 0, vein: "#3c2d22" },
-  { hp: 60, color: "#5f4631", scrap: 2, vein: "#9b7a4a" },
-  { hp: 90, color: "#715337", scrap: 4, vein: "#c59a5c" },
-  { hp: 120, color: "#6a4f37", scrap: 6, vein: "#d0a66a" },
-  { hp: 180, color: "#6f4f40", scrap: 8, vein: "#b66e3b" },
-  { hp: 300, color: "#60473f", scrap: 11, vein: "#a57f58" },
-  { hp: 420, color: "#4f3d36", scrap: 14, vein: "#9cb1b7" },
-  { hp: 600, color: "#3e3236", scrap: 18, vein: "#d6d9df" },
+  { hp: 0, color: "#1a1410", gold: 0, vein: "#3c2d22" },
+  { hp: 60, color: "#5f4631", gold: 2, vein: "#9b7a4a" },
+  { hp: 90, color: "#715337", gold: 4, vein: "#c59a5c" },
+  { hp: 120, color: "#6a4f37", gold: 6, vein: "#d0a66a" },
+  { hp: 180, color: "#6f4f40", gold: 8, vein: "#b66e3b" },
+  { hp: 300, color: "#60473f", gold: 11, vein: "#a57f58" },
+  { hp: 420, color: "#4f3d36", gold: 14, vein: "#9cb1b7" },
+  { hp: 600, color: "#3e3236", gold: 18, vein: "#d6d9df" },
 ];
 
 const TILE_PERK_TYPES = [
@@ -111,7 +111,7 @@ const TILE_PERK_TYPES = [
   { name: "Броня", icon: "A", color: "#b4d7ff", desc: "+1 брони против внешней опасности" },
 ];
 
-const SCRAP_PERK_TYPES = [
+const GOLD_PERK_TYPES = [
   null,
   { name: "Боковые буры", icon: "⫼", desc: "Удар также бьет по двум боковым клеткам" },
   null,
@@ -123,14 +123,14 @@ const SCRAP_PERK_TYPES = [
   { name: "Топливный контур", icon: "⛽", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
   { name: "Линза обзора", icon: "◉", desc: "+1 к радиусу обзора, до максимума 9" },
   { name: "Радарный модуль", icon: "⌖", desc: "Отмечает ближайшие кристаллы на радаре" },
-  { name: "Ломосбор", icon: "⛭", desc: "+2 скрапа за каждый разрушенный блок" },
+  { name: "Ломосбор", icon: "●", desc: "+2 золота за каждый разрушенный блок" },
   null,
   { name: "Перегрузка", icon: "⚡", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
   { name: "Усиленный корпус", icon: "✚", desc: "+1 к максимуму HP и лечит на 2" },
   { name: "Перелив адреналина", icon: "❤", desc: "Overheal дает 4 секунды бафа, потом растет до максимума 10" },
   { name: "Контурный трофей", icon: "◈", desc: "Большой контур может создать случайный перк внутри" },
   { name: "Автоконтур", icon: "◎", desc: "-1 сек к задержке автозамыкания контура, до минимума 1" },
-  { name: "Кристальный катализатор", icon: "✧", desc: "Кристаллы начинают давать scrap, потом fuel и HP" },
+  { name: "Кристальный катализатор", icon: "✧", desc: "Кристаллы начинают давать золото, потом fuel и HP" },
   { name: "Шиповой форсаж", icon: "✹", desc: "Разбитые шипы дают overdrive-баф на 6/9/12 секунд" },
   { name: "Термозаряд", icon: "☇", desc: "Усиливает урон и радиус взрыва от перегрева" },
   { name: "Терморасширение", icon: "☍", desc: "Скрыто: слито в Термозаряд" },
@@ -188,9 +188,9 @@ const state = {
   heatDamageBonus: 0,
   armor: 0,
   depth: 0,
-  scrap: 0,
-  unsafeScrap: 0,
-  scrapParticles: [],
+  gold: 0,
+  unsafeGold: 0,
+  goldParticles: [],
   baseFound: false,
   outOfFuel: false,
   dead: false,
@@ -220,8 +220,8 @@ const state = {
   crystalRewardShuffleTick: 0,
   crystalRewardPreviewPerks: [0, 0],
   crystalRewardPerks: [0, 0],
-  nextScrapPerkAt: SCRAP_PERK_BASE_COST,
-  scrapPerkLevel: 0,
+  nextGoldPerkAt: GOLD_PERK_BASE_COST,
+  goldPerkLevel: 0,
   perkChoices: [],
   pathTiles: [],
   pathIndexByCell: new Int16Array(GRID_W * GRID_H),
@@ -234,7 +234,7 @@ const state = {
   hazardMask: new Uint8Array(GRID_W * GRID_H),
   hazardTriggeredMask: new Uint8Array(GRID_W * GRID_H),
   metalMask: new Uint8Array(GRID_W * GRID_H),
-  scrapOreMask: new Uint8Array(GRID_W * GRID_H),
+  goldOreMask: new Uint8Array(GRID_W * GRID_H),
   gasPocketMask: new Uint8Array(GRID_W * GRID_H),
   gasMask: new Uint8Array(GRID_W * GRID_H),
   gasClouds: [],
@@ -246,8 +246,8 @@ const state = {
   beaconMask: new Uint8Array(GRID_W * GRID_H),
   beacons: [],
   health: new Float32Array(GRID_W * GRID_H),
-  loopScrapMask: new Float32Array(GRID_W * GRID_H),
-  droppedScrapMask: new Float32Array(GRID_W * GRID_H),
+  loopGoldMask: new Float32Array(GRID_W * GRID_H),
+  droppedGoldMask: new Float32Array(GRID_W * GRID_H),
   visibleMask: new Uint8Array(GRID_W * GRID_H),
   visibleAlpha: new Float32Array(GRID_W * GRID_H),
   visibleTargetAlpha: new Float32Array(GRID_W * GRID_H),
@@ -266,7 +266,7 @@ const state = {
   strikeFuelCost: STRIKE_FUEL_COST,
   strikeSpeed: 1,
   drillPower: 1,
-  scrapBonus: 0,
+  goldBonus: 0,
   fuelPickupBonus: 0,
   perkFuelBonus: 0,
   overflowBomb: false,
@@ -329,13 +329,13 @@ const state = {
     value: 0,
     time: 0,
   },
-  scrapToast: {
+  goldToast: {
     value: 0,
     time: 0,
   },
   damageFlash: 0,
   fatalErrorText: "",
-  scrapHitRect: null,
+  goldHitRect: null,
   sprites: null,
   effects: [],
   tileAnimations: [],
@@ -701,7 +701,7 @@ function createMetalSprite() {
   return canvas;
 }
 
-function createScrapOreSprite() {
+function createGoldOreSprite() {
   const canvas = makeSpriteCanvas();
   const ctx = canvas.getContext("2d");
 
@@ -834,7 +834,7 @@ function createSpriteAtlas() {
     },
     cracks: [null, createCrackSprite(1), createCrackSprite(2), createCrackSprite(3)],
     metal: createMetalSprite(),
-    scrapOre: createScrapOreSprite(),
+    goldOre: createGoldOreSprite(),
     drillFrames: [createDrillFrame(0), createDrillFrame(1), createDrillFrame(2), createDrillFrame(3)],
     baseFrames: [createBaseFrame(0), createBaseFrame(1), createBaseFrame(2), createBaseFrame(3)],
   };
@@ -878,9 +878,9 @@ function spawnExplosionEffect(x, y, radius) {
   });
 }
 
-function spawnScrapOreEffect(x, y, value) {
+function spawnGoldOreEffect(x, y, value) {
   state.effects.push({
-    kind: "scrapOre",
+    kind: "goldOre",
     x,
     y,
     value,
@@ -890,14 +890,14 @@ function spawnScrapOreEffect(x, y, value) {
   });
 }
 
-function spawnScrapParticles(tileX, tileY, totalValue, options = {}) {
+function spawnGoldParticles(tileX, tileY, totalValue, options = {}) {
   if (totalValue <= 0) return;
   const count = Math.min(8, Math.max(3, totalValue));
   const baseValue = Math.floor(totalValue / count);
   for (let i = 0; i < count; i += 1) {
     const value = i === count - 1 ? totalValue - baseValue * (count - 1) : baseValue;
     const seed = (tileX * 73417 + tileY * 53923 + i * 131) % 1000;
-    state.scrapParticles.push({
+    state.goldParticles.push({
       tileX: tileX + 0.5,
       tileY: tileY + 0.5,
       value,
@@ -956,13 +956,13 @@ function chooseWeightedPerk(weights, random = Math.random) {
   return 1;
 }
 
-function getScrapPerkCost(level) {
-  const multiplier = SCRAP_PERK_COST_MULTIPLIER + level * SCRAP_PERK_LEVEL_MULTIPLIER_STEP;
-  return Math.round(SCRAP_PERK_BASE_COST * multiplier ** level);
+function getGoldPerkCost(level) {
+  const multiplier = GOLD_PERK_COST_MULTIPLIER + level * GOLD_PERK_LEVEL_MULTIPLIER_STEP;
+  return Math.round(GOLD_PERK_BASE_COST * multiplier ** level);
 }
 
 function getIdleFuelDrain() {
-  const baseDrain = IDLE_FUEL_DRAIN + Math.floor(state.scrapPerkLevel / 3);
+  const baseDrain = IDLE_FUEL_DRAIN + Math.floor(state.goldPerkLevel / 3);
   const tankPenalty = state.tankBoostLevel > 0 ? Math.max(1, baseDrain * 0.1) * state.tankBoostLevel : 0;
   return baseDrain + tankPenalty;
 }
@@ -1174,11 +1174,11 @@ function setupField() {
   state.perkZoneMask.fill(-1);
   state.gasMask.fill(0);
   state.steamMask.fill(0);
-  state.loopScrapMask.fill(0);
-  state.droppedScrapMask.fill(0);
+  state.loopGoldMask.fill(0);
+  state.droppedGoldMask.fill(0);
   state.hazardTriggeredMask.fill(0);
   state.metalMask.fill(0);
-  state.scrapOreMask.fill(0);
+  state.goldOreMask.fill(0);
   state.visibleMask.fill(0);
   state.gasPocketMask.fill(0);
   state.steamPocketMask.fill(0);
@@ -1205,8 +1205,8 @@ function setupField() {
   state.heatExplosionRadiusBonus = 0;
   state.heatDamageBonus = 0;
   state.armor = 0;
-  state.scrap = 0;
-  state.unsafeScrap = 0;
+  state.gold = 0;
+  state.unsafeGold = 0;
   state.depth = 0;
   state.perkText = "Нет";
   state.crystalRecipe = [];
@@ -1228,8 +1228,8 @@ function setupField() {
   state.crystalRewardShuffleTick = 0;
   state.crystalRewardPreviewPerks = [0, 0];
   state.crystalRewardPerks = [0, 0];
-  state.nextScrapPerkAt = SCRAP_PERK_BASE_COST;
-  state.scrapPerkLevel = 0;
+  state.nextGoldPerkAt = GOLD_PERK_BASE_COST;
+  state.goldPerkLevel = 0;
   state.perkChoices = [];
   state.signalMovesLeft = 0;
   state.signalMovesMax = 0;
@@ -1241,7 +1241,7 @@ function setupField() {
   state.strikeFuelCost = STRIKE_FUEL_COST;
   state.strikeSpeed = 1;
   state.drillPower = 1;
-  state.scrapBonus = 0;
+  state.goldBonus = 0;
   state.fuelPickupBonus = 0;
   state.perkFuelBonus = 0;
   state.overflowBomb = false;
@@ -1298,11 +1298,11 @@ function setupField() {
   state.fuelToast.time = 0;
   state.hpToast.value = 0;
   state.hpToast.time = 0;
-  state.scrapParticles.length = 0;
-  state.scrapToast.value = 0;
-  state.scrapToast.time = 0;
+  state.goldParticles.length = 0;
+  state.goldToast.value = 0;
+  state.goldToast.time = 0;
   state.damageFlash = 0;
-  state.scrapHitRect = null;
+  state.goldHitRect = null;
   state.effects.length = 0;
   state.tileAnimations.length = 0;
   state.tileAnimDest.clear();
@@ -1339,7 +1339,7 @@ function setupField() {
   state.hardness.set(map.hardness);
   state.hazardMask.set(map.hazardMask);
   state.metalMask.set(map.metalMask);
-  state.scrapOreMask.set(map.scrapOreMask);
+  state.goldOreMask.set(map.goldOreMask);
   state.gasPocketMask.set(map.gasPocketMask);
   state.steamPocketMask.set(map.steamPocketMask);
   state.boulderPocketMask.set(map.boulderPocketMask);
@@ -1460,12 +1460,12 @@ function startCrystalRecipe(firstCrystalType) {
   state.crystalStatusText = `${CRYSTAL_TYPES[firstCrystalType].name}: 1/${state.crystalRecipe.length}`;
 }
 
-function awardBonusScrapPerkChoice() {
+function awardBonusGoldPerkChoice() {
   if (state.isChoosingPerk || state.pendingPerkChoice) {
     state.bonusPerkChoices += 1;
     return;
   }
-  if (!prepareScrapPerkChoices()) {
+  if (!prepareGoldPerkChoices()) {
     return;
   }
   state.isChoosingPerk = true;
@@ -1488,8 +1488,8 @@ function applyCrystalCatalystBonus(x, y) {
     return;
   }
 
-  state.unsafeScrap += 30;
-  showScrapToast(30);
+  state.unsafeGold += 30;
+  showGoldToast(30);
 
   if (state.crystalCatalystLevel >= 2) {
     addFuel(40, x, y);
@@ -1557,12 +1557,12 @@ function carveTunnel(x, y) {
     state.visibilityDirty = true;
   }
 
-  // Pick up any dropped scrap lying on this tile
-  const droppedPickup = Math.floor(state.droppedScrapMask[index]);
+  // Pick up any dropped gold lying on this tile
+  const droppedPickup = Math.floor(state.droppedGoldMask[index]);
   if (droppedPickup > 0) {
-    state.droppedScrapMask[index] = 0;
-    state.unsafeScrap += droppedPickup;
-    spawnScrapParticles(x, y, droppedPickup);
+    state.droppedGoldMask[index] = 0;
+    state.unsafeGold += droppedPickup;
+    spawnGoldParticles(x, y, droppedPickup);
   }
 
   if (perkType > 0) {
@@ -1696,7 +1696,7 @@ function applyTilePerk(perkType, x, y, showToast = true) {
   }
 }
 
-function applyScrapPerk(perkType) {
+function applyGoldPerk(perkType) {
   switch (perkType) {
     case 1:
       state.sideDrills += 1;
@@ -1737,7 +1737,7 @@ function applyScrapPerk(perkType) {
       state.perkText = "Радарный модуль";
       break;
     case 11:
-      state.scrapBonus += 2;
+      state.goldBonus += 2;
       state.perkText = "Ломосбор";
       break;
     case 13:
@@ -1858,7 +1858,7 @@ function applyShopPerk(nodeId, level) {
       showPerkToast("Топливный контур");
       break;
     case "recirculator":
-      state.scrapBonus += 2;
+      state.goldBonus += 2;
       state.fuelPickupBonus += 2;
       showPerkToast("Рециркулятор");
       break;
@@ -1914,9 +1914,9 @@ function showFuelToast(value) {
   state.fuelToast.time = 0.9;
 }
 
-function showScrapToast(value) {
-  state.scrapToast.value = value;
-  state.scrapToast.time = 0.9;
+function showGoldToast(value) {
+  state.goldToast.value = value;
+  state.goldToast.time = 0.9;
 }
 
 function runFuelEvent(callback) {
@@ -2205,7 +2205,7 @@ function bindUi() {
     if (state.debugPerkMenuOpen || state.manualModalOpen || state.shopModalOpen) {
       return;
     }
-    if (state.scrapHitRect && isPointInsideRect(event.clientX, event.clientY, state.scrapHitRect)) {
+    if (state.goldHitRect && isPointInsideRect(event.clientX, event.clientY, state.goldHitRect)) {
       state.dragId = null;
       state.touchAimX = 0;
       state.touchAimY = 0;
@@ -2267,7 +2267,7 @@ function bindUi() {
 
   for (let i = 0; i < perkButtons.length; i += 1) {
     perkButtons[i].addEventListener("click", () => {
-      chooseScrapPerk(i);
+      chooseGoldPerk(i);
     });
   }
 
@@ -2284,15 +2284,15 @@ function bindUi() {
       resetPad();
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
-      openShop(state.scrap);
+      openShop(state.gold);
     });
   }
 
   document.addEventListener("shop:purchase", (e) => {
     const { cost, nodeId, level } = e.detail;
-    state.scrap = Math.max(0, state.scrap - cost);
+    state.gold = Math.max(0, state.gold - cost);
     applyShopPerk(nodeId, level);
-    renderShop(state.scrap);
+    renderShop(state.gold);
   });
 
   if (manualOpen) {
@@ -2345,18 +2345,18 @@ function bindUi() {
     });
   }
 
-  const debugAddScrap = document.getElementById("debugAddScrap");
-  if (debugAddScrap) {
-    debugAddScrap.addEventListener("click", () => {
-      state.scrap += 100;
-      renderShop(state.scrap);
+  const debugAddGold = document.getElementById("debugAddGold");
+  if (debugAddGold) {
+    debugAddGold.addEventListener("click", () => {
+      state.gold += 100;
+      renderShop(state.gold);
     });
   }
 
-  const debugAddUnsafeScrap = document.getElementById("debugAddUnsafeScrap");
-  if (debugAddUnsafeScrap) {
-    debugAddUnsafeScrap.addEventListener("click", () => {
-      state.unsafeScrap += 100;
+  const debugAddUnsafeGold = document.getElementById("debugAddUnsafeGold");
+  if (debugAddUnsafeGold) {
+    debugAddUnsafeGold.addEventListener("click", () => {
+      state.unsafeGold += 100;
     });
   }
 
@@ -2411,8 +2411,8 @@ function isPointInsideRect(x, y, rect) {
 
 function buildDebugPerkButtons() {
   const tileRoot = document.getElementById("debugTilePerks");
-  const scrapRoot = document.getElementById("debugScrapPerks");
-  if (!tileRoot || !scrapRoot) {
+  const goldRoot = document.getElementById("debugGoldPerks");
+  if (!tileRoot || !goldRoot) {
     return;
   }
 
@@ -2438,32 +2438,32 @@ function buildDebugPerkButtons() {
     tileRoot.appendChild(button);
   }
 
-  scrapRoot.innerHTML = "";
-  for (let i = 1; i < SCRAP_PERK_TYPES.length; i += 1) {
+  goldRoot.innerHTML = "";
+  for (let i = 1; i < GOLD_PERK_TYPES.length; i += 1) {
     if (i === 21) {
       continue;
     }
-    if (!SCRAP_PERK_TYPES[i]) {
+    if (!GOLD_PERK_TYPES[i]) {
       continue;
     }
-    const perk = SCRAP_PERK_TYPES[i];
-    const key = `scrap:${i}`;
+    const perk = GOLD_PERK_TYPES[i];
+    const key = `gold:${i}`;
     const isSelected = state.debugPerkSelection === key;
     const button = document.createElement("button");
     button.type = "button";
     button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
-    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon">${getScrapPerkIconMarkup(i, "debug-perk-menu__icon-svg")}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
+    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon">${getGoldPerkIconMarkup(i, "debug-perk-menu__icon-svg")}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
     button.addEventListener("click", () => {
       if (state.debugPerkSelection !== key) {
         state.debugPerkSelection = key;
         buildDebugPerkButtons();
         return;
       }
-      runFuelEvent(() => applyScrapPerk(i));
+      runFuelEvent(() => applyGoldPerk(i));
       state.debugPerkSelection = "";
       syncDebugPerkOverlay();
     });
-    scrapRoot.appendChild(button);
+    goldRoot.appendChild(button);
   }
 }
 
@@ -2763,7 +2763,7 @@ function update(dt) {
   updatePerkZones(dt);
   updateChainExplosions(dt);
   updateEffects(dt);
-  updateScrapParticles(dt);
+  updateGoldParticles(dt);
   if (state.visibilityDirty) {
     rebuildVisibilityMask();
     state.visibilityDirty = false;
@@ -2823,7 +2823,7 @@ function update(dt) {
   state.perkToast.time = Math.max(0, state.perkToast.time - dt);
   state.fuelToast.time = Math.max(0, state.fuelToast.time - dt);
   state.hpToast.time = Math.max(0, state.hpToast.time - dt);
-  state.scrapToast.time = Math.max(0, state.scrapToast.time - dt);
+  state.goldToast.time = Math.max(0, state.goldToast.time - dt);
   state.damageFlash = Math.max(0, state.damageFlash - dt * 2.4);
   if (state.pendingPerkChoice) {
     state.pendingPerkDelay = Math.max(0, state.pendingPerkDelay - dt);
@@ -2836,10 +2836,10 @@ function update(dt) {
   }
   if (!state.isChoosingPerk && !state.pendingPerkChoice && state.bonusPerkChoices > 0) {
     state.bonusPerkChoices -= 1;
-    awardBonusScrapPerkChoice();
+    awardBonusGoldPerkChoice();
     return;
   }
-  // checkScrapPerkUnlock(); // replaced by beacon shop
+  // checkGoldPerkUnlock(); // replaced by beacon shop
 }
 
 function updateEffects(dt) {
@@ -2855,16 +2855,16 @@ function updateEffects(dt) {
   }
 }
 
-function updateScrapParticles(dt) {
-  for (let i = state.scrapParticles.length - 1; i >= 0; i -= 1) {
-    const p = state.scrapParticles[i];
+function updateGoldParticles(dt) {
+  for (let i = state.goldParticles.length - 1; i >= 0; i -= 1) {
+    const p = state.goldParticles[i];
     p.elapsed += dt;
     const active = p.elapsed - p.delay;
     if (active < p.duration) continue;
-    // Particle arrived — credit unsafe scrap (unless already credited as deposit)
+    // Particle arrived — credit unsafe gold (unless already credited as deposit)
     if (!p.skipCredit) {
-      state.unsafeScrap += p.value;
-      if (p.isLast && !p.skipArrivalEffect) spawnScrapOreEffect(state.drill.x, state.drill.y, p.toastValue || p.value);
+      state.unsafeGold += p.value;
+      if (p.isLast && !p.skipArrivalEffect) spawnGoldOreEffect(state.drill.x, state.drill.y, p.toastValue || p.value);
     } else if (p.destTileX !== undefined) {
       state.effects.push({
         kind: "depositArrival",
@@ -2875,7 +2875,7 @@ function updateScrapParticles(dt) {
         seed: (p.seed * 137) % 360,
       });
     }
-    state.scrapParticles.splice(i, 1);
+    state.goldParticles.splice(i, 1);
   }
 }
 
@@ -3001,7 +3001,7 @@ function rebuildVisibilityMask() {
   }
 }
 
-function prepareScrapPerkChoices() {
+function prepareGoldPerkChoices() {
   const bag = [1, 3, 4, 5, 6, 8, 11, 14, 15, 20, 22, 23, 24, 25];
   if (state.contourLengthDamageLevel < 4) {
     bag.push(26);
@@ -3062,18 +3062,18 @@ function prepareScrapPerkChoices() {
   return state.perkChoices.length > 0;
 }
 
-function checkScrapPerkUnlock() {
-  if (state.isChoosingPerk || state.pendingPerkChoice || state.scrap < state.nextScrapPerkAt) {
+function checkGoldPerkUnlock() {
+  if (state.isChoosingPerk || state.pendingPerkChoice || state.gold < state.nextGoldPerkAt) {
     return;
   }
 
-  if (!prepareScrapPerkChoices()) {
+  if (!prepareGoldPerkChoices()) {
     return;
   }
   state.pendingPerkChoice = true;
-  state.pendingPerkDelay = SCRAP_PERK_POPUP_DELAY;
-  state.scrapPerkLevel += 1;
-  state.nextScrapPerkAt += getScrapPerkCost(state.scrapPerkLevel);
+  state.pendingPerkDelay = GOLD_PERK_POPUP_DELAY;
+  state.goldPerkLevel += 1;
+  state.nextGoldPerkAt += getGoldPerkCost(state.goldPerkLevel);
 }
 
 function activateDrillOverdrive(duration, toastText = "") {
@@ -3167,7 +3167,7 @@ function healPlayer(amount, sourceText = "") {
   return actualHeal;
 }
 
-function chooseScrapPerk(slotIndex) {
+function chooseGoldPerk(slotIndex) {
   if (!state.isChoosingPerk) {
     return;
   }
@@ -3177,7 +3177,7 @@ function chooseScrapPerk(slotIndex) {
     return;
   }
 
-  runFuelEvent(() => applyScrapPerk(perkType));
+  runFuelEvent(() => applyGoldPerk(perkType));
   state.isChoosingPerk = false;
   state.perkChoices = [];
   syncPerkChoiceOverlay();
@@ -3188,7 +3188,7 @@ function rerollPerkChoices() {
     return;
   }
 
-  if (!prepareScrapPerkChoices()) {
+  if (!prepareGoldPerkChoices()) {
     return;
   }
 
@@ -3209,7 +3209,7 @@ function formatSignedNumber(value, suffix = "") {
   return suffix ? `${text}${suffix}` : text;
 }
 
-function getScrapPerkIconMarkup(perkType, className = "") {
+function getGoldPerkIconMarkup(perkType, className = "") {
   const cls = className ? ` class="${className}"` : "";
   const stroke = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"';
   switch (perkType) {
@@ -3290,7 +3290,7 @@ function getLoopPerkChance(cellCount, level = state.loopPerkLevel) {
   return largeLoop ? 0.75 : 0.4;
 }
 
-function getScrapPerkNextLevel(perkType) {
+function getGoldPerkNextLevel(perkType) {
   switch (perkType) {
     case 1:
       return state.sideDrills + 1;
@@ -3311,7 +3311,7 @@ function getScrapPerkNextLevel(perkType) {
     case 10:
       return 1;
     case 11:
-      return Math.round(state.scrapBonus / 2) + 1;
+      return Math.round(state.goldBonus / 2) + 1;
     case 13:
       return 1;
     case 14:
@@ -3353,7 +3353,7 @@ function getScrapPerkNextLevel(perkType) {
   }
 }
 
-function getScrapPerkCurrentLevel(perkType) {
+function getGoldPerkCurrentLevel(perkType) {
   switch (perkType) {
     case 1:
       return state.sideDrills;
@@ -3374,7 +3374,7 @@ function getScrapPerkCurrentLevel(perkType) {
     case 10:
       return state.radarCrystalModule ? 1 : 0;
     case 11:
-      return Math.round(state.scrapBonus / 2);
+      return Math.round(state.goldBonus / 2);
     case 13:
       return state.overflowBomb ? 1 : 0;
     case 14:
@@ -3416,7 +3416,7 @@ function getScrapPerkCurrentLevel(perkType) {
   }
 }
 
-function getScrapPerkPreview(perkType) {
+function getGoldPerkPreview(perkType) {
   switch (perkType) {
     case 1: {
       const currentPower = 0.5 + state.sideDrills * 0.25;
@@ -3489,8 +3489,8 @@ function getScrapPerkPreview(perkType) {
     }
     case 11: {
       return {
-        effect: "+2 scrap за каждый блок",
-        compare: `${state.scrapBonus} → ${state.scrapBonus + 2}`,
+        effect: "+2 gold за каждый блок",
+        compare: `${state.goldBonus} → ${state.goldBonus + 2}`,
       };
     }
     case 13: {
@@ -3532,9 +3532,9 @@ function getScrapPerkPreview(perkType) {
     case 18: {
       const level = state.crystalCatalystLevel;
       let effect = "Бонусы за кристаллы";
-      let compare = "0 → +30 scrap";
+      let compare = "0 → +30 gold";
       if (level === 1) {
-        compare = "+30 scrap → +40 fuel";
+        compare = "+30 gold → +40 fuel";
       } else if (level === 2) {
         compare = "+40 fuel → +1 HP";
       } else if (level >= 3) {
@@ -3629,7 +3629,7 @@ function getScrapPerkPreview(perkType) {
       const currentTank = Math.round(120 * currentMultiplier) - state.perkFuelBonus;
       const nextTank = Math.round(120 * nextMultiplier) - state.perkFuelBonus;
       const currentDrain = getIdleFuelDrain();
-      const nextBaseDrain = IDLE_FUEL_DRAIN + Math.floor(state.scrapPerkLevel / 3);
+      const nextBaseDrain = IDLE_FUEL_DRAIN + Math.floor(state.goldPerkLevel / 3);
       const nextDrain = nextBaseDrain + Math.max(1, nextBaseDrain * 0.1) * Math.min(3, state.tankBoostLevel + 1);
       return {
         effect: "Бак сильнее, но растет расход в секунду",
@@ -3655,7 +3655,7 @@ function syncPerkChoiceOverlay() {
   const rerollButton = document.getElementById("perkReroll");
   const rerollCount = document.getElementById("perkRerollCount");
   if (subtitle) {
-    subtitle.textContent = `Апгрейд за ${getScrapPerkCost(state.scrapPerkLevel)} скрапа`;
+    subtitle.textContent = `Апгрейд за ${getGoldPerkCost(state.goldPerkLevel)} золота`;
   }
   if (rerollButton) {
     rerollButton.disabled = !state.isChoosingPerk || state.perkRerolls <= 0;
@@ -3672,8 +3672,8 @@ function syncPerkChoiceOverlay() {
       button.innerHTML = "";
       continue;
     }
-    const preview = getScrapPerkPreview(perkType);
-    button.innerHTML = `<span class="perk-option__top"><span class="perk-option__title"><span class="perk-option__icon">${getScrapPerkIconMarkup(perkType, "perk-option__icon-svg")}</span><span class="perk-option__name">${SCRAP_PERK_TYPES[perkType].name}</span></span><span class="perk-option__level">Лвл ${getScrapPerkNextLevel(perkType)}</span></span><span class="perk-option__effect">${preview.effect}</span><span class="perk-option__compare">${preview.compare}</span>`;
+    const preview = getGoldPerkPreview(perkType);
+    button.innerHTML = `<span class="perk-option__top"><span class="perk-option__title"><span class="perk-option__icon">${getGoldPerkIconMarkup(perkType, "perk-option__icon-svg")}</span><span class="perk-option__name">${GOLD_PERK_TYPES[perkType].name}</span></span><span class="perk-option__level">Лвл ${getGoldPerkNextLevel(perkType)}</span></span><span class="perk-option__effect">${preview.effect}</span><span class="perk-option__compare">${preview.compare}</span>`;
   }
 }
 
@@ -3702,10 +3702,10 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   }
 }
 
-function dropUnsafeScrap() {
-  if (state.unsafeScrap <= 0) return;
-  const total = Math.floor(state.unsafeScrap);
-  state.unsafeScrap = 0;
+function dropUnsafeGold() {
+  if (state.unsafeGold <= 0) return;
+  const total = Math.floor(state.unsafeGold);
+  state.unsafeGold = 0;
   const dropAmount = Math.ceil(total / 2); // half disappears, half drops
 
   const px = state.drill.x;
@@ -3745,12 +3745,12 @@ function dropUnsafeScrap() {
     const tileValue = perTarget + (remainder > 0 ? 1 : 0);
     if (remainder > 0) remainder -= 1;
     if (tileValue <= 0) continue;
-    state.droppedScrapMask[idx] += tileValue;
+    state.droppedGoldMask[idx] += tileValue;
 
     // Visual: particles fly from hero to each target tile
     const particleCount = Math.max(1, Math.floor(tileValue / 5));
     for (let p = 0; p < particleCount; p += 1) {
-      state.scrapParticles.push({
+      state.goldParticles.push({
         tileX: 0,
         tileY: 0,
         destTileX: tx,
@@ -3792,7 +3792,7 @@ function applyHazardDamage(amount, options = {}) {
   state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
   state.damageFlash = Math.min(1, state.damageFlash + 0.8);
   showHpToast(damageLeft);
-  dropUnsafeScrap();
+  dropUnsafeGold();
   if (state.hp <= 0) {
     state.dead = true;
   }
@@ -4118,21 +4118,21 @@ function breakCell(x, y, index, options = {}) {
     return;
   }
   const hazardType = state.hazardMask[index];
-  const scrapMultiplier = state.loopScrapMask[index] > 0 ? state.loopScrapMask[index] : 1;
-  const scrapGain =
+  const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
+  const goldGain =
     hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion"
       ? 1
-      : state.scrapOreMask[index]
-        ? Math.floor(SCRAP_ORE_PER_BLOCK * scrapMultiplier)
+      : state.goldOreMask[index]
+        ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier)
         : 0;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
-  if (state.scrapOreMask[index]) {
-    spawnScrapParticles(x, y, scrapGain);
+  if (state.goldOreMask[index]) {
+    spawnGoldParticles(x, y, goldGain);
   }
-  const embeddedScrap = Math.floor(state.droppedScrapMask[index]);
-  if (embeddedScrap > 0) {
-    state.droppedScrapMask[index] = 0;
-    spawnScrapParticles(x, y, embeddedScrap);
+  const embeddedGold = Math.floor(state.droppedGoldMask[index]);
+  if (embeddedGold > 0) {
+    state.droppedGoldMask[index] = 0;
+    spawnGoldParticles(x, y, embeddedGold);
   }
   state.hardness[index] = 0;
   state.health[index] = 0;
@@ -4146,8 +4146,8 @@ function breakCell(x, y, index, options = {}) {
   }
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
-  state.loopScrapMask[index] = 0;
-  state.scrapOreMask[index] = 0;
+  state.loopGoldMask[index] = 0;
+  state.goldOreMask[index] = 0;
   if (hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion") {
     triggerSpikeChain(x, y);
   }
@@ -4270,10 +4270,10 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   consumeSignalMove(fromX, fromY, toX, toY);
   extendPath(toX, toY);
   const moveIndex = cellIndex(toX, toY);
-  const droppedPickup = Math.floor(state.droppedScrapMask[moveIndex]);
+  const droppedPickup = Math.floor(state.droppedGoldMask[moveIndex]);
   if (droppedPickup > 0 && state.tunnelMask[moveIndex]) {
-    state.droppedScrapMask[moveIndex] = 0;
-    spawnScrapParticles(toX, toY, droppedPickup);
+    state.droppedGoldMask[moveIndex] = 0;
+    spawnGoldParticles(toX, toY, droppedPickup);
   }
   state.signalPrevX = toX;
   state.signalPrevY = toY;
@@ -4433,7 +4433,7 @@ function maybeMoveBase() {
   const sourceCrystal = state.crystalMask[fromIndex];
   const sourceHazard = state.hazardMask[fromIndex];
   const sourceHazardTriggered = state.hazardTriggeredMask[fromIndex];
-  const sourceLoopScrap = state.loopScrapMask[fromIndex];
+  const sourceLoopGold = state.loopGoldMask[fromIndex];
   const targetVisual = captureCellVisualData(toIndex);
   const targetTunnel = state.tunnelMask[toIndex];
   const targetHardness = state.hardness[toIndex];
@@ -4442,7 +4442,7 @@ function maybeMoveBase() {
   const targetCrystal = state.crystalMask[toIndex];
   const targetHazard = state.hazardMask[toIndex];
   const targetHazardTriggered = state.hazardTriggeredMask[toIndex];
-  const targetLoopScrap = state.loopScrapMask[toIndex];
+  const targetLoopGold = state.loopGoldMask[toIndex];
 
   state.tunnelMask[toIndex] = sourceTunnel;
   state.hardness[toIndex] = sourceHardness;
@@ -4451,7 +4451,7 @@ function maybeMoveBase() {
   state.crystalMask[toIndex] = sourceCrystal;
   state.hazardMask[toIndex] = sourceHazard;
   state.hazardTriggeredMask[toIndex] = sourceHazardTriggered;
-  state.loopScrapMask[toIndex] = sourceLoopScrap;
+  state.loopGoldMask[toIndex] = sourceLoopGold;
 
   state.tunnelMask[fromIndex] = targetTunnel;
   state.hardness[fromIndex] = targetHardness;
@@ -4460,7 +4460,7 @@ function maybeMoveBase() {
   state.crystalMask[fromIndex] = targetCrystal;
   state.hazardMask[fromIndex] = targetHazard;
   state.hazardTriggeredMask[fromIndex] = targetHazardTriggered;
-  state.loopScrapMask[fromIndex] = targetLoopScrap;
+  state.loopGoldMask[fromIndex] = targetLoopGold;
   startBaseMoveAnimation(toX, toY);
   startTileMoveAnimation(targetVisual, toX, toY, fromX, fromY, BASE_MOVE_ANIMATION_DURATION);
   state.base.x = toX;
@@ -4876,7 +4876,7 @@ function updateDiscovery() {
 }
 
 function tryBeaconContourDeposit(x, y) {
-  if (state.unsafeScrap <= 0) return;
+  if (state.unsafeGold <= 0) return;
   for (const beacon of state.beacons) {
     if (x < beacon.x - 1 || x > beacon.x + 2 || y < beacon.y - 1 || y > beacon.y + 2) continue;
     // Count tiles in beacon 4×4 area not yet covered by contour.
@@ -4889,13 +4889,13 @@ function tryBeaconContourDeposit(x, y) {
       }
     }
     const i = uncoveredAfter + 1; // tiles remaining including current step
-    const chunk = Math.max(1, Math.floor(state.unsafeScrap / i));
-    state.unsafeScrap = Math.max(0, state.unsafeScrap - chunk);
-    state.scrap += chunk;
-    // Visual: particles fly from hero to beacon, one per 5 scrap
+    const chunk = Math.max(1, Math.floor(state.unsafeGold / i));
+    state.unsafeGold = Math.max(0, state.unsafeGold - chunk);
+    state.gold += chunk;
+    // Visual: particles fly from hero to beacon, one per 5 gold
     const particleCount = Math.max(1, Math.floor(chunk / 5));
     for (let i = 0; i < particleCount; i += 1) {
-      state.scrapParticles.push({
+      state.goldParticles.push({
         tileX: 0,
         tileY: 0,
         destTileX: beacon.x + 0.5,
@@ -4988,7 +4988,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       }
       interiorCells.push({ x, y });
       const index = cellIndex(x, y);
-      state.loopScrapMask[index] = 0.5;
+      state.loopGoldMask[index] = 0.5;
       if (state.tunnelMask[index]) {
         continue;
       }
@@ -5026,15 +5026,15 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     if (pathWithinBeaconArea) {
       const wasActive = beacon.active;
       beacon.active = true;
-      // Deposit any remaining unsafe scrap (most was deposited progressively)
-      if (state.unsafeScrap > 0) {
-        state.scrap += Math.floor(state.unsafeScrap);
-        state.unsafeScrap = 0;
+      // Deposit any remaining unsafe gold (most was deposited progressively)
+      if (state.unsafeGold > 0) {
+        state.gold += Math.floor(state.unsafeGold);
+        state.unsafeGold = 0;
       }
       showPerkToast(wasActive ? "Скреп сохранён!" : "Маяк активирован!");
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
-      openShop(state.scrap);
+      openShop(state.gold);
     }
   }
 
@@ -5110,7 +5110,7 @@ function maybeSpawnLoopPerk(interiorCells) {
   state.health[index] = BLOCK_TYPES[hardness].hp;
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
-  state.loopScrapMask[index] = 0;
+  state.loopGoldMask[index] = 0;
   state.perkMask[index] = chooseTilePerkForPosition(cell.x, cell.y, state.worldRandom);
   showPerkToast("Контурный трофей");
 }
@@ -5336,7 +5336,7 @@ function renderEffects(camera) {
       ctx.fillStyle = "#fff7ea";
       ctx.strokeText(text, cx + driftX, cy - 8 - lift);
       ctx.fillText(text, cx + driftX, cy - 8 - lift);
-    } else if (effect.kind === "scrapOre") {
+    } else if (effect.kind === "goldOre") {
       const t = progress;
       const easeOut = 1 - (1 - t) * (1 - t);
 
@@ -5416,8 +5416,8 @@ function renderEffects(camera) {
       ctx.lineWidth = 3.5;
       ctx.strokeStyle = "rgba(16, 8, 2, 0.95)";
       ctx.fillStyle = "#f8e040";
-      ctx.strokeText(`+${effect.value} ⛭`, 0, 0);
-      ctx.fillText(`+${effect.value} ⛭`, 0, 0);
+      ctx.strokeText(`+${effect.value} ●`, 0, 0);
+      ctx.fillText(`+${effect.value} ●`, 0, 0);
       ctx.restore();
       ctx.globalAlpha = 1;
     } else if (effect.kind === "loopField") {
@@ -5495,14 +5495,14 @@ function renderDepositArrivals(camera) {
   ctx.restore();
 }
 
-function renderScrapParticles(camera) {
-  if (state.scrapParticles.length === 0) return;
+function renderGoldParticles(camera) {
+  if (state.goldParticles.length === 0) return;
   const ctx = state.ctx;
   const heroX = state.drill.renderX * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
   const heroY = state.drill.renderY * TILE_SIZE - camera.y + TILE_SIZE * 0.5;
 
-  for (let i = 0; i < state.scrapParticles.length; i += 1) {
-    const p = state.scrapParticles[i];
+  for (let i = 0; i < state.goldParticles.length; i += 1) {
+    const p = state.goldParticles[i];
     const active = p.elapsed - p.delay;
     if (active <= 0) continue;
 
@@ -5641,11 +5641,11 @@ function render() {
         drawTileSprite(state.sprites.boulderPocket, sx, sy);
       } else {
         drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
-        if (state.scrapOreMask[index]) {
-          drawTileSprite(state.sprites.scrapOre, sx, sy);
+        if (state.goldOreMask[index]) {
+          drawTileSprite(state.sprites.goldOre, sx, sy);
         }
-        if (state.droppedScrapMask[index] > 0) {
-          const amount = state.droppedScrapMask[index];
+        if (state.droppedGoldMask[index] > 0) {
+          const amount = state.droppedGoldMask[index];
           const pulse = Math.sin((state.lastTs || 0) * 0.004 + x * 1.7 + y * 1.3) * 0.5 + 0.5;
           const intensity = Math.min(1, amount / 30);
           const dotCount = 2 + Math.floor(intensity * 4);
@@ -5709,7 +5709,7 @@ function render() {
       renderPerkTile(x, y, sx, sy);
       renderCrystalTile(x, y, sx, sy);
 
-      if (state.tunnelMask[index] && state.droppedScrapMask[index] > 0) {
+      if (state.tunnelMask[index] && state.droppedGoldMask[index] > 0) {
         const pulse = Math.sin((state.lastTs || 0) * 0.004 + x * 1.3 + y * 0.9) * 0.5 + 0.5;
         ctx.globalAlpha = visibleAlpha * (0.65 + pulse * 0.35);
         ctx.fillStyle = "#f0c040";
@@ -5727,14 +5727,14 @@ function render() {
   renderSteamJets(camera);
   renderEffects(camera);
   renderBeacon(camera);
-  renderScrapParticles(camera);
+  renderGoldParticles(camera);
   renderDepositArrivals(camera);
   renderBase(camera);
   renderBoulders(camera);
   renderDrill(camera);
   renderFuelToast(camera);
   renderHpToast(camera);
-  renderScrapToast(camera);
+  renderGoldToast(camera);
   renderPerkToast(camera);
   renderSignalStatus(camera);
   renderBeaconRadar(camera);
@@ -6919,17 +6919,17 @@ function renderHpToast(camera) {
   ctx.restore();
 }
 
-function renderScrapToast(camera) {
-  if (state.scrapToast.time <= 0 || state.scrapToast.value <= 0) {
+function renderGoldToast(camera) {
+  if (state.goldToast.time <= 0 || state.goldToast.value <= 0) {
     return;
   }
 
   const ctx = state.ctx;
   const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const lift = (0.9 - state.scrapToast.time) * 22;
+  const lift = (0.9 - state.goldToast.time) * 22;
   const y = state.drill.renderY * TILE_SIZE - camera.y - 56 - lift;
-  const alpha = clamp(state.scrapToast.time / 0.9, 0, 1);
-  const text = `+${state.scrapToast.value} scrap`;
+  const alpha = clamp(state.goldToast.time / 0.9, 0, 1);
+  const text = `+${state.goldToast.value} золото`;
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -6962,7 +6962,7 @@ function renderHud() {
 
   const hpLabel = state.armor > 0 ? `${state.hp}/${state.maxHp} • A:${state.armor}` : `${state.hp}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
-  state.scrapHitRect = { x: left, y: top, width: panelWidth, height: panelHeight };
+  state.goldHitRect = { x: left, y: top, width: panelWidth, height: panelHeight };
 
   // Crystal recipe in top-right slot
   const ctx = state.ctx;
@@ -7065,7 +7065,7 @@ function renderHud() {
   ctx.restore();
 }
 
-function drawHudScrapCounter(x, y, width, height) {
+function drawHudGoldCounter(x, y, width, height) {
   const ctx = state.ctx;
   ctx.save();
   const cy = y + height * 0.5;
@@ -7073,31 +7073,21 @@ function drawHudScrapCounter(x, y, width, height) {
   const iconSize = 18;
   const half = iconSize * 0.5;
 
-  // Diamond icon — same style as renderHudMiniPerkIcon
+  // Golden circle icon
   ctx.translate(iconX, cy);
-  ctx.fillStyle = "#d79f4928";
+  const r = iconSize * 0.38;
   ctx.beginPath();
-  ctx.arc(0, 0, iconSize * 0.32, 0, Math.PI * 2);
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#d79f49";
   ctx.fill();
-  ctx.strokeStyle = "#d79f49";
+  ctx.strokeStyle = "#f0c060";
   ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(0, -half + 2);
-  ctx.lineTo(half - 2, 0);
-  ctx.lineTo(0, half - 2);
-  ctx.lineTo(-half + 2, 0);
-  ctx.closePath();
   ctx.stroke();
-  ctx.fillStyle = "#2b1b14";
-  ctx.font = `700 ${Math.max(8, iconSize * 0.38)}px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("⛭", 0, 0.5);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // Safe scrap value
+  // Safe gold value
   const textX = iconX + half + 6;
-  const safeText = `${Math.floor(state.scrap)}`;
+  const safeText = `${Math.floor(state.gold)}`;
   ctx.font = `700 11px ${HUD_FONT}`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
@@ -7107,10 +7097,10 @@ function drawHudScrapCounter(x, y, width, height) {
   ctx.fillStyle = "#f1dfb6";
   ctx.fillText(safeText, textX, cy);
 
-  // Unsafe scrap
-  if (state.unsafeScrap > 0) {
+  // Unsafe gold
+  if (state.unsafeGold > 0) {
     const unsafeX = textX + ctx.measureText(safeText).width + 6;
-    const unsafeText = `+${Math.floor(state.unsafeScrap)}`;
+    const unsafeText = `+${Math.floor(state.unsafeGold)}`;
     ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
     ctx.lineWidth = 3;
     ctx.strokeText(unsafeText, unsafeX, cy);
@@ -7230,51 +7220,40 @@ function renderHudCoreStats(x, y, width, title) {
   ctx.save();
   ctx.textBaseline = "middle";
 
-  // Scrap row — first
-  const scrapRowY = y + 8;
+  // Gold row — first
+  const goldRowY = y + 8;
   const half = 9;
   ctx.save();
-  ctx.translate(x + 20, scrapRowY);
-  ctx.fillStyle = "#d79f4928";
+  ctx.translate(x + 20, goldRowY);
   ctx.beginPath();
-  ctx.arc(0, 0, 18 * 0.32, 0, Math.PI * 2);
+  ctx.arc(0, 0, 18 * 0.38, 0, Math.PI * 2);
+  ctx.fillStyle = "#d79f49";
   ctx.fill();
-  ctx.strokeStyle = "#d79f49";
+  ctx.strokeStyle = "#f0c060";
   ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(0, -half + 2);
-  ctx.lineTo(half - 2, 0);
-  ctx.lineTo(0, half - 2);
-  ctx.lineTo(-half + 2, 0);
-  ctx.closePath();
   ctx.stroke();
-  ctx.fillStyle = "#2b1b14";
-  ctx.font = `700 7px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("⛭", 0, 0.5);
   ctx.restore();
 
   ctx.font = `700 11px ${HUD_FONT}`;
   ctx.textAlign = "left";
-  const safeText = `${Math.floor(state.scrap)}`;
+  const safeText = `${Math.floor(state.gold)}`;
   ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
   ctx.lineWidth = 3;
-  ctx.strokeText(safeText, x + 36, scrapRowY);
+  ctx.strokeText(safeText, x + 36, goldRowY);
   ctx.fillStyle = "#f1dfb6";
-  ctx.fillText(safeText, x + 36, scrapRowY);
-  if (state.unsafeScrap > 0) {
+  ctx.fillText(safeText, x + 36, goldRowY);
+  if (state.unsafeGold > 0) {
     const unsafeX = x + 36 + ctx.measureText(safeText).width + 5;
-    const unsafeText = `+${Math.floor(state.unsafeScrap)}`;
+    const unsafeText = `+${Math.floor(state.unsafeGold)}`;
     ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
     ctx.lineWidth = 3;
-    ctx.strokeText(unsafeText, unsafeX, scrapRowY);
+    ctx.strokeText(unsafeText, unsafeX, goldRowY);
     ctx.fillStyle = "#ff9940";
-    ctx.fillText(unsafeText, unsafeX, scrapRowY);
+    ctx.fillText(unsafeText, unsafeX, goldRowY);
   }
 
   for (let i = 0; i < rows.length; i += 1) {
-    const rowY = scrapRowY + (i + 1) * rowHeight;
+    const rowY = goldRowY + (i + 1) * rowHeight;
     renderHudMiniPerkIcon(rows[i].perkType, x + 20, rowY, 18);
     ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
     ctx.lineWidth = 3;
@@ -7291,21 +7270,21 @@ function renderHudCoreStats(x, y, width, title) {
 function renderHudPerkColumn(x, y, width, title) {
   const ctx = state.ctx;
   const perkRows = [];
-  for (let i = 1; i < SCRAP_PERK_TYPES.length; i += 1) {
+  for (let i = 1; i < GOLD_PERK_TYPES.length; i += 1) {
     if (i === 21) {
       continue;
     }
-    if (!SCRAP_PERK_TYPES[i]) {
+    if (!GOLD_PERK_TYPES[i]) {
       continue;
     }
-    const level = getScrapPerkCurrentLevel(i);
+    const level = getGoldPerkCurrentLevel(i);
     if (level <= 0) {
       continue;
     }
     perkRows.push({
       perkType: i,
-      icon: SCRAP_PERK_TYPES[i].icon || "?",
-      name: SCRAP_PERK_TYPES[i].name,
+      icon: GOLD_PERK_TYPES[i].icon || "?",
+      name: GOLD_PERK_TYPES[i].name,
       level,
     });
   }
@@ -7335,7 +7314,7 @@ function renderHudPerkColumn(x, y, width, title) {
     ctx.fillStyle = "#ffeacb";
     ctx.font = `700 10px ${HUD_FONT}`;
     ctx.textAlign = "center";
-    ctx.fillText(SCRAP_PERK_TYPES[perkType].icon || "?", cx, cy + 0.5);
+    ctx.fillText(GOLD_PERK_TYPES[perkType].icon || "?", cx, cy + 0.5);
 
     if (perkRows[i].level >= 2) {
       const badgeText = String(perkRows[i].level);

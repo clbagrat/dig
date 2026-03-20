@@ -234,7 +234,7 @@ body {
   background: linear-gradient(90deg, #ffbf62, #ff8c3b);
 }
 
-.resource-bar__fill--scrap {
+.resource-bar__fill--gold {
   background: linear-gradient(90deg, #f0df84, #d7b548);
 }
 
@@ -1005,7 +1005,7 @@ strong {
   color: var(--muted);
 }
 
-.shop-head__scrap {
+.shop-head__gold {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1018,7 +1018,16 @@ strong {
   color: var(--accent);
 }
 
-.shop-head__scrap-icon { opacity: 0.7; }
+.shop-head__gold-icon {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d79f49;
+  border: 1.5px solid #f0c060;
+  vertical-align: middle;
+  margin-bottom: 1px;
+}
 
 .shop-close {
   width: 28px;

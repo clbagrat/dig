@@ -36,7 +36,7 @@
       <div id="perkChoice" class="perk-choice" hidden>
         <div class="perk-choice__panel">
           <div class="perk-choice__title">Выбери апгрейд</div>
-          <div class="perk-choice__subtitle">Апгрейд за 30 скрапа</div>
+          <div class="perk-choice__subtitle">Апгрейд за 30 золота</div>
           <div class="perk-choice__actions">
             <button id="perkReroll" class="perk-choice__reroll" type="button">Реролл</button>
             <span id="perkRerollCount" class="perk-choice__reroll-count">0</span>
@@ -69,10 +69,10 @@
             <button id="debugPerkClose" class="debug-perk-menu__close" type="button">Закрыть</button>
           </div>
           <div class="debug-perk-menu__section">
-            <div class="debug-perk-menu__label">Scrap</div>
+            <div class="debug-perk-menu__label">Gold</div>
             <div class="debug-perk-menu__grid">
-              <button id="debugAddScrap" type="button" class="debug-perk-menu__button">+100 ⛭</button>
-              <button id="debugAddUnsafeScrap" type="button" class="debug-perk-menu__button">+100 ⚠️⛭</button>
+              <button id="debugAddGold" type="button" class="debug-perk-menu__button">+100 ●</button>
+              <button id="debugAddUnsafeGold" type="button" class="debug-perk-menu__button">+100 ⚠️●</button>
             </div>
           </div>
           <div class="debug-perk-menu__section">
@@ -80,8 +80,8 @@
             <div id="debugTilePerks" class="debug-perk-menu__grid"></div>
           </div>
           <div class="debug-perk-menu__section">
-            <div class="debug-perk-menu__label">Scrap Perks</div>
-            <div id="debugScrapPerks" class="debug-perk-menu__grid"></div>
+            <div class="debug-perk-menu__label">Gold Perks</div>
+            <div id="debugGoldPerks" class="debug-perk-menu__grid"></div>
           </div>
         </div>
       </div>
@@ -95,6 +95,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js?v=31"></script>
+    <script type="module" src="./src/game.js?v=35"></script>
   </body>
 </html>
