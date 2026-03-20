@@ -1,4 +1,5 @@
 import { initShop, openShop, closeShop, renderShop } from "./shop.js";
+import { generateMap, mulberry32 as _mulberry32 } from "./worldgen.js";
 
 const TILE_SIZE = 36;
 const GRID_W = 150;
@@ -46,7 +47,9 @@ const BOULDER_MOVE_INTERVAL = 0.12;
 const BOULDER_BREAK_LIMIT = 20;
 const BOULDER_DAMAGE = 5;
 const BOULDER_MIN_START_DISTANCE = 4;
-const BEACON_DISTANCE = 22;
+const BEACON_COUNT = 5;
+const BEACON_MIN_DIST = 15;
+const BEACON_MAX_DIST = 60;
 const STEAM_RELEASE_DELAY = 2;
 const STEAM_LIFETIME = 3;
 const STEAM_DAMAGE = 1;
@@ -232,7 +235,7 @@ const state = {
   boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
   boulders: [],
   beaconMask: new Uint8Array(GRID_W * GRID_H),
-  beacon: { x: 0, y: 0, active: false },
+  beacons: [],
   health: new Float32Array(GRID_W * GRID_H),
   loopScrapMask: new Float32Array(GRID_W * GRID_H),
   visibleMask: new Uint8Array(GRID_W * GRID_H),
@@ -551,12 +554,53 @@ function createHazardSprite(hazardType) {
   ctx.strokeStyle = hazard.color;
   ctx.lineWidth = 2.4;
   if (hazardType === HAZARD_TYPES.SPIKE) {
-    ctx.beginPath();
-    ctx.moveTo(TILE_SIZE * 0.25, TILE_SIZE * 0.78);
-    ctx.lineTo(TILE_SIZE * 0.42, TILE_SIZE * 0.28);
-    ctx.lineTo(TILE_SIZE * 0.52, TILE_SIZE * 0.62);
-    ctx.lineTo(TILE_SIZE * 0.7, TILE_SIZE * 0.2);
-    ctx.stroke();
+    const S = TILE_SIZE;
+    ctx.lineCap = "round";
+
+    // Two crossing vines with thorns
+    const vines = [
+      // vine 1: bottom-left to top-right
+      { pts: [[0.1, 0.95], [0.25, 0.6], [0.45, 0.4], [0.7, 0.15]],
+        thorns: [[0.22, 0.65, -1, 1], [0.44, 0.42, 1, -1], [0.65, 0.22, -1, 1]] },
+      // vine 2: bottom-right to mid-left
+      { pts: [[0.9, 0.9], [0.65, 0.55], [0.35, 0.55], [0.15, 0.3]],
+        thorns: [[0.68, 0.52, 1, -1], [0.36, 0.53, -1, 1]] },
+    ];
+
+    for (const vine of vines) {
+      // Stem
+      ctx.beginPath();
+      ctx.moveTo(S * vine.pts[0][0], S * vine.pts[0][1]);
+      for (let i = 1; i < vine.pts.length; i += 1) {
+        ctx.lineTo(S * vine.pts[i][0], S * vine.pts[i][1]);
+      }
+      ctx.strokeStyle = "rgba(80, 38, 18, 0.9)";
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.strokeStyle = hazard.color;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Thorns
+      for (const [tx, ty, dx, dy] of vine.thorns) {
+        const ox = S * tx;
+        const oy = S * ty;
+        ctx.beginPath();
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(ox + dx * 5, oy + dy * 5);
+        ctx.strokeStyle = "rgba(80, 38, 18, 0.9)";
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        ctx.strokeStyle = hazard.color;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        // Thorn tip
+        ctx.fillStyle = "rgba(255, 140, 100, 0.8)";
+        ctx.beginPath();
+        ctx.arc(ox + dx * 5, oy + dy * 5, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   } else if (hazardType === HAZARD_TYPES.VOLATILE) {
     ctx.beginPath();
     ctx.arc(TILE_SIZE * 0.5, TILE_SIZE * 0.5, 7, 0, Math.PI * 2);
@@ -847,15 +891,7 @@ function spawnDamageNumberEffect(x, y, value) {
   });
 }
 
-function mulberry32(seed) {
-  let t = seed >>> 0;
-  return () => {
-    t += 0x6d2b79f5;
-    let x = Math.imul(t ^ (t >>> 15), 1 | t);
-    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-}
+const mulberry32 = _mulberry32;
 
 function newWorldSeed() {
   if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
@@ -911,30 +947,8 @@ function getTankFuelDelta() {
   return Math.round(120 * getTankFuelMultiplier()) - state.perkFuelBonus;
 }
 
-function getTargetPerkTileCount() {
-  return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_TILE));
-}
-
-function getTargetPerkZoneCount() {
-  return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_ZONE));
-}
-
-function getTargetCrystalTileCount() {
-  return Math.max(4, Math.round((GRID_W * GRID_H) / TILES_PER_CRYSTAL_TILE));
-}
-
 function getCenterDistanceRatio(x, y) {
   return clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.8);
-}
-
-function getCenterPerkDensity(x, y) {
-  const ratio = getCenterDistanceRatio(x, y);
-  return clamp(0.72 + ratio * 0.42, 0.5, 1.45);
-}
-
-function getPerkZoneDensity(x, y) {
-  const ratio = getCenterDistanceRatio(x, y);
-  return clamp(0.6 + ratio * 0.5, 0.45, 1.5);
 }
 
 function chooseTilePerkForPosition(x, y, random = Math.random) {
@@ -952,281 +966,8 @@ function chooseCrystalType(random = Math.random) {
   return 1 + Math.floor(random() * 5);
 }
 
-function isFarEnoughFromPlaced(x, y, placed, minDistance) {
-  for (let i = 0; i < placed.length; i += 1) {
-    const dx = x - placed[i].x;
-    const dy = y - placed[i].y;
-    if (Math.hypot(dx, dy) < minDistance) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function getExactDistanceOffsets(distance) {
-  const offsets = [];
-  const seen = new Set();
-
-  for (let dx = 0; dx <= distance; dx += 1) {
-    for (let dy = 0; dy <= distance; dy += 1) {
-      if (dx * dx + dy * dy !== distance * distance) {
-        continue;
-      }
-
-      const variants = [
-        [dx, dy],
-        [dx, -dy],
-        [-dx, dy],
-        [-dx, -dy],
-        [dy, dx],
-        [dy, -dx],
-        [-dy, dx],
-        [-dy, -dx],
-      ];
-
-      for (let i = 0; i < variants.length; i += 1) {
-        const key = `${variants[i][0]},${variants[i][1]}`;
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        offsets.push({ x: variants[i][0], y: variants[i][1] });
-      }
-    }
-  }
-
-  return offsets;
-}
-
-function addDangerBlob(field, cx, cy, radius, strength) {
-  const minX = Math.max(0, Math.floor(cx - radius));
-  const maxX = Math.min(GRID_W - 1, Math.ceil(cx + radius));
-  const minY = Math.max(0, Math.floor(cy - radius));
-  const maxY = Math.min(GRID_H - 1, Math.ceil(cy + radius));
-
-  for (let y = minY; y <= maxY; y += 1) {
-    for (let x = minX; x <= maxX; x += 1) {
-      const dx = x - cx;
-      const dy = y - cy;
-      const dist = Math.hypot(dx, dy);
-      if (dist > radius) {
-        continue;
-      }
-      const influence = 1 - dist / radius;
-      field[cellIndex(x, y)] += strength * influence;
-    }
-  }
-}
-
-function addDangerVein(field, startX, startY, length, radius, strength, random) {
-  let x = startX;
-  let y = startY;
-  let angle = random() * Math.PI * 2;
-
-  for (let step = 0; step < length; step += 1) {
-    addDangerBlob(field, x, y, radius, strength);
-    angle += (random() - 0.5) * 0.95;
-    x = clamp(x + Math.cos(angle) * 1.35, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.35, 1, GRID_H - 2);
-  }
-}
-
-function chooseHazardType(random, x, y) {
-  const centerRatio = clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.4);
-  const roll = random() + centerRatio * 0.2;
-  if (roll > 0.8) {
-    return HAZARD_TYPES.VOLATILE;
-  }
-  return HAZARD_TYPES.SPIKE;
-}
-
-function getHazardOrigin(random) {
-  if (random() < 0.35) {
-    return {
-      x: Math.round(clamp(START_X + (random() - 0.5) * 56, 1, GRID_W - 2)),
-      y: Math.round(clamp(START_Y + (random() - 0.5) * 56, 1, GRID_H - 2)),
-    };
-  }
-  return {
-    x: 1 + Math.floor(random() * (GRID_W - 2)),
-    y: 1 + Math.floor(random() * (GRID_H - 2)),
-  };
-}
-
-function canPlaceHazardAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function canPlaceMetalAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function canPlaceScrapOreAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function placeScrapOreVein(random, blockCount) {
-  const origin = getHazardOrigin(random);
-  let x = origin.x;
-  let y = origin.y;
-  let angle = random() * Math.PI * 2;
-  let placed = 0;
-  let attempts = 0;
-  while (placed < blockCount && attempts < blockCount * 10) {
-    attempts += 1;
-    const ix = Math.round(x);
-    const iy = Math.round(y);
-    if (canPlaceScrapOreAt(ix, iy)) {
-      state.scrapOreMask[cellIndex(ix, iy)] = 1;
-      placed += 1;
-    }
-    angle += (random() - 0.5) * 0.6;
-    x = clamp(x + Math.cos(angle) * 1.1, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.1, 1, GRID_H - 2);
-  }
-}
-
-function placeHazardBlob(random, blockCount) {
-  const origin = getHazardOrigin(random);
-  const hazardType = chooseHazardType(random, origin.x, origin.y);
-  const frontier = [{ x: origin.x, y: origin.y }];
-  const seen = new Set();
-  let placed = 0;
-
-  while (frontier.length > 0 && placed < blockCount) {
-    const frontierIndex = Math.floor(random() * frontier.length);
-    const cell = frontier.splice(frontierIndex, 1)[0];
-    const key = `${cell.x},${cell.y}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    if (!canPlaceHazardAt(cell.x, cell.y)) {
-      continue;
-    }
-
-    state.hazardMask[cellIndex(cell.x, cell.y)] = hazardType;
-    placed += 1;
-
-    const neighbors = [
-      { x: cell.x + 1, y: cell.y },
-      { x: cell.x - 1, y: cell.y },
-      { x: cell.x, y: cell.y + 1 },
-      { x: cell.x, y: cell.y - 1 },
-      { x: cell.x + 1, y: cell.y + 1 },
-      { x: cell.x + 1, y: cell.y - 1 },
-      { x: cell.x - 1, y: cell.y + 1 },
-      { x: cell.x - 1, y: cell.y - 1 },
-    ];
-    for (let i = 0; i < neighbors.length; i += 1) {
-      if (random() < 0.88) {
-        frontier.push(neighbors[i]);
-      }
-    }
-  }
-}
-
-function placeHazardVein(random, blockCount) {
-  const origin = getHazardOrigin(random);
-  const hazardType = chooseHazardType(random, origin.x, origin.y);
-  let x = origin.x;
-  let y = origin.y;
-  let angle = random() * Math.PI * 2;
-  let placed = 0;
-  let attempts = 0;
-
-  while (placed < blockCount && attempts < blockCount * 8) {
-    attempts += 1;
-    const ix = Math.round(x);
-    const iy = Math.round(y);
-    if (canPlaceHazardAt(ix, iy)) {
-      state.hazardMask[cellIndex(ix, iy)] = hazardType;
-      placed += 1;
-    }
-    angle += (random() - 0.5) * 0.85;
-    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
-  }
-}
-
-function placeMetalVein(random, blockCount) {
-  const origin = getHazardOrigin(random);
-  let x = origin.x;
-  let y = origin.y;
-  let angle = random() * Math.PI * 2;
-  let placed = 0;
-  let attempts = 0;
-
-  while (placed < blockCount && attempts < blockCount * 10) {
-    attempts += 1;
-    const ix = Math.round(x);
-    const iy = Math.round(y);
-    if (canPlaceMetalAt(ix, iy)) {
-      const index = cellIndex(ix, iy);
-      state.metalMask[index] = 1;
-      state.hazardMask[index] = 0;
-      state.gasPocketMask[index] = 0;
-      state.steamPocketMask[index] = 0;
-      state.boulderPocketMask[index] = 0;
-      placed += 1;
-    }
-    angle += (random() - 0.5) * 0.55;
-    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
-  }
-}
-
 function canPlaceGasPocketAt(x, y) {
   return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function canPlaceSteamPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function canPlaceBoulderPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function placeGasPocket(random, cellCount) {
-  const origin = getHazardOrigin(random);
-  const frontier = [{ x: origin.x, y: origin.y }];
-  const seen = new Set();
-  let placed = 0;
-
-  while (frontier.length > 0 && placed < cellCount) {
-    const frontierIndex = Math.floor(random() * frontier.length);
-    const cell = frontier.splice(frontierIndex, 1)[0];
-    const key = `${cell.x},${cell.y}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    if (!canPlaceGasPocketAt(cell.x, cell.y)) {
-      continue;
-    }
-
-    const index = cellIndex(cell.x, cell.y);
-    state.gasPocketMask[index] = 1;
-    state.hazardMask[index] = 0;
-    placed += 1;
-
-    const neighbors = [
-      { x: cell.x + 1, y: cell.y },
-      { x: cell.x - 1, y: cell.y },
-      { x: cell.x, y: cell.y + 1 },
-      { x: cell.x, y: cell.y - 1 },
-      { x: cell.x + 1, y: cell.y + 1 },
-      { x: cell.x + 1, y: cell.y - 1 },
-      { x: cell.x - 1, y: cell.y + 1 },
-      { x: cell.x - 1, y: cell.y - 1 },
-    ];
-    for (let i = 0; i < neighbors.length; i += 1) {
-      if (random() < 0.82) {
-        frontier.push(neighbors[i]);
-      }
-    }
-  }
 }
 
 function revealGasPocket(x, y) {
@@ -1282,74 +1023,6 @@ function revealGasPocket(x, y) {
     spreadsDone: 0,
   });
   applyGasContactDamage();
-}
-
-function placeSteamPocket(random, cellCount) {
-  const origin = getHazardOrigin(random);
-  const frontier = [{ x: origin.x, y: origin.y }];
-  const seen = new Set();
-  let placed = 0;
-
-  while (frontier.length > 0 && placed < cellCount) {
-    const frontierIndex = Math.floor(random() * frontier.length);
-    const cell = frontier.splice(frontierIndex, 1)[0];
-    const key = `${cell.x},${cell.y}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    if (!canPlaceSteamPocketAt(cell.x, cell.y)) {
-      continue;
-    }
-
-    const index = cellIndex(cell.x, cell.y);
-    state.steamPocketMask[index] = 1;
-    state.hazardMask[index] = 0;
-    state.gasPocketMask[index] = 0;
-    placed += 1;
-
-    const neighbors = [
-      { x: cell.x + 1, y: cell.y },
-      { x: cell.x - 1, y: cell.y },
-      { x: cell.x, y: cell.y + 1 },
-      { x: cell.x, y: cell.y - 1 },
-      { x: cell.x + 1, y: cell.y + 1 },
-      { x: cell.x + 1, y: cell.y - 1 },
-      { x: cell.x - 1, y: cell.y + 1 },
-      { x: cell.x - 1, y: cell.y - 1 },
-    ];
-    for (let i = 0; i < neighbors.length; i += 1) {
-      if (random() < 0.78) {
-        frontier.push(neighbors[i]);
-      }
-    }
-  }
-}
-
-function placeBoulderPocket(random) {
-  const origin = getHazardOrigin(random);
-  if (!canPlaceBoulderPocketAt(origin.x, origin.y)) {
-    return;
-  }
-  if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) {
-    return;
-  }
-  for (let y = 1; y < GRID_H - 1; y += 1) {
-    if (state.boulderPocketMask[cellIndex(origin.x, y)]) {
-      return;
-    }
-  }
-  for (let x = 1; x < GRID_W - 1; x += 1) {
-    if (state.boulderPocketMask[cellIndex(x, origin.y)]) {
-      return;
-    }
-  }
-
-  const index = cellIndex(origin.x, origin.y);
-  state.boulderPocketMask[index] = 1;
-  state.hazardMask[index] = 0;
-  state.gasPocketMask[index] = 0;
-  state.steamPocketMask[index] = 0;
 }
 
 function addSteamCells(cells, delta) {
@@ -1457,112 +1130,6 @@ function revealSteamPocket(x, y, dirX, dirY) {
   state.steamJets.push(jet);
 }
 
-function generateHardnessMap(random) {
-  const danger = new Float32Array(GRID_W * GRID_H);
-
-  for (let y = 0; y < GRID_H; y += 1) {
-    for (let x = 0; x < GRID_W; x += 1) {
-      const distanceRatio = clamp(Math.hypot(x - START_X, y - START_Y) / 95, 0, 1);
-      danger[cellIndex(x, y)] = 1 + distanceRatio * 4.9;
-    }
-  }
-
-  const area = GRID_W * GRID_H;
-  const blobCount = Math.max(24, Math.round(area / 1200));
-  for (let i = 0; i < blobCount; i += 1) {
-    addDangerBlob(
-      danger,
-      2 + random() * (GRID_W - 4),
-      2 + random() * (GRID_H - 4),
-      10 + random() * 24,
-      -1.6 + random() * 3.2,
-    );
-  }
-
-  const softVeins = Math.max(10, Math.round(area / 2600));
-  const hardVeins = Math.max(12, Math.round(area / 2200));
-  const ultraVeins = Math.max(6, Math.round(area / 5200));
-
-  for (let i = 0; i < softVeins; i += 1) {
-    addDangerVein(
-      danger,
-      2 + random() * (GRID_W - 4),
-      2 + random() * (GRID_H - 4),
-      14 + Math.floor(random() * 24),
-      1.3 + random() * 1.6,
-      -0.95 - random() * 0.35,
-      random,
-    );
-  }
-
-  for (let i = 0; i < hardVeins; i += 1) {
-    addDangerVein(
-      danger,
-      2 + random() * (GRID_W - 4),
-      2 + random() * (GRID_H - 4),
-      16 + Math.floor(random() * 28),
-      1.1 + random() * 1.2,
-      0.85 + random() * 0.55,
-      random,
-    );
-  }
-
-  for (let i = 0; i < ultraVeins; i += 1) {
-    addDangerVein(
-      danger,
-      2 + random() * (GRID_W - 4),
-      2 + random() * (GRID_H - 4),
-      10 + Math.floor(random() * 16),
-      0.9 + random() * 0.8,
-      1.35 + random() * 0.75,
-      random,
-    );
-  }
-
-  for (let y = 0; y < GRID_H; y += 1) {
-    for (let x = 0; x < GRID_W; x += 1) {
-      const index = cellIndex(x, y);
-      const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.16;
-      state.hardness[index] = clamp(Math.round(danger[index] + microNoise), 1, 7);
-      if (isInStartEasyRadius(x, y)) {
-        state.hardness[index] = 1;
-      }
-      state.health[index] = BLOCK_TYPES[state.hardness[index]].hp;
-      state.tunnelMask[index] = 0;
-      state.hazardMask[index] = 0;
-      state.hazardTriggeredMask[index] = 0;
-      state.gasPocketMask[index] = 0;
-      state.steamPocketMask[index] = 0;
-      state.boulderPocketMask[index] = 0;
-      state.steamMask[index] = 0;
-    }
-  }
-
-  const hazardBlobGroups = Math.max(12, Math.round(area / 3000));
-  const hazardVeinGroups = Math.max(12, Math.round(area / 3000));
-  for (let i = 0; i < hazardBlobGroups; i += 1) {
-    placeHazardBlob(random, 4 + Math.floor(random() * 17));
-  }
-  for (let i = 0; i < hazardVeinGroups; i += 1) {
-    placeHazardVein(random, 4 + Math.floor(random() * 37));
-  }
-  for (let i = 0; i < METAL_VEIN_GROUPS; i += 1) {
-    placeMetalVein(random, 12 + Math.floor(random() * 22));
-  }
-  for (let i = 0; i < SCRAP_ORE_GROUPS; i += 1) {
-    placeScrapOreVein(random, 4 + Math.floor(random() * 7));
-  }
-  for (let i = 0; i < GAS_POCKET_GROUPS; i += 1) {
-    placeGasPocket(random, 4 + Math.floor(random() * 17));
-  }
-  for (let i = 0; i < STEAM_POCKET_GROUPS; i += 1) {
-    placeSteamPocket(random, 3 + Math.floor(random() * 7));
-  }
-  for (let i = 0; i < BOULDER_POCKET_GROUPS; i += 1) {
-    placeBoulderPocket(random);
-  }
-}
-
 function setupField() {
   state.pathIndexByCell.fill(-1);
   state.perkMask.fill(0);
@@ -1579,7 +1146,7 @@ function setupField() {
   state.steamPocketMask.fill(0);
   state.boulderPocketMask.fill(0);
   state.beaconMask.fill(0);
-  state.beacon.active = false;
+  state.beacons.length = 0;
   state.perkZones.length = 0;
   state.gasClouds.length = 0;
   state.steamJets.length = 0;
@@ -1723,39 +1290,51 @@ function setupField() {
   state.worldSeed = newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
 
-  generateHardnessMap(state.worldRandom);
+  const map = generateMap(state.worldSeed);
+  state.hardness.set(map.hardness);
+  state.hazardMask.set(map.hazardMask);
+  state.metalMask.set(map.metalMask);
+  state.scrapOreMask.set(map.scrapOreMask);
+  state.gasPocketMask.set(map.gasPocketMask);
+  state.steamPocketMask.set(map.steamPocketMask);
+  state.boulderPocketMask.set(map.boulderPocketMask);
+  state.beaconMask.set(map.beaconMask);
+  state.tunnelMask.fill(0);
+  for (let i = 0; i < GRID_W * GRID_H; i += 1) {
+    state.health[i] = BLOCK_TYPES[state.hardness[i]].hp;
+    if (map.beaconMask[i] >= 1) {
+      state.hardness[i] = 0;
+      state.health[i] = 0;
+    }
+    if (map.beaconMask[i] === 2) {
+      state.tunnelMask[i] = 1;
+    }
+  }
+  state.base.x = map.base.x;
+  state.base.y = map.base.y;
+  for (const b of map.beacons) {
+    state.beacons.push({ x: b.x, y: b.y, active: false });
+  }
+  state.perkMask.set(map.perkMask);
+  state.crystalMask.set(map.crystalMask);
+  for (const zone of map.perkZones) {
+    const zoneId = state.perkZones.length;
+    state.perkZones.push({
+      x: zone.x, y: zone.y, cells: zone.cells,
+      iconX: zone.iconX, iconY: zone.iconY,
+      perkType: zone.perkType,
+      openedCount: 0, openedMask: 0,
+      arming: false, armingTimer: 0, collected: false,
+    });
+    for (let i = 0; i < zone.cells.length; i += 1) {
+      state.perkZoneMask[cellIndex(zone.cells[i].x, zone.cells[i].y)] = zoneId;
+    }
+  }
 
   state.pathTiles.length = 0;
   carveTunnel(state.drill.x, state.drill.y);
   extendPath(state.drill.x, state.drill.y);
 
-  placeHiddenBase();
-  placeBeacon();
-  // DEBUG: beacon near player
-  state.beaconMask.fill(0);
-  state.beacon.x = START_X + 4;
-  state.beacon.y = START_Y + 4;
-  state.beacon.active = false;
-  for (let dy = 0; dy < 2; dy += 1) {
-    for (let dx = 0; dx < 2; dx += 1) {
-      const idx = cellIndex(state.beacon.x + dx, state.beacon.y + dy);
-      state.beaconMask[idx] = 1;
-      state.hardness[idx] = 0;
-      state.health[idx] = 0;
-    }
-  }
-  for (let dy = -1; dy <= 2; dy += 1) {
-    for (let dx = -1; dx <= 2; dx += 1) {
-      if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) continue;
-      const rx = state.beacon.x + dx;
-      const ry = state.beacon.y + dy;
-      const idx = cellIndex(rx, ry);
-      state.beaconMask[idx] = 2;
-      state.tunnelMask[idx] = 1;
-      state.hardness[idx] = 0;
-      state.health[idx] = 0;
-    }
-  }
   state.base.renderX = state.base.x;
   state.base.renderY = state.base.y;
   state.base.animFromX = state.base.x;
@@ -1769,10 +1348,6 @@ function setupField() {
     state.camera.x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - viewWidth * 0.5;
     state.camera.y = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - viewHeight * 0.56;
   }
-  placePerkTiles();
-  placeCrystalTiles();
-  placePerkZones();
-  // placeDebugStartPerkZone();
   clearCrystalRecipe();
   rebuildVisibilityMask();
   for (let i = 0; i < state.visibleAlpha.length; i += 1) {
@@ -1780,239 +1355,6 @@ function setupField() {
   }
   syncDebugPerkOverlay();
 
-}
-
-function placeHiddenBase() {
-  const offsets = getExactDistanceOffsets(BASE_MIN_DISTANCE);
-  for (let i = offsets.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(state.worldRandom() * (i + 1));
-    const tmp = offsets[i];
-    offsets[i] = offsets[j];
-    offsets[j] = tmp;
-  }
-
-  for (let i = 0; i < offsets.length; i += 1) {
-    const x = START_X + offsets[i].x;
-    const y = START_Y + offsets[i].y;
-    if (
-      x >= 3 &&
-      x <= GRID_W - 4 &&
-      y >= 3 &&
-      y <= GRID_H - 4 &&
-      !state.metalMask[cellIndex(x, y)] &&
-      !state.gasPocketMask[cellIndex(x, y)] &&
-      !state.steamPocketMask[cellIndex(x, y)] &&
-      !state.boulderPocketMask[cellIndex(x, y)]
-    ) {
-      state.base.x = x;
-      state.base.y = y;
-      return;
-    }
-  }
-
-  throw new Error("Unable to place base at exact required distance");
-}
-
-function placeBeacon() {
-  const minDist = BEACON_DISTANCE - 3;
-  const maxDist = BEACON_DISTANCE + 3;
-  const offsets = [];
-  for (let dx = -maxDist; dx <= maxDist; dx += 1) {
-    for (let dy = -maxDist; dy <= maxDist; dy += 1) {
-      const d = Math.hypot(dx, dy);
-      if (d >= minDist && d <= maxDist) {
-        offsets.push({ x: dx, y: dy });
-      }
-    }
-  }
-  for (let i = offsets.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(state.worldRandom() * (i + 1));
-    const tmp = offsets[i];
-    offsets[i] = offsets[j];
-    offsets[j] = tmp;
-  }
-
-  for (let i = 0; i < offsets.length; i += 1) {
-    const x = START_X + offsets[i].x;
-    const y = START_Y + offsets[i].y;
-    if (x < 2 || x >= GRID_W - 3 || y < 2 || y >= GRID_H - 3) continue;
-    let clear = true;
-    for (let dy = -1; dy <= 2 && clear; dy += 1) {
-      for (let dx = -1; dx <= 2 && clear; dx += 1) {
-        const idx = cellIndex(x + dx, y + dy);
-        if (state.metalMask[idx] || state.gasPocketMask[idx] || state.steamPocketMask[idx] || state.boulderPocketMask[idx]) {
-          clear = false;
-        }
-      }
-    }
-    if (!clear) continue;
-
-    state.beacon.x = x;
-    state.beacon.y = y;
-
-    // 2x2 core: indestructible, floor-like
-    for (let dy = 0; dy < 2; dy += 1) {
-      for (let dx = 0; dx < 2; dx += 1) {
-        const idx = cellIndex(x + dx, y + dy);
-        state.beaconMask[idx] = 1;
-        state.hardness[idx] = 0;
-        state.health[idx] = 0;
-      }
-    }
-
-    // Ring: pre-cleared, shows pale outline
-    for (let dy = -1; dy <= 2; dy += 1) {
-      for (let dx = -1; dx <= 2; dx += 1) {
-        if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) continue;
-        const rx = x + dx;
-        const ry = y + dy;
-        if (rx < 0 || rx >= GRID_W || ry < 0 || ry >= GRID_H) continue;
-        const idx = cellIndex(rx, ry);
-        state.beaconMask[idx] = 2;
-        state.tunnelMask[idx] = 1;
-        state.hardness[idx] = 0;
-        state.health[idx] = 0;
-      }
-    }
-    return;
-  }
-}
-
-function placePerkTiles() {
-  const placed = [];
-  const targetCount = getTargetPerkTileCount();
-  let attempts = 0;
-
-  while (placed.length < targetCount && attempts < targetCount * 80) {
-    const x = 2 + Math.floor(state.worldRandom() * (GRID_W - 4));
-    const y = 2 + Math.floor(state.worldRandom() * (GRID_H - 4));
-    const index = cellIndex(x, y);
-    attempts += 1;
-
-    if (state.tunnelMask[index] || state.perkMask[index] > 0 || state.metalMask[index]) {
-      continue;
-    }
-    if (state.gasPocketMask[index] || state.steamPocketMask[index] || state.boulderPocketMask[index]) {
-      continue;
-    }
-    if ((x === state.base.x && y === state.base.y) || (x === START_X && y === START_Y)) {
-      continue;
-    }
-    if (!isFarEnoughFromPlaced(x, y, placed, PERK_MIN_DISTANCE)) {
-      continue;
-    }
-    if (state.worldRandom() > getCenterPerkDensity(x, y)) {
-      continue;
-    }
-
-    state.perkMask[index] = chooseTilePerkForPosition(x, y, state.worldRandom);
-    placed.push({ x, y });
-  }
-}
-
-function placeCrystalTiles() {
-  const placed = [];
-  const targetCount = getTargetCrystalTileCount();
-  let attempts = 0;
-
-  while (placed.length < targetCount && attempts < targetCount * 90) {
-    const x = 2 + Math.floor(state.worldRandom() * (GRID_W - 4));
-    const y = 2 + Math.floor(state.worldRandom() * (GRID_H - 4));
-    const index = cellIndex(x, y);
-    attempts += 1;
-
-    if (
-      state.tunnelMask[index] ||
-      state.perkMask[index] > 0 ||
-      state.crystalMask[index] > 0 ||
-      state.perkZoneMask[index] !== -1 ||
-      state.metalMask[index] ||
-      state.gasPocketMask[index] ||
-      state.steamPocketMask[index] ||
-      state.boulderPocketMask[index]
-    ) {
-      continue;
-    }
-    if ((x === state.base.x && y === state.base.y) || (x === START_X && y === START_Y)) {
-      continue;
-    }
-    if (!isFarEnoughFromPlaced(x, y, placed, CRYSTAL_MIN_DISTANCE)) {
-      continue;
-    }
-
-    state.crystalMask[index] = chooseCrystalType(state.worldRandom);
-    placed.push({ x, y });
-  }
-}
-
-function placePerkZones() {
-  const placed = [];
-  const targetCount = getTargetPerkZoneCount();
-  let attempts = 0;
-
-  while (state.perkZones.length < targetCount && attempts < targetCount * 120) {
-    const shape = createPerkZoneShape(state.worldRandom);
-    const originX = 1 + Math.floor(state.worldRandom() * Math.max(1, GRID_W - shape.width - 2));
-    const originY = 1 + Math.floor(state.worldRandom() * Math.max(1, GRID_H - shape.height - 2));
-    attempts += 1;
-
-    const centerX = originX + shape.centerX;
-    const centerY = originY + shape.centerY;
-
-    if (!isFarEnoughFromPlaced(centerX, centerY, placed, PERK_ZONE_MIN_DISTANCE)) {
-      continue;
-    }
-    if (state.worldRandom() > getPerkZoneDensity(centerX, centerY)) {
-      continue;
-    }
-
-    let blocked = false;
-    const cells = [];
-    for (let i = 0; i < shape.cells.length; i += 1) {
-      const cell = shape.cells[i];
-      const x = originX + cell.x;
-      const y = originY + cell.y;
-      const index = cellIndex(x, y);
-      if (
-        (x === START_X && y === START_Y) ||
-        (x === state.base.x && y === state.base.y) ||
-        state.tunnelMask[index] ||
-        state.metalMask[index] ||
-        state.perkZoneMask[index] !== -1 ||
-        state.gasPocketMask[index] ||
-        state.steamPocketMask[index] ||
-        state.boulderPocketMask[index]
-      ) {
-        blocked = true;
-        break;
-      }
-      cells.push({ x, y });
-    }
-    if (blocked) {
-      continue;
-    }
-
-    const zoneId = state.perkZones.length;
-    const perkType = chooseTilePerkForPosition(centerX, centerY, state.worldRandom);
-    state.perkZones.push({
-      x: centerX,
-      y: centerY,
-      cells,
-      iconX: originX + shape.iconX,
-      iconY: originY + shape.iconY,
-      perkType,
-      openedCount: 0,
-      openedMask: 0,
-      arming: false,
-      armingTimer: 0,
-      collected: false,
-    });
-    placed.push({ x: centerX, y: centerY });
-
-    for (let i = 0; i < cells.length; i += 1) {
-      state.perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
-    }
-  }
 }
 
 function placeDebugStartPerkZone() {
@@ -2053,79 +1395,6 @@ function placeDebugStartPerkZone() {
     armingTimer: 0,
     collected: false,
   });
-}
-
-function createPerkZoneShape(random) {
-  const targetCells = 6 + Math.floor(random() * 4);
-  const cells = [{ x: 0, y: 0 }];
-  const used = new Set(["0,0"]);
-  let minX = 0;
-  let maxX = 0;
-  let minY = 0;
-  let maxY = 0;
-  let growthAttempts = 0;
-
-  while (cells.length < targetCells && growthAttempts < 80) {
-    const base = cells[Math.floor(random() * cells.length)];
-    const dir = CARDINAL_DIRS[Math.floor(random() * CARDINAL_DIRS.length)];
-    const nextX = base.x + dir.x;
-    const nextY = base.y + dir.y;
-    const key = `${nextX},${nextY}`;
-    growthAttempts += 1;
-
-    if (used.has(key)) {
-      continue;
-    }
-
-    const nextMinX = Math.min(minX, nextX);
-    const nextMaxX = Math.max(maxX, nextX);
-    const nextMinY = Math.min(minY, nextY);
-    const nextMaxY = Math.max(maxY, nextY);
-    if (nextMaxX - nextMinX > 3 || nextMaxY - nextMinY > 3) {
-      continue;
-    }
-
-    used.add(key);
-    cells.push({ x: nextX, y: nextY });
-    minX = nextMinX;
-    maxX = nextMaxX;
-    minY = nextMinY;
-    maxY = nextMaxY;
-  }
-
-  const normalizedCells = [];
-  let sumX = 0;
-  let sumY = 0;
-  for (let i = 0; i < cells.length; i += 1) {
-    const x = cells[i].x - minX;
-    const y = cells[i].y - minY;
-    normalizedCells.push({ x, y });
-    sumX += x;
-    sumY += y;
-  }
-
-  const centroidX = sumX / normalizedCells.length;
-  const centroidY = sumY / normalizedCells.length;
-  let iconCell = normalizedCells[0];
-  let bestDistance = Infinity;
-  for (let i = 0; i < normalizedCells.length; i += 1) {
-    const cell = normalizedCells[i];
-    const dist = Math.hypot(cell.x - centroidX, cell.y - centroidY);
-    if (dist < bestDistance) {
-      bestDistance = dist;
-      iconCell = cell;
-    }
-  }
-
-  return {
-    cells: normalizedCells,
-    width: maxX - minX + 1,
-    height: maxY - minY + 1,
-    centerX: centroidX,
-    centerY: centroidY,
-    iconX: iconCell.x,
-    iconY: iconCell.y,
-  };
 }
 
 function clearCrystalRecipe() {
@@ -5436,17 +4705,18 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   maybeSpawnLoopPerk(interiorCells);
   spawnLoopFieldEffect(loopPath, affectedCells);
 
-  if (!state.beacon.active && state.beacon.x > 0) {
+  for (const beacon of state.beacons) {
+    if (beacon.active) continue;
     let allInside = true;
     for (let dy = 0; dy < 2 && allInside; dy += 1) {
       for (let dx = 0; dx < 2 && allInside; dx += 1) {
-        if (!isPointInPolygon(state.beacon.x + dx + 0.5, state.beacon.y + dy + 0.5, polygon)) {
+        if (!isPointInPolygon(beacon.x + dx + 0.5, beacon.y + dy + 0.5, polygon)) {
           allInside = false;
         }
       }
     }
     if (allInside) {
-      state.beacon.active = true;
+      beacon.active = true;
       showPerkToast("Маяк активирован!");
     }
   }
@@ -6306,10 +5576,15 @@ function renderAutoClosePreview(camera) {
 }
 
 function renderBeacon(camera) {
-  if (!state.beacon.x && !state.beacon.y) return;
+  for (const beacon of state.beacons) {
+    renderOneBeacon(camera, beacon);
+  }
+}
+
+function renderOneBeacon(camera, beacon) {
   const ctx = state.ctx;
-  const bx = state.beacon.x;
-  const by = state.beacon.y;
+  const bx = beacon.x;
+  const by = beacon.y;
   const visAlpha = Math.max(
     state.visibleAlpha[cellIndex(bx, by)],
     state.visibleAlpha[cellIndex(bx + 1, by)],
@@ -6323,7 +5598,7 @@ function renderBeacon(camera) {
   const h = TILE_SIZE * 2;
   const t = state.lastTs || 0;
   const pulse = Math.sin(t * 0.008) * 0.5 + 0.5;
-  const active = state.beacon.active;
+  const active = beacon.active;
 
   ctx.save();
   ctx.globalAlpha = visAlpha;
@@ -6398,8 +5673,6 @@ function renderBeacon(camera) {
 
   // Placeholder contour hint (only when not yet activated)
   if (!active) {
-    const bx = state.beacon.x;
-    const by = state.beacon.y;
     const ringPath = [
       { x: bx - 1, y: by - 1 },
       { x: bx,     y: by - 1 },
@@ -6415,7 +5688,7 @@ function renderBeacon(camera) {
       { x: bx - 1, y: by     },
     ];
     const n = ringPath.length;
-    const speed = 0.00018;
+    const speed = 0.00008;
     const progress = ((state.lastTs || 0) * speed) % 1;
 
     ctx.save();
@@ -6477,13 +5750,19 @@ function renderBeacon(camera) {
 }
 
 function renderBeaconRadar(camera) {
-  if (!state.beacon.active) return;
+  for (const beacon of state.beacons) {
+    if (!beacon.active) continue;
+    renderOneBeaconRadar(camera, beacon);
+  }
+}
+
+function renderOneBeaconRadar(camera, beacon) {
   const ctx = state.ctx;
-  const midX = state.beacon.x * TILE_SIZE + TILE_SIZE - camera.x;
-  const midY = state.beacon.y * TILE_SIZE + TILE_SIZE - camera.y;
+  const midX = beacon.x * TILE_SIZE + TILE_SIZE - camera.x;
+  const midY = beacon.y * TILE_SIZE + TILE_SIZE - camera.y;
   const radius = 52;
-  const bdx = state.base.x - (state.beacon.x + 0.5);
-  const bdy = state.base.y - (state.beacon.y + 0.5);
+  const bdx = state.base.x - (beacon.x + 0.5);
+  const bdy = state.base.y - (beacon.y + 0.5);
   const blen = Math.hypot(bdx, bdy) || 1;
   const angle = Math.atan2(bdy / blen, bdx / blen);
   const dotX = midX + Math.cos(angle) * radius;
