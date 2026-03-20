@@ -6962,59 +6962,27 @@ function renderHud() {
 
   const hpLabel = state.armor > 0 ? `${state.hp}/${state.maxHp} • A:${state.armor}` : `${state.hp}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
-  drawHudScrapCounter(left + panelWidth + gap, top, panelWidth, panelHeight);
-  state.scrapHitRect = {
-    x: left + panelWidth + gap,
-    y: top,
-    width: panelWidth,
-    height: panelHeight,
-  };
-  drawHudBar(left, secondRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
-  drawHudBar(
-    left + panelWidth + gap,
-    secondRowTop,
-    panelWidth,
-    panelHeight,
-    "HEAT",
-    `${Math.floor(state.heat)}/${state.maxHeat}`,
-    heatRatio,
-    ["#ffb36d", "#ff4c3f"],
-  );
+  state.scrapHitRect = { x: left, y: top, width: panelWidth, height: panelHeight };
 
+  // Crystal recipe in top-right slot
   const ctx = state.ctx;
-  const recipeTop = secondRowTop + panelHeight + 8;
-  const recipeWidth = 232;
-  const manualButton = document.getElementById("manualOpen");
-  if (manualButton) {
-    manualButton.style.top = `${recipeTop - 1}px`;
-    manualButton.style.left = `${left + recipeWidth + 8}px`;
-    manualButton.style.right = "auto";
-  }
+  const recipeX = left + panelWidth + gap;
+  drawHudPanel(recipeX, top, panelWidth, panelHeight);
   ctx.save();
-  ctx.fillStyle = "rgba(31, 18, 12, 0.82)";
-  ctx.strokeStyle = "rgba(220, 169, 93, 0.28)";
-  ctx.lineWidth = 1;
-  drawRoundedRectPath(left, recipeTop, recipeWidth, 32, 10);
-  ctx.fill();
-  ctx.stroke();
   ctx.fillStyle = "#c6ab84";
   ctx.font = `700 10px ${HUD_FONT}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("CRYSTAL RECIPE", left + 10, recipeTop + 16);
-  if (state.crystalRecipe.length === 0) {
-    ctx.restore();
-  } else {
+  ctx.fillText("CRYSTAL RECIPE", recipeX + 10, top + 16);
+  if (state.crystalRecipe.length > 0) {
     const usedCounts = [0, 0, 0, 0, 0, 0];
     for (let i = 0; i < state.crystalRecipe.length; i += 1) {
       const crystalType = state.crystalRecipe[i];
       const crystal = CRYSTAL_TYPES[crystalType];
-      const cx = left + 118 + i * 26;
-      const cy = recipeTop + 16;
+      const cx = recipeX + 118 + i * 26;
+      const cy = top + panelHeight * 0.5;
       const completed = usedCounts[crystalType] < state.crystalCollected[crystalType];
-      if (completed) {
-        usedCounts[crystalType] += 1;
-      }
+      if (completed) usedCounts[crystalType] += 1;
       ctx.globalAlpha = completed ? 1 : 0.82;
       ctx.fillStyle = crystal.glow;
       ctx.beginPath();
@@ -7037,24 +7005,45 @@ function renderHud() {
         ctx.stroke();
       }
     }
-    ctx.restore();
+  }
+  ctx.restore();
+
+  drawHudBar(left, secondRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
+  drawHudBar(
+    left + panelWidth + gap,
+    secondRowTop,
+    panelWidth,
+    panelHeight,
+    "HEAT",
+    `${Math.floor(state.heat)}/${state.maxHeat}`,
+    heatRatio,
+    ["#ffb36d", "#ff4c3f"],
+  );
+
+  const thirdRowTop = secondRowTop + panelHeight + 8;
+
+  const manualButton = document.getElementById("manualOpen");
+  if (manualButton) {
+    manualButton.style.top = `${thirdRowTop - 1}px`;
+    manualButton.style.left = "auto";
+    manualButton.style.right = "14px";
   }
 
-  const detailTop = recipeTop + 40;
+  const detailTop = thirdRowTop;
   renderHudCoreStats(left, detailTop, panelWidth, "СТАТЫ");
   renderHudPerkColumn(left + panelWidth + gap, detailTop, panelWidth, "ПЕРКИ");
 
   ctx.save();
   ctx.fillStyle = "rgba(198, 171, 132, 0.68)";
   ctx.font = `700 10px ${HUD_FONT}`;
-  ctx.textAlign = "left";
+  ctx.textAlign = "right";
   ctx.textBaseline = "top";
-  ctx.fillText(`FPS ${Math.round(state.fps || 0)}`, left, detailTop + 52);
+  ctx.fillText(`FPS ${Math.round(state.fps || 0)}`, state.width - 14, detailTop + 52);
 
   // FPS sparkline graph
   const history = state.fpsHistory;
   if (history.length > 1) {
-    const gx = left + 38;
+    const gx = state.width - 14 - 44 - 38;
     const gy = detailTop + 52;
     const gw = 44;
     const gh = 12;
@@ -7078,22 +7067,55 @@ function renderHud() {
 
 function drawHudScrapCounter(x, y, width, height) {
   const ctx = state.ctx;
-  drawHudPanel(x, y, width, height);
   ctx.save();
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#c6ab84";
-  ctx.font = `700 10px ${HUD_FONT}`;
+  const cy = y + height * 0.5;
+  const iconX = x + 20;
+  const iconSize = 18;
+  const half = iconSize * 0.5;
+
+  // Diamond icon — same style as renderHudMiniPerkIcon
+  ctx.translate(iconX, cy);
+  ctx.fillStyle = "#d79f4928";
+  ctx.beginPath();
+  ctx.arc(0, 0, iconSize * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#d79f49";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -half + 2);
+  ctx.lineTo(half - 2, 0);
+  ctx.lineTo(0, half - 2);
+  ctx.lineTo(-half + 2, 0);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = "#2b1b14";
+  ctx.font = `700 ${Math.max(8, iconSize * 0.38)}px ${HUD_FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("⛭", 0, 0.5);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Safe scrap value
+  const textX = iconX + half + 6;
+  const safeText = `${Math.floor(state.scrap)}`;
+  ctx.font = `700 11px ${HUD_FONT}`;
+  ctx.textBaseline = "middle";
   ctx.textAlign = "left";
-  ctx.fillText("SCRAP", x + 10, y + 13);
-  ctx.fillStyle = "#f0df84";
-  ctx.font = `700 13px ${HUD_FONT}`;
-  ctx.textAlign = "left";
-  ctx.fillText(`${Math.floor(state.scrap)} ⛭`, x + 10, y + 28);
+  ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
+  ctx.lineWidth = 3;
+  ctx.strokeText(safeText, textX, cy);
+  ctx.fillStyle = "#f1dfb6";
+  ctx.fillText(safeText, textX, cy);
+
+  // Unsafe scrap
   if (state.unsafeScrap > 0) {
+    const unsafeX = textX + ctx.measureText(safeText).width + 6;
+    const unsafeText = `+${Math.floor(state.unsafeScrap)}`;
+    ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
+    ctx.lineWidth = 3;
+    ctx.strokeText(unsafeText, unsafeX, cy);
     ctx.fillStyle = "#ff9940";
-    ctx.font = `700 10px ${HUD_FONT}`;
-    ctx.textAlign = "right";
-    ctx.fillText(`+${Math.floor(state.unsafeScrap)}`, x + width - 10, y + 28);
+    ctx.fillText(unsafeText, unsafeX, cy);
   }
   ctx.restore();
 }
@@ -7208,8 +7230,51 @@ function renderHudCoreStats(x, y, width, title) {
   ctx.save();
   ctx.textBaseline = "middle";
 
+  // Scrap row — first
+  const scrapRowY = y + 8;
+  const half = 9;
+  ctx.save();
+  ctx.translate(x + 20, scrapRowY);
+  ctx.fillStyle = "#d79f4928";
+  ctx.beginPath();
+  ctx.arc(0, 0, 18 * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#d79f49";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -half + 2);
+  ctx.lineTo(half - 2, 0);
+  ctx.lineTo(0, half - 2);
+  ctx.lineTo(-half + 2, 0);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = "#2b1b14";
+  ctx.font = `700 7px ${HUD_FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("⛭", 0, 0.5);
+  ctx.restore();
+
+  ctx.font = `700 11px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  const safeText = `${Math.floor(state.scrap)}`;
+  ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
+  ctx.lineWidth = 3;
+  ctx.strokeText(safeText, x + 36, scrapRowY);
+  ctx.fillStyle = "#f1dfb6";
+  ctx.fillText(safeText, x + 36, scrapRowY);
+  if (state.unsafeScrap > 0) {
+    const unsafeX = x + 36 + ctx.measureText(safeText).width + 5;
+    const unsafeText = `+${Math.floor(state.unsafeScrap)}`;
+    ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
+    ctx.lineWidth = 3;
+    ctx.strokeText(unsafeText, unsafeX, scrapRowY);
+    ctx.fillStyle = "#ff9940";
+    ctx.fillText(unsafeText, unsafeX, scrapRowY);
+  }
+
   for (let i = 0; i < rows.length; i += 1) {
-    const rowY = y + 8 + i * rowHeight;
+    const rowY = scrapRowY + (i + 1) * rowHeight;
     renderHudMiniPerkIcon(rows[i].perkType, x + 20, rowY, 18);
     ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
     ctx.lineWidth = 3;
@@ -7219,6 +7284,7 @@ function renderHudCoreStats(x, y, width, title) {
     ctx.fillStyle = "#f1dfb6";
     ctx.fillText(rows[i].value, x + 36, rowY);
   }
+
   ctx.restore();
 }
 
