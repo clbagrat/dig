@@ -171,6 +171,11 @@ function renderSvg(seed, map) {
 
   const startPx = START_X * TILE_PX;
   const startPy = START_Y * TILE_PX;
+  const startCx = startPx + TILE_PX * 0.5;
+  const startCy = startPy + TILE_PX * 0.5;
+  parts.push(`<circle cx="${startCx}" cy="${startCy}" r="${TILE_PX * 2.2}" fill="#f0d09b" fill-opacity="0.12"/>`);
+  parts.push(`<circle cx="${startCx}" cy="${startCy}" r="${TILE_PX * 1.6}" fill="none" stroke="#f0d09b" stroke-width="2.2"/>`);
+  parts.push(`<circle cx="${startCx}" cy="${startCy}" r="${TILE_PX * 0.95}" fill="none" stroke="#d3a15a" stroke-width="2.2"/>`);
   parts.push(`<rect x="${startPx + TILE_PX * 0.16}" y="${startPy + TILE_PX * 0.2}" width="${TILE_PX * 0.68}" height="${TILE_PX * 0.48}" fill="#d3a15a"/>`);
   parts.push(`<rect x="${startPx + TILE_PX * 0.3}" y="${startPy + TILE_PX * 0.12}" width="${TILE_PX * 0.4}" height="${TILE_PX * 0.18}" fill="#34231a"/>`);
   parts.push(`<line x1="${startPx + TILE_PX * 0.5}" y1="${startPy + TILE_PX * 0.5}" x2="${startPx + TILE_PX * 0.5}" y2="${startPy + TILE_PX * 0.9}" stroke="#f0d09b" stroke-width="1.8"/>`);

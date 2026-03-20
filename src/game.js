@@ -1094,7 +1094,7 @@ function revealSteamPocket(x, y, dirX, dirY) {
     for (let i = 0; i < neighbors.length; i += 1) {
       const nx = neighbors[i].x;
       const ny = neighbors[i].y;
-      if (!canPlaceSteamPocketAt(nx, ny)) {
+      if (nx < 2 || ny < 2 || nx >= GRID_W - 2 || ny >= GRID_H - 2) {
         continue;
       }
       const index = cellIndex(nx, ny);
