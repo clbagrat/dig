@@ -4751,7 +4751,16 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         }
       }
     }
-    if (allInside) {
+    if (!allInside) continue;
+    // All contour cells must be within the beacon's 4x4 area (the 2x2 beacon + 1-tile ring)
+    const pathWithinBeaconArea = loopPath.every(
+      (cell) =>
+        cell.x >= beacon.x - 1 &&
+        cell.x <= beacon.x + 2 &&
+        cell.y >= beacon.y - 1 &&
+        cell.y <= beacon.y + 2,
+    );
+    if (pathWithinBeaconArea) {
       beacon.active = true;
       showPerkToast("Маяк активирован!");
     }
