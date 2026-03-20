@@ -74,6 +74,12 @@ const POST_BREAK_MOVE_DELAY = 0.2;
 const VISIBILITY_FADE_SPEED = 7;
 const BASE_MOVE_ANIMATION_DURATION = 0.18;
 const TILE_SWAP_ANIMATION_DURATION = 0.18;
+
+// Reusable buffers for visibility BFS — avoids per-frame allocations
+const _visFogDistance = new Int16Array(GRID_W * GRID_H);
+const _visBfsQueue = new Int32Array(GRID_W * GRID_H);
+const _visFogQueue = new Int32Array(GRID_W * GRID_H);
+
 const HAZARD_TYPES = {
   SPIKE: 1,
   VOLATILE: 2,
@@ -330,6 +336,8 @@ const state = {
   sprites: null,
   effects: [],
   tileAnimations: [],
+  tileAnimDest: new Set(),
+  visibilityDirty: true,
   chainExplosions: [],
   base: {
     x: 0,
@@ -1269,6 +1277,8 @@ function setupField() {
   state.scrapHitRect = null;
   state.effects.length = 0;
   state.tileAnimations.length = 0;
+  state.tileAnimDest.clear();
+  state.visibilityDirty = true;
   state.chainExplosions.length = 0;
   state.base.renderX = 0;
   state.base.renderY = 0;
@@ -1516,6 +1526,7 @@ function carveTunnel(x, y) {
     state.tunnelMask[index] = 1;
     state.hardness[index] = 0;
     state.health[index] = 0;
+    state.visibilityDirty = true;
   }
 
   if (perkType > 0) {
@@ -1919,6 +1930,7 @@ function startTileMoveAnimation(content, fromX, fromY, toX, toY, duration = TILE
     timer: duration,
     duration,
   });
+  state.tileAnimDest.add(toY * GRID_W + toX);
 }
 
 function rebuildPathIndex() {
@@ -1963,6 +1975,7 @@ function updateMovementAnimations(dt) {
     anim.renderY = anim.fromY + (anim.toY - anim.fromY) * t;
     if (anim.timer === 0) {
       state.tileAnimations.splice(i, 1);
+      state.tileAnimDest.delete(anim.toY * GRID_W + anim.toX);
     }
   }
 }
@@ -2620,7 +2633,10 @@ function update(dt) {
   updatePerkZones(dt);
   updateChainExplosions(dt);
   updateEffects(dt);
-  rebuildVisibilityMask();
+  if (state.visibilityDirty) {
+    rebuildVisibilityMask();
+    state.visibilityDirty = false;
+  }
   updateVisibilityFade(dt);
   updateDiscovery();
   updateCamera(dt);
@@ -2753,100 +2769,78 @@ function rebuildVisibilityMask() {
   const startX = state.drill.x;
   const startY = state.drill.y;
   const radiusSq = state.visionRadius * state.visionRadius;
-  const queue = [{ x: startX, y: startY }];
-  state.visibleMask[cellIndex(startX, startY)] = 1;
+  const startIndex = cellIndex(startX, startY);
 
-  for (let i = 0; i < queue.length; i += 1) {
-    const cell = queue[i];
-    const neighbors = [
-      { x: cell.x + 1, y: cell.y },
-      { x: cell.x - 1, y: cell.y },
-      { x: cell.x, y: cell.y + 1 },
-      { x: cell.x, y: cell.y - 1 },
-      { x: cell.x + 1, y: cell.y + 1 },
-      { x: cell.x + 1, y: cell.y - 1 },
-      { x: cell.x - 1, y: cell.y + 1 },
-      { x: cell.x - 1, y: cell.y - 1 },
-    ];
+  // BFS using flat indices — no per-iteration object allocation
+  let bfsHead = 0;
+  let bfsTail = 0;
+  _visBfsQueue[bfsTail++] = startIndex;
+  state.visibleMask[startIndex] = 1;
 
-    for (let n = 0; n < neighbors.length; n += 1) {
-      const nx = neighbors[n].x;
-      const ny = neighbors[n].y;
-      if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
-        continue;
+  const offsets = [-1, 1, -GRID_W, GRID_W, -GRID_W - 1, -GRID_W + 1, GRID_W - 1, GRID_W + 1];
+  const stepDxLUT = [-1, 1, 0, 0, -1, 1, -1, 1];
+  const stepDyLUT = [0, 0, -1, 1, -1, -1, 1, 1];
+
+  while (bfsHead < bfsTail) {
+    const idx = _visBfsQueue[bfsHead++];
+    const cx = idx % GRID_W;
+    const cy = (idx / GRID_W) | 0;
+    for (let n = 0; n < 8; n += 1) {
+      const nx = cx + stepDxLUT[n];
+      const ny = cy + stepDyLUT[n];
+      if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) continue;
+      const ddx = nx - startX;
+      const ddy = ny - startY;
+      if (ddx * ddx + ddy * ddy > radiusSq) continue;
+      const ni = cellIndex(nx, ny);
+      if (state.visibleMask[ni]) continue;
+      const sdx = stepDxLUT[n];
+      const sdy = stepDyLUT[n];
+      if (sdx !== 0 && sdy !== 0) {
+        if (state.metalMask[cellIndex(cx + sdx, cy)] || state.metalMask[cellIndex(cx, cy + sdy)]) continue;
       }
-      const dx = nx - startX;
-      const dy = ny - startY;
-      if (dx * dx + dy * dy > radiusSq) {
-        continue;
-      }
-
-      const index = cellIndex(nx, ny);
-      if (state.visibleMask[index]) {
-        continue;
-      }
-
-      const stepDx = nx - cell.x;
-      const stepDy = ny - cell.y;
-      if (stepDx !== 0 && stepDy !== 0) {
-        const sideA = cellIndex(cell.x + stepDx, cell.y);
-        const sideB = cellIndex(cell.x, cell.y + stepDy);
-        if (state.metalMask[sideA] || state.metalMask[sideB]) {
-          continue;
-        }
-      }
-
-      state.visibleMask[index] = 1;
-      if (!state.metalMask[index]) {
-        queue.push({ x: nx, y: ny });
+      state.visibleMask[ni] = 1;
+      if (!state.metalMask[ni]) {
+        _visBfsQueue[bfsTail++] = ni;
       }
     }
   }
 
+  // Fog gradient BFS — reuse persistent buffers
   const fogMaxDistance = 6;
-  const fogQueue = [];
-  const fogDistance = new Int16Array(GRID_W * GRID_H);
-  fogDistance.fill(-1);
+  _visFogDistance.fill(-1);
+  let fogHead = 0;
+  let fogTail = 0;
 
   for (let i = 0; i < state.visibleMask.length; i += 1) {
-    if (!state.visibleMask[i]) {
-      continue;
-    }
+    if (!state.visibleMask[i]) continue;
     state.visibleTargetAlpha[i] = 1;
-    fogDistance[i] = 0;
-    fogQueue.push(i);
+    _visFogDistance[i] = 0;
+    _visFogQueue[fogTail++] = i;
   }
 
-  for (let qi = 0; qi < fogQueue.length; qi += 1) {
-    const index = fogQueue[qi];
-    const distance = fogDistance[index];
-    if (distance >= fogMaxDistance) {
-      continue;
-    }
+  while (fogHead < fogTail) {
+    const index = _visFogQueue[fogHead++];
+    const distance = _visFogDistance[index];
+    if (distance >= fogMaxDistance) continue;
     const x = index % GRID_W;
-    const y = Math.floor(index / GRID_W);
+    const y = (index / GRID_W) | 0;
     for (let oy = -1; oy <= 1; oy += 1) {
       for (let ox = -1; ox <= 1; ox += 1) {
-        if (ox === 0 && oy === 0) {
-          continue;
-        }
+        if (ox === 0 && oy === 0) continue;
         const nx = x + ox;
         const ny = y + oy;
-        if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
-          continue;
-        }
+        if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) continue;
         const nextIndex = cellIndex(nx, ny);
-        if (fogDistance[nextIndex] !== -1) {
-          continue;
-        }
+        if (_visFogDistance[nextIndex] !== -1) continue;
         const nextDistance = distance + 1;
-        fogDistance[nextIndex] = nextDistance;
+        _visFogDistance[nextIndex] = nextDistance;
         if (!state.visibleMask[nextIndex]) {
           state.visibleTargetAlpha[nextIndex] = nextDistance === 1 ? 0.4 : nextDistance === 2 ? 0.1 : 0;
         } else {
           state.visibleTargetAlpha[nextIndex] = 1;
         }
-        fogQueue.push(nextIndex);
+        _visFogQueue[fogTail++] = nextIndex;
       }
     }
   }
@@ -4048,6 +4042,7 @@ function triggerRemoteBombSquare(originX, originY, distance) {
 }
 
 function recordPlayerMove(fromX, fromY, toX, toY) {
+  state.visibilityDirty = true;
   consumeSignalMove(fromX, fromY, toX, toY);
   extendPath(toX, toY);
   state.signalPrevX = toX;
@@ -5232,7 +5227,6 @@ function render() {
       }
 
       if (visibleAlpha <= 0.001) {
-        ctx.save();
         ctx.globalAlpha = 0.16;
         if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
@@ -5245,7 +5239,7 @@ function render() {
         } else {
           drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
         }
-        ctx.restore();
+        ctx.globalAlpha = 1;
         ctx.fillStyle = "rgba(6, 4, 3, 0.72)";
         ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
         ctx.strokeStyle = "rgba(255, 225, 179, 0.04)";
@@ -5254,7 +5248,6 @@ function render() {
       }
 
       if (visibleAlpha < 0.999) {
-        ctx.save();
         ctx.globalAlpha = (1 - visibleAlpha) * 0.16;
         if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
@@ -5267,14 +5260,13 @@ function render() {
         } else {
           drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
         }
-        ctx.restore();
+        ctx.globalAlpha = 1;
         ctx.fillStyle = `rgba(6, 4, 3, ${(1 - visibleAlpha) * 0.72})`;
         ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
         ctx.strokeStyle = `rgba(255, 225, 179, ${(1 - visibleAlpha) * 0.04})`;
         ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
       }
 
-      ctx.save();
       ctx.globalAlpha = visibleAlpha;
       if (state.tunnelMask[index]) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
@@ -5339,7 +5331,7 @@ function render() {
       renderPerkZoneTile(x, y, sx, sy);
       renderPerkTile(x, y, sx, sy);
       renderCrystalTile(x, y, sx, sy);
-      ctx.restore();
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -5432,13 +5424,7 @@ function renderBoulders(camera) {
 }
 
 function isAnimatedTileDestination(x, y) {
-  for (let i = 0; i < state.tileAnimations.length; i += 1) {
-    const anim = state.tileAnimations[i];
-    if (anim.toX === x && anim.toY === y) {
-      return true;
-    }
-  }
-  return false;
+  return state.tileAnimDest.has(y * GRID_W + x);
 }
 
 function drawCellVisualContent(content, sx, sy) {
