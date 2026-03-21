@@ -28,7 +28,6 @@ const GOLD_PERK_BASE_COST = 30;
 const GOLD_PERK_COST_MULTIPLIER = 1.35;
 const GOLD_PERK_LEVEL_MULTIPLIER_STEP = 0.05;
 const GOLD_PERK_POPUP_DELAY = 0.5;
-const BASE_MOVE_AWAY_CHANCE = 0.5;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
 const IDLE_AUTO_CLOSE_PREVIEW_DELAY = 0.5;
@@ -72,7 +71,6 @@ const MOVE_ANIMATION_DURATION = 0.14;
 const MOVE_SPEED_TILES = 5;
 const POST_BREAK_MOVE_DELAY = 0.2;
 const VISIBILITY_FADE_SPEED = 7;
-const BASE_MOVE_ANIMATION_DURATION = 0.18;
 const TILE_SWAP_ANIMATION_DURATION = 0.18;
 
 // Reusable buffers for visibility BFS — avoids per-frame allocations
@@ -316,7 +314,6 @@ const state = {
   contourReturnFuelLevel: 0,
   heatOverloadRocketLevel: 0,
   tankBoostLevel: 0,
-  playerMoveProgress: 0,
   perkToast: {
     text: "",
     time: 0,
@@ -345,15 +342,8 @@ const state = {
   base: {
     x: 0,
     y: 0,
-    visible: false,
     renderX: 0,
     renderY: 0,
-    animFromX: 0,
-    animFromY: 0,
-    animToX: 0,
-    animToY: 0,
-    animTimer: 0,
-    animDuration: 0,
   },
   camera: {
     x: 0,
@@ -1190,7 +1180,6 @@ function setupField() {
   state.steamJets.length = 0;
   state.boulders.length = 0;
   state.baseFound = false;
-  state.base.visible = false;
   state.cameraShake.time = 0;
   state.cameraShake.amplitude = 0;
   state.outOfFuel = false;
@@ -1291,7 +1280,6 @@ function setupField() {
   state.contourReturnFuelLevel = 0;
   state.heatOverloadRocketLevel = 0;
   state.tankBoostLevel = 0;
-  state.playerMoveProgress = 0;
   state.perkToast.text = "";
   state.perkToast.time = 0;
   state.fuelToast.value = 0;
@@ -1310,12 +1298,6 @@ function setupField() {
   state.chainExplosions.length = 0;
   state.base.renderX = 0;
   state.base.renderY = 0;
-  state.base.animFromX = 0;
-  state.base.animFromY = 0;
-  state.base.animToX = 0;
-  state.base.animToY = 0;
-  state.base.animTimer = 0;
-  state.base.animDuration = 0;
   state.drill.renderX = state.drill.x;
   state.drill.renderY = state.drill.y;
   state.drill.animFromX = state.drill.x;
@@ -1382,10 +1364,6 @@ function setupField() {
 
   state.base.renderX = state.base.x;
   state.base.renderY = state.base.y;
-  state.base.animFromX = state.base.x;
-  state.base.animFromY = state.base.y;
-  state.base.animToX = state.base.x;
-  state.base.animToY = state.base.y;
   {
     const zoom = getCameraZoom();
     const viewWidth = state.width / zoom;
@@ -2045,18 +2023,6 @@ function getCurrentDrillRenderPosition() {
   );
 }
 
-function getCurrentBaseRenderPosition() {
-  return getAnimatedPosition(
-    state.base.renderX,
-    state.base.renderY,
-    state.base.animFromX,
-    state.base.animFromY,
-    state.base.animToX,
-    state.base.animToY,
-    state.base.animTimer,
-    state.base.animDuration,
-  );
-}
 
 function startDrillMoveAnimation(toX, toY, duration = MOVE_ANIMATION_DURATION) {
   const current = getCurrentDrillRenderPosition();
@@ -2070,17 +2036,6 @@ function startDrillMoveAnimation(toX, toY, duration = MOVE_ANIMATION_DURATION) {
   state.drill.animDuration = duration;
 }
 
-function startBaseMoveAnimation(toX, toY, duration = BASE_MOVE_ANIMATION_DURATION) {
-  const current = getCurrentBaseRenderPosition();
-  state.base.renderX = current.x;
-  state.base.renderY = current.y;
-  state.base.animFromX = current.x;
-  state.base.animFromY = current.y;
-  state.base.animToX = toX;
-  state.base.animToY = toY;
-  state.base.animTimer = duration;
-  state.base.animDuration = duration;
-}
 
 function captureCellVisualData(index) {
   return {
@@ -2153,19 +2108,8 @@ function updateMovementAnimations(dt) {
     }
   }
 
-  if (state.base.animTimer > 0 && state.base.animDuration > 0) {
-    state.base.animTimer = Math.max(0, state.base.animTimer - dt);
-    const current = getCurrentBaseRenderPosition();
-    state.base.renderX = current.x;
-    state.base.renderY = current.y;
-    if (state.base.animTimer === 0) {
-      state.base.renderX = state.base.animToX;
-      state.base.renderY = state.base.animToY;
-    }
-  } else {
-    state.base.renderX = state.base.x;
-    state.base.renderY = state.base.y;
-  }
+  state.base.renderX = state.base.x;
+  state.base.renderY = state.base.y;
 
   for (let i = state.tileAnimations.length - 1; i >= 0; i -= 1) {
     const anim = state.tileAnimations[i];
@@ -4365,60 +4309,8 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   state.signalPrevY = toY;
   applyGasContactDamage();
   applySteamContactDamage();
-  state.playerMoveProgress += 1;
-  const baseMoveInterval = getBaseMoveInterval();
-  if (state.playerMoveProgress >= baseMoveInterval) {
-    state.playerMoveProgress -= baseMoveInterval;
-    maybeMoveBase();
-  }
 }
 
-function getBaseMoveDirections(awayFromHero) {
-  const directions = [
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 },
-    { x: 1, y: 1 },
-    { x: 1, y: -1 },
-    { x: -1, y: 1 },
-    { x: -1, y: -1 },
-  ];
-  const currentDistance = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
-  const candidates = [];
-
-  for (let i = 0; i < directions.length; i += 1) {
-    const toX = state.base.x + directions[i].x;
-    const toY = state.base.y + directions[i].y;
-    if (toX < 1 || toY < 1 || toX >= GRID_W - 1 || toY >= GRID_H - 1) {
-      continue;
-    }
-    if (toX === state.drill.x && toY === state.drill.y) {
-      continue;
-    }
-    if (state.metalMask[cellIndex(toX, toY)]) {
-      continue;
-    }
-    if (state.perkZoneMask[cellIndex(toX, toY)] !== -1) {
-      continue;
-    }
-
-    const nextDistance = Math.hypot(toX - state.drill.x, toY - state.drill.y);
-    if (!awayFromHero || nextDistance > currentDistance + 0.001) {
-      candidates.push(directions[i]);
-    }
-  }
-
-  return candidates;
-}
-
-function getBaseMoveInterval() {
-  const distance = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
-  if (distance <= 5) {
-    return 3;
-  }
-  return 8;
-}
 
 function moveDrillFreely(dx, dy, dt) {
   const currentCellX = state.drill.x;
@@ -4491,75 +4383,6 @@ function moveDrillRenderToward(targetX, targetY, dt, speed = MOVE_SPEED_TILES) {
   state.drill.renderY += (dy / distance) * step;
 }
 
-function maybeMoveBase() {
-  if (state.baseFound) {
-    return;
-  }
-
-  const preferAway = state.worldRandom() < BASE_MOVE_AWAY_CHANCE;
-  let directions = getBaseMoveDirections(preferAway);
-  if (!directions.length) {
-    directions = getBaseMoveDirections(false);
-  }
-  if (!directions.length) {
-    return;
-  }
-
-  const dir = directions[Math.floor(state.worldRandom() * directions.length)];
-  const fromX = state.base.x;
-  const fromY = state.base.y;
-  const toX = fromX + dir.x;
-  const toY = fromY + dir.y;
-  const fromIndex = cellIndex(fromX, fromY);
-  const toIndex = cellIndex(toX, toY);
-  const sourceTunnel = state.tunnelMask[fromIndex];
-  const sourceHardness = state.hardness[fromIndex];
-  const sourceHealth = state.health[fromIndex];
-  const sourcePerk = state.perkMask[fromIndex];
-  const sourceCrystal = state.crystalMask[fromIndex];
-  const sourceHazard = state.hazardMask[fromIndex];
-  const sourceHazardTriggered = state.hazardTriggeredMask[fromIndex];
-  const sourceLoopGold = state.loopGoldMask[fromIndex];
-  const targetVisual = captureCellVisualData(toIndex);
-  const targetTunnel = state.tunnelMask[toIndex];
-  const targetHardness = state.hardness[toIndex];
-  const targetHealth = state.health[toIndex];
-  const targetPerk = state.perkMask[toIndex];
-  const targetCrystal = state.crystalMask[toIndex];
-  const targetHazard = state.hazardMask[toIndex];
-  const targetHazardTriggered = state.hazardTriggeredMask[toIndex];
-  const targetLoopGold = state.loopGoldMask[toIndex];
-
-  state.tunnelMask[toIndex] = sourceTunnel;
-  state.hardness[toIndex] = sourceHardness;
-  state.health[toIndex] = sourceHealth;
-  state.perkMask[toIndex] = sourcePerk;
-  state.crystalMask[toIndex] = sourceCrystal;
-  state.hazardMask[toIndex] = sourceHazard;
-  state.hazardTriggeredMask[toIndex] = sourceHazardTriggered;
-  state.loopGoldMask[toIndex] = sourceLoopGold;
-
-  state.tunnelMask[fromIndex] = targetTunnel;
-  state.hardness[fromIndex] = targetHardness;
-  state.health[fromIndex] = targetHealth;
-  state.perkMask[fromIndex] = targetPerk;
-  state.crystalMask[fromIndex] = targetCrystal;
-  state.hazardMask[fromIndex] = targetHazard;
-  state.hazardTriggeredMask[fromIndex] = targetHazardTriggered;
-  state.loopGoldMask[fromIndex] = targetLoopGold;
-  startBaseMoveAnimation(toX, toY);
-  startTileMoveAnimation(targetVisual, toX, toY, fromX, fromY, BASE_MOVE_ANIMATION_DURATION);
-  state.base.x = toX;
-  state.base.y = toY;
-
-  if (targetTunnel) {
-    removePathTile(toX, toY);
-    if (state.pathIndexByCell[fromIndex] === -1) {
-      state.pathTiles.push({ x: fromX, y: fromY });
-      rebuildPathIndex();
-    }
-  }
-}
 
 function removePathTile(x, y) {
   const pathIndex = state.pathIndexByCell[cellIndex(x, y)];
@@ -4955,8 +4778,7 @@ function consumeSignalMove(fromX, fromY, toX, toY) {
 }
 
 function updateDiscovery() {
-  state.base.visible = isVisibleCell(state.base.x, state.base.y);
-  if (state.drill.x === state.base.x && state.drill.y === state.base.y) {
+  if (!state.baseFound && state.tunnelMask[cellIndex(state.base.x, state.base.y)]) {
     state.baseFound = true;
   }
 }
@@ -5818,6 +5640,7 @@ function render() {
   renderBase(camera);
   renderBoulders(camera);
   renderDrill(camera);
+  renderBaseProximityDot(camera);
   renderFuelToast(camera);
   renderHpToast(camera);
   renderGoldToast(camera);
@@ -6348,9 +6171,48 @@ function renderOneBeaconRadar(camera, beacon) {
   ctx.restore();
 }
 
+function renderBaseProximityDot(camera) {
+  const ACTIVATE_RADIUS = 6;
+  const dist = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
+  if (dist > ACTIVATE_RADIUS || state.baseFound) return;
+
+  const ctx = state.ctx;
+  // t: 0 at edge of radius, 1 at base
+  const t = 1 - dist / ACTIVATE_RADIUS;
+  // how many bars are lit (1–3)
+  const litBars = t < 0.34 ? 1 : t < 0.67 ? 2 : 3;
+  const pulse = 0.88 + 0.12 * Math.sin((state.lastTs || 0) / 220);
+
+  const BAR_W = 3;
+  const GAP = 2;
+  const BARS = 3;
+  const totalW = BARS * BAR_W + (BARS - 1) * GAP;
+  const maxH = 9;
+
+  // center above hero head
+  const baseX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x - totalW / 2;
+  const baseY = state.drill.renderY * TILE_SIZE - camera.y - 14;
+
+  ctx.save();
+  ctx.shadowColor = "#ff3030";
+
+  for (let i = 0; i < BARS; i++) {
+    const barH = maxH * (i + 1) / BARS;
+    const x = baseX + i * (BAR_W + GAP);
+    const y = baseY - barH;
+    const lit = i < litBars;
+    ctx.globalAlpha = lit ? 0.9 * pulse : 0.18;
+    ctx.shadowBlur = lit ? 5 + t * 7 : 0;
+    ctx.fillStyle = "#ff4040";
+    ctx.fillRect(x, y, BAR_W, barH);
+  }
+
+  ctx.restore();
+}
+
 function renderBase(camera) {
   const ctx = state.ctx;
-  if (!state.base.visible) {
+  if (!state.baseFound) {
     return;
   }
 
