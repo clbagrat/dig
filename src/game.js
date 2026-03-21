@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop } from "./shop.js?v=32";
+import { initShop, openShop, closeShop, renderShop } from "./shop.js?v=37";
 import { generateMap, mulberry32 as _mulberry32 } from "./worldgen.js?v=32";
 
 const TILE_SIZE = 36;
@@ -1885,6 +1885,92 @@ function applyShopPerk(nodeId, level) {
     case "radar_booster":
       state.radarBoosterLevel = (state.radarBoosterLevel || 0) + 1;
       showPerkToast("Усилитель радара");
+      break;
+    case "speed":
+      state.strikeSpeed += 0.2;
+      showPerkToast("Скорость бура");
+      break;
+    // ── Бурение (дополнение) ─────────────────────────────────────────────
+    case "spike_boost":
+      state.spikeOverdriveLevel = Math.min(3, (state.spikeOverdriveLevel || 0) + 1);
+      showPerkToast("Шиповой форсаж");
+      break;
+    // ── Топливо (дополнение) ─────────────────────────────────────────────
+    case "tank_boost":
+      state.tankBoostLevel = Math.min(3, (state.tankBoostLevel || 0) + 1);
+      showPerkToast("Усиленный бак");
+      break;
+    // ── Контур ───────────────────────────────────────────────────────────
+    case "contour_charge":
+      state.loopChargeLevel = Math.min(4, (state.loopChargeLevel || 0) + 1);
+      state.loopChargeDuration = 2 + state.loopChargeLevel;
+      showPerkToast("Контурный заряд");
+      break;
+    case "contour_trophy":
+      state.loopPerkLevel = Math.min(2, (state.loopPerkLevel || 0) + 1);
+      showPerkToast("Контурный трофей");
+      break;
+    case "auto_contour":
+      state.idleAutoCloseDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
+      showPerkToast("Автоконтур");
+      break;
+    case "contour_resonance":
+      state.contourLengthDamageLevel = Math.min(4, (state.contourLengthDamageLevel || 0) + 1);
+      showPerkToast("Контурный резонанс");
+      break;
+    case "contour_recovery":
+      state.contourReturnFuelLevel = Math.min(3, (state.contourReturnFuelLevel || 0) + 1);
+      showPerkToast("Рекуперация контура");
+      break;
+    // ── Нагрев ───────────────────────────────────────────────────────────
+    case "heat_sink":
+      state.maxHeat += 20;
+      showPerkToast("Теплоотвод");
+      break;
+    case "heat_drill":
+      state.heatDamageBonus += 0.2;
+      showPerkToast("Накал бура");
+      break;
+    case "thermo_charge":
+      state.heatExplosionDamageBonus += 1;
+      state.heatExplosionRadiusBonus += 0.5;
+      showPerkToast("Термозаряд");
+      break;
+    case "accel_dampers":
+      state.stunReduction += 0.4;
+      state.heatGainBonus += 1;
+      showPerkToast("Разгонные демпферы");
+      break;
+    case "cooling_pulse":
+      state.heatCoolingRewardLevel += 1;
+      showPerkToast("Импульс остывания");
+      break;
+    case "thermo_rockets":
+      state.heatOverloadRocketLevel = Math.min(3, (state.heatOverloadRocketLevel || 0) + 1);
+      showPerkToast("Терморакеты");
+      break;
+    case "cryo_rockets":
+      state.coolingRocketLevel = Math.min(3, (state.coolingRocketLevel || 0) + 1);
+      showPerkToast("Охлаждающие ракеты");
+      break;
+    // ── Выживание ────────────────────────────────────────────────────────
+    case "reinforced_hull":
+      state.maxHp += 1;
+      healPlayer(2, "Усиленный корпус");
+      showPerkToast("Усиленный корпус");
+      break;
+    case "adrenaline":
+      state.overhealOverdrive = true;
+      state.overhealOverdriveDuration = Math.min(10, (state.overhealOverdriveDuration || 0) + 2);
+      showPerkToast("Перелив адреналина");
+      break;
+    case "ore_collector":
+      state.goldBonus += 2;
+      showPerkToast("Ломосбор");
+      break;
+    case "crystal_catalyst":
+      state.crystalCatalystLevel = Math.min(3, (state.crystalCatalystLevel || 0) + 1);
+      showPerkToast("Кристальный катализатор");
       break;
     default:
       break;

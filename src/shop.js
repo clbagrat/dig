@@ -1,4 +1,4 @@
-import { SHOP_TREES } from "./shop-config.js";
+import { SHOP_TREES } from "./shop-config.js?v=37";
 
 const levels = {};
 let onCloseCallback = null;
