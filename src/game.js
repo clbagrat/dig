@@ -980,9 +980,6 @@ function chooseTilePerkForPosition(x, y, random = Math.random) {
   const farBias = ratio;
   const centerBias = 1.2 - ratio;
   const weights = TILE_PERK_WEIGHTS.slice();
-  weights[2] += Math.round(farBias * 7);
-  weights[3] += Math.round(centerBias * 5);
-  weights[5] += Math.round(centerBias * 4);
   return chooseWeightedPerk(weights, random);
 }
 
