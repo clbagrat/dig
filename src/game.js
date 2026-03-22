@@ -14,8 +14,7 @@ const START_FUEL = 420;
 const START_HP = 7;
 const MAX_HEAT = 100;
 const IDLE_FUEL_DRAIN = 0.8;
-const MOVE_FUEL_COST = 1.8;
-const STRIKE_FUEL_COST = 4.5;
+const DRILL_FUEL_DRAIN = 8;
 const STRIKE_CYCLE_SPEED = 8;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
@@ -103,7 +102,7 @@ const TILE_PERK_TYPES = [
   { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+120 топлива прямо сейчас" },
   { name: "Радар", icon: "R", color: "#f2ede2", desc: "+10 сек направляющего радара" },
   { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.35 к силе удара бура" },
-  { name: "Бомба", icon: "*", color: "#c796ff", desc: "Взрыв в радиусе 2 тайлов с уроном x10" },
+  { name: "Бомба", icon: "*", color: "#c796ff", desc: "Ракета на дистанцию 2 в направлении бурения с взрывом x10" },
   { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+15% к скорости нового удара" },
   { name: "HP+", icon: "H", color: "#73e58f", desc: "+1 к текущему здоровью" },
   { name: "Броня", icon: "A", color: "#b4d7ff", desc: "+1 брони против внешней опасности" },
@@ -260,8 +259,6 @@ const state = {
   crystalCollected: [0, 0, 0, 0, 0, 0],
   crystalProgress: 0,
   crystalStatusText: "",
-  moveFuelCost: MOVE_FUEL_COST,
-  strikeFuelCost: STRIKE_FUEL_COST,
   strikeSpeed: 1,
   drillPower: 1,
   goldBonus: 0,
@@ -1226,8 +1223,6 @@ function setupField() {
   state.signalPrevY = START_Y;
   state.signalDirX = 0;
   state.signalDirY = -1;
-  state.moveFuelCost = MOVE_FUEL_COST;
-  state.strikeFuelCost = STRIKE_FUEL_COST;
   state.strikeSpeed = 1;
   state.drillPower = 1;
   state.goldBonus = 0;
@@ -1647,10 +1642,17 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       state.drillPower += 0.35;
       state.perkText = "Бур";
       break;
-    case 4:
-      explodeAt(x, y, state.drillPower * 10);
+    case 4: {
+      const targetX = clamp(x + state.drill.facingX * 2, 1, GRID_W - 2);
+      const targetY = clamp(y + state.drill.facingY * 2, 1, GRID_H - 2);
+      spawnRocketEffect(x, y, targetX, targetY, {
+        kind: "radiusBomb",
+        damage: state.drillPower * 10,
+        radius: 2,
+      });
       state.perkText = "Бомба";
       break;
+    }
     case 5:
       state.strikeSpeed += 0.15;
       state.perkText = "Скорость";
@@ -4319,14 +4321,6 @@ function moveDrillFreely(dx, dy, dt) {
   let nextY = state.drill.renderY;
   let maxDistance = MOVE_SPEED_TILES * dt;
 
-  if (state.fuel < state.moveFuelCost * maxDistance) {
-    maxDistance = state.moveFuelCost > 0 ? state.fuel / state.moveFuelCost : maxDistance;
-  }
-  if (maxDistance <= 0) {
-    state.fuel = 0;
-    return;
-  }
-
   if (dx > 0) {
     nextY = currentCellY;
     const rightCell = currentCellX + 1 < GRID_W ? cellIndex(currentCellX + 1, currentCellY) : -1;
@@ -4356,7 +4350,6 @@ function moveDrillFreely(dx, dy, dt) {
 
   state.drill.renderX = nextX;
   state.drill.renderY = nextY;
-  state.fuel = Math.max(0, state.fuel - state.moveFuelCost * movedDistance);
 
   const nextCellX = clamp(Math.round(state.drill.renderX), 1, GRID_W - 2);
   const nextCellY = clamp(Math.round(state.drill.renderY), 1, GRID_H - 2);
@@ -4674,10 +4667,6 @@ function updateDrill(dt) {
       state.drill.strikeEnergy = Math.max(0.08, state.drill.strikeEnergy - dt * 4);
       return;
     }
-    if (state.fuel <= 0) {
-      state.fuel = 0;
-      return;
-    }
     moveDrillFreely(dx, dy, dt);
     state.drill.strikePhase += dt * actionRate;
     state.drill.progress = 0;
@@ -4707,6 +4696,9 @@ function updateDrill(dt) {
   if (state.drill.actionCooldown > 0) {
     state.drill.strikePhase += dt * actionRate;
     state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
+    if (state.overhealDrillTimer <= 0) {
+      state.fuel = Math.max(0, state.fuel - DRILL_FUEL_DRAIN * dt);
+    }
     moveDrillRenderToward(state.drill.x, state.drill.y, dt);
     return;
   }
@@ -4715,18 +4707,10 @@ function updateDrill(dt) {
   state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
 
-  if (state.overhealDrillTimer <= 0 && state.fuel < state.strikeFuelCost) {
-    state.fuel = 0;
-    return;
-  }
-
   moveDrillRenderToward(state.drill.x, state.drill.y, dt);
 
   state.drill.strikePhase = Math.PI * 0.5;
   state.drill.actionCooldown = actionInterval;
-  if (state.overhealDrillTimer <= 0) {
-    state.fuel -= state.strikeFuelCost;
-  }
   const strikeDamage = getStrikeDamage();
   const hardness = state.hardness[targetIndex];
   damageCell(targetX, targetY, strikeDamage, {
