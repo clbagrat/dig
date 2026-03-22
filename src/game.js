@@ -142,7 +142,7 @@ const GOLD_PERK_TYPES = [
   { name: "Усиленный бак", icon: "◌", desc: "Бак дает больше топлива, но растет расход в секунду" },
 ];
 
-const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
+const TILE_PERK_WEIGHTS = [0, 7, 0, 0, 4, 0, 2, 2];
 const CRYSTAL_TYPES = [
   null,
   { name: "Красный", color: "#ff4747", glow: "rgba(255,71,71,0.24)" },
@@ -152,7 +152,7 @@ const CRYSTAL_TYPES = [
   { name: "Синий", color: "#72b7ff", glow: "rgba(114,183,255,0.22)" },
 ];
 const CRYSTAL_REWARD_TILE_PERKS = [0, 3, 1, 2, 6, 5];
-const TILES_PER_CRYSTAL_TILE = 32;
+const TILES_PER_CRYSTAL_TILE = 22;
 const CRYSTAL_MIN_DISTANCE = 3;
 const CRYSTAL_RECIPE_LENGTH = 3;
 const CARDINAL_DIRS = [
