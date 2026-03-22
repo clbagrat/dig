@@ -1,5 +1,5 @@
 import { initShop, openShop, closeShop, renderShop } from "./shop.js?v=37";
-import { generateMap, mulberry32 as _mulberry32 } from "./worldgen.js?v=32";
+import { generateMap, mulberry32 as _mulberry32 } from "./worldgen.js?v=33";
 
 const TILE_SIZE = 36;
 const GRID_W = 150;

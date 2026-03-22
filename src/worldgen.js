@@ -14,7 +14,7 @@ const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 26;
 const TILES_PER_PERK_ZONE = 370;
-const TILES_PER_CRYSTAL_TILE = 32;
+const TILES_PER_CRYSTAL_TILE = 22;
 const CRYSTAL_MIN_DISTANCE = 3;
 const METAL_VEIN_GROUPS = 16;
 const GOLD_ORE_GROUPS = 50;
@@ -50,7 +50,7 @@ export const TILE_PERK_TYPES = [
   { name: "Броня",       icon: "A", color: "#b4d7ff" },
 ];
 
-export const TILE_PERK_WEIGHTS = [0, 7, 3, 2, 4, 3, 2, 2];
+export const TILE_PERK_WEIGHTS = [0, 7, 0, 0, 4, 0, 2, 2];
 
 export const CRYSTAL_TYPES = [
   null,
@@ -175,9 +175,6 @@ function chooseTilePerkForPosition(x, y, random) {
   const farBias = ratio;
   const centerBias = 1.2 - ratio;
   const weights = TILE_PERK_WEIGHTS.slice();
-  weights[2] += Math.round(farBias * 7);
-  weights[3] += Math.round(centerBias * 5);
-  weights[5] += Math.round(centerBias * 4);
   return chooseWeightedPerk(random, weights);
 }
 
