@@ -1,15 +1,11 @@
 import { initShop, openShop, closeShop, renderShop } from "./shop.js?v=37";
-import { generateMap, mulberry32 as _mulberry32 } from "./worldgen.js?v=33";
+import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y } from "./worldgen.js?v=34";
 
 const TILE_SIZE = 36;
-const GRID_W = 150;
-const GRID_H = 220;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
 const STEP_MS = 1000 / 60;
 const MAX_FRAME_MS = 100;
 const VISION_RADIUS = 5;
-const START_X = Math.floor(GRID_W / 2);
-const START_Y = Math.floor(GRID_H / 2);
 const START_FUEL = 420;
 const START_HP = 7;
 const MAX_HEAT = 100;
@@ -2537,6 +2533,8 @@ function syncDebugPerkOverlay() {
   if (!overlay) {
     return;
   }
+  const seedDisplay = document.getElementById("debugSeedDisplay");
+  if (seedDisplay) seedDisplay.textContent = `Seed: ${state.worldSeed}`;
   if (state.debugPerkMenuOpen) {
     overlay.hidden = false;
     overlay.removeAttribute("hidden");

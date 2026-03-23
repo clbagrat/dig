@@ -2,7 +2,7 @@
 // Both game.js and the debug render script import from here.
 
 export const GRID_W = 150;
-export const GRID_H = 220;
+export const GRID_H = 150;
 export const START_X = Math.floor(GRID_W / 2);
 export const START_Y = Math.floor(GRID_H / 2);
 
@@ -22,7 +22,7 @@ const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
 const BOULDER_MIN_START_DISTANCE = 4;
-export const BEACON_COUNT = 15;
+export const BEACON_COUNT = 25;
 const BEACON_MIN_DIST = 9;
 const BEACON_MAX_DIST = 60;
 
