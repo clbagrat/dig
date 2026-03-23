@@ -1,11 +1,10 @@
 import { initShop, openShop, closeShop, renderShop } from "./shop.js?v=37";
-import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y } from "./worldgen.js?v=34";
+import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=35";
 
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
 const STEP_MS = 1000 / 60;
 const MAX_FRAME_MS = 100;
-const VISION_RADIUS = 5;
 const START_FUEL = 420;
 const START_HP = 7;
 const MAX_HEAT = 100;

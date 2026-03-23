@@ -6,8 +6,10 @@ export const GRID_H = 150;
 export const START_X = Math.floor(GRID_W / 2);
 export const START_Y = Math.floor(GRID_H / 2);
 
-const START_EASY_RADIUS = 5;
+export const VISION_RADIUS = 5;
+const START_EASY_RADIUS = VISION_RADIUS;
 const START_NEAR_RADIUS = 7;
+const COMPASS_BEACON_DIST = VISION_RADIUS + 3;
 const START_NEAR_GOLD_COUNT = 4;
 const BASE_MIN_DISTANCE = 50;
 const PERK_MIN_DISTANCE = 4;
@@ -525,17 +527,46 @@ function placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPoc
   }
 }
 
-function placeNearBeacon(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, random) {
-  const offsets = [];
-  for (let dx = -(START_NEAR_RADIUS + 1); dx <= START_NEAR_RADIUS + 1; dx += 1) {
-    for (let dy = -(START_NEAR_RADIUS + 1); dy <= START_NEAR_RADIUS + 1; dy += 1) {
-      const d = Math.hypot(dx, dy);
-      if (d > START_EASY_RADIUS && d <= START_NEAR_RADIUS) offsets.push({ x: dx, y: dy });
+function placeCompassBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons) {
+  const d = COMPASS_BEACON_DIST;
+  const positions = [
+    { x: START_X - 1, y: START_Y - d },      // North
+    { x: START_X - 1, y: START_Y + d - 1 },  // South
+    { x: START_X - d,     y: START_Y - 1 },  // West
+    { x: START_X + d - 1, y: START_Y - 1 },  // East
+  ];
+
+  for (const { x, y } of positions) {
+    // Clear obstacles in the beacon check area to guarantee placement
+    for (let dy = -1; dy <= 2; dy += 1) {
+      for (let dx = -1; dx <= 2; dx += 1) {
+        const rx = x + dx, ry = y + dy;
+        if (rx < 0 || rx >= GRID_W || ry < 0 || ry >= GRID_H) continue;
+        const idx = cellIndex(rx, ry);
+        metalMask[idx] = 0;
+        hazardMask[idx] = 0;
+        gasPocketMask[idx] = 0;
+        steamPocketMask[idx] = 0;
+        boulderPocketMask[idx] = 0;
+      }
     }
-  }
-  shuffle(offsets, random);
-  for (let i = 0; i < offsets.length; i += 1) {
-    if (tryPlaceBeacon(START_X + offsets[i].x, START_Y + offsets[i].y, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons)) return;
+    // Place 2x2 beacon body
+    beacons.push({ x, y });
+    for (let dy = 0; dy < 2; dy += 1) {
+      for (let dx = 0; dx < 2; dx += 1) {
+        beaconMask[cellIndex(x + dx, y + dy)] = 1;
+      }
+    }
+    // Mark border ring as tunnel
+    for (let dy = -1; dy <= 2; dy += 1) {
+      for (let dx = -1; dx <= 2; dx += 1) {
+        if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) continue;
+        const rx = x + dx, ry = y + dy;
+        if (rx < 0 || rx >= GRID_W || ry < 0 || ry >= GRID_H) continue;
+        const idx = cellIndex(rx, ry);
+        if (!beaconMask[idx]) beaconMask[idx] = 2;
+      }
+    }
   }
 }
 
@@ -735,7 +766,7 @@ export function generateMap(seed) {
 
   const base = placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, random);
 
-  placeNearBeacon(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, random);
+  placeCompassBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons);
   placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, random);
   for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     if (beaconMask[i] >= 1) hardness[i] = 0;
