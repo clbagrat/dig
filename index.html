@@ -73,18 +73,33 @@
         <div class="debug-perk-menu__panel">
           <div class="debug-perk-menu__head">
             <div>
-              <div class="debug-perk-menu__title">Debug Perks</div>
+              <div class="debug-perk-menu__title">Debug</div>
               <div class="debug-perk-menu__subtitle">Тап по SEED открывает это меню</div>
               <div id="debugSeedDisplay" class="debug-perk-menu__subtitle"></div>
             </div>
             <button id="debugPerkClose" class="debug-perk-menu__close" type="button">Закрыть</button>
           </div>
           <div class="debug-perk-menu__section">
-            <div class="debug-perk-menu__label">Gold</div>
+            <div class="debug-perk-menu__label">Быстрые действия</div>
             <div class="debug-perk-menu__grid">
-              <button id="debugAddGold" type="button" class="debug-perk-menu__button">+100 ●</button>
-              <button id="debugAddUnsafeGold" type="button" class="debug-perk-menu__button">+100 ⚠️●</button>
+              <button id="debugGiveArtifact" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">🔮 Дать артефакт</button>
+              <button id="debugTeleportBeacon" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">📡 К ближ. маяку</button>
+              <button id="debugOpenShop" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">🛒 Открыть магазин</button>
+              <button id="debugUnlockTree" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">🔓 Случ. инструмент</button>
             </div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Ресурсы</div>
+            <div class="debug-perk-menu__grid">
+              <button id="debugAddGold" type="button" class="debug-perk-menu__button">+500 ●</button>
+              <button id="debugAddUnsafeGold" type="button" class="debug-perk-menu__button">+100 ⚠️●</button>
+              <button id="debugAddFuel" type="button" class="debug-perk-menu__button">+200 ⛽</button>
+              <button id="debugHealFull" type="button" class="debug-perk-menu__button">❤️ Full HP</button>
+            </div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Инструменты</div>
+            <div id="debugInstruments" class="debug-perk-menu__grid"></div>
           </div>
           <div class="debug-perk-menu__section">
             <div class="debug-perk-menu__label">Tile Perks</div>
@@ -106,6 +121,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js?v=41"></script>
+    <script type="module" src="./src/game.js?v=46"></script>
   </body>
 </html>

@@ -704,6 +704,20 @@ strong {
   min-height: 68px;
 }
 
+.debug-perk-menu__button--accent {
+  border-color: rgba(180, 120, 255, 0.4);
+  background:
+    linear-gradient(180deg, rgba(120, 60, 180, 0.18), rgba(18, 10, 7, 0.04)),
+    var(--panel);
+  min-height: 44px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.debug-perk-menu__button--accent:active {
+  transform: scale(0.97);
+}
+
 .debug-perk-menu__button--selected {
   border-color: rgba(255, 207, 122, 0.72);
   box-shadow:

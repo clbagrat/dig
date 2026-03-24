@@ -1,4 +1,4 @@
-import { SHOP_TREES as ALL_SHOP_TREES } from "./shop-config.js?v=37";
+import { SHOP_TREES as ALL_SHOP_TREES } from "./shop-config.js?v=38";
 const SHOP_TREES = ALL_SHOP_TREES.slice(0, 1);
 
 const levels = {};
@@ -19,7 +19,7 @@ export function initShop(callbacks = {}) {
   bindEvents();
 }
 
-export function openShop(currentGold) {
+export function openShop(currentGold, focusTreeId) {
   const overlay = document.getElementById("shopModal");
   if (!overlay) return;
   currentGoldCache = currentGold;
@@ -28,6 +28,10 @@ export function openShop(currentGold) {
     "position:absolute;inset:0;z-index:9998;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;";
   renderShop(currentGold);
   requestAnimationFrame(() => {
+    if (focusTreeId) {
+      const idx = SHOP_TREES.findIndex(t => t.id === focusTreeId);
+      if (idx !== -1) selectTab(idx);
+    }
     drawAllLines();
     syncTabFromScroll();
   });
@@ -48,6 +52,14 @@ export function getShopLevel(id) {
 
 export function getLockedTrees() {
   return ALL_SHOP_TREES.filter(t => !unlockedTreeIds.has(t.id));
+}
+
+export function getAllTrees() {
+  return ALL_SHOP_TREES;
+}
+
+export function isTreeUnlocked(treeId) {
+  return unlockedTreeIds.has(treeId);
 }
 
 export function unlockTreeById(treeId) {
