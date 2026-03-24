@@ -11,7 +11,7 @@ import {
   getTargetPerkTileCount, getTargetPerkZoneCount, getTargetCrystalTileCount,
 } from "../src/worldgen.js";
 
-const TILE_PX = 12;
+let TILE_PX = 4;
 const LEGEND_W = 260;
 const HAZARD_DATA = {
   [HAZARD_TYPES.SPIKE]:    { label: "Spike",    color: "#ff6b48" },
@@ -21,6 +21,8 @@ const HAZARD_DATA = {
 function parseArgs(argv) {
   let seed = 1;
   let output = "";
+  let png = false;
+  let tilePx = null;
 
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--seed" && argv[i + 1]) {
@@ -29,12 +31,19 @@ function parseArgs(argv) {
     } else if (argv[i] === "--output" && argv[i + 1]) {
       output = argv[i + 1];
       i += 1;
+    } else if (argv[i] === "--png") {
+      png = true;
+    } else if (argv[i] === "--tile-px" && argv[i + 1]) {
+      tilePx = Number(argv[i + 1]);
+      i += 1;
     }
   }
 
   if (!Number.isFinite(seed)) throw new Error("Seed must be a finite number");
-  if (!output) output = path.join("debug", `map-seed-${seed}.svg`);
-  return { seed, output };
+  if (tilePx === null) tilePx = png ? 8 : 4;
+  const ext = png ? "png" : "svg";
+  if (!output) output = path.join("debug", `map-seed-${seed}.${ext}`);
+  return { seed, output, png, tilePx };
 }
 
 function esc(text) {
@@ -97,7 +106,7 @@ function renderSvg(seed, map) {
         parts.push(`<path d="M ${px + TILE_PX * 0.18} ${py + TILE_PX * 0.3} L ${px + TILE_PX * 0.48} ${py + TILE_PX * 0.58} L ${px + TILE_PX * 0.82} ${py + TILE_PX * 0.22}" fill="none" stroke="${tile.vein}" stroke-opacity="0.45" stroke-width="1"/>`);
       }
 
-      const isScrapOre = map.scrapOreMask[idx];
+      const isScrapOre = map.scrapOreMask?.[idx];
       if (isScrapOre && !isMetal && !isPocket) {
         parts.push(`<circle cx="${px + TILE_PX * 0.26}" cy="${py + TILE_PX * 0.30}" r="${TILE_PX * 0.22}" fill="#c8920a"/>`);
         parts.push(`<circle cx="${px + TILE_PX * 0.26}" cy="${py + TILE_PX * 0.30}" r="${TILE_PX * 0.16}" fill="#f0c030"/>`);
@@ -258,10 +267,17 @@ function renderSvg(seed, map) {
   return parts.join("");
 }
 
-const { seed, output } = parseArgs(process.argv.slice(2));
+const { seed, output, png, tilePx } = parseArgs(process.argv.slice(2));
+TILE_PX = tilePx;
 const map = generateMap(seed);
 const svg = renderSvg(seed, map);
 const outputPath = path.resolve(process.cwd(), output);
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-fs.writeFileSync(outputPath, svg, "utf8");
+
+if (png) {
+  const { default: sharp } = await import("/Users/bagrat/.nvm/versions/node/v24.9.0/lib/node_modules/clawdbot/node_modules/sharp/lib/index.js");
+  await sharp(Buffer.from(svg)).png().toFile(outputPath);
+} else {
+  fs.writeFileSync(outputPath, svg, "utf8");
+}
 process.stdout.write(`${outputPath}\n`);
