@@ -1,6 +1,8 @@
-import { SHOP_TREES } from "./shop-config.js?v=37";
+import { SHOP_TREES as ALL_SHOP_TREES } from "./shop-config.js?v=37";
+const SHOP_TREES = ALL_SHOP_TREES.slice(0, 1);
 
 const levels = {};
+const unlockedTreeIds = new Set(SHOP_TREES.map(t => t.id));
 let onCloseCallback = null;
 let selectedNodeId = null;
 let selectedTreeId = null;
@@ -44,6 +46,48 @@ export function getShopLevel(id) {
   return levels[id] ?? 0;
 }
 
+export function getLockedTrees() {
+  return ALL_SHOP_TREES.filter(t => !unlockedTreeIds.has(t.id));
+}
+
+export function unlockTreeById(treeId) {
+  const tree = ALL_SHOP_TREES.find(t => t.id === treeId);
+  if (!tree || unlockedTreeIds.has(tree.id)) return null;
+  unlockedTreeIds.add(tree.id);
+  SHOP_TREES.push(tree);
+  for (const node of tree.nodes) levels[node.id] = 0;
+
+  // Append tab
+  const tabsEl = document.getElementById("shopTabs");
+  if (tabsEl) {
+    const btn = document.createElement("button");
+    btn.className = "shop-tab";
+    btn.dataset.treeIdx = SHOP_TREES.length - 1;
+    btn.textContent = `${tree.icon} ${tree.name}`;
+    tabsEl.appendChild(btn);
+  }
+
+  // Append tree section
+  const bodyEl = document.getElementById("shopBody");
+  if (bodyEl) {
+    const section = document.createElement("div");
+    section.className = "shop-tree";
+    section.id = `shopTree_${SHOP_TREES.length - 1}`;
+    section.dataset.treeIdx = SHOP_TREES.length - 1;
+    section.appendChild(buildTreeGrid(tree));
+    bodyEl.appendChild(section);
+  }
+
+  return tree;
+}
+
+export function unlockRandomTree() {
+  const locked = getLockedTrees();
+  if (locked.length === 0) return null;
+  const tree = locked[Math.floor(Math.random() * locked.length)];
+  return unlockTreeById(tree.id);
+}
+
 export function renderShop(currentGold) {
   currentGoldCache = currentGold;
   const goldEl = document.getElementById("shopGoldValue");
@@ -63,7 +107,7 @@ function buildDOM() {
   overlay.innerHTML = `
     <div class="shop-panel">
       <div class="shop-head">
-        <span class="shop-head__title">Прокачка</span>
+        <span class="shop-head__title">Инструменты</span>
         <span class="shop-head__gold">
           <span class="shop-head__gold-icon"></span>
           <span id="shopGoldValue">0</span>

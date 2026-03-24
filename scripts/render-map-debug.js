@@ -168,6 +168,27 @@ function renderSvg(seed, map) {
     }
   }
 
+  // Artifacts
+  for (let y = 0; y < GRID_H; y += 1) {
+    for (let x = 0; x < GRID_W; x += 1) {
+      if (!map.artifactMask[cellIndex(x, y)]) continue;
+      const px = x * TILE_PX;
+      const py = y * TILE_PX;
+      const cx = px + TILE_PX * 0.5;
+      const cy = py + TILE_PX * 0.5;
+      const r = TILE_PX * 0.3;
+      let hex = `M`;
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 6 + (Math.PI * 2 * i) / 6;
+        hex += `${i ? "L" : ""} ${cx + Math.cos(a) * r} ${cy + Math.sin(a) * r} `;
+      }
+      hex += "Z";
+      parts.push(`<circle cx="${cx}" cy="${cy}" r="${TILE_PX * 0.42}" fill="rgba(180,120,255,0.2)"/>`);
+      parts.push(`<path d="${hex}" fill="rgba(200,150,255,0.5)" stroke="#dcc0ff" stroke-width="1.2"/>`);
+      parts.push(`<circle cx="${cx}" cy="${cy}" r="${TILE_PX * 0.1}" fill="#e8d0ff"/>`);
+    }
+  }
+
   for (const beacon of map.beacons) {
     const bx = beacon.x * TILE_PX;
     const by = beacon.y * TILE_PX;

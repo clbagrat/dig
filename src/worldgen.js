@@ -27,6 +27,9 @@ const BOULDER_MIN_START_DISTANCE = 4;
 export const BEACON_COUNT = 25;
 const BEACON_MIN_DIST = 9;
 const BEACON_MAX_DIST = 60;
+const ARTIFACT_COUNT = 6;
+const ARTIFACT_MIN_DISTANCE = 8;
+const ARTIFACT_MIN_BEACON_DIST = 5;
 
 export const HAZARD_TYPES = { SPIKE: 1, VOLATILE: 2 };
 
@@ -725,6 +728,38 @@ function placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask,
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
+function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
+  const placed = [];
+  let attempts = 0;
+  while (placed.length < ARTIFACT_COUNT && attempts < ARTIFACT_COUNT * 120) {
+    const x = 3 + Math.floor(random() * (GRID_W - 6));
+    const y = 3 + Math.floor(random() * (GRID_H - 6));
+    const index = cellIndex(x, y);
+    attempts += 1;
+    if (
+      perkMask[index] > 0 || crystalMask[index] > 0 || perkZoneMask[index] !== -1 ||
+      metalMask[index] || gasPocketMask[index] || steamPocketMask[index] ||
+      boulderPocketMask[index] || beaconMask[index] || artifactMask[index]
+    ) continue;
+    if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
+    if (!isFarEnoughFromPlaced(x, y, placed, ARTIFACT_MIN_DISTANCE)) continue;
+    // Must be far enough from the start
+    const distFromStart = Math.abs(x - START_X) + Math.abs(y - START_Y);
+    if (distFromStart < 12) continue;
+    // Must not be too close to any beacon
+    let tooCloseToBeacon = false;
+    for (const b of beacons) {
+      if (Math.abs(x - b.x) + Math.abs(y - b.y) < ARTIFACT_MIN_BEACON_DIST) {
+        tooCloseToBeacon = true;
+        break;
+      }
+    }
+    if (tooCloseToBeacon) continue;
+    artifactMask[index] = 1;
+    placed.push({ x, y });
+  }
+}
+
 /**
  * Generate a complete map for the given seed.
  * Returns plain data arrays — no game state, safe to use from any context.
@@ -747,6 +782,7 @@ export function generateMap(seed) {
   const perkMask       = new Uint8Array(GRID_W * GRID_H);
   const crystalMask    = new Uint8Array(GRID_W * GRID_H);
   const perkZoneMask   = new Int32Array(GRID_W * GRID_H).fill(-1);
+  const artifactMask   = new Uint8Array(GRID_W * GRID_H);
 
   const beacons   = [];
   const perkZones = [];
@@ -774,12 +810,14 @@ export function generateMap(seed) {
   placePerkTiles(perkMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placeCrystalTiles(crystalMask, perkMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
+  placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
 
   return {
     hardness, hazardMask, metalMask, goldOreMask,
     gasPocketMask, steamPocketMask, boulderPocketMask,
     beaconMask, beacons,
     perkMask, crystalMask, perkZones,
+    artifactMask,
     base,
   };
 }

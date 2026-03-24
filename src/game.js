@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop } from "./shop.js?v=37";
+import { initShop, openShop, closeShop, renderShop, unlockRandomTree, getLockedTrees, unlockTreeById } from "./shop.js?v=38";
 import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=35";
 
 const TILE_SIZE = 36;
@@ -236,6 +236,11 @@ const state = {
   boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
   boulders: [],
   beaconMask: new Uint8Array(GRID_W * GRID_H),
+  artifactMask: new Uint8Array(GRID_W * GRID_H),
+  heldArtifact: false,
+  artifactChoiceOpen: false,
+  artifactChoiceTrees: [],
+  artifactChoicePendingBeacon: null,
   beacons: [],
   health: new Float32Array(GRID_W * GRID_H),
   loopGoldMask: new Float32Array(GRID_W * GRID_H),
@@ -1163,6 +1168,11 @@ function setupField() {
   state.steamPocketMask.fill(0);
   state.boulderPocketMask.fill(0);
   state.beaconMask.fill(0);
+  state.artifactMask.fill(0);
+  state.heldArtifact = false;
+  state.artifactChoiceOpen = false;
+  state.artifactChoiceTrees = [];
+  state.artifactChoicePendingBeacon = null;
   state.beacons.length = 0;
   state.perkZones.length = 0;
   state.gasClouds.length = 0;
@@ -1313,6 +1323,7 @@ function setupField() {
   state.steamPocketMask.set(map.steamPocketMask);
   state.boulderPocketMask.set(map.boulderPocketMask);
   state.beaconMask.set(map.beaconMask);
+  state.artifactMask.set(map.artifactMask);
   state.tunnelMask.fill(0);
   for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     state.health[i] = BLOCK_TYPES[state.hardness[i]].hp;
@@ -1344,6 +1355,9 @@ function setupField() {
       state.perkZoneMask[cellIndex(zone.cells[i].x, zone.cells[i].y)] = zoneId;
     }
   }
+
+  // DEBUG: place artifact near spawn
+  state.artifactMask[cellIndex(START_X + 2, START_Y)] = 1;
 
   state.pathTiles.length = 0;
   carveTunnel(state.drill.x, state.drill.y);
@@ -1541,6 +1555,16 @@ function carveTunnel(x, y) {
   if (zoneId !== -1) {
     revealPerkZoneCell(zoneId, x, y);
   }
+
+  if (state.artifactMask[index] > 0) {
+    collectArtifact(x, y, index);
+  }
+}
+
+function collectArtifact(x, y, index) {
+  state.artifactMask[index] = 0;
+  state.heldArtifact = true;
+  showPerkToast("Артефакт найден! Неси к маяку");
 }
 
 function collectPerkTile(x, y, index, perkType) {
@@ -2203,6 +2227,7 @@ function bindUi() {
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
   const crystalRewardOverlay = document.getElementById("crystalReward");
   const crystalRewardClose = document.getElementById("crystalRewardClose");
+  const artifactChoiceOverlay = document.getElementById("artifactChoice");
   const keysDown = new Set();
 
   window.addEventListener("resize", resize);
@@ -2423,6 +2448,15 @@ function bindUi() {
     });
   }
 
+  if (artifactChoiceOverlay) {
+    artifactChoiceOverlay.addEventListener("click", (event) => {
+      const card = event.target.closest(".artifact-choice__card");
+      if (!card) return;
+      const idx = card.id === "artifactChoiceCard0" ? 0 : 1;
+      pickArtifactChoice(idx);
+    });
+  }
+
   buildDebugPerkButtons();
   syncManualModal();
   syncDebugPerkOverlay();
@@ -2497,7 +2531,7 @@ function syncTouchZonesInteractivity() {
     return;
   }
   touchZones.style.pointerEvents =
-    state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen ? "none" : "auto";
+    state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen ? "none" : "auto";
   syncMoveAim();
 }
 
@@ -2635,6 +2669,59 @@ function closeCrystalRewardModal() {
   syncCrystalRewardOverlay();
 }
 
+// ─── Artifact choice modal ────────────────────────────────────────────────────
+
+function openArtifactChoice() {
+  state.artifactChoiceOpen = true;
+  syncTouchZonesInteractivity();
+  const overlay = document.getElementById("artifactChoice");
+  if (!overlay) return;
+  overlay.hidden = false;
+  overlay.style.cssText =
+    "position:absolute;inset:0;z-index:9999;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;background:rgba(10,8,6,0.85);";
+
+  const [t0, t1] = state.artifactChoiceTrees;
+  const card0 = document.getElementById("artifactChoiceCard0");
+  const card1 = document.getElementById("artifactChoiceCard1");
+  if (card0) card0.innerHTML = buildArtifactChoiceCard(t0);
+  if (card1) card1.innerHTML = buildArtifactChoiceCard(t1);
+}
+
+function buildArtifactChoiceCard(tree) {
+  const nodesPreview = tree.nodes.slice(0, 3).map(n =>
+    `<div class="artifact-choice__node"><span class="artifact-choice__node-icon">${n.icon}</span> ${n.name}</div>`
+  ).join("");
+  return `
+    <div class="artifact-choice__card-icon">${tree.icon}</div>
+    <div class="artifact-choice__card-name">${tree.name}</div>
+    <div class="artifact-choice__card-nodes">${nodesPreview}</div>
+  `;
+}
+
+function pickArtifactChoice(idx) {
+  if (!state.artifactChoiceOpen || !state.artifactChoiceTrees[idx]) return;
+  const tree = unlockTreeById(state.artifactChoiceTrees[idx].id);
+  closeArtifactChoice();
+  if (tree) showPerkToast(`Открыт инструмент: ${tree.icon} ${tree.name}`);
+  state.shopModalOpen = true;
+  syncTouchZonesInteractivity();
+  openShop(state.gold);
+}
+
+function closeArtifactChoice() {
+  state.artifactChoiceOpen = false;
+  state.artifactChoiceTrees = [];
+  state.artifactChoicePendingBeacon = null;
+  const overlay = document.getElementById("artifactChoice");
+  if (overlay) {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+  }
+  syncTouchZonesInteractivity();
+}
+
+// ─── Crystal reward modal ─────────────────────────────────────────────────────
+
 function openCrystalRewardModal(firstPerkType, secondPerkType) {
   state.crystalRewardModalOpen = true;
   state.crystalRewardCloseReady = false;
@@ -2686,7 +2773,7 @@ function showPadAt(x, y, pad, stick) {
 }
 
 function syncMoveAim() {
-  if (state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.isChoosingPerk) {
+  if (state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.isChoosingPerk) {
     state.moveAimX = 0;
     state.moveAimY = 0;
     return;
@@ -4917,6 +5004,29 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         state.gold += Math.floor(state.unsafeGold);
         state.unsafeGold = 0;
       }
+      if (state.heldArtifact) {
+        const locked = getLockedTrees();
+        if (locked.length >= 2) {
+          // Pick 2 random locked trees
+          const shuffled = locked.slice();
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          state.heldArtifact = false;
+          state.artifactChoiceTrees = [shuffled[0], shuffled[1]];
+          state.artifactChoicePendingBeacon = beacon;
+          openArtifactChoice();
+          showPerkToast(wasActive ? "Скреп сохранён!" : "Маяк активирован!");
+          continue;
+        } else if (locked.length === 1) {
+          state.heldArtifact = false;
+          const tree = unlockTreeById(locked[0].id);
+          if (tree) showPerkToast(`Открыт инструмент: ${tree.icon} ${tree.name}`);
+        } else {
+          state.heldArtifact = false;
+        }
+      }
       showPerkToast(wasActive ? "Скреп сохранён!" : "Маяк активирован!");
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
@@ -5594,6 +5704,7 @@ function render() {
       renderPerkZoneTile(x, y, sx, sy);
       renderPerkTile(x, y, sx, sy);
       renderCrystalTile(x, y, sx, sy);
+      renderArtifactTile(x, y, sx, sy);
 
       if (state.tunnelMask[index] && state.droppedGoldMask[index] > 0) {
         const pulse = Math.sin((state.lastTs || 0) * 0.004 + x * 1.3 + y * 0.9) * 0.5 + 0.5;
@@ -6286,6 +6397,53 @@ function renderCrystalTileAt(crystalType, sx, sy) {
   ctx.restore();
 }
 
+function renderArtifactTile(x, y, sx, sy) {
+  const index = cellIndex(x, y);
+  if (!state.artifactMask[index]) return;
+
+  const ctx = state.ctx;
+  const t = state.lastTs || 0;
+  const pulse = Math.sin(t * 0.005 + x * 1.1 + y * 0.7) * 0.5 + 0.5;
+  const midX = sx + TILE_SIZE * 0.5;
+  const midY = sy + TILE_SIZE * 0.5;
+
+  ctx.save();
+  // Outer glow
+  ctx.fillStyle = `rgba(180, 120, 255, ${0.12 + pulse * 0.1})`;
+  ctx.beginPath();
+  ctx.arc(midX, midY, TILE_SIZE * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner glow
+  ctx.fillStyle = `rgba(200, 150, 255, ${0.2 + pulse * 0.15})`;
+  ctx.beginPath();
+  ctx.arc(midX, midY, TILE_SIZE * 0.28, 0, Math.PI * 2);
+  ctx.fill();
+  // Artifact shape — hexagon
+  ctx.strokeStyle = `rgba(220, 180, 255, ${0.7 + pulse * 0.3})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.PI / 6 + (Math.PI * 2 * i) / 6;
+    const r = TILE_SIZE * 0.24;
+    const px = midX + Math.cos(angle) * r;
+    const py = midY + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  // Center dot
+  ctx.fillStyle = `rgba(240, 200, 255, ${0.8 + pulse * 0.2})`;
+  ctx.beginPath();
+  ctx.arc(midX, midY, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Label
+  ctx.fillStyle = "#2b1b14";
+  ctx.font = `700 8px ${HUD_FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillText("A", midX, midY + 3);
+  ctx.restore();
+}
+
 function renderPerkZoneTile(x, y, sx, sy) {
   const zoneId = state.perkZoneMask[cellIndex(x, y)];
   if (zoneId === -1) {
@@ -6953,6 +7111,35 @@ function renderHud() {
     manualButton.style.top = `${thirdRowTop - 1}px`;
     manualButton.style.left = "auto";
     manualButton.style.right = "14px";
+  }
+
+  // Artifact indicator
+  if (state.heldArtifact) {
+    const artifactX = left + panelWidth + gap;
+    const artifactY = thirdRowTop - 30;
+    const pulse = Math.sin((state.lastTs || 0) * 0.006) * 0.5 + 0.5;
+    ctx.save();
+    ctx.fillStyle = `rgba(180, 120, 255, ${0.5 + pulse * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(artifactX + 12, artifactY + 12, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(220, 180, 255, ${0.7 + pulse * 0.3})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + (Math.PI * 2 * i) / 6;
+      const px = artifactX + 12 + Math.cos(a) * 7;
+      const py = artifactY + 12 + Math.sin(a) * 7;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = "#e8d0ff";
+    ctx.font = `700 10px ${HUD_FONT}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("АРТЕФАКТ", artifactX + 26, artifactY + 12);
+    ctx.restore();
   }
 
   const detailTop = thirdRowTop;

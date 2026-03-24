@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <title>Dig Path Prototype</title>
-    <link rel="stylesheet" href="./styles.css?v=20260320-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260324-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -45,6 +45,16 @@
             <button class="perk-option" data-perk-slot="0"></button>
             <button class="perk-option" data-perk-slot="1"></button>
             <button class="perk-option" data-perk-slot="2"></button>
+          </div>
+        </div>
+      </div>
+      <div id="artifactChoice" class="artifact-choice" hidden>
+        <div class="artifact-choice__panel">
+          <div class="artifact-choice__title">Выбери инструмент</div>
+          <div class="artifact-choice__subtitle">Артефакт активирован — открой одну ветку</div>
+          <div class="artifact-choice__cards">
+            <button id="artifactChoiceCard0" class="artifact-choice__card"></button>
+            <button id="artifactChoiceCard1" class="artifact-choice__card"></button>
           </div>
         </div>
       </div>
@@ -96,6 +106,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js?v=40"></script>
+    <script type="module" src="./src/game.js?v=41"></script>
   </body>
 </html>
