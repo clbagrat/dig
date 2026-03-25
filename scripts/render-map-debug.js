@@ -183,6 +183,7 @@ function renderSvg(seed, map) {
         hex += `${i ? "L" : ""} ${cx + Math.cos(a) * r} ${cy + Math.sin(a) * r} `;
       }
       hex += "Z";
+      parts.push(`<circle cx="${cx}" cy="${cy}" r="${TILE_PX * 6}" fill="none" stroke="rgba(180,120,255,0.8)" stroke-width="3" stroke-dasharray="6,4"/>`);
       parts.push(`<circle cx="${cx}" cy="${cy}" r="${TILE_PX * 0.42}" fill="rgba(180,120,255,0.2)"/>`);
       parts.push(`<path d="${hex}" fill="rgba(200,150,255,0.5)" stroke="#dcc0ff" stroke-width="1.2"/>`);
       parts.push(`<circle cx="${cx}" cy="${cy}" r="${TILE_PX * 0.1}" fill="#e8d0ff"/>`);
@@ -296,7 +297,7 @@ const outputPath = path.resolve(process.cwd(), output);
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
 if (png) {
-  const { default: sharp } = await import("/Users/bagrat/.nvm/versions/node/v24.9.0/lib/node_modules/clawdbot/node_modules/sharp/lib/index.js");
+  const { default: sharp } = await import("sharp");
   await sharp(Buffer.from(svg)).png().toFile(outputPath);
 } else {
   fs.writeFileSync(outputPath, svg, "utf8");

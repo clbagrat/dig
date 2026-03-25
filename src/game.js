@@ -1364,6 +1364,7 @@ function setupField() {
     }
   }
 
+
   state.pathTiles.length = 0;
   carveTunnel(state.drill.x, state.drill.y);
   extendPath(state.drill.x, state.drill.y);
@@ -5910,8 +5911,6 @@ function render() {
       renderPerkZoneTile(x, y, sx, sy);
       renderPerkTile(x, y, sx, sy);
       renderCrystalTile(x, y, sx, sy);
-      renderArtifactTile(x, y, sx, sy);
-
       if (state.tunnelMask[index] && state.droppedGoldMask[index] > 0) {
         const pulse = Math.sin((state.lastTs || 0) * 0.004 + x * 1.3 + y * 0.9) * 0.5 + 0.5;
         ctx.globalAlpha = visibleAlpha * (0.65 + pulse * 0.35);
@@ -5922,6 +5921,22 @@ function render() {
       }
 
       ctx.globalAlpha = 1;
+    }
+  }
+
+  // Artifact overlay pass — drawn after all tiles so waves aren't clipped
+  // Only render if tile is visible (not hidden by fog of war)
+  for (let y = startY; y < endY; y += 1) {
+    for (let x = startX; x < endX; x += 1) {
+      const idx = cellIndex(x, y);
+      if (!state.artifactMask[idx]) continue;
+      const alpha = state.visibleAlpha[idx];
+      if (alpha < 0.01) continue;
+      const sx = x * TILE_SIZE - camera.x;
+      const sy = y * TILE_SIZE - camera.y;
+      if (alpha < 0.999) ctx.globalAlpha = alpha;
+      renderArtifactTile(x, y, sx, sy);
+      if (alpha < 0.999) ctx.globalAlpha = 1;
     }
   }
 
@@ -6574,44 +6589,61 @@ function renderArtifactTile(x, y, sx, sy) {
 
   const ctx = state.ctx;
   const t = state.lastTs || 0;
-  const pulse = Math.sin(t * 0.005 + x * 1.1 + y * 0.7) * 0.5 + 0.5;
   const midX = sx + TILE_SIZE * 0.5;
   const midY = sy + TILE_SIZE * 0.5;
+  const seed = x * 73 + y * 137; // per-tile phase offset
 
   ctx.save();
-  // Outer glow
-  ctx.fillStyle = `rgba(180, 120, 255, ${0.12 + pulse * 0.1})`;
+
+  // Expanding ripple waves (4 rings, faster & bolder)
+  const WAVE_COUNT = 4;
+  const WAVE_PERIOD = 2000; // ms per full cycle
+  const MAX_R = TILE_SIZE * 1.1;
+  for (let w = 0; w < WAVE_COUNT; w++) {
+    const phase = ((t + seed * 40 + w * (WAVE_PERIOD / WAVE_COUNT)) % WAVE_PERIOD) / WAVE_PERIOD;
+    const r = TILE_SIZE * 0.18 + phase * (MAX_R - TILE_SIZE * 0.18);
+    const alpha = (1 - phase) * 0.45;
+    ctx.strokeStyle = `rgba(190, 140, 255, ${alpha})`;
+    ctx.lineWidth = 2.0 * (1 - phase * 0.4);
+    ctx.beginPath();
+    ctx.arc(midX, midY, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Soft glow underneath
+  const glowPulse = Math.sin(t * 0.003 + seed) * 0.5 + 0.5;
+  const grad = ctx.createRadialGradient(midX, midY, 0, midX, midY, TILE_SIZE * 0.35);
+  grad.addColorStop(0, `rgba(200, 160, 255, ${0.3 + glowPulse * 0.15})`);
+  grad.addColorStop(1, `rgba(160, 100, 240, 0)`);
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.arc(midX, midY, TILE_SIZE * 0.42, 0, Math.PI * 2);
+  ctx.arc(midX, midY, TILE_SIZE * 0.35, 0, Math.PI * 2);
   ctx.fill();
-  // Inner glow
-  ctx.fillStyle = `rgba(200, 150, 255, ${0.2 + pulse * 0.15})`;
-  ctx.beginPath();
-  ctx.arc(midX, midY, TILE_SIZE * 0.28, 0, Math.PI * 2);
-  ctx.fill();
-  // Artifact shape — hexagon
-  ctx.strokeStyle = `rgba(220, 180, 255, ${0.7 + pulse * 0.3})`;
-  ctx.lineWidth = 2;
+
+  // Hexagon body — gentle bob up/down
+  const bob = Math.sin(t * 0.0025 + seed * 0.5) * 1.5;
+  const hexY = midY + bob;
+  const hexR = TILE_SIZE * 0.2;
+  ctx.fillStyle = `rgba(180, 130, 255, ${0.7 + glowPulse * 0.2})`;
+  ctx.strokeStyle = `rgba(230, 200, 255, ${0.8 + glowPulse * 0.2})`;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
-    const angle = Math.PI / 6 + (Math.PI * 2 * i) / 6;
-    const r = TILE_SIZE * 0.24;
-    const px = midX + Math.cos(angle) * r;
-    const py = midY + Math.sin(angle) * r;
+    const a = Math.PI / 6 + (Math.PI * 2 * i) / 6;
+    const px = midX + Math.cos(a) * hexR;
+    const py = hexY + Math.sin(a) * hexR;
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
   }
   ctx.closePath();
-  ctx.stroke();
-  // Center dot
-  ctx.fillStyle = `rgba(240, 200, 255, ${0.8 + pulse * 0.2})`;
-  ctx.beginPath();
-  ctx.arc(midX, midY, 2.5, 0, Math.PI * 2);
   ctx.fill();
-  // Label
-  ctx.fillStyle = "#2b1b14";
-  ctx.font = `700 8px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  ctx.fillText("A", midX, midY + 3);
+  ctx.stroke();
+
+  // Inner sparkle dot
+  ctx.fillStyle = `rgba(255, 240, 255, ${0.7 + glowPulse * 0.3})`;
+  ctx.beginPath();
+  ctx.arc(midX, hexY, 2, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 
