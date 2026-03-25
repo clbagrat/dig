@@ -1,5 +1,5 @@
 import { initShop, openShop, closeShop, renderShop, unlockRandomTree, getLockedTrees, unlockTreeById, getAllTrees, isTreeUnlocked } from "./shop.js?v=40";
-import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=35";
+import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=37";
 
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
@@ -245,6 +245,18 @@ const state = {
   artifactChoiceOpen: false,
   artifactChoiceTrees: [],
   artifactChoicePendingBeacon: null,
+  // Safe/key system
+  safes: [],
+  safeDoorMask: new Int16Array(GRID_W * GRID_H),  // >0 = locked door (safeIdx+1), <0 = opened
+  keyMask: new Uint8Array(GRID_W * GRID_H),        // >0 = key for safe (safeIdx+1)
+  safeInteriorMask: new Int16Array(GRID_W * GRID_H), // >0 = safe interior (safeIdx+1)
+  heldKeyForSafe: -1,      // index of safe this key belongs to, -1 = no key
+  keyBumpTime: 0,
+  keyBumpDir: null,
+  pickupRadarTimer: 0,     // seconds remaining for pickup radar pulse
+  pickupRadarKind: null,   // "artifact" or "key"
+  pickupRadarTargetX: 0,
+  pickupRadarTargetY: 0,
   beacons: [],
   health: new Float32Array(GRID_W * GRID_H),
   loopGoldMask: new Float32Array(GRID_W * GRID_H),
@@ -1181,6 +1193,13 @@ function setupField() {
   state.artifactChoiceOpen = false;
   state.artifactChoiceTrees = [];
   state.artifactChoicePendingBeacon = null;
+  state.safes.length = 0;
+  state.safeDoorMask.fill(0);
+  state.keyMask.fill(0);
+  state.safeInteriorMask.fill(0);
+  state.heldKeyForSafe = -1;
+  state.keyBumpTime = 0;
+  state.keyBumpDir = null;
   state.beacons.length = 0;
   state.perkZones.length = 0;
   state.gasClouds.length = 0;
@@ -1321,6 +1340,8 @@ function setupField() {
   state.drill.digDelayDy = 0;
   state.worldSeed = newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
+  window.__worldSeed = state.worldSeed;
+  console.log("World seed:", state.worldSeed);
 
   const map = generateMap(state.worldSeed);
   state.hardness.set(map.hardness);
@@ -1364,6 +1385,26 @@ function setupField() {
     }
   }
 
+  // Load safes
+  for (const s of map.safes) {
+    const safeIdx = state.safes.length;
+    state.safes.push({
+      x: s.x, y: s.y, cx: s.cx, cy: s.cy,
+      doorX: s.doorX, doorY: s.doorY,
+      keyX: s.keyX, keyY: s.keyY,
+      interiorCells: s.interiorCells,
+      opened: false,
+    });
+    // Mark door
+    state.safeDoorMask[cellIndex(s.doorX, s.doorY)] = safeIdx + 1;
+    // Mark key
+    state.keyMask[cellIndex(s.keyX, s.keyY)] = safeIdx + 1;
+    // Mark interior (NOT tunneled yet — only when door opens)
+    for (const c of s.interiorCells) {
+      const ci = cellIndex(c.x, c.y);
+      state.safeInteriorMask[ci] = safeIdx + 1;
+    }
+  }
 
   state.pathTiles.length = 0;
   carveTunnel(state.drill.x, state.drill.y);
@@ -1532,6 +1573,9 @@ function refreshSignalDirection(fromX = state.drill.x, fromY = state.drill.y) {
 
 function carveTunnel(x, y) {
   const index = cellIndex(x, y);
+  // Never carve through metal or locked safe doors
+  if (state.metalMask[index]) return;
+  if (state.safeDoorMask[index] > 0) return;
   const perkType = state.perkMask[index];
   const crystalType = state.crystalMask[index];
   const zoneId = state.perkZoneMask[index];
@@ -2434,6 +2478,28 @@ function bindUi() {
     });
   }
 
+  const debugGiveKey = document.getElementById("debugGiveKey");
+  if (debugGiveKey) {
+    debugGiveKey.addEventListener("click", () => {
+      // Give key for nearest unopened safe
+      let nearest = null;
+      let bestDist = Infinity;
+      for (let i = 0; i < state.safes.length; i++) {
+        if (state.safes[i].opened) continue;
+        const d = Math.abs(state.safes[i].cx - state.drill.x) + Math.abs(state.safes[i].cy - state.drill.y);
+        if (d < bestDist) { bestDist = d; nearest = i; }
+      }
+      if (nearest !== null) {
+        state.heldKeyForSafe = nearest;
+        showPerkToast(`Ключ выдан (сейф #${nearest})`);
+      } else {
+        showPerkToast("Нет закрытых сейфов");
+      }
+      state.debugPerkMenuOpen = false;
+      syncDebugPerkOverlay();
+    });
+  }
+
   const debugTeleportBeacon = document.getElementById("debugTeleportBeacon");
   if (debugTeleportBeacon) {
     debugTeleportBeacon.addEventListener("click", () => {
@@ -2459,6 +2525,40 @@ function bindUi() {
         state.debugPerkMenuOpen = false;
         syncDebugPerkOverlay();
       }
+    });
+  }
+
+  const debugTeleportSafe = document.getElementById("debugTeleportSafe");
+  if (debugTeleportSafe) {
+    debugTeleportSafe.addEventListener("click", () => {
+      let nearest = null;
+      let bestDist = Infinity;
+      for (const s of state.safes) {
+        if (s.opened) continue;
+        const d = Math.abs(s.doorX - state.drill.x) + Math.abs(s.doorY - state.drill.y);
+        if (d < bestDist) { bestDist = d; nearest = s; }
+      }
+      if (nearest) {
+        // Teleport in front of door (outside the safe)
+        const dx = nearest.doorX - nearest.cx;
+        const dy = nearest.doorY - nearest.cy;
+        const tx = nearest.doorX + dx;
+        const ty = nearest.doorY + dy;
+        state.drill.x = tx;
+        state.drill.y = ty;
+        state.drill.renderX = tx;
+        state.drill.renderY = ty;
+        state.visibilityDirty = true;
+        carveTunnel(tx, ty);
+        state.pathTiles.length = 0;
+        state.pathTiles.push({ x: tx, y: ty });
+        rebuildPathIndex();
+        showPerkToast(`Телепорт к сейфу (${nearest.doorX}, ${nearest.doorY})`);
+      } else {
+        showPerkToast("Нет закрытых сейфов");
+      }
+      state.debugPerkMenuOpen = false;
+      syncDebugPerkOverlay();
     });
   }
 
@@ -2953,6 +3053,10 @@ function update(dt) {
 
   if (state.isChoosingPerk) {
     return;
+  }
+
+  if (state.pickupRadarTimer > 0) {
+    state.pickupRadarTimer = Math.max(0, state.pickupRadarTimer - dt);
   }
 
   if (state.signalMovesLeft > 0) {
@@ -3949,6 +4053,86 @@ function dropArtifactOnDamage() {
   showPerkToast("Артефакт потерян!");
 }
 
+function dropKeyOnDamage() {
+  if (state.heldKeyForSafe === -1) return;
+  const dx = state.drill.facingX;
+  const dy = state.drill.facingY;
+  const candidates = [
+    { x: state.drill.x - dx, y: state.drill.y - dy },
+    { x: state.drill.x - dy, y: state.drill.y - dx },
+    { x: state.drill.x + dy, y: state.drill.y + dx },
+    { x: state.drill.x, y: state.drill.y },
+  ];
+  for (const c of candidates) {
+    if (c.x < 0 || c.x >= GRID_W || c.y < 0 || c.y >= GRID_H) continue;
+    const ci = cellIndex(c.x, c.y);
+    if (!state.tunnelMask[ci]) continue;
+    if (c.x === state.drill.x && c.y === state.drill.y) continue;
+    state.keyMask[ci] = state.heldKeyForSafe + 1;
+    state.heldKeyForSafe = -1;
+    state.keyBumpTime = 0;
+    state.keyBumpDir = null;
+    showPerkToast("Ключ потерян!");
+    return;
+  }
+  // fallback: drop on self
+  const selfIdx = cellIndex(state.drill.x, state.drill.y);
+  state.keyMask[selfIdx] = state.heldKeyForSafe + 1;
+  state.heldKeyForSafe = -1;
+  state.keyBumpTime = 0;
+  state.keyBumpDir = null;
+  showPerkToast("Ключ потерян!");
+}
+
+function openSafeDoor(safeIdx, doorX, doorY) {
+  const safe = state.safes[safeIdx];
+  if (!safe || safe.opened) return;
+  safe.opened = true;
+  state.heldKeyForSafe = -1;
+  state.keyBumpTime = 0;
+  state.keyBumpDir = null;
+  // Open the door tile
+  const doorIdx = cellIndex(doorX, doorY);
+  state.safeDoorMask[doorIdx] = -(safeIdx + 1); // negative = opened
+  state.hardness[doorIdx] = 0;
+  state.health[doorIdx] = 0;
+  state.tunnelMask[doorIdx] = 1;
+  // Tunnel interior
+  for (const c of safe.interiorCells) {
+    state.tunnelMask[cellIndex(c.x, c.y)] = 1;
+  }
+  // Gold reward: 200-300 spread across interior
+  const totalGold = 200 + Math.floor(Math.random() * 101);
+  const cells = safe.interiorCells;
+  const goldPerCell = Math.floor(totalGold / cells.length);
+  let remainder = totalGold - goldPerCell * cells.length;
+  for (const c of cells) {
+    const ci = cellIndex(c.x, c.y);
+    state.droppedGoldMask[ci] += goldPerCell + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+  }
+  // 50/50: artifact or 3 random perks (+damage=3, +speed=5)
+  if (Math.random() < 0.5) {
+    // Artifact in center
+    const center = cells[Math.floor(cells.length / 2)];
+    state.artifactMask[cellIndex(center.x, center.y)] = 1;
+    showPerkToast("Сейф открыт! Артефакт внутри!");
+  } else {
+    // 3 random perks: damage(3) or speed(5)
+    const perkPool = [3, 5]; // Бур, Скорость
+    const shuffled = cells.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    for (let p = 0; p < 3 && p < shuffled.length; p++) {
+      const perkType = perkPool[Math.floor(Math.random() * perkPool.length)];
+      state.perkMask[cellIndex(shuffled[p].x, shuffled[p].y)] = perkType;
+    }
+    showPerkToast("Сейф открыт! Перки внутри!");
+  }
+}
+
 function dropUnsafeGold() {
   if (state.unsafeGold <= 0) return;
   const total = Math.floor(state.unsafeGold);
@@ -4041,6 +4225,7 @@ function applyHazardDamage(amount, options = {}) {
   showHpToast(damageLeft);
   dropUnsafeGold();
   dropArtifactOnDamage();
+  dropKeyOnDamage();
   if (state.hp <= 0) {
     state.dead = true;
   }
@@ -4303,6 +4488,13 @@ function damageCell(x, y, damage, options = {}) {
     }
     return false;
   }
+  // Locked safe door — cannot be drilled, need key
+  if (state.safeDoorMask[index] > 0) {
+    if (options.byDrill) {
+      spawnImpactEffect(x, y, options.dirX ?? state.drill.facingX ?? 0, options.dirY ?? state.drill.facingY ?? 1, 8);
+    }
+    return false;
+  }
   if (state.beaconMask[index]) {
     return false;
   }
@@ -4523,6 +4715,15 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
     state.droppedGoldMask[moveIndex] = 0;
     spawnGoldParticles(toX, toY, droppedPickup);
   }
+  // Pick up perks/crystals on already-tunneled tiles (e.g. inside opened safe)
+  const perkOnTile = state.perkMask[moveIndex];
+  if (perkOnTile > 0 && state.tunnelMask[moveIndex]) {
+    collectPerkTile(toX, toY, moveIndex, perkOnTile);
+  }
+  const crystalOnTile = state.crystalMask[moveIndex];
+  if (crystalOnTile > 0 && state.tunnelMask[moveIndex]) {
+    collectCrystalTile(toX, toY, moveIndex, crystalOnTile);
+  }
   // Pick up artifact by walking over it
   if (!state.heldArtifact && state.artifactMask[moveIndex] > 0) {
     state.artifactMask[moveIndex] = 0;
@@ -4532,6 +4733,17 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
     state.artifactBumpTime = 0;
     state.artifactBumpDir = null;
     showPerkToast("Артефакт подобран! Неси к маяку");
+    triggerPickupRadar("artifact", toX, toY);
+  }
+  // Pick up key by walking over it
+  if (state.heldKeyForSafe === -1 && !state.heldArtifact && state.keyMask[moveIndex] > 0) {
+    const safeIdx = state.keyMask[moveIndex] - 1;
+    state.keyMask[moveIndex] = 0;
+    state.heldKeyForSafe = safeIdx;
+    state.keyBumpTime = 0;
+    state.keyBumpDir = null;
+    showPerkToast("Ключ подобран! Неси к замку");
+    triggerPickupRadar("key", toX, toY);
   }
   state.signalPrevX = toX;
   state.signalPrevY = toY;
@@ -4816,8 +5028,8 @@ function updateDrill(dt) {
     return;
   }
 
-  // Carrying artifact drains fuel passively
-  if (state.heldArtifact) {
+  // Carrying artifact or key drains fuel passively
+  if (state.heldArtifact || state.heldKeyForSafe >= 0) {
     state.fuel = Math.max(0, state.fuel - 4 * dt);
   }
 
@@ -4898,9 +5110,11 @@ function updateDrill(dt) {
       state.drill.strikeEnergy = Math.max(0.08, state.drill.strikeEnergy - dt * 4);
       return;
     }
-    // Reset bump timer when moving freely
+    // Reset bump timers when moving freely
     state.artifactBumpTime = 0;
     state.artifactBumpDir = null;
+    state.keyBumpTime = 0;
+    state.keyBumpDir = null;
     moveDrillFreely(dx, dy, dt);
     state.drill.strikePhase += dt * actionRate;
     state.drill.progress = 0;
@@ -4953,6 +5167,54 @@ function updateDrill(dt) {
       showPerkToast("Артефакт выброшен");
     }
     // Animate bumping but don't drill
+    state.drill.strikePhase += dt * actionRate * 0.3;
+    state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 3);
+    moveDrillRenderToward(state.drill.x, state.drill.y, dt);
+    return;
+  }
+
+  // While carrying key: cannot drill, drop by bumping wall for 1s (same as artifact)
+  if (state.heldKeyForSafe >= 0) {
+    // Check if bumping into this safe's door — open it!
+    const doorVal = state.safeDoorMask[targetIndex];
+    if (doorVal > 0 && doorVal - 1 === state.heldKeyForSafe) {
+      openSafeDoor(state.heldKeyForSafe, targetX, targetY);
+      moveDrillRenderToward(state.drill.x, state.drill.y, dt);
+      return;
+    }
+    const bumpKey = `${dx},${dy}`;
+    if (state.keyBumpDir === bumpKey) {
+      state.keyBumpTime += dt;
+    } else {
+      state.keyBumpDir = bumpKey;
+      state.keyBumpTime = dt;
+    }
+    if (state.keyBumpTime >= 1.0) {
+      const candidates = [
+        { x: state.drill.x - dx, y: state.drill.y - dy },
+        { x: state.drill.x - dy, y: state.drill.y - dx },
+        { x: state.drill.x + dy, y: state.drill.y + dx },
+        { x: state.drill.x, y: state.drill.y },
+      ];
+      let dropped = false;
+      for (const c of candidates) {
+        if (c.x < 0 || c.x >= GRID_W || c.y < 0 || c.y >= GRID_H) continue;
+        const ci = cellIndex(c.x, c.y);
+        if (!state.tunnelMask[ci]) continue;
+        if (c.x === state.drill.x && c.y === state.drill.y) continue;
+        state.keyMask[ci] = state.heldKeyForSafe + 1;
+        dropped = true;
+        break;
+      }
+      if (!dropped) {
+        const selfIdx = cellIndex(state.drill.x, state.drill.y);
+        state.keyMask[selfIdx] = state.heldKeyForSafe + 1;
+      }
+      state.heldKeyForSafe = -1;
+      state.keyBumpTime = 0;
+      state.keyBumpDir = null;
+      showPerkToast("Ключ выброшен");
+    }
     state.drill.strikePhase += dt * actionRate * 0.3;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 3);
     moveDrillRenderToward(state.drill.x, state.drill.y, dt);
@@ -5908,6 +6170,7 @@ function render() {
         ctx.fillRect(sx + 6, sy + TILE_SIZE - 9, (TILE_SIZE - 12) * ratio, 4);
       }
 
+      renderSafeDoorTile(x, y, sx, sy);
       renderPerkZoneTile(x, y, sx, sy);
       renderPerkTile(x, y, sx, sy);
       renderCrystalTile(x, y, sx, sy);
@@ -5924,18 +6187,20 @@ function render() {
     }
   }
 
-  // Artifact overlay pass — drawn after all tiles so waves aren't clipped
-  // Only render if tile is visible (not hidden by fog of war)
+  // Artifact & key overlay pass — drawn after all tiles so waves aren't clipped
   for (let y = startY; y < endY; y += 1) {
     for (let x = startX; x < endX; x += 1) {
       const idx = cellIndex(x, y);
-      if (!state.artifactMask[idx]) continue;
+      const hasArtifact = state.artifactMask[idx] > 0;
+      const hasKey = state.keyMask[idx] > 0;
+      if (!hasArtifact && !hasKey) continue;
       const alpha = state.visibleAlpha[idx];
       if (alpha < 0.01) continue;
       const sx = x * TILE_SIZE - camera.x;
       const sy = y * TILE_SIZE - camera.y;
       if (alpha < 0.999) ctx.globalAlpha = alpha;
-      renderArtifactTile(x, y, sx, sy);
+      if (hasArtifact) renderArtifactTile(x, y, sx, sy);
+      if (hasKey) renderKeyTile(x, y, sx, sy);
       if (alpha < 0.999) ctx.globalAlpha = 1;
     }
   }
@@ -5957,6 +6222,7 @@ function render() {
   renderPerkToast(camera);
   renderSignalStatus(camera);
   renderBeaconRadar(camera);
+  renderPickupRadar(camera);
   renderOverdriveStatus(camera);
   renderStunStatus(camera);
   renderHeatWarningStatus(camera);
@@ -6446,6 +6712,90 @@ function renderOneBeaconRadar(camera, beacon) {
   ctx.restore();
 }
 
+function triggerPickupRadar(kind, fromX, fromY) {
+  let bestDist = Infinity;
+  let bestX = 0, bestY = 0;
+  if (kind === "artifact") {
+    // Find nearest inactive beacon
+    for (const b of state.beacons) {
+      if (b.active) continue;
+      const d = Math.hypot(b.x + 1 - fromX, b.y + 1 - fromY);
+      if (d < bestDist) { bestDist = d; bestX = b.x + 1; bestY = b.y + 1; }
+    }
+  } else {
+    // Find the safe this key belongs to
+    const safe = state.safes[state.heldKeyForSafe];
+    if (safe && !safe.opened) {
+      bestX = safe.doorX;
+      bestY = safe.doorY;
+      bestDist = 1;
+    }
+  }
+  if (bestDist === Infinity) return;
+  state.pickupRadarTimer = 1.0;
+  state.pickupRadarKind = kind;
+  state.pickupRadarTargetX = bestX;
+  state.pickupRadarTargetY = bestY;
+}
+
+function renderPickupRadar(camera) {
+  if (state.pickupRadarTimer <= 0) return;
+  const ctx = state.ctx;
+  const t = state.lastTs || 0;
+  const alpha = Math.min(1, state.pickupRadarTimer); // fade out in last second
+
+  const heroX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const heroY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+  const targetX = state.pickupRadarTargetX;
+  const targetY = state.pickupRadarTargetY;
+
+  const dx = targetX - (state.drill.renderX + 0.5);
+  const dy = targetY - (state.drill.renderY + 0.5);
+  const dist = Math.hypot(dx, dy) || 1;
+  const angle = Math.atan2(dy, dx);
+
+  const radius = 44;
+  const dotX = heroX + Math.cos(angle) * radius;
+  const dotY = heroY + Math.sin(angle) * radius;
+  const pulse = 0.55 + (Math.sin(t * 0.01) * 0.5 + 0.5) * 0.45;
+
+  const isKey = state.pickupRadarKind === "key";
+  const color1 = isKey ? "255, 210, 80" : "180, 120, 255";
+  const color2 = isKey ? "255, 230, 130" : "220, 180, 255";
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Ring
+  ctx.strokeStyle = `rgba(${color1}, 0.45)`;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(heroX, heroY, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Direction line
+  ctx.strokeStyle = `rgba(${color1}, 0.22)`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(heroX, heroY);
+  ctx.lineTo(dotX, dotY);
+  ctx.stroke();
+
+  // Outer glow dot
+  ctx.fillStyle = `rgba(${color1}, ${0.18 + pulse * 0.18})`;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 5.8 + pulse * 2.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner dot
+  ctx.fillStyle = `rgba(${color2}, 1)`;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 3.2 + pulse * 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function renderBaseProximityDot(camera) {
   const ACTIVATE_RADIUS = 6;
   const dist = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
@@ -6647,6 +6997,91 @@ function renderArtifactTile(x, y, sx, sy) {
   ctx.restore();
 }
 
+function renderKeyTile(x, y, sx, sy) {
+  const index = cellIndex(x, y);
+  if (!state.keyMask[index]) return;
+
+  const ctx = state.ctx;
+  const t = state.lastTs || 0;
+  const midX = sx + TILE_SIZE * 0.5;
+  const midY = sy + TILE_SIZE * 0.5;
+  const seed = x * 97 + y * 53;
+  const bob = Math.sin(t * 0.003 + seed) * 1.5;
+  const pulse = Math.sin(t * 0.004 + seed) * 0.5 + 0.5;
+
+  ctx.save();
+  // Glow
+  const grad = ctx.createRadialGradient(midX, midY + bob, 0, midX, midY + bob, TILE_SIZE * 0.35);
+  grad.addColorStop(0, `rgba(255, 210, 80, ${0.3 + pulse * 0.15})`);
+  grad.addColorStop(1, `rgba(255, 180, 40, 0)`);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(midX, midY + bob, TILE_SIZE * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  // Key shape — circle head + shaft
+  const ky = midY + bob;
+  ctx.fillStyle = `rgba(255, 220, 100, ${0.85 + pulse * 0.15})`;
+  ctx.strokeStyle = `rgba(200, 160, 40, 0.9)`;
+  ctx.lineWidth = 1.5;
+  // Head (circle)
+  ctx.beginPath();
+  ctx.arc(midX, ky - 3, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Shaft
+  ctx.beginPath();
+  ctx.moveTo(midX, ky + 1);
+  ctx.lineTo(midX, ky + 7);
+  ctx.stroke();
+  // Teeth
+  ctx.beginPath();
+  ctx.moveTo(midX, ky + 5);
+  ctx.lineTo(midX + 2.5, ky + 5);
+  ctx.moveTo(midX, ky + 7);
+  ctx.lineTo(midX + 2, ky + 7);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function renderSafeDoorTile(x, y, sx, sy) {
+  const index = cellIndex(x, y);
+  const doorVal = state.safeDoorMask[index];
+  if (doorVal === 0) return;
+
+  const ctx = state.ctx;
+  const t = state.lastTs || 0;
+  const midX = sx + TILE_SIZE * 0.5;
+  const midY = sy + TILE_SIZE * 0.5;
+
+  if (doorVal > 0) {
+    // Locked door
+    const pulse = Math.sin(t * 0.003) * 0.5 + 0.5;
+    ctx.save();
+    ctx.fillStyle = `rgba(120, 90, 50, ${0.9 + pulse * 0.1})`;
+    ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    ctx.strokeStyle = `rgba(180, 140, 60, 0.8)`;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    // Lock icon
+    ctx.strokeStyle = `rgba(255, 220, 100, ${0.7 + pulse * 0.3})`;
+    ctx.lineWidth = 1.5;
+    // Lock body
+    ctx.fillStyle = `rgba(200, 170, 80, ${0.8 + pulse * 0.2})`;
+    ctx.fillRect(midX - 4, midY - 1, 8, 7);
+    // Lock arch
+    ctx.beginPath();
+    ctx.arc(midX, midY - 1, 3.5, Math.PI, 0);
+    ctx.stroke();
+    // Keyhole
+    ctx.fillStyle = "#3a2a15";
+    ctx.beginPath();
+    ctx.arc(midX, midY + 2, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 function renderPerkZoneTile(x, y, sx, sy) {
   const zoneId = state.perkZoneMask[cellIndex(x, y)];
   if (zoneId === -1) {
@@ -6832,7 +7267,7 @@ function renderDrill(camera) {
   ctx.drawImage(state.sprites.drillFrames[frame], -TILE_SIZE * 0.5, -TILE_SIZE * 0.5, TILE_SIZE, TILE_SIZE);
   ctx.restore();
 
-  if (!state.heldArtifact) {
+  if (!state.heldArtifact && state.heldKeyForSafe < 0) {
     if (heatRatio > 0.04) {
       ctx.save();
       const tipX = px + TILE_SIZE * 0.5 + state.drill.facingX * 10;
@@ -6928,6 +7363,38 @@ function renderDrill(camera) {
     ctx.beginPath();
     ctx.arc(acx, acy, 2, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+  }
+
+  // Key carried indicator — floating key above drill
+  if (state.heldKeyForSafe >= 0) {
+    const t = state.lastTs || 0;
+    const floatY = Math.sin(t * 0.005) * 3;
+    const kcx = px + TILE_SIZE * 0.5;
+    const kcy = py - (state.heldArtifact ? 22 : 6) + floatY;
+    const pulse = Math.sin(t * 0.006) * 0.5 + 0.5;
+    ctx.save();
+    // Glow
+    ctx.fillStyle = `rgba(255, 210, 80, ${0.2 + pulse * 0.15})`;
+    ctx.beginPath();
+    ctx.arc(kcx, kcy, 10, 0, Math.PI * 2);
+    ctx.fill();
+    // Key shape
+    ctx.strokeStyle = `rgba(255, 220, 100, ${0.8 + pulse * 0.2})`;
+    ctx.fillStyle = `rgba(255, 220, 100, ${0.7 + pulse * 0.2})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(kcx, kcy - 3, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(kcx, kcy + 1.5);
+    ctx.lineTo(kcx, kcy + 8);
+    ctx.moveTo(kcx, kcy + 5.5);
+    ctx.lineTo(kcx + 3, kcy + 5.5);
+    ctx.moveTo(kcx, kcy + 8);
+    ctx.lineTo(kcx + 2.5, kcy + 8);
+    ctx.stroke();
     ctx.restore();
   }
 }
@@ -7380,6 +7847,36 @@ function renderHud() {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText("АРТЕФАКТ", artifactX + 26, artifactY + 12);
+    ctx.restore();
+  }
+
+  // Key indicator
+  if (state.heldKeyForSafe >= 0) {
+    const keyX = left + panelWidth + gap;
+    const keyY = thirdRowTop - (state.heldArtifact ? 54 : 30);
+    const pulse = Math.sin((state.lastTs || 0) * 0.006) * 0.5 + 0.5;
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 210, 80, ${0.5 + pulse * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(keyX + 12, keyY + 12, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(200, 160, 40, ${0.7 + pulse * 0.3})`;
+    ctx.lineWidth = 1.5;
+    // Key icon
+    ctx.beginPath();
+    ctx.arc(keyX + 12, keyY + 9, 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(keyX + 12, keyY + 13);
+    ctx.lineTo(keyX + 12, keyY + 18);
+    ctx.moveTo(keyX + 12, keyY + 16);
+    ctx.lineTo(keyX + 14.5, keyY + 16);
+    ctx.stroke();
+    ctx.fillStyle = "#ffe4a0";
+    ctx.font = `700 10px ${HUD_FONT}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("КЛЮЧ", keyX + 26, keyY + 12);
     ctx.restore();
   }
 

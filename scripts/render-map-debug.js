@@ -190,6 +190,27 @@ function renderSvg(seed, map) {
     }
   }
 
+  // Safes
+  for (const safe of map.safes) {
+    const sx = safe.x * TILE_PX;
+    const sy = safe.y * TILE_PX;
+    // Safe outline
+    parts.push(`<rect x="${sx}" y="${sy}" width="${TILE_PX * 5}" height="${TILE_PX * 5}" fill="none" stroke="rgba(255,210,80,0.6)" stroke-width="2" stroke-dasharray="4,3"/>`);
+    // Door
+    const dx = safe.doorX * TILE_PX;
+    const dy = safe.doorY * TILE_PX;
+    parts.push(`<rect x="${dx}" y="${dy}" width="${TILE_PX}" height="${TILE_PX}" fill="rgba(200,160,40,0.6)" stroke="#ffd850" stroke-width="1.5"/>`);
+    // Key
+    const kx = safe.keyX * TILE_PX + TILE_PX * 0.5;
+    const ky = safe.keyY * TILE_PX + TILE_PX * 0.5;
+    parts.push(`<circle cx="${kx}" cy="${ky}" r="${TILE_PX * 4}" fill="none" stroke="rgba(255,210,80,0.5)" stroke-width="2" stroke-dasharray="4,3"/>`);
+    parts.push(`<circle cx="${kx}" cy="${ky}" r="${TILE_PX * 0.5}" fill="rgba(255,220,100,0.8)"/>`);
+    // Line from key to safe
+    const scx = safe.cx * TILE_PX + TILE_PX * 0.5;
+    const scy = safe.cy * TILE_PX + TILE_PX * 0.5;
+    parts.push(`<line x1="${kx}" y1="${ky}" x2="${scx}" y2="${scy}" stroke="rgba(255,210,80,0.3)" stroke-width="1" stroke-dasharray="3,4"/>`);
+  }
+
   for (const beacon of map.beacons) {
     const bx = beacon.x * TILE_PX;
     const by = beacon.y * TILE_PX;

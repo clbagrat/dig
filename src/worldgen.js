@@ -30,6 +30,11 @@ const BEACON_MAX_DIST = 60;
 const ARTIFACT_COUNT = 8;
 const ARTIFACT_MIN_DISTANCE = 8;
 const ARTIFACT_MIN_BEACON_DIST = 5;
+const SAFE_COUNT = 4;
+const SAFE_MIN_DISTANCE = 20;
+const SAFE_MIN_START_DISTANCE = 15;
+const SAFE_KEY_MIN_DIST = 6;
+const SAFE_KEY_MAX_DIST = 14;
 
 export const HAZARD_TYPES = { SPIKE: 1, VOLATILE: 2 };
 
@@ -726,6 +731,109 @@ function placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask,
   }
 }
 
+// ── Safes ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Place safes: 5x5 footprint (3x3 interior + metal border).
+ * One border cell = door (locked). Key spawned nearby.
+ * Returns array of { x, y, doorX, doorY, keyX, keyY, interiorCells }.
+ * x,y = top-left of the 5x5 footprint.
+ */
+function placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, random) {
+  const placed = [];
+  let attempts = 0;
+
+  while (placed.length < SAFE_COUNT && attempts < SAFE_COUNT * 200) {
+    attempts += 1;
+    // top-left of 5x5 footprint
+    const ox = 4 + Math.floor(random() * (GRID_W - 12));
+    const oy = 4 + Math.floor(random() * (GRID_H - 12));
+    const cx = ox + 2; // center
+    const cy = oy + 2;
+
+    // Distance from start
+    if (Math.abs(cx - START_X) + Math.abs(cy - START_Y) < SAFE_MIN_START_DISTANCE) continue;
+    // Distance from other safes
+    if (!isFarEnoughFromPlaced(cx, cy, placed, SAFE_MIN_DISTANCE)) continue;
+
+    // Check entire 5x5 is clear
+    let blocked = false;
+    for (let dy = 0; dy < 5 && !blocked; dy++) {
+      for (let dx = 0; dx < 5 && !blocked; dx++) {
+        const idx = cellIndex(ox + dx, oy + dy);
+        if (metalMask[idx] || beaconMask[idx] || gasPocketMask[idx] ||
+            steamPocketMask[idx] || boulderPocketMask[idx] || perkZoneMask[idx] !== -1) {
+          blocked = true;
+        }
+      }
+    }
+    if (blocked) continue;
+
+    // Pick a door position on the border (not corner)
+    // Border = edge cells of 5x5
+    const doorSide = Math.floor(random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+    const doorOffset = 1 + Math.floor(random() * 3); // 1,2,3 along side
+    let doorX, doorY;
+    if (doorSide === 0) { doorX = ox + doorOffset; doorY = oy; }
+    else if (doorSide === 1) { doorX = ox + 4; doorY = oy + doorOffset; }
+    else if (doorSide === 2) { doorX = ox + doorOffset; doorY = oy + 4; }
+    else { doorX = ox; doorY = oy + doorOffset; }
+
+    // Place key nearby
+    let keyX = -1, keyY = -1;
+    for (let ka = 0; ka < 100; ka++) {
+      const kx = cx + Math.floor((random() - 0.5) * 2 * SAFE_KEY_MAX_DIST);
+      const ky = cy + Math.floor((random() - 0.5) * 2 * SAFE_KEY_MAX_DIST);
+      if (kx < 2 || kx >= GRID_W - 2 || ky < 2 || ky >= GRID_H - 2) continue;
+      const dist = Math.hypot(kx - cx, ky - cy);
+      if (dist < SAFE_KEY_MIN_DIST || dist > SAFE_KEY_MAX_DIST) continue;
+      const ki = cellIndex(kx, ky);
+      if (metalMask[ki] || beaconMask[ki] || gasPocketMask[ki] || steamPocketMask[ki] || boulderPocketMask[ki]) continue;
+      keyX = kx;
+      keyY = ky;
+      break;
+    }
+    if (keyX === -1) continue; // couldn't place key
+
+    // Stamp the safe into the world
+    const interiorCells = [];
+    for (let dy = 0; dy < 5; dy++) {
+      for (let dx = 0; dx < 5; dx++) {
+        const wx = ox + dx, wy = oy + dy;
+        const idx = cellIndex(wx, wy);
+        const isBorder = dx === 0 || dx === 4 || dy === 0 || dy === 4;
+        if (isBorder) {
+          if (wx === doorX && wy === doorY) {
+            // door tile — keep as hard rock, not metal
+            hardness[idx] = 7; // max tier, very hard
+          } else {
+            metalMask[idx] = 1;
+          }
+        } else {
+          // Interior — clear to tier 1 so it's open once door is opened
+          hardness[idx] = 0;
+          interiorCells.push({ x: wx, y: wy });
+        }
+      }
+    }
+
+    // Clear perks, crystals, hazards from entire 5x5 footprint
+    for (let dy = 0; dy < 5; dy++) {
+      for (let dx = 0; dx < 5; dx++) {
+        const idx = cellIndex(ox + dx, oy + dy);
+        perkMask[idx] = 0;
+        crystalMask[idx] = 0;
+        hazardMask[idx] = 0;
+        if (perkZoneMask[idx] !== -1) perkZoneMask[idx] = -1;
+      }
+    }
+
+    const safe = { x: ox, y: oy, cx, cy, doorX, doorY, keyX, keyY, interiorCells };
+    safes.push(safe);
+    placed.push({ x: cx, y: cy });
+  }
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
@@ -786,6 +894,7 @@ export function generateMap(seed) {
 
   const beacons   = [];
   const perkZones = [];
+  const safes     = [];
 
   const area = GRID_W * GRID_H;
   const hazardBlobGroups = Math.max(12, Math.round(area / 3000));
@@ -811,13 +920,14 @@ export function generateMap(seed) {
   placeCrystalTiles(crystalMask, perkMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
   placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
+  placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, random);
 
   return {
     hardness, hazardMask, metalMask, goldOreMask,
     gasPocketMask, steamPocketMask, boulderPocketMask,
     beaconMask, beacons,
     perkMask, crystalMask, perkZones,
-    artifactMask,
+    artifactMask, safes,
     base,
   };
 }
