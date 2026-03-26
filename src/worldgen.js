@@ -290,16 +290,44 @@ function canPlaceGoldOreAt(x, y) {
   return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
 }
 
-function canPlaceGasPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+function canPlaceGasPocketAt(x, y, steamPocketMask, boulderPocketMask) {
+  if (x < 2 || y < 2 || x >= GRID_W - 2 || y >= GRID_H - 2) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  const idx = cellIndex(x, y);
+  // Don't overlap with other pocket types (including 1-cell border)
+  if (steamPocketMask && isPocketNeighbor(x, y, steamPocketMask)) return false;
+  if (boulderPocketMask && isPocketNeighbor(x, y, boulderPocketMask)) return false;
+  return true;
 }
 
-function canPlaceSteamPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+function canPlaceSteamPocketAt(x, y, gasPocketMask, boulderPocketMask) {
+  if (x < 2 || y < 2 || x >= GRID_W - 2 || y >= GRID_H - 2) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  if (gasPocketMask && isPocketNeighbor(x, y, gasPocketMask)) return false;
+  if (boulderPocketMask && isPocketNeighbor(x, y, boulderPocketMask)) return false;
+  return true;
 }
 
-function canPlaceBoulderPocketAt(x, y) {
-  return x >= 2 && y >= 2 && x < GRID_W - 2 && y < GRID_H - 2 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+function canPlaceBoulderPocketAt(x, y, gasPocketMask, steamPocketMask) {
+  if (x < 2 || y < 2 || x >= GRID_W - 2 || y >= GRID_H - 2) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  if (gasPocketMask && isPocketNeighbor(x, y, gasPocketMask)) return false;
+  if (steamPocketMask && isPocketNeighbor(x, y, steamPocketMask)) return false;
+  return true;
+}
+
+function isPocketNeighbor(x, y, mask) {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= GRID_W || ny < 0 || ny >= GRID_H) continue;
+      if (mask[cellIndex(nx, ny)]) return true;
+    }
+  }
+  return false;
 }
 
 function placeHazardBlob(hazardMask, random, blockCount) {
@@ -398,7 +426,7 @@ function placeGoldOreVein(goldOreMask, random, blockCount) {
   }
 }
 
-function placeGasPocket(gasPocketMask, hazardMask, random, cellCount) {
+function placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, random, cellCount) {
   const origin = getHazardOrigin(random);
   const frontier = [{ x: origin.x, y: origin.y }];
   const seen = new Set();
@@ -409,7 +437,7 @@ function placeGasPocket(gasPocketMask, hazardMask, random, cellCount) {
     const key = `${cell.x},${cell.y}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!canPlaceGasPocketAt(cell.x, cell.y)) continue;
+    if (!canPlaceGasPocketAt(cell.x, cell.y, steamPocketMask, boulderPocketMask)) continue;
     const index = cellIndex(cell.x, cell.y);
     gasPocketMask[index] = 1;
     hazardMask[index] = 0;
@@ -426,7 +454,7 @@ function placeGasPocket(gasPocketMask, hazardMask, random, cellCount) {
   }
 }
 
-function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, random, cellCount) {
+function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, random, cellCount) {
   const origin = getHazardOrigin(random);
   const frontier = [{ x: origin.x, y: origin.y }];
   const seen = new Set();
@@ -437,7 +465,7 @@ function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, random, ce
     const key = `${cell.x},${cell.y}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!canPlaceSteamPocketAt(cell.x, cell.y)) continue;
+    if (!canPlaceSteamPocketAt(cell.x, cell.y, gasPocketMask, boulderPocketMask)) continue;
     const index = cellIndex(cell.x, cell.y);
     steamPocketMask[index] = 1;
     hazardMask[index] = 0;
@@ -457,7 +485,7 @@ function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, random, ce
 
 function placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, random) {
   const origin = getHazardOrigin(random);
-  if (!canPlaceBoulderPocketAt(origin.x, origin.y)) return;
+  if (!canPlaceBoulderPocketAt(origin.x, origin.y, gasPocketMask, steamPocketMask)) return;
   if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) return;
   for (let y = 1; y < GRID_H - 1; y += 1) {
     if (boulderPocketMask[cellIndex(origin.x, y)]) return;
@@ -876,6 +904,42 @@ function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metal
  * perkZones entries: { x, y, cells, iconX, iconY, perkType }
  *   (game.js adds openedCount, openedMask, arming, armingTimer, collected)
  */
+/**
+ * Repair pockets after beacons/safes may have destroyed some cells.
+ * For each pocket cell, check if any of its 4-neighbors are also pocket cells.
+ * If a pocket cell is completely isolated (no same-type neighbor), remove it.
+ * Then, remove pocket cells that overlap with beacon areas.
+ */
+function repairPockets(pocketMask, beaconMask) {
+  // First: remove any pocket cell that overlaps a beacon
+  for (let i = 0; i < GRID_W * GRID_H; i++) {
+    if (pocketMask[i] && beaconMask[i]) {
+      pocketMask[i] = 0;
+    }
+  }
+  // Second: remove orphaned pocket cells (no same-type 4-neighbor)
+  // Iterate until stable — removing one cell can orphan another
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let y = 1; y < GRID_H - 1; y++) {
+      for (let x = 1; x < GRID_W - 1; x++) {
+        const idx = cellIndex(x, y);
+        if (!pocketMask[idx]) continue;
+        const hasNeighbor =
+          pocketMask[cellIndex(x + 1, y)] ||
+          pocketMask[cellIndex(x - 1, y)] ||
+          pocketMask[cellIndex(x, y + 1)] ||
+          pocketMask[cellIndex(x, y - 1)];
+        if (!hasNeighbor) {
+          pocketMask[idx] = 0;
+          changed = true;
+        }
+      }
+    }
+  }
+}
+
 export function generateMap(seed) {
   const random = mulberry32(seed);
 
@@ -905,8 +969,8 @@ export function generateMap(seed) {
   for (let i = 0; i < METAL_VEIN_GROUPS;    i += 1) placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, random, 12 + Math.floor(random() * 22));
   for (let i = 0; i < GOLD_ORE_GROUPS;     i += 1) placeGoldOreVein(goldOreMask, random, 4 + Math.floor(random() * 7));
   placeNearGold(goldOreMask, random);
-  for (let i = 0; i < GAS_POCKET_GROUPS;    i += 1) placeGasPocket(gasPocketMask, hazardMask, random, 4 + Math.floor(random() * 17));
-  for (let i = 0; i < STEAM_POCKET_GROUPS;  i += 1) placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, random, 3 + Math.floor(random() * 7));
+  for (let i = 0; i < GAS_POCKET_GROUPS;    i += 1) placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, random, 4 + Math.floor(random() * 17));
+  for (let i = 0; i < STEAM_POCKET_GROUPS;  i += 1) placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, random, 3 + Math.floor(random() * 7));
   for (let i = 0; i < BOULDER_POCKET_GROUPS; i += 1) placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, random);
 
   const base = placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, random);
@@ -921,6 +985,13 @@ export function generateMap(seed) {
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
   placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
   placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, random);
+
+  // Repair pockets: remove any pocket cells that were destroyed by beacons/safes
+  // A pocket cell is orphaned if it has no pocket neighbor of the same type
+  // (i.e. it became isolated by beacon clearing). Remove such cells.
+  repairPockets(gasPocketMask, beaconMask);
+  repairPockets(steamPocketMask, beaconMask);
+  repairPockets(boulderPocketMask, beaconMask);
 
   return {
     hardness, hazardMask, metalMask, goldOreMask,
