@@ -9,6 +9,7 @@ The player sees only within a small radius around the driller.
 
 The run is about:
 - managing fuel,
+- collecting experience from destroyed blocks,
 - choosing digging routes through mixed rock difficulty,
 - picking up tile perks,
 - buying stronger scrap upgrades,
@@ -159,6 +160,21 @@ So the sequence is roughly:
 - `74`
 - `100`
 - ...
+
+## Experience And Levels
+
+Every destroyed block drops `1` experience crystal on the tile where that block stood.
+
+Pickup rules:
+- experience stays on the map until collected
+- the driller picks it up automatically when within radius `1`
+- multiple drops on one tile stack together
+
+Current level flow:
+- the run starts at level `1`
+- level requirement grows linearly each level
+- on level up, a modal confirmation appears
+- future reward choices per level are planned but not assigned yet
 
 ## Radar
 

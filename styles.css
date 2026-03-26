@@ -1100,6 +1100,71 @@ strong {
 
 .shop-modal[hidden] { display: none; }
 
+.level-up-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 8, 6, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.level-up-modal[hidden] { display: none; }
+
+.level-up-modal__panel {
+  width: min(92vw, 420px);
+  padding: 24px 22px 22px;
+  border: 1px solid rgba(220, 169, 93, 0.34);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top, rgba(255, 202, 116, 0.16), transparent 50%),
+    linear-gradient(180deg, rgba(64, 38, 24, 0.96), rgba(24, 14, 10, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 186, 0.08),
+    0 24px 48px rgba(0, 0, 0, 0.4);
+  text-align: center;
+}
+
+.level-up-modal__eyebrow {
+  color: var(--accent);
+  font: 700 11px/1.2 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.level-up-modal__title {
+  margin-top: 10px;
+  color: #fff0d5;
+  font: 700 30px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.level-up-modal__text {
+  margin-top: 12px;
+  color: var(--muted);
+  font: 400 16px/1.45 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.level-up-modal__button {
+  margin-top: 18px;
+  min-width: 148px;
+  border: 1px solid rgba(255, 211, 142, 0.28);
+  border-radius: 14px;
+  padding: 12px 18px;
+  color: #fff2dc;
+  font: 700 16px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  background:
+    linear-gradient(180deg, rgba(224, 161, 78, 0.4), rgba(120, 64, 27, 0.7)),
+    rgba(50, 28, 16, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 237, 200, 0.12),
+    0 10px 22px rgba(0, 0, 0, 0.28);
+}
+
+.level-up-modal__button:active { transform: translateY(1px); }
+
 /* Панель */
 .shop-panel {
   width: 100%;

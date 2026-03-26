@@ -73,6 +73,8 @@ const WORM_DAMAGE = 3;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
+const XP_PER_BLOCK = 1;
+const XP_PICKUP_RADIUS = 1;
 
 // Reusable buffers for visibility BFS — avoids per-frame allocations
 const _visFogDistance = new Int16Array(GRID_W * GRID_H);
@@ -189,7 +191,13 @@ const state = {
   depth: 0,
   gold: 0,
   unsafeGold: 0,
+  xp: 0,
+  level: 1,
+  xpToNext: 12,
+  pendingLevelUps: 0,
+  levelUpModalOpen: false,
   goldParticles: [],
+  xpParticles: [],
   baseFound: false,
   outOfFuel: false,
   dead: false,
@@ -270,6 +278,7 @@ const state = {
   health: new Float32Array(GRID_W * GRID_H),
   loopGoldMask: new Float32Array(GRID_W * GRID_H),
   droppedGoldMask: new Float32Array(GRID_W * GRID_H),
+  xpPickupMask: new Uint16Array(GRID_W * GRID_H),
   visibleMask: new Uint8Array(GRID_W * GRID_H),
   visibleAlpha: new Float32Array(GRID_W * GRID_H),
   visibleTargetAlpha: new Float32Array(GRID_W * GRID_H),
@@ -924,6 +933,27 @@ function spawnGoldParticles(tileX, tileY, totalValue, options = {}) {
   }
 }
 
+function spawnExperienceParticles(tileX, tileY, totalValue) {
+  if (totalValue <= 0) {
+    return;
+  }
+  const count = Math.min(6, Math.max(1, Math.ceil(totalValue / 2)));
+  const baseValue = Math.floor(totalValue / count);
+  for (let i = 0; i < count; i += 1) {
+    const value = i === count - 1 ? totalValue - baseValue * (count - 1) : baseValue;
+    const seed = (tileX * 193 + tileY * 389 + i * 97) % 1000;
+    state.xpParticles.push({
+      tileX: tileX + 0.5,
+      tileY: tileY + 0.5,
+      value,
+      elapsed: 0,
+      delay: i * 0.03,
+      duration: 0.24 + (seed % 6) * 0.02,
+      seed,
+    });
+  }
+}
+
 function spawnDamageNumberEffect(x, y, value) {
   if (value <= 0) {
     return;
@@ -1185,6 +1215,7 @@ function setupField() {
   state.steamMask.fill(0);
   state.loopGoldMask.fill(0);
   state.droppedGoldMask.fill(0);
+  state.xpPickupMask.fill(0);
   state.hazardTriggeredMask.fill(0);
   state.metalMask.fill(0);
   state.goldOreMask.fill(0);
@@ -1233,6 +1264,11 @@ function setupField() {
   state.armor = 0;
   state.gold = 0;
   state.unsafeGold = 0;
+  state.xp = 0;
+  state.level = 1;
+  state.xpToNext = getXpNeededForLevel(state.level);
+  state.pendingLevelUps = 0;
+  state.levelUpModalOpen = false;
   state.depth = 0;
   state.perkText = "Нет";
   state.crystalRecipe = [];
@@ -1322,6 +1358,7 @@ function setupField() {
   state.hpToast.value = 0;
   state.hpToast.time = 0;
   state.goldParticles.length = 0;
+  state.xpParticles.length = 0;
   state.goldToast.value = 0;
   state.goldToast.time = 0;
   state.damageFlash = 0;
@@ -1441,6 +1478,7 @@ function setupField() {
     state.visibleAlpha[i] = state.visibleTargetAlpha[i];
   }
   syncDebugPerkOverlay();
+  syncLevelUpModal();
 
 }
 
@@ -2285,6 +2323,8 @@ function bindUi() {
   const crystalRewardOverlay = document.getElementById("crystalReward");
   const crystalRewardClose = document.getElementById("crystalRewardClose");
   const artifactChoiceOverlay = document.getElementById("artifactChoice");
+  const levelUpOverlay = document.getElementById("levelUpModal");
+  const levelUpConfirm = document.getElementById("levelUpConfirm");
   const keysDown = new Set();
 
   window.addEventListener("resize", resize);
@@ -2308,7 +2348,7 @@ function bindUi() {
   };
 
   zone.addEventListener("pointerdown", (event) => {
-    if (state.debugPerkMenuOpen || state.manualModalOpen || state.shopModalOpen) {
+    if (state.debugPerkMenuOpen || state.manualModalOpen || state.shopModalOpen || state.levelUpModalOpen) {
       return;
     }
     if (state.goldHitRect && isPointInsideRect(event.clientX, event.clientY, state.goldHitRect)) {
@@ -2680,10 +2720,26 @@ function bindUi() {
     });
   }
 
+  if (levelUpConfirm) {
+    levelUpConfirm.addEventListener("click", () => {
+      closeLevelUpModal();
+    });
+  }
+
+  if (levelUpOverlay) {
+    levelUpOverlay.addEventListener("click", (event) => {
+      if (event.target !== levelUpOverlay) {
+        return;
+      }
+      closeLevelUpModal();
+    });
+  }
+
   buildDebugPerkButtons();
   syncManualModal();
   syncDebugPerkOverlay();
   syncCrystalRewardOverlay();
+  syncLevelUpModal();
 }
 
 function isPointInsideRect(x, y, rect) {
@@ -2776,7 +2832,7 @@ function syncTouchZonesInteractivity() {
     return;
   }
   touchZones.style.pointerEvents =
-    state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen ? "none" : "auto";
+    state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen ? "none" : "auto";
   syncMoveAim();
 }
 
@@ -2914,6 +2970,35 @@ function closeCrystalRewardModal() {
   syncCrystalRewardOverlay();
 }
 
+function syncLevelUpModal() {
+  const overlay = document.getElementById("levelUpModal");
+  if (!overlay) {
+    return;
+  }
+  overlay.hidden = !state.levelUpModalOpen;
+  if (state.levelUpModalOpen) {
+    overlay.removeAttribute("hidden");
+  }
+  syncTouchZonesInteractivity();
+}
+
+function openLevelUpModal() {
+  state.levelUpModalOpen = true;
+  syncLevelUpModal();
+}
+
+function closeLevelUpModal() {
+  state.levelUpModalOpen = false;
+  if (state.pendingLevelUps > 0) {
+    state.pendingLevelUps -= 1;
+  }
+  if (state.pendingLevelUps > 0) {
+    openLevelUpModal();
+    return;
+  }
+  syncLevelUpModal();
+}
+
 // ─── Artifact choice modal ────────────────────────────────────────────────────
 
 function openArtifactChoice() {
@@ -3019,7 +3104,7 @@ function showPadAt(x, y, pad, stick) {
 }
 
 function syncMoveAim() {
-  if (state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.isChoosingPerk) {
+  if (state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen || state.isChoosingPerk) {
     state.moveAimX = 0;
     state.moveAimY = 0;
     return;
@@ -3092,9 +3177,14 @@ function update(dt) {
   }
 
   updateMovementAnimations(dt);
+  updateExperienceParticles(dt);
 
   if (state.crystalRewardModalOpen) {
     updateCrystalRewardModal(dt);
+    return;
+  }
+
+  if (state.levelUpModalOpen) {
     return;
   }
 
@@ -3105,6 +3195,8 @@ function update(dt) {
   if (state.pickupRadarTimer > 0) {
     state.pickupRadarTimer = Math.max(0, state.pickupRadarTimer - dt);
   }
+
+  pickupExperienceNearPlayer();
 
   if (state.signalMovesLeft > 0) {
     state.signalMovesLeft = Math.max(0, state.signalMovesLeft - dt);
@@ -3240,6 +3332,18 @@ function updateGoldParticles(dt) {
       });
     }
     state.goldParticles.splice(i, 1);
+  }
+}
+
+function updateExperienceParticles(dt) {
+  for (let i = state.xpParticles.length - 1; i >= 0; i -= 1) {
+    const particle = state.xpParticles[i];
+    particle.elapsed += dt;
+    if (particle.elapsed - particle.delay < particle.duration) {
+      continue;
+    }
+    gainExperience(particle.value);
+    state.xpParticles.splice(i, 1);
   }
 }
 
@@ -4050,6 +4154,56 @@ function getStrikeDamage() {
   return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * 10 * chargeBoost * heatBoost * contourBoost;
 }
 
+function getXpNeededForLevel(level) {
+  return 12 + Math.max(0, level - 1) * 6;
+}
+
+function spawnExperienceCrystal(x, y, amount = XP_PER_BLOCK) {
+  if (amount <= 0) {
+    return;
+  }
+  const index = cellIndex(x, y);
+  state.xpPickupMask[index] += amount;
+}
+
+function gainExperience(amount) {
+  if (amount <= 0) {
+    return;
+  }
+  state.xp += amount;
+  while (state.xp >= state.xpToNext) {
+    state.xp -= state.xpToNext;
+    state.level += 1;
+    state.xpToNext = getXpNeededForLevel(state.level);
+    state.pendingLevelUps += 1;
+    showPerkToast(`Уровень ${state.level}`);
+  }
+  if (state.pendingLevelUps > 0 && !state.levelUpModalOpen) {
+    openLevelUpModal();
+  }
+}
+
+function pickupExperienceNearPlayer() {
+  const px = state.drill.x;
+  const py = state.drill.y;
+  for (let dy = -XP_PICKUP_RADIUS; dy <= XP_PICKUP_RADIUS; dy += 1) {
+    for (let dx = -XP_PICKUP_RADIUS; dx <= XP_PICKUP_RADIUS; dx += 1) {
+      const tx = px + dx;
+      const ty = py + dy;
+      if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) {
+        continue;
+      }
+      const index = cellIndex(tx, ty);
+      const amount = state.xpPickupMask[index];
+      if (amount <= 0) {
+        continue;
+      }
+      state.xpPickupMask[index] = 0;
+      spawnExperienceParticles(tx, ty, amount);
+    }
+  }
+}
+
 function addFuel(amount, originX = state.drill.x, originY = state.drill.y, options = {}) {
   if (amount <= 0) {
     return;
@@ -4509,22 +4663,32 @@ function buildWormPath(nestX, nestY, playerX, playerY, radius) {
   // Extend the line to the edge of the radius (and a bit beyond)
   const endX = nestX + dirX * (radius + 5);
   const endY = nestY + dirY * (radius + 5);
-  // Bresenham line from nest to end point
   const path = [];
   let x0 = nestX, y0 = nestY;
   const x1 = Math.round(endX), y1 = Math.round(endY);
-  const sdx = Math.abs(x1 - x0), sdy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  let err = sdx - sdy;
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  const lineDx = x1 - nestX;
+  const lineDy = y1 - nestY;
   while (true) {
     if (x0 >= 0 && x0 < GRID_W && y0 >= 0 && y0 < GRID_H) {
       path.push({ x: x0, y: y0 });
     }
     if (x0 === x1 && y0 === y1) break;
     if (path.length > radius * 3) break; // safety
-    const e2 = 2 * err;
-    if (e2 > -sdy) { err -= sdy; x0 += sx; }
-    if (e2 < sdx) { err += sdx; y0 += sy; }
+    if (x0 !== x1 && y0 !== y1) {
+      const stepXError = Math.abs((x0 + sx - nestX) * lineDy - (y0 - nestY) * lineDx);
+      const stepYError = Math.abs((x0 - nestX) * lineDy - (y0 + sy - nestY) * lineDx);
+      if (stepXError <= stepYError) {
+        x0 += sx;
+      } else {
+        y0 += sy;
+      }
+    } else if (x0 !== x1) {
+      x0 += sx;
+    } else if (y0 !== y1) {
+      y0 += sy;
+    }
   }
   return path;
 }
@@ -4775,6 +4939,7 @@ function breakCell(x, y, index, options = {}) {
   }
 
   carveTunnel(x, y);
+  spawnExperienceCrystal(x, y);
 
   // Check if a worm nest was destroyed
   for (const nest of state.wormNests) {
@@ -6229,6 +6394,43 @@ function renderGoldParticles(camera) {
   ctx.globalAlpha = 1;
 }
 
+function renderExperienceParticles(camera) {
+  if (state.xpParticles.length === 0) return;
+  const ctx = state.ctx;
+  const heroX = state.drill.renderX * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
+  const heroY = state.drill.renderY * TILE_SIZE - camera.y + TILE_SIZE * 0.5;
+
+  for (let i = 0; i < state.xpParticles.length; i += 1) {
+    const particle = state.xpParticles[i];
+    const active = particle.elapsed - particle.delay;
+    if (active <= 0) continue;
+
+    const t = Math.min(1, active / particle.duration);
+    const easeIn = t * t * (3 - 2 * t);
+    const startX = particle.tileX * TILE_SIZE - camera.x;
+    const startY = particle.tileY * TILE_SIZE - camera.y;
+    const dx = heroX - startX;
+    const dy = heroY - startY;
+    const len = Math.hypot(dx, dy) || 1;
+    const bulge = Math.sin(t * Math.PI) * Math.min(16, len * 0.18) * ((((particle.seed % 3) - 1) || 1));
+    const px = startX + dx * easeIn - (dy / len) * bulge;
+    const py = startY + dy * easeIn + (dx / len) * bulge;
+    const alpha = t > 0.82 ? (1 - t) / 0.18 : 1;
+    const size = 2.6 - t * 0.9;
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#7ee3ff";
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#dbfbff";
+    ctx.beginPath();
+    ctx.arc(px, py, size * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 function render() {
   const ctx = state.ctx;
   const camera = getCamera();
@@ -6328,6 +6530,33 @@ function render() {
       ctx.globalAlpha = visibleAlpha;
       if (state.tunnelMask[index]) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
+        if (state.xpPickupMask[index] > 0) {
+          const pulse = Math.sin((state.lastTs || 0) * 0.006 + x * 0.8 + y * 1.2) * 0.5 + 0.5;
+          const amount = state.xpPickupMask[index];
+          ctx.save();
+          ctx.globalAlpha = visibleAlpha * (0.72 + pulse * 0.24);
+          ctx.fillStyle = "#78d8ff";
+          ctx.beginPath();
+          ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, 3.2 + pulse * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#bff4ff";
+          ctx.beginPath();
+          ctx.moveTo(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 - 4.4);
+          ctx.lineTo(sx + TILE_SIZE * 0.5 + 4.4, sy + TILE_SIZE * 0.5);
+          ctx.lineTo(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 + 4.4);
+          ctx.lineTo(sx + TILE_SIZE * 0.5 - 4.4, sy + TILE_SIZE * 0.5);
+          ctx.closePath();
+          ctx.fill();
+          if (amount > 1) {
+            ctx.fillStyle = "#133040";
+            ctx.font = `700 7px ${HUD_FONT}`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(String(amount), sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 + 0.5);
+          }
+          ctx.restore();
+          ctx.globalAlpha = visibleAlpha;
+        }
       } else if (state.beaconMask[index] === 1) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
       } else if (state.metalMask[index]) {
@@ -6450,6 +6679,7 @@ function render() {
   renderEffects(camera);
   renderBeacon(camera);
   renderGoldParticles(camera);
+  renderExperienceParticles(camera);
   renderDepositArrivals(camera);
   renderBase(camera);
   renderBoulders(camera);
@@ -8181,10 +8411,13 @@ function renderHud() {
   );
 
   const thirdRowTop = secondRowTop + panelHeight + 8;
+  const xpRatio = clamp(state.xp / Math.max(1, state.xpToNext), 0, 1);
+  drawHudXpBar(left, thirdRowTop, totalWidth, panelHeight, `LVL ${state.level}`, `${state.xp}/${state.xpToNext}`, xpRatio);
+  const detailTop = thirdRowTop + panelHeight + 8;
 
   const manualButton = document.getElementById("manualOpen");
   if (manualButton) {
-    manualButton.style.top = `${thirdRowTop - 1}px`;
+    manualButton.style.top = `${detailTop - 1}px`;
     manualButton.style.left = "auto";
     manualButton.style.right = "14px";
   }
@@ -8248,7 +8481,6 @@ function renderHud() {
     ctx.restore();
   }
 
-  const detailTop = thirdRowTop;
   renderHudCoreStats(left, detailTop, panelWidth, "СТАТЫ");
   renderHudPerkColumn(left + panelWidth + gap, detailTop, panelWidth, "ПЕРКИ");
 
@@ -8393,6 +8625,44 @@ function renderHudInfoColumn(x, y, width, rows, title) {
     ctx.font = `700 11px ${HUD_FONT}`;
     ctx.fillText(row.value, x + width - 10, rowY);
     ctx.textAlign = "left";
+  }
+  ctx.restore();
+}
+
+function drawHudXpBar(x, y, width, height, label, value, ratio) {
+  const ctx = state.ctx;
+  const trackX = x + 86;
+  const trackY = y + 12;
+  const trackWidth = Math.max(96, width - 126);
+  const trackHeight = 10;
+
+  drawHudPanel(x, y, width, height);
+
+  ctx.save();
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#8fdfff";
+  ctx.font = `700 10px ${HUD_FONT}`;
+  ctx.textAlign = "left";
+  ctx.fillText(label, x + 12, y + 16);
+
+  ctx.strokeStyle = "rgba(18, 12, 8, 0.78)";
+  ctx.lineWidth = 3;
+  ctx.font = `700 11px ${HUD_FONT}`;
+  ctx.textAlign = "right";
+  ctx.strokeText(value, x + width - 12, y + 16);
+  ctx.fillStyle = "#e5f8ff";
+  ctx.fillText(value, x + width - 12, y + 16);
+
+  ctx.fillStyle = "rgba(180, 238, 255, 0.1)";
+  drawRoundedRectPath(trackX, trackY, trackWidth, trackHeight, trackHeight * 0.5);
+  ctx.fill();
+
+  const fillWidth = Math.max(0, trackWidth * ratio);
+  if (fillWidth > 0) {
+    const glow = 0.8 + Math.sin((state.lastTs || 0) * 0.004) * 0.1;
+    ctx.fillStyle = `rgba(125, 224, 255, ${glow})`;
+    drawRoundedRectPath(trackX, trackY, fillWidth, trackHeight, trackHeight * 0.5);
+    ctx.fill();
   }
   ctx.restore();
 }
