@@ -252,6 +252,7 @@ const state = {
   perkRerolls: 0,
   manualModalOpen: false,
   shopModalOpen: false,
+  beaconActivationAnim: null, // { beacon, startTs, pendingAction }
   debugPerkMenuOpen: false,
   debugPerkSelection: "",
   crystalRewardModalOpen: false,
@@ -2384,7 +2385,7 @@ function bindUi() {
   };
 
   zone.addEventListener("pointerdown", (event) => {
-    if (state.debugPerkMenuOpen || state.manualModalOpen || state.shopModalOpen || state.levelUpModalOpen) {
+    if (state.beaconActivationAnim || state.debugPerkMenuOpen || state.manualModalOpen || state.shopModalOpen || state.levelUpModalOpen) {
       return;
     }
     if (state.goldHitRect && isPointInsideRect(event.clientX, event.clientY, state.goldHitRect)) {
@@ -2863,7 +2864,7 @@ function syncTouchZonesInteractivity() {
     return;
   }
   touchZones.style.pointerEvents =
-    state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen ? "none" : "auto";
+    state.beaconActivationAnim || state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen ? "none" : "auto";
   syncMoveAim();
 }
 
@@ -3035,6 +3036,7 @@ function maybeOpenPendingLevelReward() {
     return;
   }
   if (
+    state.beaconActivationAnim ||
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
@@ -3281,7 +3283,7 @@ function showPadAt(x, y, pad, stick) {
 }
 
 function syncMoveAim() {
-  if (state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen || state.isChoosingPerk) {
+  if (state.beaconActivationAnim || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen || state.isChoosingPerk) {
     state.moveAimX = 0;
     state.moveAimY = 0;
     return;
@@ -3407,6 +3409,7 @@ function update(dt) {
   updateDiscovery();
   updateCamera(dt);
   updateCameraShake(dt);
+  updateBeaconActivationAnim();
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
   if (state.overhealDrillTimer === 0) {
     state.overdriveDisplayDuration = 0;
@@ -5862,6 +5865,7 @@ function updateDiscovery() {
 function tryBeaconContourDeposit(x, y) {
   if (state.unsafeGold <= 0) return;
   for (const beacon of state.beacons) {
+    if (beacon.active) continue;
     if (x < beacon.x - 1 || x > beacon.x + 2 || y < beacon.y - 1 || y > beacon.y + 2) continue;
     // Count tiles in beacon 4×4 area not yet covered by contour.
     // The current tile was just added to the path, so add 1 back to get
@@ -6010,12 +6014,14 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     if (beacon.active) continue;
     if (pathWithinBeaconArea) {
       beacon.active = true;
+      beacon.activationAnimStart = state.lastTs || performance.now();
       // Deposit any remaining unsafe gold (most was deposited progressively)
       if (state.unsafeGold > 0) {
         state.gold += Math.floor(state.unsafeGold);
         state.unsafeGold = 0;
       }
-      // First activation
+      // Build pending action, defer shop/artifact opening for animation
+      let pendingAction;
       if (state.heldArtifact) {
         const locked = getLockedTrees();
         if (locked.length >= 2) {
@@ -6025,29 +6031,22 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
           state.heldArtifact = false;
-          state.artifactChoiceTrees = [shuffled[0], shuffled[1]];
-          state.artifactChoicePendingBeacon = beacon;
-          openArtifactChoice();
-          showPerkToast("Маяк активирован!");
-          continue;
+          pendingAction = { type: "artifactChoice", trees: [shuffled[0], shuffled[1]], beacon };
         } else if (locked.length === 1) {
           state.heldArtifact = false;
           const lastId = locked[0].id;
           const tree = unlockTreeById(lastId);
           if (tree) showPerkToast(`Открыт инструмент: ${tree.icon} ${tree.name}`);
-          showPerkToast("Маяк активирован!");
-          state.shopModalOpen = true;
-          syncTouchZonesInteractivity();
-          openShop(state.gold, lastId);
-          continue;
+          pendingAction = { type: "shop", lastId };
         } else {
           state.heldArtifact = false;
+          pendingAction = { type: "shop" };
         }
+      } else {
+        pendingAction = { type: "shop" };
       }
       showPerkToast("Маяк активирован!");
-      state.shopModalOpen = true;
-      syncTouchZonesInteractivity();
-      openShop(state.gold);
+      state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
     }
   }
 
@@ -7135,6 +7134,25 @@ function renderAutoClosePreview(camera) {
   ctx.restore();
 }
 
+function updateBeaconActivationAnim() {
+  const anim = state.beaconActivationAnim;
+  if (!anim) return;
+  const elapsed = (state.lastTs || 0) - anim.startTs;
+  if (elapsed < 2500) return; // 2000ms animation + 500ms pause
+  // Animation done — execute pending action
+  state.beaconActivationAnim = null;
+  const pa = anim.pendingAction;
+  if (pa.type === "artifactChoice") {
+    state.artifactChoiceTrees = pa.trees;
+    state.artifactChoicePendingBeacon = pa.beacon;
+    openArtifactChoice();
+  } else {
+    state.shopModalOpen = true;
+    syncTouchZonesInteractivity();
+    openShop(state.gold, pa.lastId);
+  }
+}
+
 function renderBeacon(camera) {
   for (const beacon of state.beacons) {
     renderOneBeacon(camera, beacon);
@@ -7294,40 +7312,97 @@ function renderOneBeaconRadar(camera, beacon) {
   const dotY = midY + Math.sin(angle) * radius;
   const pulse = 0.55 + (Math.sin((state.lastTs || 0) * 0.008) * 0.5 + 0.5) * 0.45;
 
-  ctx.save();
-  ctx.strokeStyle = "rgba(160, 220, 255, 0.45)";
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.arc(midX, midY, radius, 0, Math.PI * 2);
-  ctx.stroke();
+  // Activation animation progress (0..1 over 2000ms)
+  // Phases: ring 0-40%, line 40-70%, dot 70-100%
+  let animT = 1;
+  if (beacon.activationAnimStart) {
+    const elapsed = (state.lastTs || 0) - beacon.activationAnimStart;
+    if (elapsed < 2000) {
+      animT = elapsed / 2000;
+    } else {
+      beacon.activationAnimStart = null;
+    }
+  }
 
-  ctx.strokeStyle = "rgba(160, 220, 255, 0.15)";
+  ctx.save();
+
+  // --- Phase 1: Ring (0% - 40%) ---
+  const ringT = Math.min(1, animT / 0.4);
+  const ringEase = 1 - Math.pow(1 - ringT, 3);
+
+  if (ringT < 1) {
+    const sweepAngle = ringEase * Math.PI * 2;
+    ctx.strokeStyle = `rgba(160, 220, 255, ${0.6 * (1 - ringEase * 0.3)})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(midX, midY, radius, -Math.PI / 2, -Math.PI / 2 + sweepAngle);
+    ctx.stroke();
+
+    const flashRadius = radius * ringEase;
+    ctx.strokeStyle = `rgba(200, 240, 255, ${0.5 * (1 - ringEase)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(midX, midY, flashRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = "rgba(160, 220, 255, 0.45)";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(midX, midY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = `rgba(160, 220, 255, ${0.15 * ringEase})`;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(midX, midY, radius - 5, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(200, 240, 255, 0.25)";
+  // Center dot
+  ctx.fillStyle = `rgba(200, 240, 255, ${0.25 * ringEase})`;
   ctx.beginPath();
   ctx.arc(midX, midY, 2.4, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(160, 220, 255, 0.22)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(midX, midY);
-  ctx.lineTo(dotX, dotY);
-  ctx.stroke();
+  // --- Phase 2: Direction line (40% - 70%) ---
+  const lineT = animT < 0.4 ? 0 : Math.min(1, (animT - 0.4) / 0.3);
+  const lineEase = 1 - Math.pow(1 - lineT, 3);
 
-  ctx.fillStyle = `rgba(180, 230, 255, ${0.18 + pulse * 0.18})`;
-  ctx.beginPath();
-  ctx.arc(dotX, dotY, 5.8 + pulse * 2.6, 0, Math.PI * 2);
-  ctx.fill();
+  if (lineEase > 0) {
+    const lineDotX = midX + Math.cos(angle) * radius * lineEase;
+    const lineDotY = midY + Math.sin(angle) * radius * lineEase;
+    ctx.strokeStyle = `rgba(160, 220, 255, ${0.22 * lineEase})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(midX, midY);
+    ctx.lineTo(lineDotX, lineDotY);
+    ctx.stroke();
+  }
 
-  ctx.fillStyle = "#c8f0ff";
-  ctx.beginPath();
-  ctx.arc(dotX, dotY, 3.2 + pulse * 1.2, 0, Math.PI * 2);
-  ctx.fill();
+  // --- Phase 3: Radar dot (70% - 100%) ---
+  const dotT = animT < 0.7 ? 0 : Math.min(1, (animT - 0.7) / 0.3);
+  const dotEase = 1 - Math.pow(1 - dotT, 3);
+
+  if (dotEase > 0) {
+    // Flash on appear
+    if (dotT < 0.8) {
+      const flashAlpha = 0.6 * (1 - dotT / 0.8);
+      ctx.fillStyle = `rgba(200, 240, 255, ${flashAlpha})`;
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 14 * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = `rgba(180, 230, 255, ${(0.18 + pulse * 0.18) * dotEase})`;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(200, 240, 255, ${dotEase})`;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore();
 }
