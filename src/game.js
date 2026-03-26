@@ -5,7 +5,7 @@ const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
 const STEP_MS = 1000 / 60;
 const MAX_FRAME_MS = 100;
-const START_FUEL = 420;
+const START_FUEL = 200;
 const START_HP = 7;
 const MAX_HEAT = 100;
 const IDLE_FUEL_DRAIN = 0.8;
@@ -76,6 +76,39 @@ const WORM_DUST_DURATION = 0.6;
 const XP_PER_BLOCK = 1;
 const XP_PICKUP_RADIUS = 1;
 
+const LEVEL_REWARD_DEFS = {
+  1: [
+    { id: "gold_5", label: "+5% золота", description: "Больше золота из разрушаемых блоков" },
+    { id: "damage_0_5", label: "+0.35 урона", description: "Постоянный прирост силы бура" },
+    { id: "speed_10", label: "+10% скорости", description: "Бур делает новые удары быстрее" },
+  ],
+  2: [
+    { id: "gold_5", label: "+5% золота", description: "Еще больше золота из разрушаемых блоков" },
+    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
+  ],
+  3: [
+    { id: "damage_0_5", label: "+0.35 урона", description: "Еще сильнее увеличивает урон бура" },
+    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
+    { id: "hp_1", label: "+1 HP", description: "Повышает максимум HP и лечит на 1" },
+  ],
+  4: [
+    { id: "artifact", label: "Артефакт", description: "Артефакт сразу выдается в руки: отнеси его к маяку" },
+    { id: "full_restore", label: "Полное восстановление", description: "Полностью лечит и заполняет бак" },
+  ],
+  5: [
+    { id: "speed_10", label: "+10% скорости", description: "Бур делает новые удары быстрее" },
+    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
+    { id: "heal_full", label: "Лечение", description: "Полностью восстанавливает HP" },
+  ],
+  6: [
+    { id: "gold_5", label: "+5% золота", description: "Еще больше золота из разрушаемых блоков" },
+    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
+    { id: "heal_full", label: "Лечение", description: "Полностью восстанавливает HP" },
+  ],
+};
+
+const LEVEL_REWARD_REPEAT_PATTERN = [3, 5, 6];
+
 // Reusable buffers for visibility BFS — avoids per-frame allocations
 const _visFogDistance = new Int16Array(GRID_W * GRID_H);
 const _visBfsQueue = new Int32Array(GRID_W * GRID_H);
@@ -103,11 +136,11 @@ const BLOCK_TYPES = [
 
 const TILE_PERK_TYPES = [
   null,
-  { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+120 топлива прямо сейчас" },
+  { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+60 топлива прямо сейчас" },
   { name: "Радар", icon: "R", color: "#f2ede2", desc: "+10 сек направляющего радара" },
   { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.35 к силе удара бура" },
   { name: "Бомба", icon: "*", color: "#c796ff", desc: "Ракета на дистанцию 2 в направлении бурения с взрывом x10" },
-  { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+15% к скорости нового удара" },
+  { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+10% к скорости нового удара" },
   { name: "HP+", icon: "H", color: "#73e58f", desc: "+1 к текущему здоровью" },
   { name: "Броня", icon: "A", color: "#b4d7ff", desc: "+1 брони против внешней опасности" },
 ];
@@ -194,7 +227,8 @@ const state = {
   xp: 0,
   level: 1,
   xpToNext: 12,
-  pendingLevelUps: 0,
+  levelRewardStep: 0,
+  levelRewardQueue: [],
   levelUpModalOpen: false,
   goldParticles: [],
   xpParticles: [],
@@ -295,6 +329,7 @@ const state = {
   crystalStatusText: "",
   strikeSpeed: 1,
   drillPower: 1,
+  miningGoldBonusMultiplier: 0,
   goldBonus: 0,
   fuelPickupBonus: 0,
   perkFuelBonus: 0,
@@ -1023,7 +1058,7 @@ function getTankFuelMultiplier(level = state.tankBoostLevel) {
 }
 
 function getTankFuelDelta() {
-  return Math.round(120 * getTankFuelMultiplier()) - state.perkFuelBonus;
+  return Math.round(60 * getTankFuelMultiplier()) - state.perkFuelBonus;
 }
 
 function getCenterDistanceRatio(x, y) {
@@ -1267,7 +1302,8 @@ function setupField() {
   state.xp = 0;
   state.level = 1;
   state.xpToNext = getXpNeededForLevel(state.level);
-  state.pendingLevelUps = 0;
+  state.levelRewardStep = 0;
+  state.levelRewardQueue = [];
   state.levelUpModalOpen = false;
   state.depth = 0;
   state.perkText = "Нет";
@@ -1301,6 +1337,7 @@ function setupField() {
   state.signalDirY = -1;
   state.strikeSpeed = 1;
   state.drillPower = 1;
+  state.miningGoldBonusMultiplier = 0;
   state.goldBonus = 0;
   state.fuelPickupBonus = 0;
   state.perkFuelBonus = 0;
@@ -1765,7 +1802,7 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       break;
     }
     case 5:
-      state.strikeSpeed += 0.15;
+      state.strikeSpeed += 0.1;
       state.perkText = "Скорость";
       break;
     case 6:
@@ -2324,7 +2361,6 @@ function bindUi() {
   const crystalRewardClose = document.getElementById("crystalRewardClose");
   const artifactChoiceOverlay = document.getElementById("artifactChoice");
   const levelUpOverlay = document.getElementById("levelUpModal");
-  const levelUpConfirm = document.getElementById("levelUpConfirm");
   const keysDown = new Set();
 
   window.addEventListener("resize", resize);
@@ -2720,18 +2756,13 @@ function bindUi() {
     });
   }
 
-  if (levelUpConfirm) {
-    levelUpConfirm.addEventListener("click", () => {
-      closeLevelUpModal();
-    });
-  }
-
   if (levelUpOverlay) {
     levelUpOverlay.addEventListener("click", (event) => {
-      if (event.target !== levelUpOverlay) {
+      const choice = event.target.closest("[data-level-reward-id]");
+      if (choice) {
+        claimLevelReward(choice.dataset.levelRewardId || "");
         return;
       }
-      closeLevelUpModal();
     });
   }
 
@@ -2970,33 +3001,179 @@ function closeCrystalRewardModal() {
   syncCrystalRewardOverlay();
 }
 
-function syncLevelUpModal() {
-  const overlay = document.getElementById("levelUpModal");
-  if (!overlay) {
+function getCurrentLevelRewardEntry() {
+  return state.levelRewardQueue[0] || null;
+}
+
+function getLevelRewardTemplateStep(step) {
+  if (LEVEL_REWARD_DEFS[step]) {
+    return step;
+  }
+  const cycleIndex = (step - 7) % LEVEL_REWARD_REPEAT_PATTERN.length;
+  return LEVEL_REWARD_REPEAT_PATTERN[(cycleIndex + LEVEL_REWARD_REPEAT_PATTERN.length) % LEVEL_REWARD_REPEAT_PATTERN.length];
+}
+
+function getLevelRewardChoices(entry = getCurrentLevelRewardEntry()) {
+  if (!entry) {
+    return [];
+  }
+  return LEVEL_REWARD_DEFS[getLevelRewardTemplateStep(entry.step)] || [];
+}
+
+function resolveLevelRewardQueue() {
+  while (state.levelRewardQueue.length > 0 && getLevelRewardChoices(state.levelRewardQueue[0]).length === 0) {
+    state.levelRewardQueue.shift();
+  }
+  if (state.levelRewardQueue.length === 0) {
+    state.levelUpModalOpen = false;
+  }
+}
+
+function maybeOpenPendingLevelReward() {
+  resolveLevelRewardQueue();
+  if (state.levelRewardQueue.length === 0 || state.levelUpModalOpen) {
     return;
   }
-  overlay.hidden = !state.levelUpModalOpen;
+  if (
+    state.manualModalOpen ||
+    state.shopModalOpen ||
+    state.debugPerkMenuOpen ||
+    state.crystalRewardModalOpen ||
+    state.artifactChoiceOpen ||
+    state.isChoosingPerk
+  ) {
+    return;
+  }
+  openLevelUpModal();
+}
+
+function syncLevelUpModal() {
+  const overlay = document.getElementById("levelUpModal");
+  const eyebrow = document.getElementById("levelUpEyebrow");
+  const title = document.getElementById("levelUpTitle");
+  const text = document.getElementById("levelUpText");
+  const choices = document.getElementById("levelUpChoices");
+  const entry = getCurrentLevelRewardEntry();
+  const rewardChoices = getLevelRewardChoices(entry);
+  if (!overlay || !eyebrow || !title || !text || !choices) {
+    return;
+  }
+  const isOpen = state.levelUpModalOpen && !!entry && rewardChoices.length > 0;
+  overlay.hidden = !isOpen;
   if (state.levelUpModalOpen) {
     overlay.removeAttribute("hidden");
   }
+  if (!isOpen) {
+    choices.innerHTML = "";
+    syncTouchZonesInteractivity();
+    return;
+  }
+  eyebrow.textContent = `Уровень ${entry.level}`;
+  title.textContent = entry.step === 4 ? "Выбор артефакта" : "Выберите награду";
+  text.textContent =
+    entry.step === 4
+      ? "Выберите: взять артефакт в руки и нести к маяку или полностью восстановиться."
+      : `Награда ${entry.step}: выберите один бонус.`;
+  choices.innerHTML = rewardChoices.map((choice) => `
+    <button class="level-up-modal__choice" type="button" data-level-reward-id="${choice.id}">
+      <span class="level-up-modal__choice-label">${choice.label}</span>
+      <span class="level-up-modal__choice-text">${choice.description}</span>
+    </button>
+  `).join("");
   syncTouchZonesInteractivity();
 }
 
 function openLevelUpModal() {
+  resolveLevelRewardQueue();
+  if (state.levelRewardQueue.length === 0) {
+    state.levelUpModalOpen = false;
+    syncLevelUpModal();
+    return;
+  }
   state.levelUpModalOpen = true;
   syncLevelUpModal();
 }
 
 function closeLevelUpModal() {
   state.levelUpModalOpen = false;
-  if (state.pendingLevelUps > 0) {
-    state.pendingLevelUps -= 1;
-  }
-  if (state.pendingLevelUps > 0) {
-    openLevelUpModal();
+  syncLevelUpModal();
+}
+
+function grantLevelRewardArtifact() {
+  if (state.heldArtifact) {
+    showPerkToast("Артефакт уже у тебя");
     return;
   }
-  syncLevelUpModal();
+  state.heldArtifact = true;
+  state.heldArtifactDropX = -1;
+  state.heldArtifactDropY = -1;
+  state.artifactBumpTime = 0;
+  state.artifactBumpDir = null;
+  showPerkToast("Артефакт получен! Неси к маяку");
+  triggerPickupRadar("artifact", state.drill.x, state.drill.y);
+}
+
+function restorePlayerFully() {
+  const fuelDelta = Math.max(0, state.maxFuel - state.fuel);
+  state.fuel = state.maxFuel;
+  if (fuelDelta > 0) {
+    showFuelToast(fuelDelta);
+  }
+  const missingHp = Math.max(0, state.maxHp - state.hp);
+  if (missingHp > 0) {
+    healPlayer(missingHp, "Полное восстановление");
+  }
+  showPerkToast("Полное восстановление");
+}
+
+function applyLevelReward(choiceId) {
+  switch (choiceId) {
+    case "gold_5":
+      state.miningGoldBonusMultiplier += 0.05;
+      showPerkToast("+5% золота из блоков");
+      return;
+    case "damage_0_5":
+      state.drillPower += 0.35;
+      showPerkToast("+0.35 урона");
+      return;
+    case "speed_10":
+      state.strikeSpeed += 0.1;
+      showPerkToast("+10% скорости");
+      return;
+    case "fuel_100":
+      addFuel(100, state.drill.x, state.drill.y);
+      showPerkToast("+100 топлива");
+      return;
+    case "hp_1":
+      state.maxHp += 1;
+      healPlayer(1, "Награда уровня");
+      showPerkToast("+1 HP");
+      return;
+    case "artifact":
+      grantLevelRewardArtifact();
+      return;
+    case "full_restore":
+      restorePlayerFully();
+      return;
+    case "heal_full":
+      healPlayer(Math.max(0, state.maxHp - state.hp), "Лечение");
+      showPerkToast("Полное лечение");
+      return;
+    default:
+      return;
+  }
+}
+
+function claimLevelReward(choiceId) {
+  const entry = getCurrentLevelRewardEntry();
+  const rewardChoices = getLevelRewardChoices(entry);
+  if (!entry || !rewardChoices.some((choice) => choice.id === choiceId)) {
+    return;
+  }
+  state.levelRewardQueue.shift();
+  closeLevelUpModal();
+  applyLevelReward(choiceId);
+  maybeOpenPendingLevelReward();
 }
 
 // ─── Artifact choice modal ────────────────────────────────────────────────────
@@ -3183,6 +3360,8 @@ function update(dt) {
     updateCrystalRewardModal(dt);
     return;
   }
+
+  maybeOpenPendingLevelReward();
 
   if (state.levelUpModalOpen) {
     return;
@@ -4155,7 +4334,14 @@ function getStrikeDamage() {
 }
 
 function getXpNeededForLevel(level) {
-  return 12 + Math.max(0, level - 1) * 6;
+  return Math.round(40 * 1.5 ** Math.max(0, level - 1));
+}
+
+function applyMiningGoldBonus(amount) {
+  if (amount <= 0) {
+    return 0;
+  }
+  return Math.max(1, Math.floor(amount * (1 + state.miningGoldBonusMultiplier)));
 }
 
 function spawnExperienceCrystal(x, y, amount = XP_PER_BLOCK) {
@@ -4175,12 +4361,11 @@ function gainExperience(amount) {
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = getXpNeededForLevel(state.level);
-    state.pendingLevelUps += 1;
+    state.levelRewardStep += 1;
+    state.levelRewardQueue.push({ step: state.levelRewardStep, level: state.level });
     showPerkToast(`Уровень ${state.level}`);
   }
-  if (state.pendingLevelUps > 0 && !state.levelUpModalOpen) {
-    openLevelUpModal();
-  }
+  maybeOpenPendingLevelReward();
 }
 
 function pickupExperienceNearPlayer() {
@@ -4904,9 +5089,9 @@ function breakCell(x, y, index, options = {}) {
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
   const goldGain =
     hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion"
-      ? 1
+      ? applyMiningGoldBonus(1)
       : state.goldOreMask[index]
-        ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier)
+        ? applyMiningGoldBonus(Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier))
         : 0;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   if (state.goldOreMask[index]) {
@@ -7063,14 +7248,11 @@ function renderOneBeacon(camera, beacon) {
       { x: bx - 1, y: by     },
     ];
     const n = ringPath.length;
-    const speed = 0.00008;
-    const progress = ((state.lastTs || 0) * speed) % 1;
 
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Full opaque outline
     ctx.beginPath();
     for (let i = 0; i <= n; i += 1) {
       const tile = ringPath[i % n];
@@ -7085,38 +7267,6 @@ function renderOneBeacon(camera, beacon) {
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(219, 171, 99, 0.25)";
     ctx.stroke();
-
-    // Single slow spark
-    const fromIdx = Math.floor(progress * n);
-    const from = ringPath[fromIdx];
-    const to = ringPath[(fromIdx + 1) % n];
-    const frac = (progress * n) % 1;
-    const sparkX = (from.x + frac * (to.x - from.x)) * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-    const sparkY = (from.y + frac * (to.y - from.y)) * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
-    ctx.fillStyle = "rgba(247, 220, 172, 0.55)";
-    ctx.beginPath();
-    ctx.arc(sparkX, sparkY, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255, 245, 210, 0.25)";
-    ctx.beginPath();
-    ctx.arc(sparkX, sparkY, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Dots only at corners (where direction changes)
-    ctx.fillStyle = "rgba(220, 185, 120, 0.2)";
-    for (let i = 0; i < n; i += 1) {
-      const prev = ringPath[(i - 1 + n) % n];
-      const cur = ringPath[i];
-      const next = ringPath[(i + 1) % n];
-      const inDx = cur.x - prev.x;
-      const inDy = cur.y - prev.y;
-      const outDx = next.x - cur.x;
-      const outDy = next.y - cur.y;
-      if (inDx === outDx && inDy === outDy) continue;
-      ctx.beginPath();
-      ctx.arc(cur.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x, cur.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
 
     ctx.restore();
   }

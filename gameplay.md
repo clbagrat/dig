@@ -127,8 +127,8 @@ This creates a deliberate `chunk-chunk-chunk` feel instead of smooth sliding.
 ## Fuel
 
 Current baseline:
-- starting fuel: `420`
-- max fuel: `420` by default
+- starting fuel: `200`
+- max fuel: `200` by default
 - passive drain: `0.8 / sec`
 - tunnel move cost: `1.8`
 - drilling hit cost: `4.5`
@@ -172,9 +172,16 @@ Pickup rules:
 
 Current level flow:
 - the run starts at level `1`
-- level requirement grows linearly each level
-- on level up, a modal confirmation appears
-- future reward choices per level are planned but not assigned yet
+- level requirement grows non-linearly: `round(40 * 1.5^(level-1))`
+- each level up opens a reward choice modal when a reward tier is assigned
+- reward tiers currently work like this:
+- first reward: `+5% gold from mined blocks` or `+0.35 damage` or `+10% speed`
+- second reward: `+5% gold from mined blocks` or `+100 fuel`
+- third reward: `+0.35 damage` or `+100 fuel` or `+1 max HP`
+- fourth reward: `carried artifact to deliver to a beacon` or `full heal + full fuel`
+- fifth reward: `+10% speed` or `+100 fuel` or `full heal`
+- sixth reward: `+5% gold from mined blocks` or `+100 fuel` or `full heal`
+- after that, rewards repeat in the cycle: `third -> fifth -> sixth`
 
 ## Radar
 
@@ -220,14 +227,14 @@ Current spatial rules:
 
 `Бак`
 - gives fuel immediately
-- current raw amount before other fuel systems: `90`
+- current raw amount before other fuel systems: `60`
 
 `Радар`
 - grants radar time
 - immediately updates the direction ring on pickup
 
 `Бур`
-- `+0.5` drill power
+- `+0.35` drill power
 
 `Бомба`
 - explodes immediately on pickup
@@ -235,7 +242,7 @@ Current spatial rules:
 - current radius: `2`
 
 `Скорость`
-- `+15%` strike speed
+- `+10%` strike speed
 
 ## Perk Zones
 
@@ -369,7 +376,7 @@ Count and placement:
 
 Gameplay role (WIP):
 - once activated, a beacon shows the direction to the base (similar to radar)
-- beacons are activated by standing on them (exact mechanic TBD)
+- a beacon is activated by closing a contour around its 2×2 core inside the beacon ring
 
 ## Debugging
 

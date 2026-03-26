@@ -27,7 +27,6 @@ const BOULDER_MIN_START_DISTANCE = 4;
 export const BEACON_COUNT = 25;
 const BEACON_MIN_DIST = 9;
 const BEACON_MAX_DIST = 60;
-const ARTIFACT_COUNT = 8;
 const ARTIFACT_MIN_DISTANCE = 8;
 const ARTIFACT_MIN_BEACON_DIST = 5;
 const SAFE_COUNT = 4;
@@ -868,33 +867,120 @@ function placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketM
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
+function isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed) {
+  if (x < 3 || x >= GRID_W - 3 || y < 3 || y >= GRID_H - 3) return true;
+  const index = cellIndex(x, y);
+  if (
+    perkMask[index] > 0 || crystalMask[index] > 0 || perkZoneMask[index] !== -1 ||
+    metalMask[index] || gasPocketMask[index] || steamPocketMask[index] ||
+    boulderPocketMask[index] || beaconMask[index] || artifactMask[index]
+  ) return true;
+  if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) return true;
+  if (!isFarEnoughFromPlaced(x, y, placed, ARTIFACT_MIN_DISTANCE)) return true;
+  const distFromStart = Math.abs(x - START_X) + Math.abs(y - START_Y);
+  if (distFromStart < 12) return true;
+  for (const b of beacons) {
+    if (Math.abs(x - b.x) + Math.abs(y - b.y) < ARTIFACT_MIN_BEACON_DIST) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildArtifactBeaconPairs(beacons) {
+  if (beacons.length <= 2) {
+    return [];
+  }
+
+  const sorted = beacons
+    .map((beacon, idx) => ({
+      beacon,
+      idx,
+      angle: Math.atan2(beacon.y + 0.5 - START_Y, beacon.x + 0.5 - START_X),
+    }))
+    .sort((a, b) => a.angle - b.angle);
+
+  const pairs = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    const a = sorted[i].beacon;
+    const b = sorted[(i + 1) % sorted.length].beacon;
+    const ax = a.x + 0.5;
+    const ay = a.y + 0.5;
+    const bx = b.x + 0.5;
+    const by = b.y + 0.5;
+    pairs.push({
+      a,
+      b,
+      midX: (ax + bx) * 0.5,
+      midY: (ay + by) * 0.5,
+      midDistance: Math.hypot((ax + bx) * 0.5 - START_X, (ay + by) * 0.5 - START_Y),
+      span: Math.hypot(bx - ax, by - ay),
+    });
+  }
+
+  pairs.sort((a, b) => b.midDistance - a.midDistance || b.span - a.span);
+  return pairs;
+}
+
+function tryPlaceArtifactBetweenBeacons(pair, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed, random) {
+  const ax = pair.a.x + 0.5;
+  const ay = pair.a.y + 0.5;
+  const bx = pair.b.x + 0.5;
+  const by = pair.b.y + 0.5;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const length = Math.hypot(dx, dy) || 1;
+  const nx = -dy / length;
+  const ny = dx / length;
+
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    const t = 0.35 + random() * 0.3;
+    const lateral = (random() - 0.5) * Math.min(8, length * 0.28);
+    const radial = (random() - 0.5) * Math.min(6, length * 0.12);
+    const x = Math.round(ax + dx * t + nx * lateral + (dx / length) * radial);
+    const y = Math.round(ay + dy * t + ny * lateral + (dy / length) * radial);
+    if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed)) {
+      continue;
+    }
+    artifactMask[cellIndex(x, y)] = 1;
+    placed.push({ x, y });
+    return true;
+  }
+
+  return false;
+}
+
 function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
   const placed = [];
+  const artifactTargetCount = Math.max(0, beacons.length - 2);
+  const pairs = buildArtifactBeaconPairs(beacons);
+
+  for (let i = 0; i < pairs.length && placed.length < artifactTargetCount; i += 1) {
+    tryPlaceArtifactBetweenBeacons(
+      pairs[i],
+      artifactMask,
+      perkMask,
+      crystalMask,
+      perkZoneMask,
+      metalMask,
+      gasPocketMask,
+      steamPocketMask,
+      boulderPocketMask,
+      beaconMask,
+      beacons,
+      base,
+      placed,
+      random,
+    );
+  }
+
   let attempts = 0;
-  while (placed.length < ARTIFACT_COUNT && attempts < ARTIFACT_COUNT * 120) {
+  while (placed.length < artifactTargetCount && attempts < artifactTargetCount * 120) {
     const x = 3 + Math.floor(random() * (GRID_W - 6));
     const y = 3 + Math.floor(random() * (GRID_H - 6));
     const index = cellIndex(x, y);
     attempts += 1;
-    if (
-      perkMask[index] > 0 || crystalMask[index] > 0 || perkZoneMask[index] !== -1 ||
-      metalMask[index] || gasPocketMask[index] || steamPocketMask[index] ||
-      boulderPocketMask[index] || beaconMask[index] || artifactMask[index]
-    ) continue;
-    if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
-    if (!isFarEnoughFromPlaced(x, y, placed, ARTIFACT_MIN_DISTANCE)) continue;
-    // Must be far enough from the start
-    const distFromStart = Math.abs(x - START_X) + Math.abs(y - START_Y);
-    if (distFromStart < 12) continue;
-    // Must not be too close to any beacon
-    let tooCloseToBeacon = false;
-    for (const b of beacons) {
-      if (Math.abs(x - b.x) + Math.abs(y - b.y) < ARTIFACT_MIN_BEACON_DIST) {
-        tooCloseToBeacon = true;
-        break;
-      }
-    }
-    if (tooCloseToBeacon) continue;
+    if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed)) continue;
     artifactMask[index] = 1;
     placed.push({ x, y });
   }

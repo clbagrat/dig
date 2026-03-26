@@ -117,12 +117,10 @@
       <div id="shopModal" class="shop-modal" hidden></div>
       <div id="levelUpModal" class="level-up-modal" hidden>
         <div class="level-up-modal__panel">
-          <div class="level-up-modal__eyebrow">Уровень повышен</div>
-          <div class="level-up-modal__title">Новый уровень</div>
-          <div class="level-up-modal__text">
-            Награды по уровню появятся следующим шагом. Пока просто подтверждение.
-          </div>
-          <button id="levelUpConfirm" class="level-up-modal__button" type="button">OK</button>
+          <div id="levelUpEyebrow" class="level-up-modal__eyebrow">Уровень повышен</div>
+          <div id="levelUpTitle" class="level-up-modal__title">Новая награда</div>
+          <div id="levelUpText" class="level-up-modal__text"></div>
+          <div id="levelUpChoices" class="level-up-modal__choices"></div>
         </div>
       </div>
 
@@ -134,6 +132,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js?v=50"></script>
+    <script type="module" src="./src/game.js?v=51"></script>
   </body>
 </html>
