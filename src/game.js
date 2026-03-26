@@ -4181,22 +4181,15 @@ function openSafeDoor(safeIdx, doorX, doorY) {
   }
 }
 
-function dropUnsafeGold() {
-  if (state.unsafeGold <= 0) return;
-  const total = Math.floor(state.unsafeGold);
-  state.unsafeGold = 0;
-  const dropAmount = Math.ceil(total / 2); // half disappears, half drops
-
-  const px = state.drill.x;
-  const py = state.drill.y;
-
+function scatterGoldAroundTile(sourceX, sourceY, dropAmount) {
+  if (dropAmount <= 0) return false;
   // Collect valid drop candidates: regular block or empty ground, no metal
   const candidates = [];
   for (let dy = -1; dy <= 1; dy += 1) {
     for (let dx = -1; dx <= 1; dx += 1) {
       if (dx === 0 && dy === 0) continue;
-      const nx = px + dx;
-      const ny = py + dy;
+      const nx = sourceX + dx;
+      const ny = sourceY + dy;
       if (nx < 1 || nx >= GRID_W - 1 || ny < 1 || ny >= GRID_H - 1) continue;
       const idx = cellIndex(nx, ny);
       if (state.metalMask[idx]) continue;
@@ -4205,7 +4198,7 @@ function dropUnsafeGold() {
     }
   }
 
-  if (candidates.length === 0) return;
+  if (candidates.length === 0) return false;
 
   // Pick 3–5 random targets
   const targetCount = Math.min(candidates.length, 3 + Math.floor(Math.random() * 3));
@@ -4226,12 +4219,12 @@ function dropUnsafeGold() {
     if (tileValue <= 0) continue;
     state.droppedGoldMask[idx] += tileValue;
 
-    // Visual: particles fly from hero to each target tile
+    // Visual: particles fly from source tile to each target tile
     const particleCount = Math.max(1, Math.floor(tileValue / 5));
     for (let p = 0; p < particleCount; p += 1) {
       state.goldParticles.push({
-        tileX: 0,
-        tileY: 0,
+        tileX: sourceX + 0.5,
+        tileY: sourceY + 0.5,
         destTileX: tx,
         destTileY: ty,
         value: 0,
@@ -4244,6 +4237,16 @@ function dropUnsafeGold() {
       });
     }
   }
+
+  return true;
+}
+
+function dropUnsafeGold() {
+  if (state.unsafeGold <= 0) return;
+  const total = Math.floor(state.unsafeGold);
+  state.unsafeGold = 0;
+  const dropAmount = Math.ceil(total / 2); // half disappears, half drops
+  scatterGoldAroundTile(state.drill.x, state.drill.y, dropAmount);
 }
 
 function applyHazardDamage(amount, options = {}) {
@@ -4781,10 +4784,12 @@ function breakCell(x, y, index, options = {}) {
       const reward = 150 + Math.floor(Math.random() * 101);
       // Flashy gold ore effect (burst + floating value text)
       spawnGoldOreEffect(x, y, reward);
-      // Gold particles fly to drill
-      spawnGoldParticles(x, y, reward);
-      state.unsafeGold += reward;
-      showPerkToast(`Гнездо уничтожено! +${reward} золота`);
+      const scattered = scatterGoldAroundTile(x, y, reward);
+      if (!scattered) {
+        spawnGoldParticles(x, y, reward);
+        state.unsafeGold += reward;
+      }
+      showPerkToast(scattered ? `Гнездо уничтожено! ${reward} золота рассыпалось` : `Гнездо уничтожено! +${reward} золота`);
       break;
     }
   }
@@ -7173,6 +7178,13 @@ function renderWormNestTile(x, y, sx, sy) {
   const cx = sx + TILE_SIZE / 2;
   const cy = sy + TILE_SIZE / 2;
   const t = state.lastTs / 1000;
+  let nestState = null;
+  for (const n of state.wormNests) {
+    if (n.x === x && n.y === y) {
+      nestState = n;
+      break;
+    }
+  }
   ctx.save();
 
   // Dark burrow hole
@@ -7188,10 +7200,7 @@ function renderWormNestTile(x, y, sx, sy) {
   ctx.fill();
 
   // Pulsing warning ring when active
-  let isActive = false;
-  for (const n of state.wormNests) {
-    if (n.x === x && n.y === y && n.active) { isActive = true; break; }
-  }
+  const isActive = !!nestState?.active;
   if (isActive) {
     const pulse = 0.4 + Math.sin(t * 4) * 0.3;
     ctx.strokeStyle = `rgba(196, 80, 50, ${pulse})`;
@@ -7199,6 +7208,21 @@ function renderWormNestTile(x, y, sx, sy) {
     ctx.beginPath();
     ctx.arc(cx, cy, 14 + Math.sin(t * 3) * 2, 0, Math.PI * 2);
     ctx.stroke();
+  }
+
+  if (isActive && nestState.cooldown > 0) {
+    const progress = 1 - Math.min(1, nestState.cooldown / WORM_ATTACK_INTERVAL);
+    const barWidth = 18;
+    const barHeight = 4;
+    const barX = cx - barWidth / 2;
+    const barY = sy + 5;
+    ctx.fillStyle = "rgba(20, 8, 6, 0.78)";
+    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+    ctx.fillStyle = "rgba(80, 38, 24, 0.9)";
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+    const glow = 0.75 + Math.sin(t * 5 + x * 0.7 + y * 0.4) * 0.15;
+    ctx.fillStyle = `rgba(229, 119, 69, ${glow})`;
+    ctx.fillRect(barX, barY, barWidth * progress, barHeight);
   }
 
   // Subtle cracks radiating from hole
