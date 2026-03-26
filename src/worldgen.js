@@ -35,6 +35,10 @@ const SAFE_MIN_DISTANCE = 20;
 const SAFE_MIN_START_DISTANCE = 15;
 const SAFE_KEY_MIN_DIST = 6;
 const SAFE_KEY_MAX_DIST = 14;
+const WORM_NEST_COUNT = 6;
+const WORM_NEST_MIN_DISTANCE = 18;
+const WORM_NEST_MIN_START_DISTANCE = 20;
+const WORM_NEST_MIN_BEACON_DIST = 5;
 
 export const HAZARD_TYPES = { SPIKE: 1, VOLATILE: 2 };
 
@@ -904,6 +908,42 @@ function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metal
  * perkZones entries: { x, y, cells, iconX, iconY, perkType }
  *   (game.js adds openedCount, openedMask, arming, armingTimer, collected)
  */
+function placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, safes, base, random) {
+  const placed = [];
+  let attempts = 0;
+  while (placed.length < WORM_NEST_COUNT && attempts < WORM_NEST_COUNT * 120) {
+    const x = 3 + Math.floor(random() * (GRID_W - 6));
+    const y = 3 + Math.floor(random() * (GRID_H - 6));
+    attempts += 1;
+    const index = cellIndex(x, y);
+    if (metalMask[index] || beaconMask[index]) continue;
+    if (gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) continue;
+    if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
+    const distFromStart = Math.hypot(x - START_X, y - START_Y);
+    if (distFromStart < WORM_NEST_MIN_START_DISTANCE) continue;
+    if (!isFarEnoughFromPlaced(x, y, placed, WORM_NEST_MIN_DISTANCE)) continue;
+    let tooCloseToBeacon = false;
+    for (const b of beacons) {
+      if (Math.hypot(x - b.x, y - b.y) < WORM_NEST_MIN_BEACON_DIST) {
+        tooCloseToBeacon = true;
+        break;
+      }
+    }
+    if (tooCloseToBeacon) continue;
+    // Also avoid safes
+    let tooCloseToSafe = false;
+    for (const s of safes) {
+      if (Math.hypot(x - s.x, y - s.y) < 8) {
+        tooCloseToSafe = true;
+        break;
+      }
+    }
+    if (tooCloseToSafe) continue;
+    placed.push({ x, y });
+  }
+  return placed;
+}
+
 /**
  * Repair pockets after beacons/safes may have destroyed some cells.
  * For each pocket cell, check if any of its 4-neighbors are also pocket cells.
@@ -985,6 +1025,7 @@ export function generateMap(seed) {
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
   placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
   placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, random);
+  const wormNests = placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, safes, base, random);
 
   // Repair pockets: remove any pocket cells that were destroyed by beacons/safes
   // A pocket cell is orphaned if it has no pocket neighbor of the same type
@@ -998,7 +1039,7 @@ export function generateMap(seed) {
     gasPocketMask, steamPocketMask, boulderPocketMask,
     beaconMask, beacons,
     perkMask, crystalMask, perkZones,
-    artifactMask, safes,
+    artifactMask, safes, wormNests,
     base,
   };
 }

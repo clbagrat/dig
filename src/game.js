@@ -1,5 +1,5 @@
 import { initShop, openShop, closeShop, renderShop, unlockRandomTree, getLockedTrees, unlockTreeById, getAllTrees, isTreeUnlocked } from "./shop.js?v=40";
-import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=37";
+import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=38";
 
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
@@ -66,6 +66,13 @@ const MOVE_SPEED_TILES = 5;
 const POST_BREAK_MOVE_DELAY = 0.2;
 const VISIBILITY_FADE_SPEED = 7;
 const TILE_SWAP_ANIMATION_DURATION = 0.18;
+const WORM_ACTIVATION_RADIUS = 10;
+const WORM_ATTACK_INTERVAL = 10;
+const WORM_SPEED = 12;
+const WORM_DAMAGE = 3;
+const WORM_BLOCK_DAMAGE_RATIO = 0.5;
+const WORM_BODY_LENGTH = 8;
+const WORM_DUST_DURATION = 0.6;
 
 // Reusable buffers for visibility BFS — avoids per-frame allocations
 const _visFogDistance = new Int16Array(GRID_W * GRID_H);
@@ -257,6 +264,8 @@ const state = {
   pickupRadarKind: null,   // "artifact" or "key"
   pickupRadarTargetX: 0,
   pickupRadarTargetY: 0,
+  wormNests: [],
+  activeWorms: [],
   beacons: [],
   health: new Float32Array(GRID_W * GRID_H),
   loopGoldMask: new Float32Array(GRID_W * GRID_H),
@@ -1194,6 +1203,8 @@ function setupField() {
   state.artifactChoiceTrees = [];
   state.artifactChoicePendingBeacon = null;
   state.safes.length = 0;
+  state.wormNests.length = 0;
+  state.activeWorms.length = 0;
   state.safeDoorMask.fill(0);
   state.keyMask.fill(0);
   state.safeInteriorMask.fill(0);
@@ -1404,6 +1415,11 @@ function setupField() {
       const ci = cellIndex(c.x, c.y);
       state.safeInteriorMask[ci] = safeIdx + 1;
     }
+  }
+
+  // Load worm nests
+  for (const n of map.wormNests) {
+    state.wormNests.push({ x: n.x, y: n.y, cooldown: 0, active: false });
   }
 
   state.pathTiles.length = 0;
@@ -2562,6 +2578,37 @@ function bindUi() {
     });
   }
 
+  const debugTeleportWorm = document.getElementById("debugTeleportWorm");
+  if (debugTeleportWorm) {
+    debugTeleportWorm.addEventListener("click", () => {
+      let nearest = null;
+      let bestDist = Infinity;
+      for (const n of state.wormNests) {
+        const d = Math.abs(n.x - state.drill.x) + Math.abs(n.y - state.drill.y);
+        if (d < bestDist) { bestDist = d; nearest = n; }
+      }
+      if (nearest) {
+        // Teleport within activation radius
+        const tx = nearest.x - 3;
+        const ty = nearest.y;
+        state.drill.x = tx;
+        state.drill.y = ty;
+        state.drill.renderX = tx;
+        state.drill.renderY = ty;
+        state.visibilityDirty = true;
+        carveTunnel(tx, ty);
+        state.pathTiles.length = 0;
+        state.pathTiles.push({ x: tx, y: ty });
+        rebuildPathIndex();
+        showPerkToast(`Телепорт к гнезду (${nearest.x}, ${nearest.y})`);
+      } else {
+        showPerkToast("Нет гнёзд червей");
+      }
+      state.debugPerkMenuOpen = false;
+      syncDebugPerkOverlay();
+    });
+  }
+
   const debugOpenShop = document.getElementById("debugOpenShop");
   if (debugOpenShop) {
     debugOpenShop.addEventListener("click", () => {
@@ -3076,6 +3123,7 @@ function update(dt) {
   updateGas(dt);
   updateSteam(dt);
   updateBoulders(dt);
+  updateWorms(dt);
   updatePerkZones(dt);
   updateChainExplosions(dt);
   updateEffects(dt);
@@ -4444,6 +4492,98 @@ function updateBoulders(dt) {
     state.health[nextIndex] = 0;
     if (boulder.x === state.drill.x && boulder.y === state.drill.y) {
       applyHazardDamage(BOULDER_DAMAGE);
+    }
+  }
+}
+
+function updateWorms(dt) {
+  if (state.dead) return;
+  const drillX = state.drill.x;
+  const drillY = state.drill.y;
+
+  // Phase A: nest activation and spawning
+  for (const nest of state.wormNests) {
+    const dist = Math.max(Math.abs(nest.x - drillX), Math.abs(nest.y - drillY));
+    if (dist <= WORM_ACTIVATION_RADIUS) {
+      nest.active = true;
+      nest.cooldown -= dt;
+      if (nest.cooldown <= 0) {
+        nest.cooldown = WORM_ATTACK_INTERVAL;
+        // Spawn worm on player's column, from nest Y, moving toward and through player
+        const dir = drillY >= nest.y ? 1 : -1;
+        // Start 10 tiles behind the nest (away from player) so it approaches through the player
+        const startY = nest.y - dir * 10;
+        state.activeWorms.push({
+          tileX: drillX,
+          tileY: Math.max(0, Math.min(GRID_H - 1, startY)),
+          dir,                          // +1 = down, -1 = up
+          renderY: Math.max(0, Math.min(GRID_H - 1, startY)), // smooth float for animation
+          moveTimer: 0,
+          alive: true,
+          damagedCells: new Set(),
+          hitPlayer: false,
+          trail: [],                    // [{tileX, tileY}] for body segments
+        });
+      }
+    } else {
+      nest.active = false;
+      nest.cooldown = 0;
+    }
+  }
+
+  // Phase B: update active worms — tile-by-tile vertical movement
+  const wormMoveInterval = 1 / WORM_SPEED; // seconds per tile
+  for (let i = state.activeWorms.length - 1; i >= 0; i--) {
+    const worm = state.activeWorms[i];
+    worm.moveTimer += dt;
+
+    // Smooth render position interpolation
+    const progress = Math.min(worm.moveTimer / wormMoveInterval, 1);
+    worm.renderY = worm.tileY - worm.dir * (1 - progress);
+
+    if (worm.moveTimer >= wormMoveInterval) {
+      worm.moveTimer -= wormMoveInterval;
+
+      // Record trail (previous position)
+      worm.trail.push({ tileX: worm.tileX, tileY: worm.tileY });
+      if (worm.trail.length > WORM_BODY_LENGTH) worm.trail.shift();
+
+      // Move to next tile
+      worm.tileY += worm.dir;
+
+      // Remove if off map
+      if (worm.tileY < 0 || worm.tileY >= GRID_H) {
+        state.activeWorms.splice(i, 1);
+        continue;
+      }
+
+      const idx = cellIndex(worm.tileX, worm.tileY);
+
+      // Block damage: 50% of max HP
+      if (!worm.damagedCells.has(idx)) {
+        worm.damagedCells.add(idx);
+        const h = state.hardness[idx];
+        if (h > 0 && !state.tunnelMask[idx]) {
+          const maxHp = BLOCK_TYPES[h].hp;
+          state.health[idx] = Math.max(0, state.health[idx] - maxHp * WORM_BLOCK_DAMAGE_RATIO);
+        }
+        // Spawn dust on solid cells
+        if (!state.tunnelMask[idx]) {
+          state.effects.push({
+            kind: "wormDust",
+            x: worm.tileX,
+            y: worm.tileY,
+            time: WORM_DUST_DURATION,
+            duration: WORM_DUST_DURATION,
+          });
+        }
+      }
+
+      // Player collision
+      if (!worm.hitPlayer && worm.tileX === drillX && worm.tileY === drillY) {
+        worm.hitPlayer = true;
+        applyHazardDamage(WORM_DAMAGE);
+      }
     }
   }
 }
@@ -5922,6 +6062,21 @@ function renderEffects(camera) {
         ctx.lineWidth = 3;
         ctx.stroke();
       }
+    } else if (effect.kind === "wormDust") {
+      const alpha = 1 - progress;
+      for (let p = 0; p < 5; p++) {
+        const seed = (effect.x * 4219 + effect.y * 7331 + p * 137) % 1000;
+        const angle = (seed / 1000) * Math.PI * 2;
+        const speed = 8 + (seed % 10);
+        const px = cx + Math.cos(angle) * speed * progress;
+        const py = cy + Math.sin(angle) * speed * progress - progress * 6;
+        const size = 1.5 + (seed % 3) * 0.5;
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.fillStyle = "#c8a070";
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
   ctx.restore();
@@ -6040,14 +6195,28 @@ function render() {
   for (let y = startY; y < endY; y += 1) {
     for (let x = startX; x < endX; x += 1) {
       const index = cellIndex(x, y);
-      const sx = x * TILE_SIZE - camera.x;
-      const sy = y * TILE_SIZE - camera.y;
+      let sx = x * TILE_SIZE - camera.x;
+      let sy = y * TILE_SIZE - camera.y;
       const visibleAlpha = clamp(state.visibleAlpha[index], 0, 1);
       const visible = visibleAlpha >= 0.999;
       const hiddenByAnim = isAnimatedTileDestination(x, y);
 
       if (hiddenByAnim) {
         continue;
+      }
+
+      // Worm tile shake
+      if (state.activeWorms.length > 0 && !state.tunnelMask[index]) {
+        for (const worm of state.activeWorms) {
+          const d = Math.max(Math.abs(x - worm.tileX), Math.abs(y - worm.renderY));
+          if (d < 3) {
+            const intensity = (1 - d / 3) * 2.5;
+            const t = state.lastTs * 40 + x * 17 + y * 31;
+            sx += Math.sin(t) * intensity;
+            sy += Math.cos(t * 1.3) * intensity;
+            break;
+          }
+        }
       }
 
       if (visibleAlpha <= 0.001) {
@@ -6214,6 +6383,7 @@ function render() {
   renderDepositArrivals(camera);
   renderBase(camera);
   renderBoulders(camera);
+  renderWorms(camera);
   renderDrill(camera);
   renderBaseProximityDot(camera);
   renderFuelToast(camera);
@@ -7222,6 +7392,46 @@ function renderCog(cx, cy, radius, ctx) {
   ctx.beginPath();
   ctx.arc(cx, cy, radius * 0.38, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function renderWorms(camera) {
+  if (state.activeWorms.length === 0) return;
+  const ctx = state.ctx;
+  ctx.save();
+  for (const worm of state.activeWorms) {
+    // Draw body segments from trail (oldest to newest)
+    for (let s = 0; s < worm.trail.length; s++) {
+      const seg = worm.trail[s];
+      const sx = seg.tileX * TILE_SIZE + TILE_SIZE / 2 - camera.x;
+      const sy = seg.tileY * TILE_SIZE + TILE_SIZE / 2 - camera.y;
+      const t = s / Math.max(1, worm.trail.length - 1); // 0=tail, 1=head
+      const radius = 4 + t * 4;
+      ctx.globalAlpha = 0.5 + t * 0.2;
+      ctx.fillStyle = "#a06040";
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Draw head at smooth render position
+    const hx = worm.tileX * TILE_SIZE + TILE_SIZE / 2 - camera.x;
+    const hy = worm.renderY * TILE_SIZE + TILE_SIZE / 2 - camera.y;
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = "#c47a5a";
+    ctx.beginPath();
+    ctx.arc(hx, hy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    // Eyes (looking in movement direction)
+    ctx.fillStyle = "#1a0e08";
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(hx - 3, hy + worm.dir * 4, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(hx + 3, hy + worm.dir * 4, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function renderDrill(camera) {
