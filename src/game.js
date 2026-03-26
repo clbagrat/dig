@@ -68,7 +68,7 @@ const VISIBILITY_FADE_SPEED = 7;
 const TILE_SWAP_ANIMATION_DURATION = 0.18;
 const WORM_ACTIVATION_RADIUS = 10;
 const WORM_ATTACK_INTERVAL = 10;
-const WORM_SPEED = 12;
+const WORM_SPEED = 4;
 const WORM_DAMAGE = 3;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
@@ -1419,7 +1419,7 @@ function setupField() {
 
   // Load worm nests
   for (const n of map.wormNests) {
-    state.wormNests.push({ x: n.x, y: n.y, cooldown: 0, active: false });
+    state.wormNests.push({ x: n.x, y: n.y, cooldown: 0, active: false, destroyed: false });
   }
 
   state.pathTiles.length = 0;
@@ -4496,6 +4496,36 @@ function updateBoulders(dt) {
   }
 }
 
+function buildWormPath(nestX, nestY, playerX, playerY, radius) {
+  const dx = playerX - nestX;
+  const dy = playerY - nestY;
+  // If player is on the nest, pick a default direction (down)
+  const len = Math.hypot(dx, dy);
+  const dirX = len > 0 ? dx / len : 0;
+  const dirY = len > 0 ? dy / len : 1;
+  // Extend the line to the edge of the radius (and a bit beyond)
+  const endX = nestX + dirX * (radius + 5);
+  const endY = nestY + dirY * (radius + 5);
+  // Bresenham line from nest to end point
+  const path = [];
+  let x0 = nestX, y0 = nestY;
+  const x1 = Math.round(endX), y1 = Math.round(endY);
+  const sdx = Math.abs(x1 - x0), sdy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = sdx - sdy;
+  while (true) {
+    if (x0 >= 0 && x0 < GRID_W && y0 >= 0 && y0 < GRID_H) {
+      path.push({ x: x0, y: y0 });
+    }
+    if (x0 === x1 && y0 === y1) break;
+    if (path.length > radius * 3) break; // safety
+    const e2 = 2 * err;
+    if (e2 > -sdy) { err -= sdy; x0 += sx; }
+    if (e2 < sdx) { err += sdx; y0 += sy; }
+  }
+  return path;
+}
+
 function updateWorms(dt) {
   if (state.dead) return;
   const drillX = state.drill.x;
@@ -4503,26 +4533,28 @@ function updateWorms(dt) {
 
   // Phase A: nest activation and spawning
   for (const nest of state.wormNests) {
+    if (nest.destroyed) continue;
     const dist = Math.max(Math.abs(nest.x - drillX), Math.abs(nest.y - drillY));
     if (dist <= WORM_ACTIVATION_RADIUS) {
       nest.active = true;
       nest.cooldown -= dt;
       if (nest.cooldown <= 0) {
         nest.cooldown = WORM_ATTACK_INTERVAL;
-        // Spawn worm on player's column, from nest Y, moving toward and through player
-        const dir = drillY >= nest.y ? 1 : -1;
-        // Start 10 tiles behind the nest (away from player) so it approaches through the player
-        const startY = nest.y - dir * 10;
+        // Build path: straight line from nest through player to edge of activation radius
+        const path = buildWormPath(nest.x, nest.y, drillX, drillY, WORM_ACTIVATION_RADIUS);
+        if (path.length < 2) continue;
         state.activeWorms.push({
-          tileX: drillX,
-          tileY: Math.max(0, Math.min(GRID_H - 1, startY)),
-          dir,                          // +1 = down, -1 = up
-          renderY: Math.max(0, Math.min(GRID_H - 1, startY)), // smooth float for animation
+          path,
+          pathIdx: 0,
+          tileX: path[0].x,
+          tileY: path[0].y,
+          renderX: path[0].x,
+          renderY: path[0].y,
           moveTimer: 0,
           alive: true,
           damagedCells: new Set(),
           hitPlayer: false,
-          trail: [],                    // [{tileX, tileY}] for body segments
+          trail: [],
         });
       }
     } else {
@@ -4531,31 +4563,36 @@ function updateWorms(dt) {
     }
   }
 
-  // Phase B: update active worms — tile-by-tile vertical movement
+  // Phase B: update active worms — follow precomputed path
   const wormMoveInterval = 1 / WORM_SPEED; // seconds per tile
   for (let i = state.activeWorms.length - 1; i >= 0; i--) {
     const worm = state.activeWorms[i];
     worm.moveTimer += dt;
 
-    // Smooth render position interpolation
+    // Smooth render position interpolation between current and next path tile
     const progress = Math.min(worm.moveTimer / wormMoveInterval, 1);
-    worm.renderY = worm.tileY - worm.dir * (1 - progress);
+    const cur = worm.path[worm.pathIdx];
+    const prev = worm.pathIdx > 0 ? worm.path[worm.pathIdx - 1] : cur;
+    worm.renderX = prev.x + (cur.x - prev.x) * progress;
+    worm.renderY = prev.y + (cur.y - prev.y) * progress;
 
     if (worm.moveTimer >= wormMoveInterval) {
       worm.moveTimer -= wormMoveInterval;
 
-      // Record trail (previous position)
+      // Record trail
       worm.trail.push({ tileX: worm.tileX, tileY: worm.tileY });
       if (worm.trail.length > WORM_BODY_LENGTH) worm.trail.shift();
 
-      // Move to next tile
-      worm.tileY += worm.dir;
-
-      // Remove if off map
-      if (worm.tileY < 0 || worm.tileY >= GRID_H) {
+      // Advance along path
+      worm.pathIdx += 1;
+      if (worm.pathIdx >= worm.path.length) {
         state.activeWorms.splice(i, 1);
         continue;
       }
+
+      const next = worm.path[worm.pathIdx];
+      worm.tileX = next.x;
+      worm.tileY = next.y;
 
       const idx = cellIndex(worm.tileX, worm.tileY);
 
@@ -4567,7 +4604,6 @@ function updateWorms(dt) {
           const maxHp = BLOCK_TYPES[h].hp;
           state.health[idx] = Math.max(0, state.health[idx] - maxHp * WORM_BLOCK_DAMAGE_RATIO);
         }
-        // Spawn dust on solid cells
         if (!state.tunnelMask[idx]) {
           state.effects.push({
             kind: "wormDust",
@@ -4736,6 +4772,23 @@ function breakCell(x, y, index, options = {}) {
   }
 
   carveTunnel(x, y);
+
+  // Check if a worm nest was destroyed
+  for (const nest of state.wormNests) {
+    if (!nest.destroyed && nest.x === x && nest.y === y) {
+      nest.destroyed = true;
+      nest.active = false;
+      const reward = 150 + Math.floor(Math.random() * 101);
+      // Flashy gold ore effect (burst + floating value text)
+      spawnGoldOreEffect(x, y, reward);
+      // Gold particles fly to drill
+      spawnGoldParticles(x, y, reward);
+      state.unsafeGold += reward;
+      showPerkToast(`Гнездо уничтожено! +${reward} золота`);
+      break;
+    }
+  }
+
   const gasNeighbors = [
     { x: x + 1, y },
     { x: x - 1, y },
@@ -6064,14 +6117,21 @@ function renderEffects(camera) {
       }
     } else if (effect.kind === "wormDust") {
       const alpha = 1 - progress;
-      for (let p = 0; p < 5; p++) {
+      // Dust cloud puff
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.fillStyle = "#a08060";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6 + progress * 10, 0, Math.PI * 2);
+      ctx.fill();
+      // Particles
+      for (let p = 0; p < 8; p++) {
         const seed = (effect.x * 4219 + effect.y * 7331 + p * 137) % 1000;
         const angle = (seed / 1000) * Math.PI * 2;
-        const speed = 8 + (seed % 10);
+        const speed = 10 + (seed % 12);
         const px = cx + Math.cos(angle) * speed * progress;
-        const py = cy + Math.sin(angle) * speed * progress - progress * 6;
-        const size = 1.5 + (seed % 3) * 0.5;
-        ctx.globalAlpha = alpha * 0.7;
+        const py = cy + Math.sin(angle) * speed * progress - progress * 8;
+        const size = 2 + (seed % 3);
+        ctx.globalAlpha = alpha * 0.6;
         ctx.fillStyle = "#c8a070";
         ctx.beginPath();
         ctx.arc(px, py, size, 0, Math.PI * 2);
@@ -6208,9 +6268,9 @@ function render() {
       // Worm tile shake
       if (state.activeWorms.length > 0 && !state.tunnelMask[index]) {
         for (const worm of state.activeWorms) {
-          const d = Math.max(Math.abs(x - worm.tileX), Math.abs(y - worm.renderY));
-          if (d < 3) {
-            const intensity = (1 - d / 3) * 2.5;
+          const d = Math.max(Math.abs(x - worm.renderX), Math.abs(y - worm.renderY));
+          if (d < 1.5) {
+            const intensity = (1 - d / 1.5) * 1.5;
             const t = state.lastTs * 40 + x * 17 + y * 31;
             sx += Math.sin(t) * intensity;
             sy += Math.cos(t * 1.3) * intensity;
@@ -6356,13 +6416,17 @@ function render() {
     }
   }
 
-  // Artifact & key overlay pass — drawn after all tiles so waves aren't clipped
+  // Artifact, key & worm nest overlay pass — drawn after all tiles so waves aren't clipped
   for (let y = startY; y < endY; y += 1) {
     for (let x = startX; x < endX; x += 1) {
       const idx = cellIndex(x, y);
       const hasArtifact = state.artifactMask[idx] > 0;
       const hasKey = state.keyMask[idx] > 0;
-      if (!hasArtifact && !hasKey) continue;
+      let isNest = false;
+      for (const n of state.wormNests) {
+        if (!n.destroyed && n.x === x && n.y === y) { isNest = true; break; }
+      }
+      if (!hasArtifact && !hasKey && !isNest) continue;
       const alpha = state.visibleAlpha[idx];
       if (alpha < 0.01) continue;
       const sx = x * TILE_SIZE - camera.x;
@@ -6370,6 +6434,7 @@ function render() {
       if (alpha < 0.999) ctx.globalAlpha = alpha;
       if (hasArtifact) renderArtifactTile(x, y, sx, sy);
       if (hasKey) renderKeyTile(x, y, sx, sy);
+      if (isNest) renderWormNestTile(x, y, sx, sy);
       if (alpha < 0.999) ctx.globalAlpha = 1;
     }
   }
@@ -7103,6 +7168,55 @@ function renderCrystalTileAt(crystalType, sx, sy) {
   ctx.restore();
 }
 
+function renderWormNestTile(x, y, sx, sy) {
+  const ctx = state.ctx;
+  const cx = sx + TILE_SIZE / 2;
+  const cy = sy + TILE_SIZE / 2;
+  const t = state.lastTs / 1000;
+  ctx.save();
+
+  // Dark burrow hole
+  ctx.fillStyle = "#1a0e08";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 2, 10, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner darker circle
+  ctx.fillStyle = "#0d0604";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 2, 6, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pulsing warning ring when active
+  let isActive = false;
+  for (const n of state.wormNests) {
+    if (n.x === x && n.y === y && n.active) { isActive = true; break; }
+  }
+  if (isActive) {
+    const pulse = 0.4 + Math.sin(t * 4) * 0.3;
+    ctx.strokeStyle = `rgba(196, 80, 50, ${pulse})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14 + Math.sin(t * 3) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Subtle cracks radiating from hole
+  ctx.strokeStyle = "rgba(80, 40, 20, 0.5)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + 0.3;
+    const r1 = 8;
+    const r2 = 13 + (i % 2) * 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
+    ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function renderArtifactTile(x, y, sx, sy) {
   const index = cellIndex(x, y);
   if (!state.artifactMask[index]) return;
@@ -7394,6 +7508,26 @@ function renderCog(cx, cy, radius, ctx) {
   ctx.fill();
 }
 
+function renderWormSegment(ctx, cx, cy, radius, alpha, color, tileX, tileY) {
+  const idx = cellIndex(tileX, tileY);
+  const isTunnel = state.tunnelMask[idx] || state.beaconMask[idx] === 1;
+  if (isTunnel) {
+    // Fully visible on open tiles
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Underground hint — subtle shadow/bump visible through block
+    ctx.globalAlpha = alpha * 0.25;
+    ctx.fillStyle = "#1a0e08";
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function renderWorms(camera) {
   if (state.activeWorms.length === 0) return;
   const ctx = state.ctx;
@@ -7404,31 +7538,31 @@ function renderWorms(camera) {
       const seg = worm.trail[s];
       const sx = seg.tileX * TILE_SIZE + TILE_SIZE / 2 - camera.x;
       const sy = seg.tileY * TILE_SIZE + TILE_SIZE / 2 - camera.y;
-      const t = s / Math.max(1, worm.trail.length - 1); // 0=tail, 1=head
+      const t = s / Math.max(1, worm.trail.length - 1);
       const radius = 4 + t * 4;
-      ctx.globalAlpha = 0.5 + t * 0.2;
-      ctx.fillStyle = "#a06040";
-      ctx.beginPath();
-      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
-      ctx.fill();
+      renderWormSegment(ctx, sx, sy, radius, 0.5 + t * 0.2, "#a06040", seg.tileX, seg.tileY);
     }
     // Draw head at smooth render position
-    const hx = worm.tileX * TILE_SIZE + TILE_SIZE / 2 - camera.x;
+    const hx = worm.renderX * TILE_SIZE + TILE_SIZE / 2 - camera.x;
     const hy = worm.renderY * TILE_SIZE + TILE_SIZE / 2 - camera.y;
-    ctx.globalAlpha = 0.8;
-    ctx.fillStyle = "#c47a5a";
-    ctx.beginPath();
-    ctx.arc(hx, hy, 8, 0, Math.PI * 2);
-    ctx.fill();
-    // Eyes (looking in movement direction)
-    ctx.fillStyle = "#1a0e08";
-    ctx.globalAlpha = 0.9;
-    ctx.beginPath();
-    ctx.arc(hx - 3, hy + worm.dir * 4, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(hx + 3, hy + worm.dir * 4, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    renderWormSegment(ctx, hx, hy, 8, 0.8, "#c47a5a", worm.tileX, worm.tileY);
+    // Eyes — only on open tiles
+    const headIdx = cellIndex(worm.tileX, worm.tileY);
+    if (state.tunnelMask[headIdx] || state.beaconMask[headIdx] === 1) {
+      const nextPt = worm.pathIdx + 1 < worm.path.length ? worm.path[worm.pathIdx + 1] : worm.path[worm.pathIdx];
+      const curPt = worm.path[worm.pathIdx];
+      const edx = nextPt.x - curPt.x, edy = nextPt.y - curPt.y;
+      const elen = Math.hypot(edx, edy) || 1;
+      const enx = edx / elen, eny = edy / elen;
+      ctx.fillStyle = "#1a0e08";
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(hx + enx * 4 - eny * 3, hy + eny * 4 + enx * 3, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(hx + enx * 4 + eny * 3, hy + eny * 4 - enx * 3, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
   ctx.restore();
