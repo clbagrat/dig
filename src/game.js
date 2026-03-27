@@ -98,12 +98,12 @@ const LEVEL_REWARD_DEFS = {
   5: [
     { id: "speed_10", label: "+10% скорости", description: "Бур делает новые удары быстрее" },
     { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
-    { id: "heal_full", label: "Лечение", description: "Полностью восстанавливает HP" },
+    { id: "hp_1", label: "+1 HP", description: "Повышает максимум HP и лечит на 1" },
   ],
   6: [
     { id: "gold_5", label: "+5% золота", description: "Еще больше золота из разрушаемых блоков" },
     { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
-    { id: "heal_full", label: "Лечение", description: "Полностью восстанавливает HP" },
+    { id: "hp_1", label: "+1 HP", description: "Повышает максимум HP и лечит на 1" },
   ],
 };
 
@@ -1770,7 +1770,7 @@ function collectPerkZone(zone) {
   showPerkToast(state.perkText);
 
   if (zone.perkType === 4) {
-    explodeAt(zone.x, zone.y, state.drillPower * 10, 6);
+    explodeAt(Math.round(zone.x), Math.round(zone.y), state.drillPower * 10, 3);
     return;
   }
 
@@ -2712,6 +2712,42 @@ function bindUi() {
     });
   }
 
+  function teleportToNearestZoneOfType(perkType) {
+    let nearest = null;
+    let bestDist = Infinity;
+    for (const z of state.perkZones) {
+      if (z.collected || z.perkType !== perkType) continue;
+      const d = Math.abs(Math.round(z.x) - state.drill.x) + Math.abs(Math.round(z.y) - state.drill.y);
+      if (d < bestDist) { bestDist = d; nearest = z; }
+    }
+    if (nearest) {
+      const tx = Math.round(nearest.x) - 2;
+      const ty = Math.round(nearest.y);
+      state.drill.x = tx; state.drill.y = ty;
+      state.drill.renderX = tx; state.drill.renderY = ty;
+      state.visibilityDirty = true;
+      carveTunnel(tx, ty);
+      state.pathTiles.length = 0;
+      state.pathTiles.push({ x: tx, y: ty });
+      rebuildPathIndex();
+      showPerkToast(`Зона ${TILE_PERK_TYPES[perkType].name} (${Math.round(nearest.x)}, ${Math.round(nearest.y)})`);
+    } else {
+      showPerkToast(`Нет зон: ${TILE_PERK_TYPES[perkType].name}`);
+    }
+    state.debugPerkMenuOpen = false;
+    syncDebugPerkOverlay();
+  }
+
+  [
+    ["debugZoneBak", 1],
+    ["debugZoneBomba", 4],
+    ["debugZoneHp", 6],
+    ["debugZoneBronya", 7],
+  ].forEach(([id, perkType]) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener("click", () => teleportToNearestZoneOfType(perkType));
+  });
+
   const debugOpenShop = document.getElementById("debugOpenShop");
   if (debugOpenShop) {
     debugOpenShop.addEventListener("click", () => {
@@ -2927,6 +2963,7 @@ function syncDebugPerkOverlay() {
   }
   const seedDisplay = document.getElementById("debugSeedDisplay");
   if (seedDisplay) seedDisplay.textContent = `Seed: ${state.worldSeed}`;
+
   if (state.debugPerkMenuOpen) {
     overlay.hidden = false;
     overlay.removeAttribute("hidden");
