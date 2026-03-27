@@ -125,13 +125,13 @@ const HAZARD_DATA = {
 
 const BLOCK_TYPES = [
   { hp: 0, color: "#1a1410", gold: 0, vein: "#3c2d22" },
-  { hp: 60, color: "#5f4631", gold: 2, vein: "#9b7a4a" },
-  { hp: 90, color: "#715337", gold: 4, vein: "#c59a5c" },
-  { hp: 120, color: "#6a4f37", gold: 6, vein: "#d0a66a" },
-  { hp: 180, color: "#6f4f40", gold: 8, vein: "#b66e3b" },
-  { hp: 300, color: "#60473f", gold: 11, vein: "#a57f58" },
-  { hp: 420, color: "#4f3d36", gold: 14, vein: "#9cb1b7" },
-  { hp: 600, color: "#3e3236", gold: 18, vein: "#d6d9df" },
+  { hp: 60, color: "#7a6550", gold: 2, vein: "#97816a" },
+  { hp: 90, color: "#6e5b48", gold: 4, vein: "#8b7560" },
+  { hp: 120, color: "#625140", gold: 6, vein: "#7f6a58" },
+  { hp: 180, color: "#564838", gold: 8, vein: "#736250" },
+  { hp: 300, color: "#4b4035", gold: 11, vein: "#675a4c" },
+  { hp: 420, color: "#423a36", gold: 14, vein: "#5e5550" },
+  { hp: 600, color: "#3a3840", gold: 18, vein: "#56545e" },
 ];
 
 const TILE_PERK_TYPES = [
@@ -311,6 +311,7 @@ const state = {
   activeWorms: [],
   beacons: [],
   health: new Float32Array(GRID_W * GRID_H),
+  crackAngle: new Float32Array(GRID_W * GRID_H),
   loopGoldMask: new Float32Array(GRID_W * GRID_H),
   droppedGoldMask: new Float32Array(GRID_W * GRID_H),
   xpPickupMask: new Uint16Array(GRID_W * GRID_H),
@@ -506,39 +507,53 @@ function darkenColor(color, amount) {
 function createBlockSprite(type, tier) {
   const canvas = makeSpriteCanvas();
   const ctx = canvas.getContext("2d");
+  const t = (tier - 1) / 6; // 0..1
+
+  // Градиент — контрастность растёт с тиром
+  const gradLight = Math.round(6 + t * 20);
+  const gradDark = Math.round(8 + t * 24);
   const gradient = ctx.createLinearGradient(0, 0, TILE_SIZE, TILE_SIZE);
-  gradient.addColorStop(0, lightenColor(type.color, 18));
+  gradient.addColorStop(0, lightenColor(type.color, gradLight));
   gradient.addColorStop(0.52, type.color);
-  gradient.addColorStop(1, darkenColor(type.color, 24));
+  gradient.addColorStop(1, darkenColor(type.color, gradDark));
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-  ctx.fillStyle = "rgba(255, 236, 204, 0.08)";
-  fillRoundRect(ctx, 2, 2, TILE_SIZE - 4, 7, 4);
-  ctx.fillStyle = "rgba(18, 10, 7, 0.22)";
-  fillRoundRect(ctx, 3, TILE_SIZE - 10, TILE_SIZE - 6, 7, 4);
-
+  // Прожилки — количество растёт с тиром
+  const veinCount = 1 + tier;
   ctx.strokeStyle = `${type.vein}aa`;
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 3; i += 1) {
-    const y = 7 + i * 9 + ((tier * 3 + i * 5) % 4);
+  ctx.lineWidth = 1.2 + t * 0.8;
+  for (let i = 0; i < veinCount; i += 1) {
+    const y0 = 4 + Math.random() * (TILE_SIZE - 8);
+    const y1 = y0 + (Math.random() - 0.5) * 8;
+    const y2 = y0 + (Math.random() - 0.5) * 8;
     ctx.beginPath();
-    ctx.moveTo(4, y);
-    ctx.lineTo(TILE_SIZE * 0.3, y + 3 + (i % 2) * 2);
-    ctx.lineTo(TILE_SIZE * 0.54, y - 1 + (tier % 3));
-    ctx.lineTo(TILE_SIZE - 5, y + 4);
+    ctx.moveTo(2 + Math.random() * 4, y0);
+    ctx.quadraticCurveTo(TILE_SIZE * 0.5, y1, TILE_SIZE - 2 - Math.random() * 4, y2);
     ctx.stroke();
   }
 
-  ctx.fillStyle = `${type.vein}55`;
-  for (let i = 0; i < 11; i += 1) {
-    const x = 4 + ((i * 11 + tier * 7) % (TILE_SIZE - 8));
-    const y = 4 + ((i * 7 + tier * 13) % (TILE_SIZE - 8));
-    ctx.fillRect(x, y, 2 + (i % 2), 2 + ((i + tier) % 2));
+  // Зернистость — от 8 до 35 точек
+  const grainCount = Math.round(8 + t * 27);
+  for (let i = 0; i < grainCount; i += 1) {
+    const x = 2 + Math.random() * (TILE_SIZE - 4);
+    const y = 2 + Math.random() * (TILE_SIZE - 4);
+    const bright = Math.random() > 0.5;
+    ctx.fillStyle = bright
+      ? `rgba(255, 240, 210, ${0.06 + t * 0.08})`
+      : `rgba(10, 5, 2, ${0.08 + t * 0.12})`;
+    ctx.fillRect(x, y, 1 + Math.round(Math.random()), 1 + Math.round(Math.random()));
   }
 
-  ctx.strokeStyle = "rgba(255, 232, 198, 0.08)";
-  ctx.strokeRect(0.5, 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+  // Виньетка — внутренняя тень по краям
+  const vignetteAlpha = 0.02 + t * 0.18;
+  const inset = 3;
+  ctx.fillStyle = `rgba(8, 4, 2, ${vignetteAlpha})`;
+  ctx.fillRect(0, 0, TILE_SIZE, inset);
+  ctx.fillRect(0, TILE_SIZE - inset, TILE_SIZE, inset);
+  ctx.fillRect(0, inset, inset, TILE_SIZE - inset * 2);
+  ctx.fillRect(TILE_SIZE - inset, inset, inset, TILE_SIZE - inset * 2);
+
   return canvas;
 }
 
@@ -687,22 +702,24 @@ function createHazardSprite(hazardType) {
   return canvas;
 }
 
+const CRACK_VARIANTS = 4;
+
 function createCrackSprite(stage) {
   const canvas = makeSpriteCanvas();
   const ctx = canvas.getContext("2d");
   ctx.strokeStyle = `rgba(255, 242, 215, ${0.2 + stage * 0.12})`;
   ctx.lineWidth = 1.2 + stage * 0.35;
-  const lines = [
-    [6, 7, 18, 14, 29, 11],
-    [10, 28, 18, 20, 28, 18],
-    [15, 6, 17, 17, 14, 31],
-  ];
-  for (let i = 0; i < Math.min(stage, lines.length); i += 1) {
-    const line = lines[i];
+  for (let i = 0; i < stage; i += 1) {
+    const x0 = 3 + Math.random() * (TILE_SIZE - 6);
+    const y0 = 3 + Math.random() * (TILE_SIZE - 6);
+    const x1 = 3 + Math.random() * (TILE_SIZE - 6);
+    const y1 = 3 + Math.random() * (TILE_SIZE - 6);
+    const x2 = 3 + Math.random() * (TILE_SIZE - 6);
+    const y2 = 3 + Math.random() * (TILE_SIZE - 6);
     ctx.beginPath();
-    ctx.moveTo(line[0], line[1]);
-    ctx.lineTo(line[2], line[3]);
-    ctx.lineTo(line[4], line[5]);
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
     ctx.stroke();
   }
   return canvas;
@@ -873,10 +890,15 @@ function createBaseFrame(frame) {
   return canvas;
 }
 
+const BLOCK_VARIANTS = 4;
+
 function createSpriteAtlas() {
   const blocks = [null];
   for (let i = 1; i < BLOCK_TYPES.length; i += 1) {
-    blocks[i] = createBlockSprite(BLOCK_TYPES[i], i);
+    blocks[i] = [];
+    for (let v = 0; v < BLOCK_VARIANTS; v += 1) {
+      blocks[i][v] = createBlockSprite(BLOCK_TYPES[i], i);
+    }
   }
 
   return {
@@ -889,7 +911,11 @@ function createSpriteAtlas() {
       [HAZARD_TYPES.SPIKE]: createHazardSprite(HAZARD_TYPES.SPIKE),
       [HAZARD_TYPES.VOLATILE]: createHazardSprite(HAZARD_TYPES.VOLATILE),
     },
-    cracks: [null, createCrackSprite(1), createCrackSprite(2), createCrackSprite(3)],
+    cracks: [null,
+      Array.from({ length: CRACK_VARIANTS }, () => createCrackSprite(1)),
+      Array.from({ length: CRACK_VARIANTS }, () => createCrackSprite(2)),
+      Array.from({ length: CRACK_VARIANTS }, () => createCrackSprite(3)),
+    ],
     metal: createMetalSprite(),
     goldOre: createGoldOreSprite(),
     drillFrames: [createDrillFrame(0), createDrillFrame(1), createDrillFrame(2), createDrillFrame(3)],
@@ -5047,6 +5073,13 @@ function damageCell(x, y, damage, options = {}) {
     spawnImpactEffect(x, y, options.dirX ?? state.drill.facingX ?? 0, options.dirY ?? state.drill.facingY ?? 1, state.hardness[index]);
   }
 
+  // Запомнить угол первого удара для ротации трещин
+  if (state.health[index] >= BLOCK_TYPES[state.hardness[index]].hp) {
+    const dirX = options.dirX ?? state.drill.facingX ?? 0;
+    const dirY = options.dirY ?? state.drill.facingY ?? 1;
+    state.crackAngle[index] = Math.atan2(dirY, dirX);
+  }
+
   const actualDamage = spikeExplosion ? state.health[index] : Math.min(state.health[index], damage);
   spawnDamageNumberEffect(x, y, actualDamage);
   state.health[index] -= spikeExplosion ? actualDamage : damage;
@@ -6681,7 +6714,7 @@ function render() {
         } else if (state.boulderPocketMask[index]) {
           drawTileSprite(state.sprites.boulderPocket, sx, sy);
         } else {
-          drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
+          drawTileSprite(state.sprites.blocks[state.hardness[index]]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
         }
         ctx.globalAlpha = 1;
         ctx.fillStyle = "rgba(6, 4, 3, 0.72)";
@@ -6702,7 +6735,7 @@ function render() {
         } else if (state.boulderPocketMask[index]) {
           drawTileSprite(state.sprites.boulderPocket, sx, sy);
         } else {
-          drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
+          drawTileSprite(state.sprites.blocks[state.hardness[index]]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
         }
         ctx.globalAlpha = 1;
         ctx.fillStyle = `rgba(6, 4, 3, ${(1 - visibleAlpha) * 0.72})`;
@@ -6752,7 +6785,7 @@ function render() {
       } else if (state.boulderPocketMask[index]) {
         drawTileSprite(state.sprites.boulderPocket, sx, sy);
       } else {
-        drawTileSprite(state.sprites.blocks[state.hardness[index]], sx, sy);
+        drawTileSprite(state.sprites.blocks[state.hardness[index]]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
         if (state.goldOreMask[index]) {
           drawTileSprite(state.sprites.goldOre, sx, sy);
         }
@@ -6810,7 +6843,15 @@ function render() {
         const crackStage = clamp(Math.ceil((1 - ratio) * 3), 0, 3);
         if (crackStage > 0) {
           ctx.globalAlpha = 0.3 + (1 - ratio) * 0.5;
-          drawTileSprite(state.sprites.cracks[crackStage], sx, sy);
+          const angle = state.crackAngle[index] || 0;
+          const cx = sx + TILE_SIZE * 0.5;
+          const cy = sy + TILE_SIZE * 0.5;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+          ctx.translate(-cx, -cy);
+          drawTileSprite(state.sprites.cracks[crackStage][(x * 7 + y * 13) % CRACK_VARIANTS], sx, sy);
+          ctx.restore();
           ctx.globalAlpha = 1;
         }
         ctx.fillStyle = "rgba(255, 231, 195, 0.2)";
@@ -6967,7 +7008,7 @@ function drawCellVisualContent(content, sx, sy) {
   } else if (content.boulderPocket) {
     drawTileSprite(state.sprites.boulderPocket, sx, sy);
   } else {
-    drawTileSprite(state.sprites.blocks[content.hardness], sx, sy);
+    drawTileSprite(state.sprites.blocks[content.hardness]?.[(Math.round(sx) * 7 + Math.round(sy) * 13) % BLOCK_VARIANTS], sx, sy);
   }
 
   const ctx = state.ctx;
