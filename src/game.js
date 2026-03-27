@@ -6116,6 +6116,8 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         pendingAction = { type: "shop" };
       }
       showPerkToast("Маяк активирован!");
+      addFuel(state.maxFuel - state.fuel, beacon.x, beacon.y);
+      healPlayer(1, "Маяк");
       state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
     }
   }
