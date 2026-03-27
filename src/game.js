@@ -7380,6 +7380,8 @@ function renderBeaconRadar(camera) {
 }
 
 function renderOneBeaconRadar(camera, beacon) {
+  const distToPlayer = Math.hypot(beacon.x - state.drill.x, beacon.y - state.drill.y);
+  if (distToPlayer > state.visionRadius) return;
   const ctx = state.ctx;
   const midX = beacon.x * TILE_SIZE + TILE_SIZE - camera.x;
   const midY = beacon.y * TILE_SIZE + TILE_SIZE - camera.y;
