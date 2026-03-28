@@ -1,5 +1,5 @@
 import { initShop, openShop, closeShop, renderShop, unlockRandomTree, getLockedTrees, unlockTreeById, getAllTrees, isTreeUnlocked } from "./shop.js?v=40";
-import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=38";
+import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=39";
 
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';

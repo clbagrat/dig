@@ -1,42 +1,47 @@
 // World generation module — pure functions, no game state.
 // Both game.js and the debug render script import from here.
 
-export const GRID_W = 150;
-export const GRID_H = 150;
+// Vertical dungeon map: player starts at top, difficulty increases with depth.
+export const GRID_W = 100;
+export const GRID_H = 240;
 export const START_X = Math.floor(GRID_W / 2);
-export const START_Y = Math.floor(GRID_H / 2);
+export const START_Y = 8;
 
 export const VISION_RADIUS = 5;
 const START_EASY_RADIUS = VISION_RADIUS;
 const START_NEAR_RADIUS = 7;
-const COMPASS_BEACON_DIST = VISION_RADIUS + 6;
 const START_NEAR_GOLD_COUNT = 4;
-const BASE_MIN_DISTANCE = 50;
+// Base hides in the bottom zone (deep floor)
+const BASE_ZONE_MIN_Y = Math.floor(GRID_H * 0.82); // ~197
+const BASE_ZONE_MAX_Y = GRID_H - 5;
+// Entry beacons: one left, one right of start at shallow depth
+const ENTRY_BEACON_X_OFFSET = 14;
+const ENTRY_BEACON_Y = START_Y + 8;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 26;
-const TILES_PER_PERK_ZONE = 370;
+const TILES_PER_PERK_ZONE = 380;
 const TILES_PER_CRYSTAL_TILE = 22;
 const CRYSTAL_MIN_DISTANCE = 3;
-const METAL_VEIN_GROUPS = 16;
-const GOLD_ORE_GROUPS = 50;
+const METAL_VEIN_GROUPS = 14;
+const GOLD_ORE_GROUPS = 45;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
 const BOULDER_MIN_START_DISTANCE = 4;
-export const BEACON_COUNT = 25;
-const BEACON_MIN_DIST = 9;
-const BEACON_MAX_DIST = 60;
+export const BEACON_COUNT = 22;
+const BEACON_MIN_DEPTH = 18;  // min Y below START_Y for regular beacons
+const BEACON_MIN_SPACING = 12; // min distance between any two beacons
 const ARTIFACT_MIN_DISTANCE = 8;
 const ARTIFACT_MIN_BEACON_DIST = 5;
 const SAFE_COUNT = 4;
 const SAFE_MIN_DISTANCE = 20;
-const SAFE_MIN_START_DISTANCE = 15;
+const SAFE_MIN_START_DISTANCE = 20;
 const SAFE_KEY_MIN_DIST = 6;
 const SAFE_KEY_MAX_DIST = 14;
 const WORM_NEST_COUNT = 6;
 const WORM_NEST_MIN_DISTANCE = 18;
-const WORM_NEST_MIN_START_DISTANCE = 20;
+const WORM_NEST_MIN_START_DISTANCE = 25;
 const WORM_NEST_MIN_BEACON_DIST = 5;
 
 export const HAZARD_TYPES = { SPIKE: 1, VOLATILE: 2 };
@@ -158,18 +163,21 @@ export function getTargetCrystalTileCount() {
   return Math.max(4, Math.round((GRID_W * GRID_H) / TILES_PER_CRYSTAL_TILE));
 }
 
-function getCenterDistanceRatio(x, y) {
-  return clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.8);
+// Depth fraction: 0 at player start, 1 at bottom of map.
+function getDepthRatio(x, y) {
+  return clamp((y - START_Y) / (GRID_H - START_Y - 15), 0, 1.5);
 }
 
 function getCenterPerkDensity(x, y) {
-  const ratio = getCenterDistanceRatio(x, y);
-  return clamp(0.72 + ratio * 0.42, 0.5, 1.45);
+  const depth = getDepthRatio(x, y);
+  // More perks in the upper half where the player needs support,
+  // thinning out as depth increases.
+  return clamp(1.15 - depth * 0.35, 0.5, 1.4);
 }
 
 function getPerkZoneDensity(x, y) {
-  const ratio = getCenterDistanceRatio(x, y);
-  return clamp(0.6 + ratio * 0.5, 0.45, 1.5);
+  const depth = getDepthRatio(x, y);
+  return clamp(1.0 - depth * 0.25, 0.45, 1.2);
 }
 
 function chooseWeightedPerk(random, weights) {
@@ -184,9 +192,6 @@ function chooseWeightedPerk(random, weights) {
 }
 
 function chooseTilePerkForPosition(x, y, random) {
-  const ratio = clamp(getCenterDistanceRatio(x, y), 0, 1.2);
-  const farBias = ratio;
-  const centerBias = 1.2 - ratio;
   const weights = TILE_PERK_WEIGHTS.slice();
   return chooseWeightedPerk(random, weights);
 }
@@ -225,28 +230,37 @@ function addDangerVein(field, startX, startY, length, radius, strength, random) 
 
 function buildHardness(random) {
   const danger = new Float32Array(GRID_W * GRID_H);
+  const maxDepth = GRID_H - START_Y - 15;
+  // Base danger: purely depth-driven — tier 1 at top, tier 7 at bottom.
   for (let y = 0; y < GRID_H; y += 1) {
     for (let x = 0; x < GRID_W; x += 1) {
-      const distanceRatio = clamp(Math.hypot(x - START_X, y - START_Y) / 95, 0, 1);
-      danger[cellIndex(x, y)] = 1 + distanceRatio * 4.9;
+      const depthFraction = clamp((y - START_Y) / maxDepth, 0, 1);
+      danger[cellIndex(x, y)] = 0.8 + depthFraction * 5.4;
     }
   }
+  // Add blobs and veins for local variety.
   const area = GRID_W * GRID_H;
-  const blobCount = Math.max(24, Math.round(area / 1200));
+  const blobCount = Math.max(20, Math.round(area / 1100));
   for (let i = 0; i < blobCount; i += 1) {
-    addDangerBlob(danger, 2 + random() * (GRID_W - 4), 2 + random() * (GRID_H - 4), 10 + random() * 24, -1.6 + random() * 3.2);
+    // Bias blobs toward mid/deep zones for variety there; a few near top too.
+    const blobY = START_Y + 5 + random() * (GRID_H - START_Y - 10);
+    addDangerBlob(danger, 2 + random() * (GRID_W - 4), blobY, 8 + random() * 22, -1.5 + random() * 3.0);
   }
-  const softVeins = Math.max(10, Math.round(area / 2600));
-  const hardVeins = Math.max(12, Math.round(area / 2200));
-  const ultraVeins = Math.max(6, Math.round(area / 5200));
+  const softVeins = Math.max(10, Math.round(area / 2800));
+  const hardVeins = Math.max(12, Math.round(area / 2400));
+  const ultraVeins = Math.max(5, Math.round(area / 5500));
   for (let i = 0; i < softVeins; i += 1) {
-    addDangerVein(danger, 2 + random() * (GRID_W - 4), 2 + random() * (GRID_H - 4), 14 + Math.floor(random() * 24), 1.3 + random() * 1.6, -0.95 - random() * 0.35, random);
+    const vy = START_Y + 5 + random() * (GRID_H - START_Y - 10);
+    addDangerVein(danger, 2 + random() * (GRID_W - 4), vy, 12 + Math.floor(random() * 22), 1.2 + random() * 1.5, -0.9 - random() * 0.4, random);
   }
   for (let i = 0; i < hardVeins; i += 1) {
-    addDangerVein(danger, 2 + random() * (GRID_W - 4), 2 + random() * (GRID_H - 4), 16 + Math.floor(random() * 28), 1.1 + random() * 1.2, 0.85 + random() * 0.55, random);
+    const vy = START_Y + 5 + random() * (GRID_H - START_Y - 10);
+    addDangerVein(danger, 2 + random() * (GRID_W - 4), vy, 14 + Math.floor(random() * 26), 1.0 + random() * 1.1, 0.8 + random() * 0.6, random);
   }
   for (let i = 0; i < ultraVeins; i += 1) {
-    addDangerVein(danger, 2 + random() * (GRID_W - 4), 2 + random() * (GRID_H - 4), 10 + Math.floor(random() * 16), 0.9 + random() * 0.8, 1.35 + random() * 0.75, random);
+    // Ultra-hard veins appear mostly in the deep zone.
+    const vy = START_Y + maxDepth * 0.5 + random() * (maxDepth * 0.5);
+    addDangerVein(danger, 2 + random() * (GRID_W - 4), vy, 8 + Math.floor(random() * 14), 0.8 + random() * 0.7, 1.4 + random() * 0.8, random);
   }
   const hardness = new Uint8Array(GRID_W * GRID_H);
   for (let y = 0; y < GRID_H; y += 1) {
@@ -263,21 +277,23 @@ function buildHardness(random) {
 // ── Placement helpers ─────────────────────────────────────────────────────────
 
 function chooseHazardType(random, x, y) {
-  const centerRatio = clamp(Math.hypot(x - START_X, y - START_Y) / BASE_MIN_DISTANCE, 0, 1.4);
-  const roll = random() + centerRatio * 0.2;
+  const depthRatio = clamp((y - START_Y) / (GRID_H - START_Y), 0, 1.4);
+  const roll = random() + depthRatio * 0.2;
   return roll > 0.8 ? HAZARD_TYPES.VOLATILE : HAZARD_TYPES.SPIKE;
 }
 
 function getHazardOrigin(random) {
-  if (random() < 0.35) {
+  // 20% chance: cluster near upper-mid zone for early challenge.
+  if (random() < 0.2) {
     return {
-      x: Math.round(clamp(START_X + (random() - 0.5) * 56, 1, GRID_W - 2)),
-      y: Math.round(clamp(START_Y + (random() - 0.5) * 56, 1, GRID_H - 2)),
+      x: Math.round(clamp(START_X + (random() - 0.5) * 50, 1, GRID_W - 2)),
+      y: Math.round(clamp(START_Y + 15 + random() * 50, START_Y + 15, START_Y + 80)),
     };
   }
+  // Otherwise: anywhere below the easy zone, biased toward middle-deep.
   return {
     x: 1 + Math.floor(random() * (GRID_W - 2)),
-    y: 1 + Math.floor(random() * (GRID_H - 2)),
+    y: START_Y + 10 + Math.floor(random() * (GRID_H - START_Y - 15)),
   };
 }
 
@@ -504,22 +520,24 @@ function placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamP
 }
 
 function placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, random) {
-  const offsets = getExactDistanceOffsets(BASE_MIN_DISTANCE);
-  shuffle(offsets, random);
-  for (let i = 0; i < offsets.length; i += 1) {
-    const x = START_X + offsets[i].x;
-    const y = START_Y + offsets[i].y;
-    if (
-      x >= 3 && x <= GRID_W - 4 && y >= 3 && y <= GRID_H - 4 &&
-      !metalMask[cellIndex(x, y)] &&
-      !gasPocketMask[cellIndex(x, y)] &&
-      !steamPocketMask[cellIndex(x, y)] &&
-      !boulderPocketMask[cellIndex(x, y)]
-    ) {
-      return { x, y };
+  // Base hides deep — in the bottom zone of the map.
+  const candidates = [];
+  for (let y = BASE_ZONE_MIN_Y; y <= BASE_ZONE_MAX_Y; y += 1) {
+    for (let x = 3; x < GRID_W - 3; x += 1) {
+      const idx = cellIndex(x, y);
+      if (
+        !metalMask[idx] &&
+        !gasPocketMask[idx] &&
+        !steamPocketMask[idx] &&
+        !boulderPocketMask[idx]
+      ) {
+        candidates.push({ x, y });
+      }
     }
   }
-  throw new Error("Unable to place base at required distance");
+  shuffle(candidates, random);
+  if (candidates.length === 0) throw new Error("Unable to place base in bottom zone");
+  return candidates[0];
 }
 
 function tryPlaceBeacon(x, y, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons) {
@@ -531,7 +549,7 @@ function tryPlaceBeacon(x, y, beaconMask, metalMask, hazardMask, gasPocketMask, 
     }
   }
   for (const b of beacons) {
-    if (Math.hypot(b.x - x, b.y - y) < 12) return false;
+    if (Math.hypot(b.x - x, b.y - y) < BEACON_MIN_SPACING) return false;
   }
   beacons.push({ x, y });
   for (let dy = 0; dy < 2; dy += 1) {
@@ -553,26 +571,26 @@ function tryPlaceBeacon(x, y, beaconMask, metalMask, hazardMask, gasPocketMask, 
 }
 
 function placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, random) {
-  const offsets = [];
-  for (let dx = -BEACON_MAX_DIST; dx <= BEACON_MAX_DIST; dx += 1) {
-    for (let dy = -BEACON_MAX_DIST; dy <= BEACON_MAX_DIST; dy += 1) {
-      const d = Math.hypot(dx, dy);
-      if (d >= BEACON_MIN_DIST && d <= BEACON_MAX_DIST) offsets.push({ x: dx, y: dy });
+  // Scan all valid positions below the start area, shuffle, and greedily place.
+  const minY = START_Y + BEACON_MIN_DEPTH;
+  const candidates = [];
+  for (let y = minY; y < GRID_H - 4; y += 1) {
+    for (let x = 2; x < GRID_W - 3; x += 1) {
+      candidates.push({ x, y });
     }
   }
-  shuffle(offsets, random);
-  for (let i = 0; i < offsets.length && beacons.length < BEACON_COUNT; i += 1) {
-    tryPlaceBeacon(START_X + offsets[i].x, START_Y + offsets[i].y, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons);
+  shuffle(candidates, random);
+  for (let i = 0; i < candidates.length && beacons.length < BEACON_COUNT; i += 1) {
+    tryPlaceBeacon(candidates[i].x, candidates[i].y, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons);
   }
 }
 
-function placeCompassBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons) {
-  const d = COMPASS_BEACON_DIST;
+// Two guaranteed entry beacons: left and right of the player start at shallow depth.
+// They give the player an immediate introduction to the beacon mechanic.
+function placeEntryBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons) {
   const positions = [
-    { x: START_X - 1, y: START_Y - d },      // North
-    { x: START_X - 1, y: START_Y + d - 1 },  // South
-    { x: START_X - d,     y: START_Y - 1 },  // West
-    { x: START_X + d - 1, y: START_Y - 1 },  // East
+    { x: START_X - ENTRY_BEACON_X_OFFSET - 1, y: ENTRY_BEACON_Y },  // Left
+    { x: START_X + ENTRY_BEACON_X_OFFSET - 1, y: ENTRY_BEACON_Y },  // Right
   ];
 
   for (const { x, y } of positions) {
@@ -877,8 +895,8 @@ function isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, p
   ) return true;
   if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) return true;
   if (!isFarEnoughFromPlaced(x, y, placed, ARTIFACT_MIN_DISTANCE)) return true;
-  const distFromStart = Math.abs(x - START_X) + Math.abs(y - START_Y);
-  if (distFromStart < 12) return true;
+  // Artifacts must be below the easy start zone.
+  if (y < START_Y + 15) return true;
   for (const b of beacons) {
     if (Math.abs(x - b.x) + Math.abs(y - b.y) < ARTIFACT_MIN_BEACON_DIST) {
       return true;
@@ -892,33 +910,31 @@ function buildArtifactBeaconPairs(beacons) {
     return [];
   }
 
+  // Sort beacons by depth (Y) so artifacts spread through depth bands.
   const sorted = beacons
-    .map((beacon, idx) => ({
-      beacon,
-      idx,
-      angle: Math.atan2(beacon.y + 0.5 - START_Y, beacon.x + 0.5 - START_X),
-    }))
-    .sort((a, b) => a.angle - b.angle);
+    .slice()
+    .sort((a, b) => a.y - b.y);
 
   const pairs = [];
+  // Pair each beacon with neighbours 1 and 2 steps ahead in depth order.
   for (let i = 0; i < sorted.length; i += 1) {
-    const a = sorted[i].beacon;
-    const b = sorted[(i + 1) % sorted.length].beacon;
-    const ax = a.x + 0.5;
-    const ay = a.y + 0.5;
-    const bx = b.x + 0.5;
-    const by = b.y + 0.5;
-    pairs.push({
-      a,
-      b,
-      midX: (ax + bx) * 0.5,
-      midY: (ay + by) * 0.5,
-      midDistance: Math.hypot((ax + bx) * 0.5 - START_X, (ay + by) * 0.5 - START_Y),
-      span: Math.hypot(bx - ax, by - ay),
-    });
+    for (const step of [1, 2]) {
+      const j = (i + step) % sorted.length;
+      const a = sorted[i];
+      const b = sorted[j];
+      const ax = a.x + 0.5, ay = a.y + 0.5;
+      const bx = b.x + 0.5, by = b.y + 0.5;
+      pairs.push({
+        a, b,
+        midX: (ax + bx) * 0.5,
+        midY: (ay + by) * 0.5,
+        span: Math.hypot(bx - ax, by - ay),
+      });
+    }
   }
 
-  pairs.sort((a, b) => b.midDistance - a.midDistance || b.span - a.span);
+  // Deepest midpoints first — artifacts appear throughout the descent.
+  pairs.sort((a, b) => b.midY - a.midY || b.span - a.span);
   return pairs;
 }
 
@@ -1101,7 +1117,7 @@ export function generateMap(seed) {
 
   const base = placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, random);
 
-  placeCompassBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons);
+  placeEntryBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons);
   placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, random);
   for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     if (beaconMask[i] >= 1) hardness[i] = 0;
