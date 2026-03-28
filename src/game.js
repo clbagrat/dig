@@ -1,4 +1,5 @@
-import { initShop, openShop, closeShop, renderShop, unlockRandomTree, getLockedTrees, unlockTreeById, getAllTrees, isTreeUnlocked } from "./shop.js?v=40";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevel, addSlot, unlockCategory, getLockedCategories, resetShopState } from "./shop.js?v=41";
+import { CATEGORIES, TAG_SYNERGIES } from "./items-catalog.js?v=1";
 import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=39";
 
 const TILE_SIZE = 36;
@@ -205,6 +206,8 @@ const state = {
   width: 0,
   height: 0,
   dpr: 1,
+  debugMapActive: false,
+  debugMapCamera: { zoom: 1, x: 0, y: 0 },
   worldSeed: 0,
   worldRandom: Math.random,
   timeAcc: 0,
@@ -220,6 +223,11 @@ const state = {
   heatExplosionDamageBonus: 0,
   heatExplosionRadiusBonus: 0,
   heatDamageBonus: 0,
+  luck: 0,
+  critChance: 0,
+  critMultiplier: 1.5,
+  heatRate: 1,
+  fuelDrainRate: 1,
   armor: 0,
   depth: 0,
   gold: 0,
@@ -293,7 +301,7 @@ const state = {
   artifactBumpTime: 0,
   artifactBumpDir: null,
   artifactChoiceOpen: false,
-  artifactChoiceTrees: [],
+  artifactChoiceCategories: [],
   artifactChoicePendingBeacon: null,
   // Safe/key system
   safes: [],
@@ -1035,6 +1043,11 @@ function spawnDamageNumberEffect(x, y, value) {
 const mulberry32 = _mulberry32;
 
 function newWorldSeed() {
+  const urlSeed = new URLSearchParams(location.search).get("seed");
+  if (urlSeed) {
+    const n = Number(urlSeed) >>> 0;
+    if (n) return n;
+  }
   if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
     const buf = new Uint32Array(1);
     globalThis.crypto.getRandomValues(buf);
@@ -1068,7 +1081,7 @@ function getGoldPerkCost(level) {
 function getIdleFuelDrain() {
   const baseDrain = IDLE_FUEL_DRAIN + Math.floor(state.goldPerkLevel / 3);
   const tankPenalty = state.tankBoostLevel > 0 ? Math.max(1, baseDrain * 0.1) * state.tankBoostLevel : 0;
-  return baseDrain + tankPenalty;
+  return (baseDrain + tankPenalty) * Math.max(0, state.fuelDrainRate);
 }
 
 function getTankFuelMultiplier(level = state.tankBoostLevel) {
@@ -1293,8 +1306,9 @@ function setupField() {
   state.artifactBumpTime = 0;
   state.artifactBumpDir = null;
   state.artifactChoiceOpen = false;
-  state.artifactChoiceTrees = [];
+  state.artifactChoiceCategories = [];
   state.artifactChoicePendingBeacon = null;
+  resetShopState();
   state.safes.length = 0;
   state.wormNests.length = 0;
   state.activeWorms.length = 0;
@@ -1323,6 +1337,11 @@ function setupField() {
   state.heatExplosionDamageBonus = 0;
   state.heatExplosionRadiusBonus = 0;
   state.heatDamageBonus = 0;
+  state.luck = 0;
+  state.critChance = 0;
+  state.critMultiplier = 1.5;
+  state.heatRate = 1;
+  state.fuelDrainRate = 1;
   state.armor = 0;
   state.gold = 0;
   state.unsafeGold = 0;
@@ -1534,7 +1553,7 @@ function setupField() {
     const viewWidth = state.width / zoom;
     const viewHeight = state.height / zoom;
     state.camera.x = state.drill.x * TILE_SIZE + TILE_SIZE * 0.5 - viewWidth * 0.5;
-    state.camera.y = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - viewHeight * 0.56;
+    state.camera.y = state.drill.y * TILE_SIZE + TILE_SIZE * 0.5 - viewHeight * 0.5;
   }
   clearCrystalRecipe();
   rebuildVisibilityMask();
@@ -1981,10 +2000,11 @@ function applyGoldPerk(perkType) {
   showPerkToast(state.perkText);
 }
 
-function applyShopPerk(nodeId, level) {
-  switch (nodeId) {
+function applyShopPerk(effectId, rarityMult) {
+  const m = rarityMult || 1;
+  switch (effectId) {
     case "drill_power":
-      state.strikeSpeed += 0.15;
+      state.strikeSpeed += 0.15 * m;
       showPerkToast("Мощность бура");
       break;
     case "side_drills":
@@ -1992,11 +2012,11 @@ function applyShopPerk(nodeId, level) {
       showPerkToast("Боковые буры");
       break;
     case "long_drill":
-      state.longDrillPower += 0.2;
+      state.longDrillPower += 0.2 * m;
       showPerkToast("Длинный бур");
       break;
     case "diagonal_drills":
-      state.diagonalDrillPower += 0.2;
+      state.diagonalDrillPower += 0.2 * m;
       showPerkToast("Диагональные буры");
       break;
     case "sapper_charge":
@@ -2005,31 +2025,31 @@ function applyShopPerk(nodeId, level) {
       showPerkToast("Саперный заряд");
       break;
     case "fuel_tank":
-      state.maxFuel += 60;
+      state.maxFuel += Math.round(60 * m);
       showPerkToast("Расширенный бак");
       break;
     case "fuel_circuit":
-      state.perkFuelBonus += 50;
+      state.perkFuelBonus += Math.round(50 * m);
       showPerkToast("Топливный контур");
       break;
     case "recirculator":
-      state.goldBonus += 2;
-      state.fuelPickupBonus += 2;
+      state.goldBonus += Math.round(2 * m);
+      state.fuelPickupBonus += Math.round(2 * m);
       showPerkToast("Рециркулятор");
       break;
     case "low_fuel_boost":
-      state.lowFuelSpeedBonus += 0.35;
+      state.lowFuelSpeedBonus += 0.35 * m;
       showPerkToast("Форсаж на нуле");
       break;
     case "overload":
       state.overflowBomb = true;
-      state.fuelPickupBonus += 50;
+      state.fuelPickupBonus += Math.round(50 * m);
       state.maxFuel = Math.max(100, state.maxFuel - 150);
       state.fuel = Math.min(state.fuel, state.maxFuel);
       showPerkToast("Перегрузка");
       break;
     case "geo_lens":
-      state.visionRadius = Math.min(12, state.visionRadius + 2);
+      state.visionRadius = Math.min(12, state.visionRadius + Math.round(2 * m));
       state.visibilityDirty = true;
       showPerkToast("Гео-линза");
       break;
@@ -2042,20 +2062,17 @@ function applyShopPerk(nodeId, level) {
       showPerkToast("Усилитель радара");
       break;
     case "speed":
-      state.strikeSpeed += 0.2;
+      state.strikeSpeed += 0.2 * m;
       showPerkToast("Скорость бура");
       break;
-    // ── Бурение (дополнение) ─────────────────────────────────────────────
     case "spike_boost":
       state.spikeOverdriveLevel = Math.min(3, (state.spikeOverdriveLevel || 0) + 1);
       showPerkToast("Шиповой форсаж");
       break;
-    // ── Топливо (дополнение) ─────────────────────────────────────────────
     case "tank_boost":
       state.tankBoostLevel = Math.min(3, (state.tankBoostLevel || 0) + 1);
       showPerkToast("Усиленный бак");
       break;
-    // ── Контур ───────────────────────────────────────────────────────────
     case "contour_charge":
       state.loopChargeLevel = Math.min(4, (state.loopChargeLevel || 0) + 1);
       state.loopChargeDuration = 2 + state.loopChargeLevel;
@@ -2077,23 +2094,22 @@ function applyShopPerk(nodeId, level) {
       state.contourReturnFuelLevel = Math.min(3, (state.contourReturnFuelLevel || 0) + 1);
       showPerkToast("Рекуперация контура");
       break;
-    // ── Нагрев ───────────────────────────────────────────────────────────
     case "heat_sink":
-      state.maxHeat += 20;
+      state.maxHeat += Math.round(20 * m);
       showPerkToast("Теплоотвод");
       break;
     case "heat_drill":
-      state.heatDamageBonus += 0.2;
+      state.heatDamageBonus += 0.2 * m;
       showPerkToast("Накал бура");
       break;
     case "thermo_charge":
-      state.heatExplosionDamageBonus += 1;
-      state.heatExplosionRadiusBonus += 0.5;
+      state.heatExplosionDamageBonus += 1 * m;
+      state.heatExplosionRadiusBonus += 0.5 * m;
       showPerkToast("Термозаряд");
       break;
     case "accel_dampers":
-      state.stunReduction += 0.4;
-      state.heatGainBonus += 1;
+      state.stunReduction += 0.4 * m;
+      state.heatGainBonus += 1 * m;
       showPerkToast("Разгонные демпферы");
       break;
     case "cooling_pulse":
@@ -2108,19 +2124,18 @@ function applyShopPerk(nodeId, level) {
       state.coolingRocketLevel = Math.min(3, (state.coolingRocketLevel || 0) + 1);
       showPerkToast("Охлаждающие ракеты");
       break;
-    // ── Выживание ────────────────────────────────────────────────────────
     case "reinforced_hull":
-      state.maxHp += 1;
-      healPlayer(2, "Усиленный корпус");
+      state.maxHp += Math.round(1 * m);
+      healPlayer(Math.round(2 * m), "Усиленный корпус");
       showPerkToast("Усиленный корпус");
       break;
     case "adrenaline":
       state.overhealOverdrive = true;
-      state.overhealOverdriveDuration = Math.min(10, (state.overhealOverdriveDuration || 0) + 2);
+      state.overhealOverdriveDuration = Math.min(10, (state.overhealOverdriveDuration || 0) + Math.round(2 * m));
       showPerkToast("Перелив адреналина");
       break;
     case "ore_collector":
-      state.goldBonus += 2;
+      state.goldBonus += Math.round(2 * m);
       showPerkToast("Ломосбор");
       break;
     case "crystal_catalyst":
@@ -2130,6 +2145,203 @@ function applyShopPerk(nodeId, level) {
     default:
       break;
   }
+}
+
+function removeShopPerk(effectId, rarityMult) {
+  const m = rarityMult || 1;
+  switch (effectId) {
+    case "drill_power": state.strikeSpeed -= 0.15 * m; break;
+    case "side_drills": state.sideDrills = Math.max(0, state.sideDrills - 1); break;
+    case "long_drill": state.longDrillPower -= 0.2 * m; break;
+    case "diagonal_drills": state.diagonalDrillPower -= 0.2 * m; break;
+    case "sapper_charge":
+      state.remoteBombLevel = Math.max(0, state.remoteBombLevel - 1);
+      state.remoteBombInterval = state.remoteBombLevel > 0 ? Math.max(15, 30 - (state.remoteBombLevel - 1) * 5) : 0;
+      break;
+    case "fuel_tank": state.maxFuel -= Math.round(60 * m); state.fuel = Math.min(state.fuel, state.maxFuel); break;
+    case "fuel_circuit": state.perkFuelBonus -= Math.round(50 * m); break;
+    case "recirculator": state.goldBonus -= Math.round(2 * m); state.fuelPickupBonus -= Math.round(2 * m); break;
+    case "low_fuel_boost": state.lowFuelSpeedBonus -= 0.35 * m; break;
+    case "overload": state.overflowBomb = false; state.fuelPickupBonus -= Math.round(50 * m); break;
+    case "geo_lens": state.visionRadius = Math.max(VISION_RADIUS, state.visionRadius - Math.round(2 * m)); state.visibilityDirty = true; break;
+    case "radar_module": state.radarCrystalModule = false; break;
+    case "radar_booster": state.radarBoosterLevel = Math.max(0, (state.radarBoosterLevel || 0) - 1); break;
+    case "speed": state.strikeSpeed -= 0.2 * m; break;
+    case "spike_boost": state.spikeOverdriveLevel = Math.max(0, (state.spikeOverdriveLevel || 0) - 1); break;
+    case "tank_boost": state.tankBoostLevel = Math.max(0, (state.tankBoostLevel || 0) - 1); break;
+    case "contour_charge": state.loopChargeLevel = Math.max(0, (state.loopChargeLevel || 0) - 1); state.loopChargeDuration = 2 + state.loopChargeLevel; break;
+    case "contour_trophy": state.loopPerkLevel = Math.max(0, (state.loopPerkLevel || 0) - 1); break;
+    case "auto_contour": state.idleAutoCloseDelay = Math.min(IDLE_AUTO_CLOSE_DELAY, state.idleAutoCloseDelay + 1); break;
+    case "contour_resonance": state.contourLengthDamageLevel = Math.max(0, (state.contourLengthDamageLevel || 0) - 1); break;
+    case "contour_recovery": state.contourReturnFuelLevel = Math.max(0, (state.contourReturnFuelLevel || 0) - 1); break;
+    case "heat_sink": state.maxHeat -= Math.round(20 * m); break;
+    case "heat_drill": state.heatDamageBonus -= 0.2 * m; break;
+    case "thermo_charge": state.heatExplosionDamageBonus -= 1 * m; state.heatExplosionRadiusBonus -= 0.5 * m; break;
+    case "accel_dampers": state.stunReduction -= 0.4 * m; state.heatGainBonus -= 1 * m; break;
+    case "cooling_pulse": state.heatCoolingRewardLevel = Math.max(0, state.heatCoolingRewardLevel - 1); break;
+    case "thermo_rockets": state.heatOverloadRocketLevel = Math.max(0, (state.heatOverloadRocketLevel || 0) - 1); break;
+    case "cryo_rockets": state.coolingRocketLevel = Math.max(0, (state.coolingRocketLevel || 0) - 1); break;
+    case "reinforced_hull": state.maxHp -= Math.round(1 * m); state.hp = Math.min(state.hp, state.maxHp); break;
+    case "adrenaline": state.overhealOverdriveDuration = Math.max(0, (state.overhealOverdriveDuration || 0) - Math.round(2 * m)); if (state.overhealOverdriveDuration <= 0) state.overhealOverdrive = false; break;
+    case "ore_collector": state.goldBonus -= Math.round(2 * m); break;
+    case "crystal_catalyst": state.crystalCatalystLevel = Math.max(0, (state.crystalCatalystLevel || 0) - 1); break;
+    default: break;
+  }
+}
+
+function applyItemEffect(effect, rarityMult) {
+  if (!effect || !effect.stat) return;
+  const value = effect.value * (rarityMult || 1);
+  state[effect.stat] = (state[effect.stat] || 0) + value;
+  if (effect.stat === "visionRadius") state.visibilityDirty = true;
+}
+
+async function openDebugMapWindow() {
+  // Try map server first (node scripts/map-server.js must be running)
+  const seed = state.worldSeed;
+  try {
+    const res = await fetch(`http://localhost:3747/map?seed=${seed}`, { signal: AbortSignal.timeout(1500) });
+    if (res.ok) {
+      const svg = await res.text();
+      const win = window.open("", "_blank");
+      win.document.write(`<!DOCTYPE html><html><head><title>Debug Map — seed ${seed}</title>
+        <style>*{margin:0;padding:0}body{background:#0b0706}svg{display:block;max-width:100%}</style></head>
+        <body>${svg}</body></html>`);
+      win.document.close();
+      return;
+    }
+  } catch (_) { /* server not running, fall through to canvas */ }
+
+  // Canvas fallback
+  const PX = 8;
+  const W = GRID_W, H = GRID_H;
+  const canvas = document.createElement("canvas");
+  canvas.width  = W * PX;
+  canvas.height = H * PX;
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(W * PX, H * PX);
+  const d = img.data;
+
+  function setPixel(tx, ty, r, g, b) {
+    for (let dy = 0; dy < PX; dy++) {
+      for (let dx = 0; dx < PX; dx++) {
+        const i = ((ty * PX + dy) * W * PX + (tx * PX + dx)) * 4;
+        d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 255;
+      }
+    }
+  }
+
+  const hardnessColors = [
+    [15, 10, 6],    // 0 — air
+    [90, 75, 55],   // 1 — soft
+    [65, 55, 40],   // 2 — medium
+    [45, 38, 28],   // 3 — hard
+    [28, 22, 16],   // 4 — very hard
+    [20, 15, 10],   // 5+
+  ];
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      const h = state.hardness[i];
+      const open = state.tunnelMask[i] === 1 || h === 0;
+      let r, g, b;
+      if (state.goldOreMask[i])        { r=220; g=180; b=30;  }
+      else if (state.metalMask[i])     { r=80;  g=160; b=220; }
+      else if (state.hazardMask[i])    { r=200; g=50;  b=50;  }
+      else if (state.gasPocketMask[i]) { r=80;  g=200; b=80;  }
+      else if (state.perkMask[i])      { r=200; g=80;  b=200; }
+      else if (state.crystalMask[i])   { r=80;  g=200; b=200; }
+      else if (state.beaconMask[i])    { r=255; g=140; b=0;   }
+      else if (state.artifactMask[i])  { r=255; g=255; b=80;  }
+      else if (open)                   { r=22;  g=15;  b=9;   }
+      else {
+        const c = hardnessColors[Math.min(h, hardnessColors.length - 1)];
+        r = c[0]; g = c[1]; b = c[2];
+      }
+      setPixel(x, y, r, g, b);
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+
+  // Helper: draw outlined marker
+  function drawMarker(tx, ty, fillColor, outlineColor, radius) {
+    const cx = tx * PX + PX / 2;
+    const cy = ty * PX + PX / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = outlineColor;
+    ctx.stroke();
+  }
+
+  function drawRect(tx, ty, fillColor, outlineColor) {
+    const x = tx * PX, y = ty * PX;
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(x, y, PX, PX);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = outlineColor;
+    ctx.strokeRect(x + 0.75, y + 0.75, PX - 1.5, PX - 1.5);
+  }
+
+  // Base
+  drawRect(state.base.x, state.base.y, "#00ff88", "#ffffff");
+
+  // Safes
+  for (const s of state.safes) {
+    if (!s.opened) drawMarker(s.x, s.y, "#8888ff", "#ffffff", PX * 0.55);
+  }
+
+  // Worm nests
+  for (const n of state.wormNests) {
+    drawMarker(n.x, n.y, "#ff4444", "#ffaaaa", PX * 0.6);
+  }
+
+  // Beacons
+  for (const b of state.beacons) {
+    const color = b.active ? "#00ffcc" : "#ff8800";
+    drawMarker(b.x, b.y, color, "#ffffff", PX * 0.65);
+  }
+
+  // Player
+  drawMarker(Math.round(state.px), Math.round(state.py), "#ffffff", "#000000", PX * 0.7);
+
+  // Open in new tab
+  const url = canvas.toDataURL("image/png");
+  const win = window.open("", "_blank");
+  win.document.write(`<!DOCTYPE html><html><head><title>Debug Map — seed ${state.worldSeed}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0f0b09;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:14px;font:12px monospace;color:#d79f49;}
+  h1{font-size:13px;color:#f1dfb6;}
+  img{image-rendering:pixelated;max-width:100%;border:1px solid #333;display:block;}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
+  .leg{display:flex;align-items:center;gap:5px;}
+  .sw{width:13px;height:13px;border-radius:2px;flex-shrink:0;border:1px solid rgba(255,255,255,0.2);}
+  .sw.circle{border-radius:50%;}
+</style></head><body>
+<h1>Seed: ${state.worldSeed} &nbsp;·&nbsp; ${W}×${H} tiles &nbsp;·&nbsp; ${PX}px/tile</h1>
+<img src="${url}">
+<div class="legend">
+  <div class="leg"><div class="sw" style="background:#ffffff;border-color:#000"></div> Игрок</div>
+  <div class="leg"><div class="sw" style="background:#00ff88"></div> База</div>
+  <div class="leg"><div class="sw circle" style="background:#ff8800"></div> Маяк</div>
+  <div class="leg"><div class="sw circle" style="background:#00ffcc"></div> Маяк (актив.)</div>
+  <div class="leg"><div class="sw circle" style="background:#ffff50"></div> Артефакт</div>
+  <div class="leg"><div class="sw circle" style="background:#8888ff"></div> Сейф</div>
+  <div class="leg"><div class="sw circle" style="background:#ff4444"></div> Червь</div>
+  <div class="leg"><div class="sw" style="background:#dcb41e"></div> Золото</div>
+  <div class="leg"><div class="sw" style="background:#50a0dc"></div> Металл</div>
+  <div class="leg"><div class="sw" style="background:#c83232"></div> Опасность</div>
+  <div class="leg"><div class="sw" style="background:#50c850"></div> Газ</div>
+  <div class="leg"><div class="sw" style="background:#c850c8"></div> Перк</div>
+  <div class="leg"><div class="sw" style="background:#50c8c8"></div> Кристалл</div>
+</div>
+</body></html>`);
+  win.document.close();
 }
 
 function showDebugToast(text) {
@@ -2493,15 +2705,56 @@ function bindUi() {
       resetPad();
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
-      openShop(state.gold);
+      openShop(state.gold, null, state.luck);
     });
   }
 
-  document.addEventListener("shop:purchase", (e) => {
-    const { cost, nodeId, level } = e.detail;
+  document.addEventListener("shop:purchase-equipment", (e) => {
+    const { effectId, cost, rarityMultiplier, isMerge, oldRarityMultiplier } = e.detail;
     state.gold = Math.max(0, state.gold - cost);
-    applyShopPerk(nodeId, level);
+    if (isMerge) removeShopPerk(effectId, oldRarityMultiplier);
+    applyShopPerk(effectId, rarityMultiplier);
     renderShop(state.gold);
+  });
+
+  document.addEventListener("shop:purchase-item", (e) => {
+    const { effect, cost, rarityMultiplier } = e.detail;
+    state.gold = Math.max(0, state.gold - cost);
+    applyItemEffect(effect, rarityMultiplier);
+    renderShop(state.gold);
+  });
+
+  document.addEventListener("shop:recycle", (e) => {
+    const { effectId, rarityMultiplier, refund } = e.detail;
+    removeShopPerk(effectId, rarityMultiplier);
+    state.gold += refund;
+    renderShop(state.gold);
+  });
+
+  document.addEventListener("shop:reroll", (e) => {
+    const { cost } = e.detail;
+    state.gold = Math.max(0, state.gold - cost);
+    renderShop(state.gold);
+  });
+
+  document.addEventListener("shop:synergies-changed", (e) => {
+    const { removed, added } = e.detail;
+    for (const tier of removed) {
+      for (const bonus of tier.bonuses) {
+        if (typeof bonus.value === "number") {
+          state[bonus.stat] = (state[bonus.stat] || 0) - bonus.value;
+          if (bonus.stat === "visionRadius") state.visibilityDirty = true;
+        }
+      }
+    }
+    for (const tier of added) {
+      for (const bonus of tier.bonuses) {
+        if (typeof bonus.value === "number") {
+          state[bonus.stat] = (state[bonus.stat] || 0) + bonus.value;
+          if (bonus.stat === "visionRadius") state.visibilityDirty = true;
+        }
+      }
+    }
   });
 
   if (manualOpen) {
@@ -2755,19 +3008,29 @@ function bindUi() {
       syncDebugPerkOverlay();
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
-      openShop(state.gold);
+      openShop(state.gold, null, state.luck);
     });
   }
 
   const debugUnlockTree = document.getElementById("debugUnlockTree");
   if (debugUnlockTree) {
     debugUnlockTree.addEventListener("click", () => {
-      const tree = unlockRandomTree();
-      if (tree) {
-        showPerkToast(`Открыт: ${tree.icon} ${tree.name}`);
+      const locked = getLockedCategories();
+      if (locked.length > 0) {
+        const cat = locked[Math.floor(Math.random() * locked.length)];
+        unlockCategory(cat.id);
+        addSlot();
+        showPerkToast(`Открыта: ${cat.icon} ${cat.name}`);
       } else {
-        showPerkToast("Все инструменты уже открыты");
+        showPerkToast("Все категории уже открыты");
       }
+    });
+  }
+
+  const debugOpenMap = document.getElementById("debugOpenMap");
+  if (debugOpenMap) {
+    debugOpenMap.addEventListener("click", () => {
+      openDebugMapWindow();
     });
   }
 
@@ -2848,20 +3111,22 @@ function buildDebugPerkButtons() {
     return;
   }
 
-  // Instruments list
+  // Categories list
   if (instrRoot) {
     instrRoot.innerHTML = "";
-    const trees = getAllTrees();
-    for (const tree of trees) {
-      const unlocked = isTreeUnlocked(tree.id);
+    const lockedCats = getLockedCategories();
+    const lockedIds = new Set(lockedCats.map(c => c.id));
+    for (const cat of CATEGORIES) {
+      const unlocked = !lockedIds.has(cat.id);
       const button = document.createElement("button");
       button.type = "button";
       button.className = `debug-perk-menu__button${unlocked ? " debug-perk-menu__button--selected" : ""}`;
-      button.innerHTML = `<span class="debug-perk-menu__button-name">${tree.icon} ${tree.name}</span><span class="debug-perk-menu__button-meta">${unlocked ? "✓ Открыт" : "🔒 Закрыт — нажми чтобы открыть"}</span>`;
+      button.innerHTML = `<span class="debug-perk-menu__button-name">${cat.icon} ${cat.name}</span><span class="debug-perk-menu__button-meta">${unlocked ? "✓ Открыт" : "🔒 Закрыт — нажми чтобы открыть"}</span>`;
       button.addEventListener("click", () => {
         if (!unlocked) {
-          const result = unlockTreeById(tree.id);
-          if (result) showPerkToast(`Открыт: ${result.icon} ${result.name}`);
+          unlockCategory(cat.id);
+          addSlot();
+          showPerkToast(`Открыта: ${cat.icon} ${cat.name}`);
         }
         buildDebugPerkButtons();
       });
@@ -3252,38 +3517,37 @@ function openArtifactChoice() {
   overlay.style.cssText =
     "position:absolute;inset:0;z-index:9999;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;background:rgba(10,8,6,0.85);";
 
-  const [t0, t1] = state.artifactChoiceTrees;
+  const [t0, t1] = state.artifactChoiceCategories;
   const card0 = document.getElementById("artifactChoiceCard0");
   const card1 = document.getElementById("artifactChoiceCard1");
   if (card0) card0.innerHTML = buildArtifactChoiceCard(t0);
   if (card1) card1.innerHTML = buildArtifactChoiceCard(t1);
 }
 
-function buildArtifactChoiceCard(tree) {
-  const nodesPreview = tree.nodes.slice(0, 3).map(n =>
-    `<div class="artifact-choice__node"><span class="artifact-choice__node-icon">${n.icon}</span> ${n.name}</div>`
-  ).join("");
+function buildArtifactChoiceCard(category) {
   return `
-    <div class="artifact-choice__card-icon">${tree.icon}</div>
-    <div class="artifact-choice__card-name">${tree.name}</div>
-    <div class="artifact-choice__card-nodes">${nodesPreview}</div>
+    <div class="artifact-choice__card-icon">${category.icon}</div>
+    <div class="artifact-choice__card-name">${category.name}</div>
+    <div class="artifact-choice__card-nodes"><div class="artifact-choice__node">+1 слот корпуса</div></div>
   `;
 }
 
 function pickArtifactChoice(idx) {
-  if (!state.artifactChoiceOpen || !state.artifactChoiceTrees[idx]) return;
-  const chosenId = state.artifactChoiceTrees[idx].id;
-  const tree = unlockTreeById(chosenId);
+  if (!state.artifactChoiceOpen || !state.artifactChoiceCategories[idx]) return;
+  const chosen = state.artifactChoiceCategories[idx];
+  unlockCategory(chosen.id);
+  addSlot();
   closeArtifactChoice();
-  if (tree) showPerkToast(`Открыт инструмент: ${tree.icon} ${tree.name}`);
+  showPerkToast(`Открыта категория: ${chosen.icon} ${chosen.name}`);
+  const beacon = state.artifactChoicePendingBeacon;
   state.shopModalOpen = true;
   syncTouchZonesInteractivity();
-  openShop(state.gold, chosenId);
+  openShop(state.gold, beacon ? beacon.y : null, state.luck);
 }
 
 function closeArtifactChoice() {
   state.artifactChoiceOpen = false;
-  state.artifactChoiceTrees = [];
+  state.artifactChoiceCategories = [];
   state.artifactChoicePendingBeacon = null;
   const overlay = document.getElementById("artifactChoice");
   if (overlay) {
@@ -4396,7 +4660,15 @@ function getStrikeDamage() {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
-  return (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * 10 * chargeBoost * heatBoost * contourBoost;
+  let damage = (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * 10 * chargeBoost * heatBoost * contourBoost;
+  // Crit
+  if (state.critChance > 0 && Math.random() * 100 < state.critChance) {
+    damage *= state.critMultiplier;
+    state._lastStrikeWasCrit = true;
+  } else {
+    state._lastStrikeWasCrit = false;
+  }
+  return damage;
 }
 
 function getXpNeededForLevel(level) {
@@ -5619,11 +5891,11 @@ function updateCamera(dt) {
   const viewWidth = state.width / zoom;
   const viewHeight = state.height / zoom;
   const targetX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - viewWidth * 0.5;
-  const targetY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - viewHeight * 0.56;
+  const targetY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - viewHeight * 0.5;
   const maxX = GRID_W * TILE_SIZE - viewWidth;
   const maxY = GRID_H * TILE_SIZE - viewHeight;
   const clampedTargetX = clamp(targetX, 0, Math.max(0, maxX));
-  const clampedTargetY = clamp(targetY, 0, Math.max(0, maxY));
+  const clampedTargetY = clamp(targetY, -viewHeight * 0.5, Math.max(0, maxY));
   const follow = 1 - Math.exp(-dt * 10);
   state.camera.x += (clampedTargetX - state.camera.x) * follow;
   state.camera.y += (clampedTargetY - state.camera.y) * follow;
@@ -5862,7 +6134,7 @@ function updateDrill(dt) {
     state.drill.strikePhase += dt * actionRate;
     state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
     if (state.overhealDrillTimer <= 0) {
-      state.fuel = Math.max(0, state.fuel - DRILL_FUEL_DRAIN * dt);
+      state.fuel = Math.max(0, state.fuel - DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt);
     }
     moveDrillRenderToward(state.drill.x, state.drill.y, dt);
     return;
@@ -5909,7 +6181,7 @@ function updateDrill(dt) {
     damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dx + dy, dirY: dy - dx });
   }
 
-  addHeatOnStrike(HEAT_PER_STRIKE + state.heatGainBonus);
+  addHeatOnStrike((HEAT_PER_STRIKE + state.heatGainBonus) * Math.max(0, state.heatRate));
 
   if (state.fuel <= 0 && state.health[targetIndex] > 0) {
     state.fuel = 0;
@@ -6093,7 +6365,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       // Build pending action, defer shop/artifact opening for animation
       let pendingAction;
       if (state.heldArtifact) {
-        const locked = getLockedTrees();
+        const locked = getLockedCategories();
         if (locked.length >= 2) {
           const shuffled = locked.slice();
           for (let i = shuffled.length - 1; i > 0; i--) {
@@ -6101,19 +6373,20 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
           state.heldArtifact = false;
-          pendingAction = { type: "artifactChoice", trees: [shuffled[0], shuffled[1]], beacon };
+          pendingAction = { type: "artifactChoice", categories: [shuffled[0], shuffled[1]], beacon };
         } else if (locked.length === 1) {
           state.heldArtifact = false;
-          const lastId = locked[0].id;
-          const tree = unlockTreeById(lastId);
-          if (tree) showPerkToast(`Открыт инструмент: ${tree.icon} ${tree.name}`);
-          pendingAction = { type: "shop", lastId };
+          const cat = locked[0];
+          unlockCategory(cat.id);
+          addSlot();
+          showPerkToast(`Открыта категория: ${cat.icon} ${cat.name}`);
+          pendingAction = { type: "shop", beaconY: beacon.y };
         } else {
           state.heldArtifact = false;
-          pendingAction = { type: "shop" };
+          pendingAction = { type: "shop", beaconY: beacon.y };
         }
       } else {
-        pendingAction = { type: "shop" };
+        pendingAction = { type: "shop", beaconY: beacon.y };
       }
       showPerkToast("Маяк активирован!");
       addFuel(state.maxFuel - state.fuel, beacon.x, beacon.y);
@@ -6245,6 +6518,7 @@ function isVisibleCell(x, y) {
 }
 
 function getCamera() {
+  if (state.debugMapActive) return { x: state.debugMapCamera.x, y: state.debugMapCamera.y };
   const shakeX = Math.sin(state.cameraShake.time * 1.7) * state.cameraShake.amplitude;
   const shakeY = Math.cos(state.cameraShake.time * 2.3) * state.cameraShake.amplitude * 0.7;
   return {
@@ -6254,6 +6528,7 @@ function getCamera() {
 }
 
 function getCameraZoom() {
+  if (state.debugMapActive) return state.debugMapCamera.zoom;
   if (state.width <= 0 || state.height <= 0) {
     return 1;
   }
@@ -6954,16 +7229,18 @@ function render() {
   renderHpToast(camera);
   renderGoldToast(camera);
   renderPerkToast(camera);
-  renderSignalStatus(camera);
-  renderBeaconRadar(camera);
-  renderPickupRadar(camera);
-  renderOverdriveStatus(camera);
-  renderStunStatus(camera);
-  renderHeatWarningStatus(camera);
-  renderLoopChargeStatus(camera);
-  renderVisionMask(camera);
+  if (!state.debugMapActive) {
+    renderSignalStatus(camera);
+    renderBeaconRadar(camera);
+    renderPickupRadar(camera);
+    renderOverdriveStatus(camera);
+    renderStunStatus(camera);
+    renderHeatWarningStatus(camera);
+    renderLoopChargeStatus(camera);
+    renderVisionMask(camera);
+  }
   ctx.restore();
-  renderHud();
+  if (!state.debugMapActive) renderHud();
 
   if (state.damageFlash > 0) {
     ctx.fillStyle = `rgba(255, 64, 64, ${0.16 * state.damageFlash})`;
@@ -7223,13 +7500,13 @@ function updateBeaconActivationAnim() {
   state.beaconActivationAnim = null;
   const pa = anim.pendingAction;
   if (pa.type === "artifactChoice") {
-    state.artifactChoiceTrees = pa.trees;
+    state.artifactChoiceCategories = pa.categories;
     state.artifactChoicePendingBeacon = pa.beacon;
     openArtifactChoice();
   } else {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
-    openShop(state.gold, pa.lastId);
+    openShop(state.gold, pa.beaconY ?? null, state.luck);
   }
 }
 
@@ -9211,4 +9488,267 @@ function renderVisionMask(camera) {
   ctx.restore();
 }
 
-init();
+// ── Debug map mode (?debug-map query param) ──────────────────────────────────
+function initDebugMapMode() {
+  // Hide all HTML UI overlays, keep canvas
+  document.querySelectorAll(".app-shell > *:not(#game)").forEach((el) => { el.hidden = true; });
+  state.canvas.style.cssText = "position:fixed;top:0;left:0;cursor:grab;touch-action:none;display:block;";
+
+  // Init game subsystems (sprites + map) without starting the game loop
+  state.ctx = state.canvas.getContext("2d");
+  state.sprites = createSpriteAtlas();
+  resize();
+  setupField(); // generates map using seed from URL (?seed=) or random
+
+  // Reveal the whole map — set all visibleAlpha to 1 (no fog)
+  state.visibleAlpha.fill(1);
+  state.visibleMask.fill(1);
+
+  // Enter debug map mode — getCamera() and getCameraZoom() will use debugMapCamera
+  state.debugMapActive = true;
+
+  // Initial camera: fit whole map on screen, centered
+  const mapW = GRID_W * TILE_SIZE;
+  const mapH = GRID_H * TILE_SIZE;
+  const fitZoom = Math.min(state.width / mapW, state.height / mapH) * 0.97;
+  state.debugMapCamera.zoom = fitZoom;
+  state.debugMapCamera.x = (mapW - state.width / fitZoom) / 2;
+  state.debugMapCamera.y = (mapH - state.height / fitZoom) / 2;
+
+  // Marker layers — drawn on top of real game tiles
+  const MARKERS = [
+    { id: "beacon",   label: "Маяк",     color: "#ff8800", visible: true },
+    { id: "artifact", label: "Артефакт", color: "#ffff50", visible: true },
+    { id: "safe",     label: "Сейф",     color: "#8888ff", visible: true },
+    { id: "worm",     label: "Червь",    color: "#ff4444", visible: true },
+    { id: "boulder",  label: "Камень",   color: "#c8a040", visible: true },
+    { id: "base",     label: "База",     color: "#00ff88", visible: true },
+    { id: "start",    label: "Старт",    color: "#ffffff", visible: true },
+  ];
+  function markerOn(id) { return MARKERS.find((m) => m.id === id)?.visible ?? true; }
+
+  // Draw colored dot markers on top of the real tile render
+  function drawMarkers() {
+    const ctx = state.ctx;
+    const zoom = state.debugMapCamera.zoom;
+    const camX = state.debugMapCamera.x;
+    const camY = state.debugMapCamera.y;
+    const R = TILE_SIZE * 0.55;
+
+    ctx.save();
+    ctx.scale(zoom, zoom);
+
+    function dot(tx, ty, fill, outline) {
+      const sx = (tx + 0.5) * TILE_SIZE - camX;
+      const sy = (ty + 0.5) * TILE_SIZE - camY;
+      ctx.beginPath();
+      ctx.arc(sx, sy, R, 0, Math.PI * 2);
+      ctx.fillStyle = fill + "bb";
+      ctx.fill();
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = R * 0.4;
+      ctx.stroke();
+    }
+
+    if (markerOn("beacon"))   state.beacons.forEach((b) => dot(b.x, b.y, "#ff8800", "#fff"));
+    if (markerOn("artifact")) {
+      for (let y = 0; y < GRID_H; y++)
+        for (let x = 0; x < GRID_W; x++)
+          if (state.artifactMask[cellIndex(x, y)]) dot(x, y, "#ffff50", "#000");
+    }
+    if (markerOn("safe"))  state.safes.forEach((s) => dot(s.x, s.y, "#8888ff", "#fff"));
+    if (markerOn("worm"))  state.wormNests.forEach((n) => dot(n.x, n.y, "#ff4444", "#faa"));
+    if (markerOn("boulder")) {
+      for (let y = 0; y < GRID_H; y++)
+        for (let x = 0; x < GRID_W; x++)
+          if (state.boulderPocketMask[cellIndex(x, y)]) dot(x, y, "#c8a040", "#fff");
+    }
+    if (markerOn("base") && state.base) dot(state.base.x, state.base.y, "#00ff88", "#fff");
+    if (markerOn("start")) dot(START_X, START_Y, "#ffffff", "#000");
+
+    ctx.restore();
+  }
+
+  // RAF loop — render game tiles + overlay markers, no game update
+  function debugFrame() {
+    render();
+    drawMarkers();
+    requestAnimationFrame(debugFrame);
+  }
+  requestAnimationFrame(debugFrame);
+
+  // ── Pan ──
+  let dragging = false, dragSX = 0, dragSY = 0, dragCX = 0, dragCY = 0;
+  state.canvas.addEventListener("mousedown", (e) => {
+    dragging = true; state.canvas.style.cursor = "grabbing";
+    dragSX = e.clientX; dragSY = e.clientY;
+    dragCX = state.debugMapCamera.x; dragCY = state.debugMapCamera.y;
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const zoom = state.debugMapCamera.zoom;
+    state.debugMapCamera.x = dragCX - (e.clientX - dragSX) / zoom;
+    state.debugMapCamera.y = dragCY - (e.clientY - dragSY) / zoom;
+  });
+  window.addEventListener("mouseup", () => { dragging = false; state.canvas.style.cursor = "grab"; });
+
+  // ── Scroll zoom ──
+  state.canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const oldZoom = state.debugMapCamera.zoom;
+    const newZoom = Math.max(fitZoom * 0.4, Math.min(oldZoom * factor, fitZoom * 60));
+    // Keep point under mouse stationary
+    const worldX = state.debugMapCamera.x + e.clientX / oldZoom;
+    const worldY = state.debugMapCamera.y + e.clientY / oldZoom;
+    state.debugMapCamera.zoom = newZoom;
+    state.debugMapCamera.x = worldX - e.clientX / newZoom;
+    state.debugMapCamera.y = worldY - e.clientY / newZoom;
+  }, { passive: false });
+
+  // ── Touch pan + pinch zoom ──
+  let lastDist = 0, lastMX = 0, lastMY = 0;
+  state.canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      dragging = true;
+      dragSX = e.touches[0].clientX; dragSY = e.touches[0].clientY;
+      dragCX = state.debugMapCamera.x; dragCY = state.debugMapCamera.y;
+    } else if (e.touches.length === 2) {
+      dragging = false;
+      lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      lastMX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      lastMY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    }
+  }, { passive: false });
+  state.canvas.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    const zoom = state.debugMapCamera.zoom;
+    if (e.touches.length === 1 && dragging) {
+      state.debugMapCamera.x = dragCX - (e.touches[0].clientX - dragSX) / zoom;
+      state.debugMapCamera.y = dragCY - (e.touches[0].clientY - dragSY) / zoom;
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const newZoom = Math.max(fitZoom * 0.4, Math.min(zoom * (dist / lastDist), fitZoom * 60));
+      const worldX = state.debugMapCamera.x + lastMX / zoom;
+      const worldY = state.debugMapCamera.y + lastMY / zoom;
+      state.debugMapCamera.zoom = newZoom;
+      state.debugMapCamera.x = worldX - mx / newZoom;
+      state.debugMapCamera.y = worldY - my / newZoom;
+      lastDist = dist; lastMX = mx; lastMY = my;
+    }
+  }, { passive: false });
+  state.canvas.addEventListener("touchend", (e) => { if (e.touches.length < 2) dragging = false; });
+
+  // ── Navigation helpers ──
+  // Returns sorted list of {x,y} tile coords for a given marker id
+  function getLocations(id) {
+    switch (id) {
+      case "beacon":   return state.beacons.map((b) => ({ x: b.x, y: b.y }));
+      case "artifact": {
+        const locs = [];
+        for (let y = 0; y < GRID_H; y++)
+          for (let x = 0; x < GRID_W; x++)
+            if (state.artifactMask[cellIndex(x, y)]) locs.push({ x, y });
+        return locs;
+      }
+      case "safe":    return state.safes.map((s) => ({ x: s.x, y: s.y }));
+      case "worm":    return state.wormNests.map((n) => ({ x: n.x, y: n.y }));
+      case "boulder": {
+        const locs = [];
+        for (let y = 0; y < GRID_H; y++)
+          for (let x = 0; x < GRID_W; x++)
+            if (state.boulderPocketMask[cellIndex(x, y)]) locs.push({ x, y });
+        return locs;
+      }
+      case "base":  return state.base ? [{ x: state.base.x, y: state.base.y }] : [];
+      case "start": return [{ x: START_X, y: START_Y }];
+      default:      return [];
+    }
+  }
+
+  // Navigate camera to tile (tx, ty), keeping current zoom or zooming in if too far out
+  function goTo(tx, ty) {
+    const targetZoom = Math.max(state.debugMapCamera.zoom, fitZoom * 4);
+    state.debugMapCamera.zoom = targetZoom;
+    state.debugMapCamera.x = (tx + 0.5) * TILE_SIZE - state.width  / (2 * targetZoom);
+    state.debugMapCamera.y = (ty + 0.5) * TILE_SIZE - state.height / (2 * targetZoom);
+  }
+
+  // ── Legend overlay ──
+  const legend = document.createElement("div");
+  legend.style.cssText = [
+    "position:fixed;top:12px;right:12px;z-index:100;",
+    "background:rgba(15,11,9,0.92);border:1px solid #3a2e20;border-radius:8px;",
+    "padding:10px 12px;color:#d79f49;font:12px/1.6 monospace;",
+    "display:flex;flex-direction:column;gap:2px;min-width:160px;",
+  ].join("");
+  legend.innerHTML = `<div style="color:#f1dfb6;font-weight:bold;margin-bottom:4px">Seed: ${state.worldSeed}</div>`;
+
+  const navIndex = {};
+  for (const marker of MARKERS) {
+    navIndex[marker.id] = 0;
+
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:6px;";
+
+    // Toggle button (swatch + label)
+    const toggleBtn = document.createElement("button");
+    toggleBtn.style.cssText = "display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;color:#d79f49;font:12px monospace;padding:2px 0;text-align:left;flex:1;min-width:0;";
+    const swatch = document.createElement("span");
+    swatch.style.cssText = `width:12px;height:12px;border-radius:50%;flex-shrink:0;background:${marker.color};`;
+    const labelEl = document.createElement("span");
+    labelEl.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    labelEl.textContent = marker.label;
+    toggleBtn.appendChild(swatch); toggleBtn.appendChild(labelEl);
+
+    function updateToggle(m, s, b) {
+      b.style.opacity = m.visible ? "1" : "0.35";
+      s.style.background = m.visible ? m.color : "#2a2a2a";
+    }
+    updateToggle(marker, swatch, toggleBtn);
+    toggleBtn.addEventListener("click", () => {
+      marker.visible = !marker.visible;
+      updateToggle(marker, swatch, toggleBtn);
+    });
+
+    // Go-to button
+    const gotoBtn = document.createElement("button");
+    gotoBtn.style.cssText = "background:none;border:1px solid #3a2e20;border-radius:3px;cursor:pointer;color:#a07840;font:10px monospace;padding:1px 5px;flex-shrink:0;white-space:nowrap;";
+    gotoBtn.textContent = "→";
+    gotoBtn.title = "Go to next";
+    gotoBtn.addEventListener("click", () => {
+      const locs = getLocations(marker.id);
+      if (!locs.length) return;
+      const idx = navIndex[marker.id] % locs.length;
+      goTo(locs[idx].x, locs[idx].y);
+      navIndex[marker.id] = (idx + 1) % locs.length;
+      gotoBtn.textContent = `→ ${idx + 1}/${locs.length}`;
+    });
+
+    row.appendChild(toggleBtn);
+    row.appendChild(gotoBtn);
+    legend.appendChild(row);
+  }
+  document.body.appendChild(legend);
+
+  // Handle window resize
+  window.addEventListener("resize", () => {
+    resize();
+    // Recalculate camera to keep map centered
+    const newFitZoom = Math.min(state.width / mapW, state.height / mapH) * 0.97;
+    if (state.debugMapCamera.zoom <= fitZoom * 1.01) {
+      state.debugMapCamera.zoom = newFitZoom;
+      state.debugMapCamera.x = (mapW - state.width / newFitZoom) / 2;
+      state.debugMapCamera.y = (mapH - state.height / newFitZoom) / 2;
+    }
+  });
+}
+
+if (new URLSearchParams(location.search).has("debug-map")) {
+  initDebugMapMode();
+} else {
+  init();
+}

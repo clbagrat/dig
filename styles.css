@@ -1250,6 +1250,28 @@ strong {
   margin-bottom: 1px;
 }
 
+.shop-reroll {
+  padding: 5px 10px;
+  border: 1px solid rgba(215, 159, 73, 0.3);
+  border-radius: 8px;
+  background: rgba(30, 14, 4, 0.5);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: transform 0.1s, opacity 0.1s;
+}
+
+.shop-reroll:active { transform: scale(0.95); }
+
+.shop-reroll--poor {
+  color: var(--muted);
+  opacity: 0.45;
+  border-color: rgba(215, 159, 73, 0.15);
+}
+
 .shop-close {
   width: 28px;
   height: 28px;
@@ -1266,133 +1288,77 @@ strong {
 
 .shop-close:active { transform: scale(0.93); }
 
-/* Табы */
-/* Табы — индикаторы текущей секции */
-.shop-tabs {
-  display: flex;
-  border-bottom: 1px solid rgba(215, 159, 73, 0.14);
+/* ── Offerings grid ──────────────────────────────────────────── */
+
+.shop-offerings {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 14px 12px;
   flex-shrink: 0;
 }
 
-.shop-tab {
-  flex: 1;
-  padding: 8px 6px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: rgba(198, 171, 132, 0.45);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  touch-action: manipulation;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.shop-tab--active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-/* Тело — горизонтальный scroll-snap-контейнер */
-.shop-body {
-  flex: 1 1 auto;
-  display: flex;
-  overflow-x: scroll;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  touch-action: pan-x pan-y;
-}
-
-.shop-body::-webkit-scrollbar { display: none; }
-
-.shop-body *,
-.shop-body {
-  touch-action: pan-x pan-y;
-}
-
-/* Каждое дерево — полноразмерная секция */
-.shop-tree {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 20px 16px 28px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(215, 159, 73, 0.15) transparent;
-  display: block;
-  touch-action: pan-x pan-y;
-}
-
-/* ── Сетка ───────────────────────────────────────────────────── */
-
-.shop-grid {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(var(--shop-cols), 1fr);
-  gap: 28px 12px;
-}
-
-/* SVG линии поверх сетки */
-.shop-lines {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: visible;
-}
-
-/* Ячейка */
-.shop-cell {
-  display: flex;
-  justify-content: center;
-}
-
-/* ── Нода ────────────────────────────────────────────────────── */
-
-.shop-node {
+.shop-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  width: 88px;
-  padding: 10px 8px 8px;
-  border: 1px solid rgba(215, 159, 73, 0.18);
+  gap: 4px;
+  padding: 10px 6px 8px;
+  border: 1.5px solid rgba(215, 159, 73, 0.18);
   border-radius: 12px;
   background: rgba(22, 11, 5, 0.7);
   cursor: pointer;
   touch-action: manipulation;
   text-align: center;
-  transition: border-color 0.12s, background 0.12s, opacity 0.12s;
+  transition: border-color 0.12s, background 0.12s, transform 0.1s;
   position: relative;
 }
 
-/* Состояния */
-.shop-node--locked {
-  opacity: 0.3;
+.shop-card:active { transform: scale(0.95); }
+
+.shop-card--sold {
+  opacity: 0.25;
   cursor: default;
   pointer-events: none;
 }
 
-.shop-node--can-buy {
-  border-color: rgba(215, 159, 73, 0.55);
-  background: rgba(35, 17, 5, 0.85);
-  box-shadow: 0 0 10px rgba(215, 159, 73, 0.1);
+.shop-card__sold {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 18px 0;
 }
 
-.shop-node--can-buy:active { transform: scale(0.95); }
+/* Rarity borders */
+.shop-card--rarity-1 { border-color: rgba(170, 170, 170, 0.35); }
+.shop-card--rarity-2 { border-color: rgba(68, 136, 255, 0.55); }
+.shop-card--rarity-3 { border-color: rgba(170, 68, 255, 0.55); }
+.shop-card--rarity-4 { border-color: rgba(255, 68, 68, 0.65); }
 
-.shop-node--maxed {
-  border-color: rgba(158, 195, 141, 0.35);
-  background: rgba(14, 26, 12, 0.7);
-  cursor: default;
+.shop-card--selected {
+  box-shadow: 0 0 0 2px rgba(215, 159, 73, 0.3), 0 0 14px rgba(215, 159, 73, 0.12);
 }
 
-/* Иконка */
-.shop-node__icon {
+.shop-card--selected.shop-card--rarity-2 { box-shadow: 0 0 0 2px rgba(68, 136, 255, 0.3), 0 0 14px rgba(68, 136, 255, 0.12); }
+.shop-card--selected.shop-card--rarity-3 { box-shadow: 0 0 0 2px rgba(170, 68, 255, 0.3), 0 0 14px rgba(170, 68, 255, 0.12); }
+.shop-card--selected.shop-card--rarity-4 { box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.3), 0 0 14px rgba(255, 68, 68, 0.12); }
+
+.shop-card--merge {
+  background: rgba(68, 136, 255, 0.08);
+}
+
+.shop-card--poor {
+  opacity: 0.5;
+}
+
+.shop-card__type {
+  font-size: 10px;
+  opacity: 0.5;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+}
+
+.shop-card__icon {
   font-size: 20px;
   line-height: 1;
   height: 24px;
@@ -1401,63 +1367,38 @@ strong {
   justify-content: center;
 }
 
-/* Название */
-.shop-node__name {
-  font-size: 10px;
+.shop-card__name {
+  font-size: 9px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.02em;
-  line-height: 1.25;
-  min-height: 24px;
+  line-height: 1.2;
+  min-height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Пипсы уровня */
-.shop-node__pips {
-  display: flex;
-  gap: 3px;
-  min-height: 7px;
+.shop-card__merge {
+  font-size: 8px;
+  font-weight: 700;
+  color: #4488ff;
+  letter-spacing: 0.03em;
 }
 
-.shop-node__pip {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1px solid rgba(215, 159, 73, 0.3);
-  background: transparent;
-}
-
-.shop-node__pip--on {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.shop-node--maxed .shop-node__pip--on {
-  background: var(--ok);
-  border-color: var(--ok);
-}
-
-/* Цена */
-.shop-node__cost {
+.shop-card__cost {
   font-size: 10px;
   font-weight: 700;
+  color: var(--accent);
   white-space: nowrap;
-  min-height: 13px;
 }
 
-.shop-node__cost[data-state="ok"]   { color: var(--accent); }
-.shop-node__cost[data-state="dim"]  { color: var(--muted); opacity: 0.55; }
-.shop-node__cost[data-state="maxed"]{ color: var(--ok); font-size: 12px; }
-
-/* Выбранная нода */
-.shop-node--selected {
-  border-color: rgba(215, 159, 73, 0.8);
-  box-shadow: 0 0 0 2px rgba(215, 159, 73, 0.25), 0 0 14px rgba(215, 159, 73, 0.12);
+.shop-card__cost--poor {
+  color: var(--muted);
+  opacity: 0.55;
 }
 
-/* ── Панель деталей ──────────────────────────────────────────── */
+/* ── Detail panel ────────────────────────────────────────────── */
 
 .shop-detail {
   flex-shrink: 0;
@@ -1504,31 +1445,45 @@ strong {
   line-height: 1.5;
 }
 
-.shop-detail__footer {
+.shop-detail__tags {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
 
-.shop-detail__levels {
-  flex: 1;
+.shop-tag {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(215, 159, 73, 0.1);
+  border: 1px solid rgba(215, 159, 73, 0.2);
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shop-detail__footer {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
 }
 
-.shop-detail__pips {
+.shop-detail__actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
 }
 
-.shop-detail__level-label {
+.shop-detail__rarity {
+  flex: 1;
   font-size: 11px;
-  color: var(--muted);
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .shop-detail__buy {
+  flex: 1;
   padding: 8px 16px;
   border-radius: 10px;
   border: 1px solid transparent;
@@ -1548,6 +1503,64 @@ strong {
 
 .shop-detail__buy--ok:active { transform: scale(0.96); }
 
+.shop-detail__buy--merge {
+  background: rgba(68, 136, 255, 0.15);
+  border-color: rgba(68, 136, 255, 0.5);
+  color: #4488ff;
+}
+
+.shop-detail__buy--merge:active { transform: scale(0.96); }
+
+.shop-detail__buy--replace {
+  background: rgba(255, 170, 68, 0.12);
+  border-color: rgba(255, 170, 68, 0.35);
+  color: #ffaa44;
+}
+
+.shop-detail__sell {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 100, 100, 0.35);
+  background: rgba(255, 100, 100, 0.1);
+  color: #ff8888;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.shop-detail__sell:hover {
+  background: rgba(255, 100, 100, 0.2);
+  border-color: rgba(255, 100, 100, 0.5);
+}
+
+.shop-detail__sell:active { transform: scale(0.96); }
+
+.shop-detail__lock {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(215, 159, 73, 0.3);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.shop-detail__lock:hover {
+  border-color: rgba(215, 159, 73, 0.6);
+  color: var(--accent);
+}
+
+.shop-detail__lock--active {
+  border-color: rgba(215, 159, 73, 0.6);
+  color: var(--accent);
+  background: rgba(215, 159, 73, 0.1);
+}
+
+.shop-detail__lock:active { transform: scale(0.96); }
+
 .shop-detail__buy--poor {
   background: transparent;
   border-color: rgba(215, 159, 73, 0.2);
@@ -1555,16 +1568,82 @@ strong {
   opacity: 0.5;
 }
 
-.shop-detail__buy--maxed {
-  background: rgba(158, 195, 141, 0.1);
-  border-color: rgba(158, 195, 141, 0.3);
-  color: var(--ok);
-  opacity: 0.7;
+/* ── Equipment slots ─────────────────────────────────────────── */
+
+.shop-slots {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(215, 159, 73, 0.12);
+  flex-shrink: 0;
 }
 
-.shop-detail__buy--locked {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.08);
+.shop-slot {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(215, 159, 73, 0.15);
+  background: rgba(22, 11, 5, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.shop-slot--empty {
+  opacity: 0.35;
+}
+
+.shop-slot__empty {
+  font-size: 16px;
   color: var(--muted);
   opacity: 0.4;
+}
+
+.shop-slot--filled {
+  background: rgba(30, 15, 6, 0.8);
+}
+
+.shop-slot--rarity-1 { border-color: rgba(170, 170, 170, 0.35); }
+.shop-slot--rarity-2 { border-color: rgba(68, 136, 255, 0.5); }
+.shop-slot--rarity-3 { border-color: rgba(170, 68, 255, 0.5); }
+.shop-slot--rarity-4 { border-color: rgba(255, 68, 68, 0.6); }
+
+.shop-slot--replaceable {
+  cursor: pointer;
+  animation: slot-pulse 0.8s ease-in-out infinite;
+}
+
+.shop-slot--selected {
+  outline: 2px solid rgba(68, 170, 255, 0.8);
+  cursor: pointer;
+}
+
+.shop-slot--merge-target {
+  cursor: pointer;
+  animation: slot-merge-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes slot-merge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(68, 255, 170, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(68, 255, 170, 0.5); }
+}
+
+@keyframes slot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 170, 68, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 170, 68, 0.3); }
+}
+
+.shop-slot__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.shop-slot__rarity {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 8px;
+  line-height: 1;
 }

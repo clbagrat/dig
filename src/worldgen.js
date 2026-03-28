@@ -5,12 +5,12 @@
 export const GRID_W = 100;
 export const GRID_H = 240;
 export const START_X = Math.floor(GRID_W / 2);
-export const START_Y = 8;
+export const START_Y = 1;
 
 export const VISION_RADIUS = 5;
 const START_EASY_RADIUS = VISION_RADIUS;
 const START_NEAR_RADIUS = 7;
-const START_NEAR_GOLD_COUNT = 4;
+const START_NEAR_GOLD_COUNT = 12;
 // Base hides in the bottom zone (deep floor)
 const BASE_ZONE_MIN_Y = Math.floor(GRID_H * 0.82); // ~197
 const BASE_ZONE_MAX_Y = GRID_H - 5;
@@ -24,7 +24,7 @@ const TILES_PER_PERK_ZONE = 380;
 const TILES_PER_CRYSTAL_TILE = 22;
 const CRYSTAL_MIN_DISTANCE = 3;
 const METAL_VEIN_GROUPS = 14;
-const GOLD_ORE_GROUPS = 45;
+const GOLD_ORE_GROUPS = 135;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -503,20 +503,27 @@ function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPoc
 }
 
 function placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, random) {
-  const origin = getHazardOrigin(random);
-  if (!canPlaceBoulderPocketAt(origin.x, origin.y, gasPocketMask, steamPocketMask)) return;
-  if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) return;
-  for (let y = 1; y < GRID_H - 1; y += 1) {
-    if (boulderPocketMask[cellIndex(origin.x, y)]) return;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const origin = getHazardOrigin(random);
+    if (!canPlaceBoulderPocketAt(origin.x, origin.y, gasPocketMask, steamPocketMask)) continue;
+    if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) continue;
+    let colBlocked = false;
+    for (let y = 1; y < GRID_H - 1; y += 1) {
+      if (boulderPocketMask[cellIndex(origin.x, y)]) { colBlocked = true; break; }
+    }
+    if (colBlocked) continue;
+    let rowBlocked = false;
+    for (let x = 1; x < GRID_W - 1; x += 1) {
+      if (boulderPocketMask[cellIndex(x, origin.y)]) { rowBlocked = true; break; }
+    }
+    if (rowBlocked) continue;
+    const index = cellIndex(origin.x, origin.y);
+    boulderPocketMask[index] = 1;
+    hazardMask[index] = 0;
+    gasPocketMask[index] = 0;
+    steamPocketMask[index] = 0;
+    return;
   }
-  for (let x = 1; x < GRID_W - 1; x += 1) {
-    if (boulderPocketMask[cellIndex(x, origin.y)]) return;
-  }
-  const index = cellIndex(origin.x, origin.y);
-  boulderPocketMask[index] = 1;
-  hazardMask[index] = 0;
-  gasPocketMask[index] = 0;
-  steamPocketMask[index] = 0;
 }
 
 function placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, random) {
@@ -969,36 +976,26 @@ function tryPlaceArtifactBetweenBeacons(pair, artifactMask, perkMask, crystalMas
 function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
   const placed = [];
   const artifactTargetCount = Math.max(0, beacons.length - 2);
-  const pairs = buildArtifactBeaconPairs(beacons);
+  if (artifactTargetCount === 0) return;
 
-  for (let i = 0; i < pairs.length && placed.length < artifactTargetCount; i += 1) {
-    tryPlaceArtifactBetweenBeacons(
-      pairs[i],
-      artifactMask,
-      perkMask,
-      crystalMask,
-      perkZoneMask,
-      metalMask,
-      gasPocketMask,
-      steamPocketMask,
-      boulderPocketMask,
-      beaconMask,
-      beacons,
-      base,
-      placed,
-      random,
-    );
-  }
+  // Divide the full map depth into equal bands and place one artifact per band.
+  const yMin = START_Y + 20; // skip easy start zone
+  const yMax = GRID_H - 3;
+  const bandH = (yMax - yMin) / artifactTargetCount;
 
-  let attempts = 0;
-  while (placed.length < artifactTargetCount && attempts < artifactTargetCount * 120) {
-    const x = 3 + Math.floor(random() * (GRID_W - 6));
-    const y = 3 + Math.floor(random() * (GRID_H - 6));
-    const index = cellIndex(x, y);
-    attempts += 1;
-    if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed)) continue;
-    artifactMask[index] = 1;
-    placed.push({ x, y });
+  for (let band = 0; band < artifactTargetCount; band += 1) {
+    const bandYMin = Math.floor(yMin + band * bandH);
+    const bandYMax = Math.floor(yMin + (band + 1) * bandH);
+    let placed_in_band = false;
+
+    for (let attempt = 0; attempt < 300 && !placed_in_band; attempt += 1) {
+      const x = 3 + Math.floor(random() * (GRID_W - 6));
+      const y = bandYMin + Math.floor(random() * (bandYMax - bandYMin));
+      if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed)) continue;
+      artifactMask[cellIndex(x, y)] = 1;
+      placed.push({ x, y });
+      placed_in_band = true;
+    }
   }
 }
 
@@ -1134,7 +1131,11 @@ export function generateMap(seed) {
   // (i.e. it became isolated by beacon clearing). Remove such cells.
   repairPockets(gasPocketMask, beaconMask);
   repairPockets(steamPocketMask, beaconMask);
-  repairPockets(boulderPocketMask, beaconMask);
+  // Boulder pockets are intentionally single cells — repairPockets would remove them all.
+  // Only clear overlaps with beacons.
+  for (let i = 0; i < GRID_W * GRID_H; i++) {
+    if (boulderPocketMask[i] && beaconMask[i]) boulderPocketMask[i] = 0;
+  }
 
   return {
     hardness, hazardMask, metalMask, goldOreMask,

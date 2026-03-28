@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Perk Editor</title>
+<title>Items Editor</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -18,6 +18,7 @@
   --border: rgba(215,159,73,0.18);
   --danger: #c04848;
   --r:      8px;
+  --r1: #aaa; --r2: #4488ff; --r3: #aa44ff; --r4: #ff4444;
 }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; -webkit-tap-highlight-color: transparent; }
 
@@ -33,7 +34,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .hdr-btn { padding: 7px 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 12px; cursor: pointer; white-space: nowrap; }
 .hdr-btn.primary { border-color: var(--acc); color: var(--acc); }
 
-/* ── Tree tabs ── */
+/* ── Tabs ── */
 .tabs-wrap { background: var(--bg2); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
 .tabs-wrap::-webkit-scrollbar { display: none; }
 .tabs { display: flex; gap: 2px; padding: 6px 8px; min-width: max-content; }
@@ -43,42 +44,50 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   color: var(--muted); transition: all .15s;
 }
 .tab.active { background: var(--bg4); border-color: var(--acc); color: var(--acc); }
-.tab-add { padding: 7px 12px; border-radius: 20px; font-size: 16px; color: var(--muted); cursor: pointer; border: 1.5px dashed var(--border); transition: all .15s; }
-.tab-add:hover, .tab-add:active { color: var(--acc); border-color: var(--acc); }
 
-/* ── Tree meta bar ── */
-.tree-meta {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+/* ── Filters ── */
+.filters {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 8px 12px; background: var(--bg2); border-bottom: 1px solid var(--border);
 }
-.meta-field { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
-.meta-field input { background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 5px 8px; font-size: 13px; width: 130px; }
-.meta-field input.sm { width: 52px; text-align: center; font-size: 17px; }
-.btn-del-tree { margin-left: auto; padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(192,72,72,.35); background: none; color: var(--danger); font-size: 12px; cursor: pointer; }
+.filter-input {
+  flex: 1; min-width: 140px;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font-size: 13px;
+}
+.filter-input:focus { outline: none; border-color: var(--acc); }
+.filter-select {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; -webkit-appearance: none;
+}
+.filter-select:focus { outline: none; border-color: var(--acc); }
+.items-count { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
 
-/* ── Node list ── */
-.nodes-list { padding: 10px 10px 120px; display: flex; flex-direction: column; gap: 6px; }
-.node-card {
+/* ── Item list ── */
+.items-list { padding: 10px 10px 120px; display: flex; flex-direction: column; gap: 6px; }
+.item-card {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px; border-radius: var(--r);
+  padding: 10px 14px; border-radius: var(--r);
   background: var(--bg3); border: 1.5px solid var(--border);
   cursor: pointer; transition: all .15s; user-select: none;
 }
-.node-card:active, .node-card.sel { background: var(--bg4); border-color: var(--acc); }
-.node-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
-.node-info { flex: 1; min-width: 0; }
-.node-name { font-weight: 700; font-size: 14px; }
-.node-desc { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.node-meta { font-size: 11px; color: var(--acc); margin-top: 1px; }
-.node-req-badge { font-size: 10px; background: rgba(215,159,73,.12); color: var(--acc); padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
-.btn-add-node {
+.item-card:active, .item-card.sel { background: var(--bg4); border-color: var(--acc); }
+.item-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
+.item-info { flex: 1; min-width: 0; }
+.item-name { font-weight: 700; font-size: 14px; }
+.item-desc { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
+.item-rarity { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.06); }
+.item-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(215,159,73,0.1); color: var(--acc); }
+.item-cost { font-size: 11px; color: var(--acc); margin-left: auto; flex-shrink: 0; }
+.btn-add-item {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 13px; border-radius: var(--r);
   border: 1.5px dashed var(--border); background: none;
   color: var(--muted); font-size: 13px; cursor: pointer;
   width: 100%; transition: all .15s;
 }
-.btn-add-node:active { color: var(--acc); border-color: var(--acc); }
+.btn-add-item:active { color: var(--acc); border-color: var(--acc); }
 
 /* ── Bottom sheet ── */
 .sheet-overlay {
@@ -91,7 +100,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 101;
   background: var(--bg2); border-top: 1px solid var(--border); border-radius: 14px 14px 0 0;
   transform: translateY(100%); transition: transform .25s cubic-bezier(.32,0,.67,0);
-  max-height: 90vh; display: flex; flex-direction: column;
+  max-height: 92vh; display: flex; flex-direction: column;
 }
 .sheet.open { transform: translateY(0); transition: transform .25s cubic-bezier(.33,1,.68,1); }
 .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 2px; flex-shrink: 0; }
@@ -114,9 +123,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .field input.icon-f { font-size: 20px; text-align: center; max-width: 70px; }
 .field-row { display: flex; gap: 8px; }
 .field-row .field { flex: 1; }
-.costs-wrap { display: flex; gap: 6px; flex-wrap: wrap; }
-.costs-wrap input { width: 72px; }
+.tags-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tag-chip { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 12px; background: rgba(215,159,73,0.12); border: 1px solid rgba(215,159,73,0.3); color: var(--acc); font-size: 12px; }
+.tag-chip button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+.tag-chip button:hover { color: var(--danger); }
+.tag-add-row { display: flex; gap: 6px; }
+.tag-add-row input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+.tag-add-row input:focus { outline: none; border-color: var(--acc); }
+.tag-add-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg4); color: var(--acc); font-size: 13px; cursor: pointer; white-space: nowrap; }
 .sep { height: 1px; background: var(--border); }
+
+/* ── Rarity colors ── */
+.r1 { color: var(--r1); } .r2 { color: var(--r2); } .r3 { color: var(--r3); } .r4 { color: var(--r4); }
 
 /* ── Toast ── */
 #toast {
@@ -128,9 +146,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ── Desktop: side-by-side sheet ── */
+/* ── Desktop ── */
 @media (min-width: 700px) {
-  .sheet { left: auto; right: 0; top: 0; bottom: 0; border-radius: 0; border-left: 1px solid var(--border); border-top: none; max-height: none; width: 320px; transform: translateX(100%); }
+  .sheet { left: auto; right: 0; top: 0; bottom: 0; border-radius: 0; border-left: 1px solid var(--border); border-top: none; max-height: none; width: 340px; transform: translateX(100%); }
   .sheet.open { transform: translateX(0); }
   .sheet-handle { display: none; }
   .sheet-overlay { display: none; }
@@ -140,26 +158,41 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <body>
 
 <div class="hdr">
-  <span class="hdr-title">⛏ Perk Editor</span>
+  <span class="hdr-title">⛏ Items Editor</span>
   <span class="unsaved" id="unsaved" hidden>●</span>
-  <button class="hdr-btn" id="btn-copy">📋</button>
+  <button class="hdr-btn" id="btn-copy">📋 Копировать</button>
   <button class="hdr-btn primary" id="btn-save">💾 Сохранить</button>
 </div>
 
 <div class="tabs-wrap">
-  <div class="tabs" id="tabs"></div>
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="equipment">⛏ Части корпуса</div>
+    <div class="tab" data-tab="items">✧ Предметы</div>
+  </div>
 </div>
 
-<div id="tree-meta" class="tree-meta"></div>
+<div class="filters">
+  <input class="filter-input" id="search" placeholder="Поиск...">
+  <select class="filter-select" id="filter-cat">
+    <option value="">Все категории</option>
+  </select>
+  <select class="filter-select" id="filter-rarity">
+    <option value="">Все редкости</option>
+    <option value="1">Обычный</option>
+    <option value="2">Необычный</option>
+    <option value="3">Редкий</option>
+    <option value="4">Легендарный</option>
+  </select>
+  <span class="items-count" id="items-count"></span>
+</div>
 
-<div id="nodes-list" class="nodes-list"></div>
+<div id="items-list" class="items-list"></div>
 
-<!-- Bottom sheet overlay -->
 <div class="sheet-overlay" id="overlay"></div>
 <div class="sheet" id="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head">
-    <span class="sheet-head-title" id="sheet-title">Узел</span>
+    <span class="sheet-head-title" id="sheet-title">Предмет</span>
     <button class="sheet-del" id="sheet-del">Удалить</button>
     <button class="sheet-close" id="sheet-close">✕</button>
   </div>
@@ -169,32 +202,38 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <div id="toast"></div>
 
 <script type="module">
-const { SHOP_TREES } = await import(`./src/shop-config.js?t=${Date.now()}`);
+const { ALL_EQUIPMENT, ALL_ITEMS, CATEGORIES } = await import(`./src/items-catalog.js?t=${Date.now()}`);
 
-// ─── State ─────────────────────────────────────────────────────────────────
+// ── State ──────────────────────────────────────────────────────────────────
 const S = {
-  trees:     JSON.parse(JSON.stringify(SHOP_TREES)),
-  activeIdx: 0,
+  equipment: JSON.parse(JSON.stringify(ALL_EQUIPMENT)),
+  items:     JSON.parse(JSON.stringify(ALL_ITEMS)),
+  tab:       'equipment',  // 'equipment' | 'items'
   selId:     null,
   dirty:     false,
 };
 
-const tree  = () => S.trees[S.activeIdx];
-const node  = () => S.selId ? tree().nodes.find(n => n.id === S.selId) : null;
+const RARITY_NAMES  = { 1: 'Обычный', 2: 'Необычный', 3: 'Редкий', 4: 'Легендарный' };
+const RARITY_COLORS = { 1: '#aaa', 2: '#4488ff', 3: '#aa44ff', 4: '#ff4444' };
+const ALL_STATS = ['strikeSpeed','maxHeat','heatDamageBonus','maxFuel','fuelDrainRate','visionRadius',
+  'radarCrystalModule','loopChargeLevel','idleAutoCloseDelay','loopPerkLevel','heatExplosionRadiusBonus',
+  'heatExplosionDamageBonus','maxHp','armor','goldBonus','luck','critChance','critMultiplier','heatRate'];
 
+function list() { return S[S.tab]; }
+function sel()  { return list().find(i => i.id === S.selId) ?? null; }
 function markDirty() { S.dirty = true; document.getElementById('unsaved').hidden = false; }
 function clearDirty() { S.dirty = false; document.getElementById('unsaved').hidden = true; }
 
-// ─── Toast ─────────────────────────────────────────────────────────────────
+// ── Toast ──────────────────────────────────────────────────────────────────
 function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 2000);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-// ─── Sheet ─────────────────────────────────────────────────────────────────
+// ── Sheet ──────────────────────────────────────────────────────────────────
 function openSheet() {
   document.getElementById('overlay').classList.add('open');
   document.getElementById('sheet').classList.add('open');
@@ -203,256 +242,322 @@ function closeSheet() {
   document.getElementById('overlay').classList.remove('open');
   document.getElementById('sheet').classList.remove('open');
   S.selId = null;
-  document.querySelectorAll('.node-card').forEach(c => c.classList.remove('sel'));
+  document.querySelectorAll('.item-card').forEach(c => c.classList.remove('sel'));
 }
 
-// ─── Serialize ─────────────────────────────────────────────────────────────
-function serialize() {
-  const ln = [];
-  ln.push(`/**\n * Конфигурация магазина прокачки.\n *\n * Структура:\n *   SHOP_TREES — массив деревьев прокачки.\n *\n * Каждое дерево:\n *   id       — уникальный строковый идентификатор\n *   name     — отображаемое название\n *   icon     — символ/emoji для таба\n *   nodes    — массив узлов дерева\n *\n * Каждый узел:\n *   id       — уникальный строковый идентификатор\n *   name     — отображаемое название\n *   icon     — символ/emoji\n *   desc     — описание эффекта одного уровня\n *   maxLevel — максимальный уровень (1 = разовая покупка)\n *   costs    — массив цен в золотое по уровням (length == maxLevel)\n *   row      — строка в сетке дерева (0 = верхний ряд)\n *   col      — столбец в сетке дерева (0 = левый)\n *   requires — id узла-родителя (null = корневой узел)\n *\n * Чтобы следующий уровень стал доступен, предыдущий должен быть куплен хотя бы на 1.\n * Чтобы дочерний узел (requires) стал доступен, родитель должен быть хотя бы на уровне 1.\n */`);
-  ln.push(`\nexport const SHOP_TREES = [`);
-  for (const t of S.trees) {
-    ln.push(`  {\n    id: ${JSON.stringify(t.id)},\n    name: ${JSON.stringify(t.name)},\n    icon: ${JSON.stringify(t.icon)},\n    nodes: [`);
-    for (const n of t.nodes) {
-      const req = (n.requires === null || n.requires === '') ? 'null' : JSON.stringify(n.requires);
-      ln.push(`      {\n        id: ${JSON.stringify(n.id)},\n        name: ${JSON.stringify(n.name)},\n        icon: ${JSON.stringify(n.icon)},\n        desc: ${JSON.stringify(n.desc)},\n        maxLevel: ${n.maxLevel},\n        costs: [${n.costs.join(', ')}],\n        row: ${n.row},\n        col: ${n.col},\n        requires: ${req},\n      },`);
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function categoryName(id) {
+  return CATEGORIES.find(c => c.id === id)?.name ?? id;
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────
+function getFilters() {
+  return {
+    search: document.getElementById('search').value.toLowerCase(),
+    cat:    document.getElementById('filter-cat').value,
+    rarity: document.getElementById('filter-rarity').value,
+  };
+}
+
+function applyFilters(items) {
+  const { search, cat, rarity } = getFilters();
+  return items.filter(item => {
+    if (cat && item.category !== cat) return false;
+    if (rarity && item.minRarity !== +rarity) return false;
+    if (search) {
+      const hay = `${item.name} ${item.desc} ${item.id}`.toLowerCase();
+      if (!hay.includes(search)) return false;
     }
-    ln.push(`    ],\n  },\n`);
-  }
-  ln.push(`];\n`);
-  return ln.join('\n');
+    return true;
+  });
 }
 
-// ─── Save ──────────────────────────────────────────────────────────────────
-let fileHandle = null;
-async function saveFile() {
-  try {
-    if (!fileHandle) fileHandle = await window.showSaveFilePicker({ suggestedName: 'src/shop-config.js', startIn: 'documents', types: [{ description: 'JavaScript', accept: { 'text/javascript': ['.js'] } }] });
-    const w = await fileHandle.createWritable();
-    await w.write(serialize());
-    await w.close();
-    clearDirty(); toast('Сохранено!');
-  } catch(e) { if (e.name !== 'AbortError') { fileHandle = null; toast('Ошибка'); } }
+// ── Populate category filter ────────────────────────────────────────────────
+function populateCategoryFilter() {
+  const sel = document.getElementById('filter-cat');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Все категории</option>' +
+    CATEGORIES.map(c => `<option value="${c.id}" ${c.id === cur ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
 }
 
-// ─── Render tabs ───────────────────────────────────────────────────────────
-function renderTabs() {
-  document.getElementById('tabs').innerHTML =
-    S.trees.map((t, i) =>
-      `<div class="tab ${i === S.activeIdx ? 'active' : ''}" data-ti="${i}">${t.icon} ${t.name}</div>`
-    ).join('') +
-    `<div class="tab-add" id="btn-add-tree">＋</div>`;
-}
-
-// ─── Render tree meta ──────────────────────────────────────────────────────
-function renderTreeMeta() {
-  const t = tree();
-  document.getElementById('tree-meta').innerHTML = `
-    <div class="meta-field">id <input id="t-id" value="${esc(t.id)}"></div>
-    <div class="meta-field">name <input id="t-name" value="${esc(t.name)}"></div>
-    <div class="meta-field">icon <input id="t-icon" value="${esc(t.icon)}" class="sm"></div>
-    <button class="btn-del-tree" id="btn-del-tree">Удалить</button>
-  `;
-  document.getElementById('t-id').onchange    = e => { t.id   = e.target.value; markDirty(); renderTabs(); };
-  document.getElementById('t-name').oninput   = e => { t.name = e.target.value; markDirty(); renderTabs(); };
-  document.getElementById('t-icon').oninput   = e => { t.icon = e.target.value; markDirty(); renderTabs(); };
-  document.getElementById('btn-del-tree').onclick = delTree;
-}
-
-// ─── Render node list ──────────────────────────────────────────────────────
+// ── Render list ────────────────────────────────────────────────────────────
 function renderList() {
-  const sorted = [...tree().nodes].sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
-  const reqName = id => tree().nodes.find(n => n.id === id)?.name ?? id;
+  const filtered = applyFilters(list());
+  document.getElementById('items-count').textContent = `${filtered.length} / ${list().length}`;
 
-  document.getElementById('nodes-list').innerHTML =
-    sorted.map(n => `
-      <div class="node-card ${S.selId === n.id ? 'sel' : ''}" data-nid="${esc(n.id)}">
-        <div class="node-icon">${n.icon}</div>
-        <div class="node-info">
-          <div class="node-name">${esc(n.name)}</div>
-          <div class="node-desc">${esc(n.desc)}</div>
-          <div class="node-meta">Lv${n.maxLevel} &nbsp;·&nbsp; ${n.costs.join(' / ')} ●
-            ${n.requires ? `&nbsp;<span class="node-req-badge">← ${esc(reqName(n.requires))}</span>` : ''}
+  const container = document.getElementById('items-list');
+  container.innerHTML = filtered.map(item => {
+    const rColor = RARITY_COLORS[item.minRarity] ?? '#aaa';
+    const rarityLabel = RARITY_NAMES[item.minRarity] ?? item.minRarity;
+    const tags = item.tags ? item.tags.map(t => `<span class="item-tag">${esc(t)}</span>`).join('') : '';
+    const effectLabel = item.effect ? `<span class="item-tag">${esc(item.effect.stat)} +${item.effect.value}</span>` : '';
+    return `
+      <div class="item-card ${S.selId === item.id ? 'sel' : ''}" data-id="${esc(item.id)}">
+        <div class="item-icon">${esc(item.icon)}</div>
+        <div class="item-info">
+          <div class="item-name">${esc(item.name)}</div>
+          <div class="item-desc">${esc(item.desc)}</div>
+          <div class="item-meta">
+            <span class="item-rarity" style="color:${rColor}">${rarityLabel}</span>
+            <span class="item-tag">${esc(categoryName(item.category))}</span>
+            ${tags}${effectLabel}
           </div>
         </div>
+        <div class="item-cost">${item.baseCost} ●</div>
       </div>
-    `).join('') +
-    `<button class="btn-add-node" id="btn-add-node">＋ Добавить узел</button>`;
+    `;
+  }).join('') + `<button class="btn-add-item" id="btn-add-item">＋ Добавить</button>`;
 
-  document.querySelectorAll('.node-card').forEach(el =>
-    el.addEventListener('click', () => { S.selId = el.dataset.nid; renderList(); renderSheetBody(); openSheet(); })
+  container.querySelectorAll('.item-card').forEach(el =>
+    el.addEventListener('click', () => {
+      S.selId = el.dataset.id;
+      renderList();
+      renderSheetBody();
+      openSheet();
+    })
   );
-  document.getElementById('btn-add-node').onclick = addNode;
+  document.getElementById('btn-add-item').onclick = addItem;
 }
 
-// ─── Sheet body ────────────────────────────────────────────────────────────
+// ── Sheet body ─────────────────────────────────────────────────────────────
 function renderSheetBody() {
-  const n = node();
-  if (!n) return;
+  const item = sel();
+  if (!item) return;
 
-  document.getElementById('sheet-title').textContent = n.name || 'Узел';
+  document.getElementById('sheet-title').textContent = item.name || 'Предмет';
 
-  const reqOpts = [
-    `<option value="">— нет —</option>`,
-    ...tree().nodes.filter(nd => nd.id !== n.id).map(nd =>
-      `<option value="${esc(nd.id)}" ${nd.id === n.requires ? 'selected' : ''}>${esc(nd.name)}</option>`
-    ),
-  ].join('');
+  const isEquip = item.type === 'equipment';
+  const catOpts = CATEGORIES.map(c =>
+    `<option value="${c.id}" ${c.id === item.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
+  ).join('');
+
+  const rarityOpts = [1,2,3,4].map(r =>
+    `<option value="${r}" ${item.minRarity === r ? 'selected' : ''}>${RARITY_NAMES[r]}</option>`
+  ).join('');
+
+  const statOpts = ALL_STATS.map(s =>
+    `<option value="${s}" ${item.effect?.stat === s ? 'selected' : ''}>${s}</option>`
+  ).join('');
+
+  const tagsHtml = isEquip
+    ? `<div class="field">
+        <label>Теги (синергии)</label>
+        <div class="tags-wrap" id="tags-wrap">
+          ${(item.tags ?? []).map((t, i) =>
+            `<div class="tag-chip">${esc(t)}<button data-ti="${i}" class="tag-rm">×</button></div>`
+          ).join('')}
+        </div>
+        <div class="tag-add-row" style="margin-top:6px">
+          <input id="tag-input" placeholder="Новый тег...">
+          <button class="tag-add-btn" id="tag-add">Добавить</button>
+        </div>
+      </div>`
+    : '';
+
+  const effectHtml = !isEquip
+    ? `<div class="sep"></div>
+       <div class="field-row">
+         <div class="field">
+           <label>Стат эффекта</label>
+           <select id="e-stat">${statOpts}</select>
+         </div>
+         <div class="field">
+           <label>Базовое значение</label>
+           <input id="e-val" type="number" step="0.01" value="${item.effect?.value ?? 0}">
+         </div>
+       </div>`
+    : '';
 
   document.getElementById('sheet-body').innerHTML = `
     <div class="field-row">
       <div class="field" style="flex:0 0 auto">
         <label>Иконка</label>
-        <input id="n-icon" class="icon-f" value="${esc(n.icon)}">
+        <input id="n-icon" class="icon-f" value="${esc(item.icon)}">
       </div>
       <div class="field">
         <label>Название</label>
-        <input id="n-name" value="${esc(n.name)}">
+        <input id="n-name" value="${esc(item.name)}">
       </div>
     </div>
     <div class="field">
       <label>id (технический)</label>
-      <input id="n-id" value="${esc(n.id)}">
+      <input id="n-id" value="${esc(item.id)}">
     </div>
     <div class="field">
       <label>Описание</label>
-      <textarea id="n-desc">${esc(n.desc)}</textarea>
+      <textarea id="n-desc">${esc(item.desc)}</textarea>
     </div>
     <div class="sep"></div>
     <div class="field-row">
       <div class="field">
-        <label>Max уровень</label>
-        <input id="n-maxlvl" type="number" min="1" max="20" value="${n.maxLevel}">
+        <label>Категория (пул)</label>
+        <select id="n-cat">${catOpts}</select>
       </div>
       <div class="field">
-        <label>Строка (row)</label>
-        <input id="n-row" type="number" min="0" value="${n.row}">
+        <label>Мин. редкость</label>
+        <select id="n-rarity">${rarityOpts}</select>
       </div>
       <div class="field">
-        <label>Столбец (col)</label>
-        <input id="n-col" type="number" min="0" value="${n.col}">
+        <label>Цена (Common)</label>
+        <input id="n-cost" type="number" min="1" value="${item.baseCost}">
       </div>
     </div>
-    <div class="field">
-      <label>Цены (× уровень)</label>
-      <div class="costs-wrap" id="costs-wrap">
-        ${n.costs.map((c, i) => `<input class="ci" type="number" data-i="${i}" value="${c}" min="1">`).join('')}
-      </div>
-    </div>
-    <div class="field">
-      <label>Требует (requires)</label>
-      <select id="n-req">${reqOpts}</select>
-    </div>
-    <div class="sep"></div>
-    <div class="field">
-      <label>Переместить в категорию</label>
-      <select id="n-move">
-        ${S.trees.map((t, i) => `<option value="${i}" ${i === S.activeIdx ? 'selected' : ''}>${esc(t.icon)} ${esc(t.name)}</option>`).join('')}
-      </select>
-    </div>
+    ${tagsHtml}
+    ${effectHtml}
   `;
 
-  // bind
-  const live = (id, fn) => document.getElementById(id)?.addEventListener('input', e => { fn(e.target.value); markDirty(); });
+  // bindings
+  const live   = (id, fn) => document.getElementById(id)?.addEventListener('input',  e => { fn(e.target.value); markDirty(); });
   const change = (id, fn) => document.getElementById(id)?.addEventListener('change', e => { fn(e.target.value); markDirty(); });
 
-  live('n-name', v => { n.name = v; document.getElementById('sheet-title').textContent = v || 'Узел'; renderList(); });
-  live('n-icon', v => { n.icon = v; renderList(); });
-  live('n-desc', v => { n.desc = v; renderList(); });
+  live('n-name', v => { item.name = v; document.getElementById('sheet-title').textContent = v || 'Предмет'; renderList(); });
+  live('n-icon', v => { item.icon = v; renderList(); });
+  live('n-desc', v => { item.desc = v; renderList(); });
 
   change('n-id', v => {
-    const old = n.id;
-    n.id = v;
-    tree().nodes.forEach(nd => { if (nd.requires === old) nd.requires = v; });
+    item.id = v;
     S.selId = v;
     renderList();
   });
 
-  change('n-maxlvl', v => {
-    const lvl = Math.max(1, +v || 1);
-    n.maxLevel = lvl;
-    while (n.costs.length < lvl) n.costs.push(Math.round((n.costs.at(-1) || 50) * 1.8));
-    while (n.costs.length > lvl) n.costs.pop();
-    markDirty();
-    // re-render costs only
-    document.getElementById('costs-wrap').innerHTML =
-      n.costs.map((c, i) => `<input class="ci" type="number" data-i="${i}" value="${c}" min="1">`).join('');
-    document.querySelectorAll('.ci').forEach(el =>
-      el.addEventListener('change', e => { n.costs[+el.dataset.i] = +e.target.value || 1; markDirty(); })
+  change('n-cat',    v => { item.category  = v; renderList(); });
+  change('n-rarity', v => { item.minRarity = +v; renderList(); });
+  change('n-cost',   v => { item.baseCost  = Math.max(1, +v || 1); renderList(); });
+
+  // Tags
+  if (isEquip) {
+    document.querySelectorAll('.tag-rm').forEach(btn =>
+      btn.addEventListener('click', () => {
+        item.tags.splice(+btn.dataset.ti, 1);
+        markDirty();
+        renderList();
+        renderSheetBody();
+      })
     );
-    renderList();
-  });
+    document.getElementById('tag-add')?.addEventListener('click', () => {
+      const input = document.getElementById('tag-input');
+      const val = input.value.trim();
+      if (val && !item.tags.includes(val)) {
+        item.tags.push(val);
+        markDirty();
+        renderList();
+        renderSheetBody();
+      }
+      input.value = '';
+    });
+    document.getElementById('tag-input')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('tag-add').click();
+    });
+  }
 
-  document.querySelectorAll('.ci').forEach(el =>
-    el.addEventListener('change', e => { n.costs[+el.dataset.i] = +e.target.value || 1; markDirty(); })
-  );
-
-  change('n-row', v => { n.row = Math.max(0, +v || 0); renderList(); });
-  change('n-col', v => { n.col = Math.max(0, +v || 0); renderList(); });
-  change('n-req',  v => { n.requires = v || null; renderList(); });
-
-  change('n-move', v => {
-    const targetIdx = +v;
-    if (targetIdx === S.activeIdx) return;
-    // remove from current tree
-    const cur = tree();
-    const idx = cur.nodes.findIndex(nd => nd.id === n.id);
-    if (idx === -1) return;
-    cur.nodes.splice(idx, 1);
-    // clear requires if it pointed to a node in the old tree
-    n.requires = null;
-    // add to target tree
-    S.trees[targetIdx].nodes.push(n);
-    S.activeIdx = targetIdx;
-    markDirty();
-    renderTabs();
-    renderTreeMeta();
-    renderList();
-    renderSheetBody();
-  });
+  // Effect
+  if (!isEquip) {
+    if (!item.effect) item.effect = { stat: 'luck', value: 1 };
+    change('e-stat', v => { item.effect.stat = v; renderList(); });
+    live('e-val',    v => { item.effect.value = parseFloat(v) || 0; renderList(); });
+  }
 }
 
-// ─── Actions ───────────────────────────────────────────────────────────────
-function addTree() {
-  S.trees.push({ id: `tree_${S.trees.length + 1}`, name: 'Новое', icon: '✦', nodes: [] });
-  S.activeIdx = S.trees.length - 1;
-  S.selId = null;
-  markDirty(); render();
-}
+// ── Actions ────────────────────────────────────────────────────────────────
+function addItem() {
+  const type = S.tab === 'equipment' ? 'equipment' : 'item';
+  const id   = `${type}_${Date.now()}`;
+  const base = {
+    id,
+    type,
+    name:      'Новый',
+    icon:      '✦',
+    desc:      'Описание',
+    category:  'stats',
+    minRarity: 1,
+    baseCost:  30,
+  };
+  if (type === 'equipment') base.tags = [];
+  else base.effect = { stat: 'luck', value: 1 };
 
-function delTree() {
-  if (S.trees.length <= 1) { toast('Нельзя удалить единственное дерево'); return; }
-  if (!confirm(`Удалить «${tree().name}»?`)) return;
-  S.trees.splice(S.activeIdx, 1);
-  S.activeIdx = Math.min(S.activeIdx, S.trees.length - 1);
-  S.selId = null;
-  markDirty(); closeSheet(); render();
-}
-
-function addNode() {
-  const maxRow = tree().nodes.reduce((m, n) => Math.max(m, n.row), -1);
-  const id = `node_${Date.now()}`;
-  tree().nodes.push({ id, name: 'Новый', icon: '✦', desc: 'Описание', maxLevel: 1, costs: [50], row: maxRow + 1, col: 0, requires: null });
+  list().push(base);
   S.selId = id;
-  markDirty(); renderList(); renderSheetBody(); openSheet();
+  markDirty();
+  renderList();
+  renderSheetBody();
+  openSheet();
 }
 
-function delNode() {
-  if (!S.selId || !confirm('Удалить узел?')) return;
-  const id = S.selId;
-  tree().nodes = tree().nodes.filter(n => n.id !== id);
-  tree().nodes.forEach(n => { if (n.requires === id) n.requires = null; });
+function delItem() {
+  if (!S.selId || !confirm('Удалить предмет?')) return;
+  const arr = list();
+  const idx = arr.findIndex(i => i.id === S.selId);
+  if (idx !== -1) arr.splice(idx, 1);
   S.selId = null;
-  markDirty(); closeSheet(); renderList();
+  markDirty();
+  closeSheet();
+  renderList();
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// ── Serialize ──────────────────────────────────────────────────────────────
+function serializeItem(item) {
+  const isEquip = item.type === 'equipment';
+  const lines = [];
+  lines.push(`  {`);
+  lines.push(`    id: ${JSON.stringify(item.id)},`);
+  lines.push(`    type: ${JSON.stringify(item.type)},`);
+  lines.push(`    name: ${JSON.stringify(item.name)},`);
+  lines.push(`    icon: ${JSON.stringify(item.icon)},`);
+  lines.push(`    desc: ${JSON.stringify(item.desc)},`);
+  lines.push(`    category: ${JSON.stringify(item.category)},`);
+  if (isEquip) lines.push(`    tags: ${JSON.stringify(item.tags ?? [])},`);
+  lines.push(`    minRarity: ${item.minRarity},`);
+  lines.push(`    baseCost: ${item.baseCost},`);
+  if (!isEquip && item.effect) lines.push(`    effect: { stat: ${JSON.stringify(item.effect.stat)}, value: ${item.effect.value} },`);
+  lines.push(`  },`);
+  return lines.join('\n');
+}
 
-// ─── Full render ───────────────────────────────────────────────────────────
-function render() { renderTabs(); renderTreeMeta(); renderList(); }
+function serialize() {
+  const eq = S.equipment.map(serializeItem).join('\n');
+  const it = S.items.map(serializeItem).join('\n');
+  return `// ── Equipment (части корпуса) ───────────────────────────────────────────────────\n\nexport const ALL_EQUIPMENT = [\n${eq}\n];\n\n// ── Items (предметы) ────────────────────────────────────────────────────────────\n\nexport const ALL_ITEMS = [\n${it}\n];\n`;
+}
 
-// ─── Static bindings ───────────────────────────────────────────────────────
+// ── Save ───────────────────────────────────────────────────────────────────
+let fileHandle = null;
+async function saveFile() {
+  try {
+    if (!fileHandle) fileHandle = await window.showSaveFilePicker({
+      suggestedName: 'items-catalog.js',
+      startIn: 'documents',
+      types: [{ description: 'JavaScript', accept: { 'text/javascript': ['.js'] } }],
+    });
+    const w = await fileHandle.createWritable();
+    await w.write(serialize());
+    await w.close();
+    clearDirty();
+    toast('Сохранено!');
+  } catch(e) {
+    if (e.name !== 'AbortError') { fileHandle = null; toast('Ошибка сохранения'); }
+  }
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  S.tab  = tab;
+  S.selId = null;
+  closeSheet();
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  renderList();
+}
+
+// ── Full render ────────────────────────────────────────────────────────────
+function render() {
+  populateCategoryFilter();
+  renderList();
+}
+
+// ── Static bindings ────────────────────────────────────────────────────────
 document.getElementById('btn-copy').onclick = () => {
   const text = serialize();
   if (navigator.clipboard?.writeText) {
@@ -461,30 +566,33 @@ document.getElementById('btn-copy').onclick = () => {
     copyFallback(text);
   }
 };
+
 function copyFallback(text) {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
   document.body.appendChild(ta);
-  ta.focus();
-  ta.select();
-  ta.setSelectionRange(0, text.length);
+  ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
   try { document.execCommand('copy'); toast('Скопировано!'); }
   catch { toast('Не удалось скопировать'); }
   document.body.removeChild(ta);
 }
-document.getElementById('btn-save').onclick  = saveFile;
-document.getElementById('overlay').onclick   = closeSheet;
-document.getElementById('sheet-close').onclick = closeSheet;
-document.getElementById('sheet-del').onclick = delNode;
+
+document.getElementById('btn-save').onclick     = saveFile;
+document.getElementById('overlay').onclick      = closeSheet;
+document.getElementById('sheet-close').onclick  = closeSheet;
+document.getElementById('sheet-del').onclick    = delItem;
 
 document.getElementById('tabs').addEventListener('click', e => {
-  const ti = e.target.closest('[data-ti]');
-  if (ti) { S.activeIdx = +ti.dataset.ti; S.selId = null; closeSheet(); render(); return; }
-  if (e.target.id === 'btn-add-tree') addTree();
+  const tab = e.target.closest('[data-tab]');
+  if (tab) switchTab(tab.dataset.tab);
 });
 
-// ─── Boot ──────────────────────────────────────────────────────────────────
+['search', 'filter-cat', 'filter-rarity'].forEach(id =>
+  document.getElementById(id).addEventListener('input', renderList)
+);
+
+// ── Boot ───────────────────────────────────────────────────────────────────
 render();
 </script>
 </body>
