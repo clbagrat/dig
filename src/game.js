@@ -1,6 +1,6 @@
 import { initShop, openShop, closeShop, renderShop, getEquipmentLevel, addSlot, unlockCategory, getLockedCategories, resetShopState } from "./shop.js?v=41";
 import { CATEGORIES, TAG_SYNERGIES } from "./items-catalog.js?v=1";
-import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS } from "./worldgen.js?v=39";
+import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS, DEPTH_LEVELS } from "./worldgen.js?v=40";
 
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
@@ -9457,6 +9457,34 @@ function initDebugMapMode() {
     }
     if (markerOn("base") && state.base) dot(state.base.x, state.base.y, "#00ff88", "#fff");
     if (markerOn("start")) dot(START_X, START_Y, "#ffffff", "#000");
+
+    // Depth level separator lines
+    const mapPxW = GRID_W * TILE_SIZE;
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.lineWidth = 1 / zoom;
+    for (const lvl of DEPTH_LEVELS) {
+      if (lvl.level === 1) continue; // skip top edge
+      const lineY = lvl.startY * TILE_SIZE - camY;
+      ctx.strokeStyle = "rgba(255,200,80,0.45)";
+      ctx.beginPath();
+      ctx.moveTo(-camX, lineY);
+      ctx.lineTo(mapPxW - camX, lineY);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // Level labels (left edge) — constant 12px screen size
+    const labelPx = 12 / zoom;
+    ctx.font = `bold ${labelPx}px monospace`;
+    ctx.textBaseline = "top";
+    for (const lvl of DEPTH_LEVELS) {
+      const labelY = lvl.startY * TILE_SIZE - camY + 2 / zoom;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillText(`L${lvl.level}  y${lvl.startY}–${lvl.endY}`, 4 / zoom - camX, labelY + 1 / zoom);
+      ctx.fillStyle = "rgba(255,200,80,0.85)";
+      ctx.fillText(`L${lvl.level}  y${lvl.startY}–${lvl.endY}`, 4 / zoom - camX, labelY);
+    }
+    ctx.restore();
 
     ctx.restore();
   }

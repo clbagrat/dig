@@ -8,6 +8,16 @@ export const START_X = Math.floor(GRID_W / 2);
 export const START_Y = 1;
 
 export const VISION_RADIUS = 5;
+
+export const DEPTH_LEVEL_COUNT = 8;
+export const DEPTH_LEVELS = Array.from({ length: DEPTH_LEVEL_COUNT }, (_, i) => {
+  const span = GRID_H - START_Y;
+  const startY = START_Y + Math.round(i * span / DEPTH_LEVEL_COUNT);
+  const endY   = i < DEPTH_LEVEL_COUNT - 1
+    ? START_Y + Math.round((i + 1) * span / DEPTH_LEVEL_COUNT) - 1
+    : GRID_H - 1;
+  return { level: i + 1, startY, endY };
+});
 const START_EASY_RADIUS = VISION_RADIUS;
 const START_NEAR_RADIUS = 7;
 const START_NEAR_GOLD_COUNT = 12;
