@@ -1,6 +1,18 @@
 import { initShop, openShop, closeShop, renderShop, getEquipmentLevel, addSlot, unlockCategory, getLockedCategories, resetShopState } from "./shop.js?v=41";
 import { CATEGORIES, TAG_SYNERGIES } from "./items-catalog.js?v=1";
-import { generateMap, mulberry32 as _mulberry32, GRID_W, GRID_H, START_X, START_Y, VISION_RADIUS, DEPTH_LEVELS } from "./worldgen.js?v=40";
+import {
+  generateMap,
+  mulberry32 as _mulberry32,
+  GRID_W,
+  GRID_H,
+  START_X,
+  START_Y,
+  VISION_RADIUS,
+  DEPTH_LEVELS,
+  getGenerationConfig,
+  setGenerationConfig,
+  resetGenerationConfig,
+} from "./worldgen.js?v=42";
 
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
@@ -76,6 +88,8 @@ const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
 const XP_PER_BLOCK = 1;
 const XP_PICKUP_RADIUS = 1;
+const GENERATION_CONFIG_STORAGE_KEY = "dig:generation-config";
+const DEBUG_MODE = new URLSearchParams(location.search).has("debug-map");
 
 const LEVEL_REWARD_DEFS = {
   1: [
@@ -263,6 +277,10 @@ const state = {
   beaconActivationAnim: null, // { beacon, startTs, pendingAction }
   debugPerkMenuOpen: false,
   debugPerkSelection: "",
+  generationEditorText: "",
+  generationEditorStatus: "",
+  generationEditorStatusTone: "",
+  debugMapGenerationPanelCollapsed: false,
   crystalRewardModalOpen: false,
   crystalRewardCloseReady: false,
   crystalRewardRevealStage: 0,
@@ -1053,6 +1071,179 @@ function newWorldSeed() {
   return ((Date.now() >>> 0) ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
 }
 
+function loadStoredGenerationConfig() {
+  try {
+    const raw = localStorage.getItem(GENERATION_CONFIG_STORAGE_KEY);
+    if (!raw) {
+      state.generationEditorText = JSON.stringify(getGenerationConfig(), null, 2);
+      state.generationEditorStatus = "";
+      state.generationEditorStatusTone = "";
+      return;
+    }
+    const config = setGenerationConfig(JSON.parse(raw));
+    state.generationEditorText = JSON.stringify(config, null, 2);
+    state.generationEditorStatus = "Stored generation config loaded.";
+    state.generationEditorStatusTone = "ok";
+  } catch (error) {
+    const resetConfig = resetGenerationConfig();
+    clearStoredGenerationConfig();
+    console.warn("Stored generation config was invalid and got reset:", error);
+    state.generationEditorText = JSON.stringify(resetConfig, null, 2);
+    state.generationEditorStatus = `Stored generation config was invalid and reset to defaults: ${error.message || error}`;
+    state.generationEditorStatusTone = "error";
+  }
+}
+
+function persistGenerationConfig(config) {
+  localStorage.setItem(GENERATION_CONFIG_STORAGE_KEY, JSON.stringify(config));
+}
+
+function clearStoredGenerationConfig() {
+  localStorage.removeItem(GENERATION_CONFIG_STORAGE_KEY);
+}
+
+function bindGenerationDebugControls() {
+  const debugGenerationSection = document.getElementById("debugGenerationSection");
+  if (debugGenerationSection) {
+    debugGenerationSection.hidden = !DEBUG_MODE;
+  }
+
+  const debugGenerationEditor = document.getElementById("debugGenerationEditor");
+  if (debugGenerationEditor && !debugGenerationEditor.dataset.bound) {
+    debugGenerationEditor.value = state.generationEditorText || JSON.stringify(getGenerationConfig(), null, 2);
+    debugGenerationEditor.addEventListener("input", () => {
+      state.generationEditorText = debugGenerationEditor.value;
+      state.generationEditorStatus = "Generation config edited but not applied.";
+      state.generationEditorStatusTone = "";
+      syncGenerationDebugEditor();
+    });
+    debugGenerationEditor.dataset.bound = "1";
+  }
+
+  const debugGenApply = document.getElementById("debugGenApply");
+  if (debugGenApply && !debugGenApply.dataset.bound) {
+    debugGenApply.addEventListener("click", () => {
+      try {
+        const nextConfig = JSON.parse(document.getElementById("debugGenerationEditor")?.value || "[]");
+        const appliedConfig = setGenerationConfig(nextConfig);
+        persistGenerationConfig(appliedConfig);
+        state.generationEditorText = JSON.stringify(appliedConfig, null, 2);
+        state.generationEditorStatus = "Generation config applied. Current seed regenerated.";
+        state.generationEditorStatusTone = "ok";
+        regenerateCurrentSeed(true);
+      } catch (error) {
+        state.generationEditorStatus = `Apply failed: ${error.message || error}`;
+        state.generationEditorStatusTone = "error";
+        syncGenerationDebugEditor();
+      }
+    });
+    debugGenApply.dataset.bound = "1";
+  }
+
+  const debugGenReset = document.getElementById("debugGenReset");
+  if (debugGenReset && !debugGenReset.dataset.bound) {
+    debugGenReset.addEventListener("click", () => {
+      const resetConfig = resetGenerationConfig();
+      clearStoredGenerationConfig();
+      state.generationEditorText = JSON.stringify(resetConfig, null, 2);
+      state.generationEditorStatus = "Generation config reset to defaults. Current seed regenerated.";
+      state.generationEditorStatusTone = "ok";
+      regenerateCurrentSeed(true);
+    });
+    debugGenReset.dataset.bound = "1";
+  }
+
+  const debugGenRegen = document.getElementById("debugGenRegen");
+  if (debugGenRegen && !debugGenRegen.dataset.bound) {
+    debugGenRegen.addEventListener("click", () => {
+      state.generationEditorStatus = "Current seed regenerated with active generation config.";
+      state.generationEditorStatusTone = "ok";
+      regenerateCurrentSeed(true);
+    });
+    debugGenRegen.dataset.bound = "1";
+  }
+}
+
+function syncDebugMapGenerationPanelCollapse() {
+  const overlay = document.getElementById("debugPerkMenu");
+  const panel = overlay?.querySelector(".debug-perk-menu__panel");
+  const generationSection = document.getElementById("debugGenerationSection");
+  const closeButton = document.getElementById("debugPerkClose");
+  if (!overlay || !panel || !generationSection || !closeButton || !DEBUG_MODE) {
+    return;
+  }
+
+  generationSection.hidden = state.debugMapGenerationPanelCollapsed;
+  closeButton.textContent = state.debugMapGenerationPanelCollapsed ? "Развернуть" : "Свернуть";
+  panel.style.width = state.debugMapGenerationPanelCollapsed
+    ? "min(320px, calc(100vw - 24px))"
+    : "min(560px, calc(100vw - 24px))";
+}
+
+function showDebugMapGenerationPanel() {
+  const overlay = document.getElementById("debugPerkMenu");
+  const panel = overlay?.querySelector(".debug-perk-menu__panel");
+  const seedDisplay = document.getElementById("debugSeedDisplay");
+  const subtitle = overlay?.querySelector(".debug-perk-menu__subtitle");
+  const closeButton = document.getElementById("debugPerkClose");
+  if (!overlay || !panel) {
+    return;
+  }
+
+  overlay.hidden = false;
+  overlay.removeAttribute("hidden");
+  overlay.style.cssText = [
+    "position:fixed",
+    "top:12px",
+    "left:12px",
+    "right:auto",
+    "bottom:auto",
+    "z-index:150",
+    "display:block",
+    "visibility:visible",
+    "pointer-events:auto",
+    "opacity:1",
+    "padding:0",
+    "background:none",
+    "backdrop-filter:none",
+  ].join(";");
+  panel.style.maxWidth = "min(560px, calc(100vw - 24px))";
+  panel.style.maxHeight = "calc(100vh - 24px)";
+  panel.style.overflow = "auto";
+
+  overlay.querySelectorAll(".debug-perk-menu__section").forEach((section) => {
+    section.hidden = section.id !== "debugGenerationSection";
+  });
+  if (subtitle) {
+    subtitle.textContent = "Generation config editor";
+  }
+  if (seedDisplay) {
+    seedDisplay.textContent = `Seed: ${state.worldSeed}`;
+  }
+  if (closeButton) {
+    closeButton.hidden = false;
+    closeButton.textContent = state.debugMapGenerationPanelCollapsed ? "Развернуть" : "Свернуть";
+    if (!closeButton.dataset.boundDebugMapToggle) {
+      closeButton.addEventListener("click", () => {
+        state.debugMapGenerationPanelCollapsed = !state.debugMapGenerationPanelCollapsed;
+        syncDebugMapGenerationPanelCollapse();
+      });
+      closeButton.dataset.boundDebugMapToggle = "1";
+    }
+  }
+  bindGenerationDebugControls();
+  syncGenerationDebugEditor();
+  syncDebugMapGenerationPanelCollapse();
+}
+
+function revealFullMapInDebugMode() {
+  if (!state.debugMapActive) {
+    return;
+  }
+  state.visibleAlpha.fill(1);
+  state.visibleMask.fill(1);
+}
+
 function chooseWeightedPerk(weights, random = Math.random) {
   let total = 0;
   for (let i = 1; i < weights.length; i += 1) {
@@ -1278,7 +1469,7 @@ function revealSteamPocket(x, y, dirX, dirY) {
   state.steamJets.push(jet);
 }
 
-function setupField() {
+function setupField(seedOverride = null) {
   state.pathIndexByCell.fill(-1);
   state.perkMask.fill(0);
   state.crystalMask.fill(0);
@@ -1463,7 +1654,7 @@ function setupField() {
   state.drill.digDelayTimer = 0;
   state.drill.digDelayDx = 0;
   state.drill.digDelayDy = 0;
-  state.worldSeed = newWorldSeed();
+  state.worldSeed = seedOverride ?? newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
   window.__worldSeed = state.worldSeed;
   console.log("World seed:", state.worldSeed);
@@ -2191,151 +2382,13 @@ function applyItemEffect(effect, rarityMult) {
 }
 
 async function openDebugMapWindow() {
-  // Try map server first (node scripts/map-server.js must be running)
-  const seed = state.worldSeed;
-  try {
-    const res = await fetch(`http://localhost:3747/map?seed=${seed}`, { signal: AbortSignal.timeout(1500) });
-    if (res.ok) {
-      const svg = await res.text();
-      const win = window.open("", "_blank");
-      win.document.write(`<!DOCTYPE html><html><head><title>Debug Map — seed ${seed}</title>
-        <style>*{margin:0;padding:0}body{background:#0b0706}svg{display:block;max-width:100%}</style></head>
-        <body>${svg}</body></html>`);
-      win.document.close();
-      return;
-    }
-  } catch (_) { /* server not running, fall through to canvas */ }
-
-  // Canvas fallback
-  const PX = 8;
-  const W = GRID_W, H = GRID_H;
-  const canvas = document.createElement("canvas");
-  canvas.width  = W * PX;
-  canvas.height = H * PX;
-  const ctx = canvas.getContext("2d");
-  const img = ctx.createImageData(W * PX, H * PX);
-  const d = img.data;
-
-  function setPixel(tx, ty, r, g, b) {
-    for (let dy = 0; dy < PX; dy++) {
-      for (let dx = 0; dx < PX; dx++) {
-        const i = ((ty * PX + dy) * W * PX + (tx * PX + dx)) * 4;
-        d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 255;
-      }
-    }
+  const url = new URL(window.location.href);
+  url.searchParams.set("debug-map", "1");
+  url.searchParams.set("seed", String(state.worldSeed));
+  const popup = window.open(url.toString(), "_blank");
+  if (!popup) {
+    showPerkToast("Браузер заблокировал debug map");
   }
-
-  const hardnessColors = [
-    [15, 10, 6],    // 0 — air
-    [90, 75, 55],   // 1 — soft
-    [65, 55, 40],   // 2 — medium
-    [45, 38, 28],   // 3 — hard
-    [28, 22, 16],   // 4 — very hard
-    [20, 15, 10],   // 5+
-  ];
-
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      const h = state.hardness[i];
-      const open = state.tunnelMask[i] === 1 || h === 0;
-      let r, g, b;
-      if (state.goldOreMask[i])        { r=220; g=180; b=30;  }
-      else if (state.metalMask[i])     { r=80;  g=160; b=220; }
-      else if (state.hazardMask[i])    { r=200; g=50;  b=50;  }
-      else if (state.gasPocketMask[i]) { r=80;  g=200; b=80;  }
-      else if (state.perkMask[i])      { r=200; g=80;  b=200; }
-      else if (state.crystalMask[i])   { r=80;  g=200; b=200; }
-      else if (state.beaconMask[i])    { r=255; g=140; b=0;   }
-      else if (state.artifactMask[i])  { r=255; g=255; b=80;  }
-      else if (open)                   { r=22;  g=15;  b=9;   }
-      else {
-        const c = hardnessColors[Math.min(h, hardnessColors.length - 1)];
-        r = c[0]; g = c[1]; b = c[2];
-      }
-      setPixel(x, y, r, g, b);
-    }
-  }
-
-  ctx.putImageData(img, 0, 0);
-
-  // Helper: draw outlined marker
-  function drawMarker(tx, ty, fillColor, outlineColor, radius) {
-    const cx = tx * PX + PX / 2;
-    const cy = ty * PX + PX / 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = outlineColor;
-    ctx.stroke();
-  }
-
-  function drawRect(tx, ty, fillColor, outlineColor) {
-    const x = tx * PX, y = ty * PX;
-    ctx.fillStyle = fillColor;
-    ctx.fillRect(x, y, PX, PX);
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = outlineColor;
-    ctx.strokeRect(x + 0.75, y + 0.75, PX - 1.5, PX - 1.5);
-  }
-
-  // Base
-  drawRect(state.base.x, state.base.y, "#00ff88", "#ffffff");
-
-  // Safes
-  for (const s of state.safes) {
-    if (!s.opened) drawMarker(s.x, s.y, "#8888ff", "#ffffff", PX * 0.55);
-  }
-
-  // Worm nests
-  for (const n of state.wormNests) {
-    drawMarker(n.x, n.y, "#ff4444", "#ffaaaa", PX * 0.6);
-  }
-
-  // Beacons
-  for (const b of state.beacons) {
-    const color = b.active ? "#00ffcc" : "#ff8800";
-    drawMarker(b.x, b.y, color, "#ffffff", PX * 0.65);
-  }
-
-  // Player
-  drawMarker(Math.round(state.px), Math.round(state.py), "#ffffff", "#000000", PX * 0.7);
-
-  // Open in new tab
-  const url = canvas.toDataURL("image/png");
-  const win = window.open("", "_blank");
-  win.document.write(`<!DOCTYPE html><html><head><title>Debug Map — seed ${state.worldSeed}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#0f0b09;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:14px;font:12px monospace;color:#d79f49;}
-  h1{font-size:13px;color:#f1dfb6;}
-  img{image-rendering:pixelated;max-width:100%;border:1px solid #333;display:block;}
-  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
-  .leg{display:flex;align-items:center;gap:5px;}
-  .sw{width:13px;height:13px;border-radius:2px;flex-shrink:0;border:1px solid rgba(255,255,255,0.2);}
-  .sw.circle{border-radius:50%;}
-</style></head><body>
-<h1>Seed: ${state.worldSeed} &nbsp;·&nbsp; ${W}×${H} tiles &nbsp;·&nbsp; ${PX}px/tile</h1>
-<img src="${url}">
-<div class="legend">
-  <div class="leg"><div class="sw" style="background:#ffffff;border-color:#000"></div> Игрок</div>
-  <div class="leg"><div class="sw" style="background:#00ff88"></div> База</div>
-  <div class="leg"><div class="sw circle" style="background:#ff8800"></div> Маяк</div>
-  <div class="leg"><div class="sw circle" style="background:#00ffcc"></div> Маяк (актив.)</div>
-  <div class="leg"><div class="sw circle" style="background:#ffff50"></div> Артефакт</div>
-  <div class="leg"><div class="sw circle" style="background:#8888ff"></div> Сейф</div>
-  <div class="leg"><div class="sw circle" style="background:#ff4444"></div> Червь</div>
-  <div class="leg"><div class="sw" style="background:#dcb41e"></div> Золото</div>
-  <div class="leg"><div class="sw" style="background:#50a0dc"></div> Металл</div>
-  <div class="leg"><div class="sw" style="background:#c83232"></div> Опасность</div>
-  <div class="leg"><div class="sw" style="background:#50c850"></div> Газ</div>
-  <div class="leg"><div class="sw" style="background:#c850c8"></div> Перк</div>
-  <div class="leg"><div class="sw" style="background:#50c8c8"></div> Кристалл</div>
-</div>
-</body></html>`);
-  win.document.close();
 }
 
 function showDebugToast(text) {
@@ -2552,6 +2605,7 @@ function bindFatalErrorHandlers() {
 function init() {
   bindFatalErrorHandlers();
   try {
+    loadStoredGenerationConfig();
     state.ctx = state.canvas.getContext("2d");
     state.sprites = createSpriteAtlas();
     resize();
@@ -2590,6 +2644,7 @@ function bindUi() {
   const debugClose = document.getElementById("debugPerkClose");
   const debugOverlay = document.getElementById("debugPerkMenu");
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
+  const debugGenerationSection = document.getElementById("debugGenerationSection");
   const crystalRewardOverlay = document.getElementById("crystalReward");
   const crystalRewardClose = document.getElementById("crystalRewardClose");
   const artifactChoiceOverlay = document.getElementById("artifactChoice");
@@ -2598,6 +2653,7 @@ function bindUi() {
 
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
+  bindGenerationDebugControls();
 
   const syncKeyboardAim = () => {
     const left = keysDown.has("arrowleft") || keysDown.has("a") || keysDown.has("ф");
@@ -3024,7 +3080,9 @@ function bindUi() {
   const debugOpenMap = document.getElementById("debugOpenMap");
   if (debugOpenMap) {
     debugOpenMap.addEventListener("click", () => {
-      openDebugMapWindow();
+      openDebugMapWindow().catch((error) => {
+        reportFatalError(error, "openDebugMapWindow");
+      });
     });
   }
 
@@ -3179,6 +3237,39 @@ function buildDebugPerkButtons() {
   }
 }
 
+function syncGenerationDebugEditor() {
+  const editor = document.getElementById("debugGenerationEditor");
+  const status = document.getElementById("debugGenStatus");
+  if (editor && document.activeElement !== editor) {
+    if (!state.generationEditorText) {
+      state.generationEditorText = JSON.stringify(getGenerationConfig(), null, 2);
+    }
+    editor.value = state.generationEditorText;
+  }
+  if (status) {
+    status.textContent = state.generationEditorStatus || `Current seed: ${state.worldSeed}. Apply regenerates the same seed with the edited config.`;
+    if (state.generationEditorStatusTone) {
+      status.dataset.tone = state.generationEditorStatusTone;
+    } else {
+      delete status.dataset.tone;
+    }
+  }
+}
+
+function regenerateCurrentSeed(reopenDebugMenu = false) {
+  const seed = state.worldSeed || newWorldSeed();
+  setupField(seed);
+  revealFullMapInDebugMode();
+  if (reopenDebugMenu) {
+    if (DEBUG_MODE && state.debugMapActive) {
+      showDebugMapGenerationPanel();
+      return;
+    }
+    state.debugPerkMenuOpen = true;
+    syncDebugPerkOverlay();
+  }
+}
+
 function syncTouchZonesInteractivity() {
   const touchZones = document.querySelector(".touch-zones");
   if (!touchZones) {
@@ -3212,6 +3303,7 @@ function syncManualModal() {
     overlay.hidden = true;
     overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
   }
+  syncGenerationDebugEditor();
   syncTouchZonesInteractivity();
 }
 
@@ -3935,7 +4027,7 @@ function rebuildVisibilityMask() {
     for (let n = 0; n < 8; n += 1) {
       const nx = cx + stepDxLUT[n];
       const ny = cy + stepDyLUT[n];
-      if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) continue;
+      if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
       const ddx = nx - startX;
       const ddy = ny - startY;
       if (ddx * ddx + ddy * ddy > radiusSq) continue;
@@ -3977,7 +4069,7 @@ function rebuildVisibilityMask() {
         if (ox === 0 && oy === 0) continue;
         const nx = x + ox;
         const ny = y + oy;
-        if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) continue;
+        if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
         const nextIndex = cellIndex(nx, ny);
         if (_visFogDistance[nextIndex] !== -1) continue;
         const nextDistance = distance + 1;
@@ -9382,22 +9474,21 @@ function renderVisionMask(camera) {
 
 // ── Debug map mode (?debug-map query param) ──────────────────────────────────
 function initDebugMapMode() {
-  // Hide all HTML UI overlays, keep canvas
-  document.querySelectorAll(".app-shell > *:not(#game)").forEach((el) => { el.hidden = true; });
+  // Hide all HTML UI overlays except the generation editor, keep canvas
+  document.querySelectorAll(".app-shell > *:not(#game):not(#debugPerkMenu)").forEach((el) => { el.hidden = true; });
   state.canvas.style.cssText = "position:fixed;top:0;left:0;cursor:grab;touch-action:none;display:block;";
 
   // Init game subsystems (sprites + map) without starting the game loop
+  loadStoredGenerationConfig();
   state.ctx = state.canvas.getContext("2d");
   state.sprites = createSpriteAtlas();
   resize();
   setupField(); // generates map using seed from URL (?seed=) or random
-
-  // Reveal the whole map — set all visibleAlpha to 1 (no fog)
-  state.visibleAlpha.fill(1);
-  state.visibleMask.fill(1);
+  showDebugMapGenerationPanel();
 
   // Enter debug map mode — getCamera() and getCameraZoom() will use debugMapCamera
   state.debugMapActive = true;
+  revealFullMapInDebugMode();
 
   // Initial camera: fit whole map on screen, centered
   const mapW = GRID_W * TILE_SIZE;
@@ -9458,19 +9549,18 @@ function initDebugMapMode() {
     if (markerOn("base") && state.base) dot(state.base.x, state.base.y, "#00ff88", "#fff");
     if (markerOn("start")) dot(START_X, START_Y, "#ffffff", "#000");
 
-    // Depth level separator lines
-    const mapPxW = GRID_W * TILE_SIZE;
+    // Depth level bounds
     ctx.save();
     ctx.setLineDash([6, 4]);
     ctx.lineWidth = 1 / zoom;
     for (const lvl of DEPTH_LEVELS) {
-      if (lvl.level === 1) continue; // skip top edge
-      const lineY = lvl.startY * TILE_SIZE - camY;
       ctx.strokeStyle = "rgba(255,200,80,0.45)";
-      ctx.beginPath();
-      ctx.moveTo(-camX, lineY);
-      ctx.lineTo(mapPxW - camX, lineY);
-      ctx.stroke();
+      ctx.strokeRect(
+        lvl.xMin * TILE_SIZE - camX,
+        lvl.startY * TILE_SIZE - camY,
+        (lvl.xMax - lvl.xMin + 1) * TILE_SIZE,
+        (lvl.endY - lvl.startY + 1) * TILE_SIZE,
+      );
     }
     ctx.setLineDash([]);
     // Level labels (left edge) — constant 12px screen size
@@ -9479,10 +9569,11 @@ function initDebugMapMode() {
     ctx.textBaseline = "top";
     for (const lvl of DEPTH_LEVELS) {
       const labelY = lvl.startY * TILE_SIZE - camY + 2 / zoom;
+      const labelX = lvl.xMin * TILE_SIZE - camX + 4 / zoom;
       ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillText(`L${lvl.level}  y${lvl.startY}–${lvl.endY}`, 4 / zoom - camX, labelY + 1 / zoom);
+      ctx.fillText(`L${lvl.level}  ${lvl.xMin}-${lvl.xMax}  y${lvl.startY}-${lvl.endY}`, labelX, labelY + 1 / zoom);
       ctx.fillStyle = "rgba(255,200,80,0.85)";
-      ctx.fillText(`L${lvl.level}  y${lvl.startY}–${lvl.endY}`, 4 / zoom - camX, labelY);
+      ctx.fillText(`L${lvl.level}  ${lvl.xMin}-${lvl.xMax}  y${lvl.startY}-${lvl.endY}`, labelX, labelY);
     }
     ctx.restore();
 

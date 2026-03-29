@@ -737,6 +737,46 @@ strong {
   font-size: 12px;
 }
 
+.debug-generation {
+  display: grid;
+  gap: 10px;
+}
+
+.debug-generation__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.debug-generation__status {
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.debug-generation__status[data-tone="error"] {
+  color: #ff9c85;
+}
+
+.debug-generation__status[data-tone="ok"] {
+  color: #a6d39b;
+}
+
+.debug-generation__editor {
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  border: 1px solid rgba(215, 159, 73, 0.34);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(14, 9, 7, 0.88);
+  color: var(--text);
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre;
+  tab-size: 2;
+}
+
 .fatal-error {
   position: absolute;
   inset: 0;

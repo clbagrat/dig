@@ -1,92 +1,63 @@
 // World generation module — pure functions, no game state.
 // Both game.js and the debug render script import from here.
 
-// Vertical dungeon map: player starts at top, difficulty increases with depth.
 export const GRID_W = 100;
-export const GRID_H = 240;
 export const START_X = Math.floor(GRID_W / 2);
 export const START_Y = 1;
-
 export const VISION_RADIUS = 5;
 
-export const DEPTH_LEVEL_COUNT = 8;
-export const DEPTH_LEVELS = Array.from({ length: DEPTH_LEVEL_COUNT }, (_, i) => {
-  const span = GRID_H - START_Y;
-  const startY = START_Y + Math.round(i * span / DEPTH_LEVEL_COUNT);
-  const endY   = i < DEPTH_LEVEL_COUNT - 1
-    ? START_Y + Math.round((i + 1) * span / DEPTH_LEVEL_COUNT) - 1
-    : GRID_H - 1;
-  return { level: i + 1, startY, endY };
-});
+export const HAZARD_TYPES = { SPIKE: 1, VOLATILE: 2 };
+
 const START_EASY_RADIUS = VISION_RADIUS;
-const START_NEAR_RADIUS = 7;
-const START_NEAR_GOLD_COUNT = 12;
-// Base hides in the bottom zone (deep floor)
-const BASE_ZONE_MIN_Y = Math.floor(GRID_H * 0.82); // ~197
-const BASE_ZONE_MAX_Y = GRID_H - 5;
-// Entry beacons: one left, one right of start at shallow depth
-const ENTRY_BEACON_X_OFFSET = 14;
-const ENTRY_BEACON_Y = START_Y + 8;
+
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 26;
 const TILES_PER_PERK_ZONE = 380;
 const TILES_PER_CRYSTAL_TILE = 22;
 const CRYSTAL_MIN_DISTANCE = 3;
-const METAL_VEIN_GROUPS = 14;
-const GOLD_ORE_GROUPS = 135;
-const GAS_POCKET_GROUPS = 10;
-const STEAM_POCKET_GROUPS = 8;
-const BOULDER_POCKET_GROUPS = 8;
-const BOULDER_MIN_START_DISTANCE = 4;
-export const BEACON_COUNT = 22;
-const BEACON_MIN_DEPTH = 18;  // min Y below START_Y for regular beacons
-const BEACON_MIN_SPACING = 12; // min distance between any two beacons
+const BEACON_MIN_SPACING = 10;
 const ARTIFACT_MIN_DISTANCE = 8;
 const ARTIFACT_MIN_BEACON_DIST = 5;
-const SAFE_COUNT = 4;
 const SAFE_MIN_DISTANCE = 20;
 const SAFE_MIN_START_DISTANCE = 20;
 const SAFE_KEY_MIN_DIST = 6;
 const SAFE_KEY_MAX_DIST = 14;
-const WORM_NEST_COUNT = 6;
 const WORM_NEST_MIN_DISTANCE = 18;
 const WORM_NEST_MIN_START_DISTANCE = 25;
 const WORM_NEST_MIN_BEACON_DIST = 5;
 
-export const HAZARD_TYPES = { SPIKE: 1, VOLATILE: 2 };
-
 export const BLOCK_TYPES = [
-  { color: "#1a1410", label: "Tunnel",  vein: "#3c2d22" },
-  { color: "#5f4631", label: "Tier 1",  vein: "#9b7a4a" },
-  { color: "#715337", label: "Tier 2",  vein: "#c59a5c" },
-  { color: "#6a4f37", label: "Tier 3",  vein: "#d0a66a" },
-  { color: "#6f4f40", label: "Tier 4",  vein: "#b66e3b" },
-  { color: "#60473f", label: "Tier 5",  vein: "#a57f58" },
-  { color: "#4f3d36", label: "Tier 6",  vein: "#9cb1b7" },
-  { color: "#3e3236", label: "Tier 7",  vein: "#d6d9df" },
+  { color: "#1a1410", label: "Tunnel", vein: "#3c2d22" },
+  { color: "#5f4631", label: "Tier 1", vein: "#9b7a4a" },
+  { color: "#715337", label: "Tier 2", vein: "#c59a5c" },
+  { color: "#6a4f37", label: "Tier 3", vein: "#d0a66a" },
+  { color: "#6f4f40", label: "Tier 4", vein: "#b66e3b" },
+  { color: "#60473f", label: "Tier 5", vein: "#a57f58" },
+  { color: "#4f3d36", label: "Tier 6", vein: "#9cb1b7" },
+  { color: "#3e3236", label: "Tier 7", vein: "#d6d9df" },
 ];
 
 export const TILE_PERK_TYPES = [
   null,
-  { name: "Бак",         icon: "F", color: "#ffcf7a" },
-  { name: "Радар",       icon: "R", color: "#f2ede2" },
-  { name: "Бур",         icon: "D", color: "#ff9f6b" },
-  { name: "Бомба",       icon: "*", color: "#c796ff" },
-  { name: "Скорость",    icon: "S", color: "#9fd7ff" },
-  { name: "HP+",         icon: "H", color: "#73e58f" },
-  { name: "Броня",       icon: "A", color: "#b4d7ff" },
+  { name: "Бак", icon: "F", color: "#ffcf7a" },
+  { name: "Радар", icon: "R", color: "#f2ede2" },
+  { name: "Бур", icon: "D", color: "#ff9f6b" },
+  { name: "Бомба", icon: "*", color: "#c796ff" },
+  { name: "Скорость", icon: "S", color: "#9fd7ff" },
+  { name: "HP+", icon: "H", color: "#73e58f" },
+  { name: "Броня", icon: "A", color: "#b4d7ff" },
 ];
 
 export const TILE_PERK_WEIGHTS = [0, 7, 0, 0, 4, 0, 2, 2];
 
 export const CRYSTAL_TYPES = [
   null,
-  { name: "Red",    color: "#ff4747" },
+  { name: "Red", color: "#ff4747" },
   { name: "Yellow", color: "#ffd166" },
-  { name: "Pale",   color: "#f2ede2" },
-  { name: "Green",  color: "#73e58f" },
-  { name: "Blue",   color: "#72b7ff" },
+  { name: "Pale", color: "#f2ede2" },
+  { name: "Green", color: "#73e58f" },
+  { name: "Blue", color: "#72b7ff" },
 ];
 
 const CARDINAL_DIRS = [
@@ -95,6 +66,219 @@ const CARDINAL_DIRS = [
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ];
+
+const DEFAULT_LEVEL_LAYOUT = [
+  {
+    id: 1,
+    height: 24,
+    width: 44,
+    canHostBase: false,
+    frame: "metal",
+    required: { beacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0, crystals: 8 },
+    rules: { hazardBlobGroups: 1, hazardVeinGroups: 1, metalVeinGroups: 1, goldOreGroups: 8, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 0, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, crystalDensity: 0.9, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -1.2 },
+  },
+  {
+    id: 2,
+    height: 26,
+    width: 52,
+    canHostBase: false,
+    frame: "metal",
+    required: { beacons: 2, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, crystals: 8 },
+    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 10, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, crystalDensity: 0.85, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -0.8 },
+  },
+  {
+    id: 3,
+    height: 28,
+    width: 60,
+    canHostBase: false,
+    frame: "metal",
+    required: { beacons: 2, perkZones: 2, safes: 1, wormNests: 1, artifacts: 2, crystals: 10 },
+    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 12, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 1, boulderPocketGroups: 0, perkTileDensity: 1.0, perkZoneDensity: 0.95, crystalDensity: 0.9, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: -0.4 },
+  },
+  {
+    id: 4,
+    height: 30,
+    width: 68,
+    canHostBase: false,
+    frame: "metal",
+    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 2, crystals: 12 },
+    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 1, boulderPocketGroups: 1, perkTileDensity: 0.95, perkZoneDensity: 0.9, crystalDensity: 0.85, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.0 },
+  },
+  {
+    id: 5,
+    height: 32,
+    width: 76,
+    canHostBase: false,
+    frame: "metal",
+    required: { beacons: 3, perkZones: 3, safes: 1, wormNests: 1, artifacts: 3, crystals: 12 },
+    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 1, perkTileDensity: 0.9, perkZoneDensity: 0.85, crystalDensity: 0.8, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.5 },
+  },
+  {
+    id: 6,
+    height: 34,
+    width: 84,
+    canHostBase: false,
+    frame: "metal",
+    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, crystals: 14 },
+    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 2, goldOreGroups: 18, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.85, perkZoneDensity: 0.8, crystalDensity: 0.78, hazardTypes: [HAZARD_TYPES.VOLATILE, HAZARD_TYPES.SPIKE], hardnessBias: 0.9 },
+  },
+  {
+    id: 7,
+    height: 32,
+    width: 74,
+    canHostBase: false,
+    frame: "metal",
+    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, crystals: 12 },
+    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.8, perkZoneDensity: 0.75, crystalDensity: 0.72, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.2 },
+  },
+  {
+    id: 8,
+    height: 33,
+    width: 64,
+    canHostBase: true,
+    frame: "metal",
+    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 3, crystals: 10 },
+    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.75, perkZoneDensity: 0.7, crystalDensity: 0.68, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.5 },
+  },
+];
+
+const PLAYABLE_HEIGHT = DEFAULT_LEVEL_LAYOUT.reduce((sum, level) => sum + level.height, 0);
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeHazardTypes(hazardTypes) {
+  if (!Array.isArray(hazardTypes) || hazardTypes.length === 0) {
+    throw new Error("hazardTypes must be a non-empty array");
+  }
+  return hazardTypes.map((value) => {
+    const num = Number(value);
+    if (num !== HAZARD_TYPES.SPIKE && num !== HAZARD_TYPES.VOLATILE) {
+      throw new Error(`Unsupported hazard type: ${value}`);
+    }
+    return num;
+  });
+}
+
+function validateLevelLayout(layout) {
+  if (!Array.isArray(layout) || layout.length !== DEFAULT_LEVEL_LAYOUT.length) {
+    throw new Error(`Generation config must contain exactly ${DEFAULT_LEVEL_LAYOUT.length} levels`);
+  }
+
+  let totalHeight = 0;
+  let hostBaseCount = 0;
+  for (let i = 0; i < layout.length; i += 1) {
+    const level = layout[i];
+    if (!level || typeof level !== "object") {
+      throw new Error(`Level ${i + 1} must be an object`);
+    }
+    const width = Math.round(Number(level.width));
+    const height = Math.round(Number(level.height));
+    if (!Number.isFinite(width) || width < 6 || width > GRID_W - 2) {
+      throw new Error(`Level ${i + 1} width must be between 6 and ${GRID_W - 2}`);
+    }
+    if (!Number.isFinite(height) || height < 8) {
+      throw new Error(`Level ${i + 1} height must be at least 8`);
+    }
+    totalHeight += height;
+    if (level.canHostBase) hostBaseCount += 1;
+    if (!level.required || typeof level.required !== "object") {
+      throw new Error(`Level ${i + 1} required must be an object`);
+    }
+    if (!level.rules || typeof level.rules !== "object") {
+      throw new Error(`Level ${i + 1} rules must be an object`);
+    }
+    level.rules.hazardTypes = normalizeHazardTypes(level.rules.hazardTypes);
+    const goldOreMinTiles = Math.round(Number(level.rules.goldOreMinTiles));
+    const goldOreMaxTiles = Math.round(Number(level.rules.goldOreMaxTiles));
+    if (!Number.isFinite(goldOreMinTiles) || goldOreMinTiles < 1) {
+      throw new Error(`Level ${i + 1} goldOreMinTiles must be at least 1`);
+    }
+    if (!Number.isFinite(goldOreMaxTiles) || goldOreMaxTiles < goldOreMinTiles) {
+      throw new Error(`Level ${i + 1} goldOreMaxTiles must be >= goldOreMinTiles`);
+    }
+    level.rules.goldOreMinTiles = goldOreMinTiles;
+    level.rules.goldOreMaxTiles = goldOreMaxTiles;
+  }
+
+  if (totalHeight !== PLAYABLE_HEIGHT) {
+    throw new Error(`Total height must stay equal to ${PLAYABLE_HEIGHT} tiles`);
+  }
+  if (hostBaseCount < 1) {
+    throw new Error("At least one level must have canHostBase=true");
+  }
+}
+
+let currentLevelLayout = deepClone(DEFAULT_LEVEL_LAYOUT);
+
+function buildDepthLevels(layout) {
+  let nextY = START_Y;
+  return layout.map((entry, index) => {
+    const xMin = Math.floor((GRID_W - entry.width) / 2);
+    const xMax = xMin + entry.width - 1;
+    const startY = nextY;
+    const endY = startY + entry.height - 1;
+    nextY = endY + 1;
+    return {
+      ...entry,
+      level: index + 1,
+      startY,
+      endY,
+      xMin,
+      xMax,
+      centerX: Math.floor((xMin + xMax) / 2),
+      area: entry.width * entry.height,
+    };
+  });
+}
+
+const INITIAL_DEPTH_LEVELS = buildDepthLevels(currentLevelLayout);
+export const DEPTH_LEVELS = [...INITIAL_DEPTH_LEVELS];
+export const GRID_H = INITIAL_DEPTH_LEVELS[INITIAL_DEPTH_LEVELS.length - 1].endY + 1;
+export let BEACON_COUNT = INITIAL_DEPTH_LEVELS.reduce(
+  (sum, level) => sum + (level.required.beacons || 0),
+  0,
+);
+
+let PLAYABLE_TILE_COUNT = INITIAL_DEPTH_LEVELS.reduce((sum, level) => sum + level.area, 0);
+const LEVEL_BY_ID = new Map(INITIAL_DEPTH_LEVELS.map((level) => [level.id, level]));
+
+function rebuildGenerationRuntime() {
+  validateLevelLayout(currentLevelLayout);
+  const levels = buildDepthLevels(currentLevelLayout);
+  if (levels[levels.length - 1].endY + 1 !== GRID_H) {
+    throw new Error(`Generation config must preserve total map height ${GRID_H}`);
+  }
+  DEPTH_LEVELS.splice(0, DEPTH_LEVELS.length, ...levels);
+  LEVEL_BY_ID.clear();
+  for (const level of DEPTH_LEVELS) {
+    LEVEL_BY_ID.set(level.id, level);
+  }
+  PLAYABLE_TILE_COUNT = DEPTH_LEVELS.reduce((sum, level) => sum + level.area, 0);
+  BEACON_COUNT = DEPTH_LEVELS.reduce(
+    (sum, level) => sum + (level.required.beacons || 0),
+    0,
+  );
+}
+
+export function getGenerationConfig() {
+  return deepClone(currentLevelLayout);
+}
+
+export function setGenerationConfig(layout) {
+  const nextLayout = deepClone(layout);
+  validateLevelLayout(nextLayout);
+  currentLevelLayout = nextLayout;
+  rebuildGenerationRuntime();
+  return getGenerationConfig();
+}
+
+export function resetGenerationConfig() {
+  currentLevelLayout = deepClone(DEFAULT_LEVEL_LAYOUT);
+  rebuildGenerationRuntime();
+  return getGenerationConfig();
+}
 
 // ── RNG ─────────────────────────────────────────────────────────────────────
 
@@ -138,56 +322,85 @@ function isFarEnoughFromPlaced(x, y, placed, minDistance) {
   return true;
 }
 
-function getExactDistanceOffsets(distance) {
-  const offsets = [];
-  const seen = new Set();
-  for (let dx = 0; dx <= distance; dx += 1) {
-    for (let dy = 0; dy <= distance; dy += 1) {
-      if (dx * dx + dy * dy !== distance * distance) continue;
-      const variants = [
-        [dx, dy], [dx, -dy], [-dx, dy], [-dx, -dy],
-        [dy, dx], [dy, -dx], [-dy, dx], [-dy, -dx],
-      ];
-      for (let i = 0; i < variants.length; i += 1) {
-        const key = `${variants[i][0]},${variants[i][1]}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        offsets.push({ x: variants[i][0], y: variants[i][1] });
-      }
+function getLevelById(id) {
+  return LEVEL_BY_ID.get(id) || null;
+}
+
+function getLevelForCell(x, y) {
+  for (let i = 0; i < DEPTH_LEVELS.length; i += 1) {
+    const level = DEPTH_LEVELS[i];
+    if (y >= level.startY && y <= level.endY && x >= level.xMin && x <= level.xMax) {
+      return level;
     }
   }
-  return offsets;
+  return null;
 }
 
-// ── Perk / crystal helpers ────────────────────────────────────────────────────
-
-export function getTargetPerkTileCount() {
-  return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_TILE));
+function isInsideLevel(x, y, level, margin = 0) {
+  return (
+    x >= level.xMin + margin &&
+    x <= level.xMax - margin &&
+    y >= level.startY + margin &&
+    y <= level.endY - margin
+  );
 }
 
-export function getTargetPerkZoneCount() {
-  return Math.max(1, Math.round((GRID_W * GRID_H) / TILES_PER_PERK_ZONE));
+function isInsidePlayableArea(x, y) {
+  return !!getLevelForCell(x, y);
 }
 
-export function getTargetCrystalTileCount() {
-  return Math.max(4, Math.round((GRID_W * GRID_H) / TILES_PER_CRYSTAL_TILE));
+function forEachCellInLevel(level, fn) {
+  for (let y = level.startY; y <= level.endY; y += 1) {
+    for (let x = level.xMin; x <= level.xMax; x += 1) {
+      fn(x, y);
+    }
+  }
 }
 
-// Depth fraction: 0 at player start, 1 at bottom of map.
-function getDepthRatio(x, y) {
-  return clamp((y - START_Y) / (GRID_H - START_Y - 15), 0, 1.5);
+function randomCellInLevel(level, margin, random) {
+  if (!isInsideLevel(level.xMin + margin, level.startY + margin, level, margin)) {
+    return null;
+  }
+  const x = level.xMin + margin + Math.floor(random() * (level.width - margin * 2));
+  const y = level.startY + margin + Math.floor(random() * (level.height - margin * 2));
+  return { x, y };
 }
 
-function getCenterPerkDensity(x, y) {
-  const depth = getDepthRatio(x, y);
-  // More perks in the upper half where the player needs support,
-  // thinning out as depth increases.
-  return clamp(1.15 - depth * 0.35, 0.5, 1.4);
+function collectCandidatesInLevel(level, margin, predicate) {
+  const candidates = [];
+  for (let y = level.startY + margin; y <= level.endY - margin; y += 1) {
+    for (let x = level.xMin + margin; x <= level.xMax - margin; x += 1) {
+      if (predicate(x, y)) candidates.push({ x, y });
+    }
+  }
+  return candidates;
 }
 
-function getPerkZoneDensity(x, y) {
-  const depth = getDepthRatio(x, y);
-  return clamp(1.0 - depth * 0.25, 0.45, 1.2);
+function getLevelDepthRatio(level, y) {
+  const local = (y - level.startY) / Math.max(1, level.height - 1);
+  return clamp((level.level - 1 + local) / DEPTH_LEVELS.length, 0, 1.5);
+}
+
+// ── Perk / crystal helpers ──────────────────────────────────────────────────
+
+export function getTargetPerkTileCount(level = null) {
+  const area = level ? level.area : PLAYABLE_TILE_COUNT;
+  const density = level ? level.rules.perkTileDensity : 1;
+  return Math.max(1, Math.round((area / TILES_PER_PERK_TILE) * density));
+}
+
+export function getTargetPerkZoneCount(level = null) {
+  if (level) {
+    return Math.max(level.required.perkZones || 0, Math.round((level.area / TILES_PER_PERK_ZONE) * level.rules.perkZoneDensity));
+  }
+  return DEPTH_LEVELS.reduce((sum, item) => sum + getTargetPerkZoneCount(item), 0);
+}
+
+export function getTargetCrystalTileCount(level = null) {
+  if (level) {
+    return Math.max(level.required.crystals || 0, Math.round((level.area / TILES_PER_CRYSTAL_TILE) * level.rules.crystalDensity));
+  }
+  return DEPTH_LEVELS.reduce((sum, item) => sum + getTargetCrystalTileCount(item), 0);
 }
 
 function chooseWeightedPerk(random, weights) {
@@ -203,6 +416,10 @@ function chooseWeightedPerk(random, weights) {
 
 function chooseTilePerkForPosition(x, y, random) {
   const weights = TILE_PERK_WEIGHTS.slice();
+  const level = getLevelForCell(x, y);
+  if (level && level.level <= 2) {
+    weights[1] += 2;
+  }
   return chooseWeightedPerk(random, weights);
 }
 
@@ -210,13 +427,13 @@ function chooseCrystalType(random) {
   return 1 + Math.floor(random() * (CRYSTAL_TYPES.length - 1));
 }
 
-// ── Hardness map ──────────────────────────────────────────────────────────────
+// ── Hardness map ────────────────────────────────────────────────────────────
 
-function addDangerBlob(field, cx, cy, radius, strength) {
-  const minX = Math.max(0, Math.floor(cx - radius));
-  const maxX = Math.min(GRID_W - 1, Math.ceil(cx + radius));
-  const minY = Math.max(0, Math.floor(cy - radius));
-  const maxY = Math.min(GRID_H - 1, Math.ceil(cy + radius));
+function addDangerBlob(field, level, cx, cy, radius, strength) {
+  const minX = Math.max(level.xMin, Math.floor(cx - radius));
+  const maxX = Math.min(level.xMax, Math.ceil(cx + radius));
+  const minY = Math.max(level.startY, Math.floor(cy - radius));
+  const maxY = Math.min(level.endY, Math.ceil(cy + radius));
   for (let y = minY; y <= maxY; y += 1) {
     for (let x = minX; x <= maxX; x += 1) {
       const dist = Math.hypot(x - cx, y - cy);
@@ -226,56 +443,66 @@ function addDangerBlob(field, cx, cy, radius, strength) {
   }
 }
 
-function addDangerVein(field, startX, startY, length, radius, strength, random) {
+function addDangerVein(field, level, startX, startY, length, radius, strength, random) {
   let x = startX;
   let y = startY;
   let angle = random() * Math.PI * 2;
   for (let step = 0; step < length; step += 1) {
-    addDangerBlob(field, x, y, radius, strength);
+    addDangerBlob(field, level, x, y, radius, strength);
     angle += (random() - 0.5) * 0.95;
-    x = clamp(x + Math.cos(angle) * 1.35, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.35, 1, GRID_H - 2);
+    x = clamp(x + Math.cos(angle) * 1.35, level.xMin + 1, level.xMax - 1);
+    y = clamp(y + Math.sin(angle) * 1.35, level.startY + 1, level.endY - 1);
   }
 }
 
 function buildHardness(random) {
   const danger = new Float32Array(GRID_W * GRID_H);
-  const maxDepth = GRID_H - START_Y - 15;
-  // Base danger: purely depth-driven — tier 1 at top, tier 7 at bottom.
-  for (let y = 0; y < GRID_H; y += 1) {
-    for (let x = 0; x < GRID_W; x += 1) {
-      const depthFraction = clamp((y - START_Y) / maxDepth, 0, 1);
-      danger[cellIndex(x, y)] = 0.8 + depthFraction * 5.4;
+
+  for (let i = 0; i < DEPTH_LEVELS.length; i += 1) {
+    const level = DEPTH_LEVELS[i];
+    forEachCellInLevel(level, (x, y) => {
+      const depthRatio = getLevelDepthRatio(level, y);
+      const localRatio = (y - level.startY) / Math.max(1, level.height - 1);
+      danger[cellIndex(x, y)] = 0.95 + depthRatio * 4.9 + localRatio * 1.2 + level.rules.hardnessBias;
+    });
+
+    const blobCount = Math.max(1, level.rules.hazardBlobGroups + Math.round(level.area / 1400));
+    for (let n = 0; n < blobCount; n += 1) {
+      const origin = randomCellInLevel(level, 2, random);
+      if (!origin) continue;
+      addDangerBlob(
+        danger,
+        level,
+        origin.x,
+        origin.y,
+        6 + random() * Math.max(8, level.width * 0.18),
+        -1.2 + random() * 2.8,
+      );
+    }
+
+    const softVeins = Math.max(1, level.rules.hazardVeinGroups);
+    const hardVeins = Math.max(1, level.rules.hazardVeinGroups);
+    for (let n = 0; n < softVeins; n += 1) {
+      const origin = randomCellInLevel(level, 2, random);
+      if (!origin) continue;
+      addDangerVein(danger, level, origin.x, origin.y, 8 + Math.floor(random() * 16), 1.2 + random() * 1.6, -0.8 - random() * 0.4, random);
+    }
+    for (let n = 0; n < hardVeins; n += 1) {
+      const origin = randomCellInLevel(level, 2, random);
+      if (!origin) continue;
+      addDangerVein(danger, level, origin.x, origin.y, 10 + Math.floor(random() * 18), 1.0 + random() * 1.2, 0.9 + random() * 0.8, random);
     }
   }
-  // Add blobs and veins for local variety.
-  const area = GRID_W * GRID_H;
-  const blobCount = Math.max(20, Math.round(area / 1100));
-  for (let i = 0; i < blobCount; i += 1) {
-    // Bias blobs toward mid/deep zones for variety there; a few near top too.
-    const blobY = START_Y + 5 + random() * (GRID_H - START_Y - 10);
-    addDangerBlob(danger, 2 + random() * (GRID_W - 4), blobY, 8 + random() * 22, -1.5 + random() * 3.0);
-  }
-  const softVeins = Math.max(10, Math.round(area / 2800));
-  const hardVeins = Math.max(12, Math.round(area / 2400));
-  const ultraVeins = Math.max(5, Math.round(area / 5500));
-  for (let i = 0; i < softVeins; i += 1) {
-    const vy = START_Y + 5 + random() * (GRID_H - START_Y - 10);
-    addDangerVein(danger, 2 + random() * (GRID_W - 4), vy, 12 + Math.floor(random() * 22), 1.2 + random() * 1.5, -0.9 - random() * 0.4, random);
-  }
-  for (let i = 0; i < hardVeins; i += 1) {
-    const vy = START_Y + 5 + random() * (GRID_H - START_Y - 10);
-    addDangerVein(danger, 2 + random() * (GRID_W - 4), vy, 14 + Math.floor(random() * 26), 1.0 + random() * 1.1, 0.8 + random() * 0.6, random);
-  }
-  for (let i = 0; i < ultraVeins; i += 1) {
-    // Ultra-hard veins appear mostly in the deep zone.
-    const vy = START_Y + maxDepth * 0.5 + random() * (maxDepth * 0.5);
-    addDangerVein(danger, 2 + random() * (GRID_W - 4), vy, 8 + Math.floor(random() * 14), 0.8 + random() * 0.7, 1.4 + random() * 0.8, random);
-  }
+
   const hardness = new Uint8Array(GRID_W * GRID_H);
   for (let y = 0; y < GRID_H; y += 1) {
     for (let x = 0; x < GRID_W; x += 1) {
       const index = cellIndex(x, y);
+      const level = getLevelForCell(x, y);
+      if (!level) {
+        hardness[index] = 0;
+        continue;
+      }
       const microNoise = (((x * 17 + y * 31) % 13) - 6) * 0.16;
       hardness[index] = clamp(Math.round(danger[index] + microNoise), 1, 7);
       if (isInStartEasyRadius(x, y)) hardness[index] = 1;
@@ -284,74 +511,18 @@ function buildHardness(random) {
   return hardness;
 }
 
-// ── Placement helpers ─────────────────────────────────────────────────────────
+// ── Placement helpers ───────────────────────────────────────────────────────
 
-function chooseHazardType(random, x, y) {
-  const depthRatio = clamp((y - START_Y) / (GRID_H - START_Y), 0, 1.4);
-  const roll = random() + depthRatio * 0.2;
-  return roll > 0.8 ? HAZARD_TYPES.VOLATILE : HAZARD_TYPES.SPIKE;
-}
-
-function getHazardOrigin(random) {
-  // 20% chance: cluster near upper-mid zone for early challenge.
-  if (random() < 0.2) {
-    return {
-      x: Math.round(clamp(START_X + (random() - 0.5) * 50, 1, GRID_W - 2)),
-      y: Math.round(clamp(START_Y + 15 + random() * 50, START_Y + 15, START_Y + 80)),
-    };
-  }
-  // Otherwise: anywhere below the easy zone, biased toward middle-deep.
-  return {
-    x: 1 + Math.floor(random() * (GRID_W - 2)),
-    y: START_Y + 10 + Math.floor(random() * (GRID_H - START_Y - 15)),
-  };
-}
-
-function canPlaceHazardAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function canPlaceMetalAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function canPlaceGoldOreAt(x, y) {
-  return x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1 && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
-}
-
-function canPlaceGasPocketAt(x, y, steamPocketMask, boulderPocketMask) {
-  if (x < 2 || y < 2 || x >= GRID_W - 2 || y >= GRID_H - 2) return false;
-  if (x === START_X && y === START_Y) return false;
-  if (isInStartEasyRadius(x, y)) return false;
-  const idx = cellIndex(x, y);
-  // Don't overlap with other pocket types (including 1-cell border)
-  if (steamPocketMask && isPocketNeighbor(x, y, steamPocketMask)) return false;
-  if (boulderPocketMask && isPocketNeighbor(x, y, boulderPocketMask)) return false;
-  return true;
-}
-
-function canPlaceSteamPocketAt(x, y, gasPocketMask, boulderPocketMask) {
-  if (x < 2 || y < 2 || x >= GRID_W - 2 || y >= GRID_H - 2) return false;
-  if (x === START_X && y === START_Y) return false;
-  if (isInStartEasyRadius(x, y)) return false;
-  if (gasPocketMask && isPocketNeighbor(x, y, gasPocketMask)) return false;
-  if (boulderPocketMask && isPocketNeighbor(x, y, boulderPocketMask)) return false;
-  return true;
-}
-
-function canPlaceBoulderPocketAt(x, y, gasPocketMask, steamPocketMask) {
-  if (x < 2 || y < 2 || x >= GRID_W - 2 || y >= GRID_H - 2) return false;
-  if (x === START_X && y === START_Y) return false;
-  if (isInStartEasyRadius(x, y)) return false;
-  if (gasPocketMask && isPocketNeighbor(x, y, gasPocketMask)) return false;
-  if (steamPocketMask && isPocketNeighbor(x, y, steamPocketMask)) return false;
-  return true;
+function chooseHazardType(random, level) {
+  const allowed = level.rules.hazardTypes;
+  return allowed[Math.floor(random() * allowed.length)];
 }
 
 function isPocketNeighbor(x, y, mask) {
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const nx = x + dx, ny = y + dy;
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const nx = x + dx;
+      const ny = y + dy;
       if (nx < 0 || nx >= GRID_W || ny < 0 || ny >= GRID_H) continue;
       if (mask[cellIndex(nx, ny)]) return true;
     }
@@ -359,9 +530,49 @@ function isPocketNeighbor(x, y, mask) {
   return false;
 }
 
-function placeHazardBlob(hazardMask, random, blockCount) {
-  const origin = getHazardOrigin(random);
-  const hazardType = chooseHazardType(random, origin.x, origin.y);
+function canPlaceHazardAt(x, y, level) {
+  return isInsideLevel(x, y, level, 1) && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+}
+
+function canPlaceMetalAt(x, y, level) {
+  return isInsideLevel(x, y, level, 1) && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+}
+
+function canPlaceGoldOreAt(x, y, level) {
+  return isInsideLevel(x, y, level, 1) && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+}
+
+function canPlaceGasPocketAt(x, y, level, steamPocketMask, boulderPocketMask) {
+  if (!isInsideLevel(x, y, level, 2)) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  if (steamPocketMask && isPocketNeighbor(x, y, steamPocketMask)) return false;
+  if (boulderPocketMask && isPocketNeighbor(x, y, boulderPocketMask)) return false;
+  return true;
+}
+
+function canPlaceSteamPocketAt(x, y, level, gasPocketMask, boulderPocketMask) {
+  if (!isInsideLevel(x, y, level, 2)) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  if (gasPocketMask && isPocketNeighbor(x, y, gasPocketMask)) return false;
+  if (boulderPocketMask && isPocketNeighbor(x, y, boulderPocketMask)) return false;
+  return true;
+}
+
+function canPlaceBoulderPocketAt(x, y, level, gasPocketMask, steamPocketMask) {
+  if (!isInsideLevel(x, y, level, 2)) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  if (gasPocketMask && isPocketNeighbor(x, y, gasPocketMask)) return false;
+  if (steamPocketMask && isPocketNeighbor(x, y, steamPocketMask)) return false;
+  return true;
+}
+
+function placeHazardBlob(hazardMask, level, random, blockCount) {
+  const origin = randomCellInLevel(level, 2, random);
+  if (!origin) return;
+  const hazardType = chooseHazardType(random, level);
   const frontier = [{ x: origin.x, y: origin.y }];
   const seen = new Set();
   let placed = 0;
@@ -371,7 +582,7 @@ function placeHazardBlob(hazardMask, random, blockCount) {
     const key = `${cell.x},${cell.y}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!canPlaceHazardAt(cell.x, cell.y)) continue;
+    if (!canPlaceHazardAt(cell.x, cell.y, level)) continue;
     hazardMask[cellIndex(cell.x, cell.y)] = hazardType;
     placed += 1;
     const neighbors = [
@@ -381,14 +592,17 @@ function placeHazardBlob(hazardMask, random, blockCount) {
       { x: cell.x - 1, y: cell.y + 1 }, { x: cell.x - 1, y: cell.y - 1 },
     ];
     for (let i = 0; i < neighbors.length; i += 1) {
-      if (random() < 0.88) frontier.push(neighbors[i]);
+      if (isInsideLevel(neighbors[i].x, neighbors[i].y, level, 1) && random() < 0.86) {
+        frontier.push(neighbors[i]);
+      }
     }
   }
 }
 
-function placeHazardVein(hazardMask, random, blockCount) {
-  const origin = getHazardOrigin(random);
-  const hazardType = chooseHazardType(random, origin.x, origin.y);
+function placeHazardVein(hazardMask, level, random, blockCount) {
+  const origin = randomCellInLevel(level, 2, random);
+  if (!origin) return;
+  const hazardType = chooseHazardType(random, level);
   let x = origin.x;
   let y = origin.y;
   let angle = random() * Math.PI * 2;
@@ -398,18 +612,19 @@ function placeHazardVein(hazardMask, random, blockCount) {
     attempts += 1;
     const ix = Math.round(x);
     const iy = Math.round(y);
-    if (canPlaceHazardAt(ix, iy)) {
+    if (canPlaceHazardAt(ix, iy, level)) {
       hazardMask[cellIndex(ix, iy)] = hazardType;
       placed += 1;
     }
     angle += (random() - 0.5) * 0.85;
-    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
+    x = clamp(x + Math.cos(angle) * 1.05, level.xMin + 1, level.xMax - 1);
+    y = clamp(y + Math.sin(angle) * 1.05, level.startY + 1, level.endY - 1);
   }
 }
 
-function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, random, blockCount) {
-  const origin = getHazardOrigin(random);
+function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount) {
+  const origin = randomCellInLevel(level, 2, random);
+  if (!origin) return;
   let x = origin.x;
   let y = origin.y;
   let angle = random() * Math.PI * 2;
@@ -419,7 +634,7 @@ function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, b
     attempts += 1;
     const ix = Math.round(x);
     const iy = Math.round(y);
-    if (canPlaceMetalAt(ix, iy)) {
+    if (canPlaceMetalAt(ix, iy, level)) {
       const index = cellIndex(ix, iy);
       metalMask[index] = 1;
       hazardMask[index] = 0;
@@ -429,13 +644,14 @@ function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, b
       placed += 1;
     }
     angle += (random() - 0.5) * 0.55;
-    x = clamp(x + Math.cos(angle) * 1.05, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.05, 1, GRID_H - 2);
+    x = clamp(x + Math.cos(angle) * 1.05, level.xMin + 1, level.xMax - 1);
+    y = clamp(y + Math.sin(angle) * 1.05, level.startY + 1, level.endY - 1);
   }
 }
 
-function placeGoldOreVein(goldOreMask, random, blockCount) {
-  const origin = getHazardOrigin(random);
+function placeGoldOreVein(goldOreMask, level, random, blockCount) {
+  const origin = randomCellInLevel(level, 2, random);
+  if (!origin) return;
   let x = origin.x;
   let y = origin.y;
   let angle = random() * Math.PI * 2;
@@ -445,18 +661,19 @@ function placeGoldOreVein(goldOreMask, random, blockCount) {
     attempts += 1;
     const ix = Math.round(x);
     const iy = Math.round(y);
-    if (canPlaceGoldOreAt(ix, iy)) {
+    if (canPlaceGoldOreAt(ix, iy, level)) {
       goldOreMask[cellIndex(ix, iy)] = 1;
       placed += 1;
     }
     angle += (random() - 0.5) * 0.6;
-    x = clamp(x + Math.cos(angle) * 1.1, 1, GRID_W - 2);
-    y = clamp(y + Math.sin(angle) * 1.1, 1, GRID_H - 2);
+    x = clamp(x + Math.cos(angle) * 1.1, level.xMin + 1, level.xMax - 1);
+    y = clamp(y + Math.sin(angle) * 1.1, level.startY + 1, level.endY - 1);
   }
 }
 
-function placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, random, cellCount) {
-  const origin = getHazardOrigin(random);
+function placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, level, random, cellCount) {
+  const origin = randomCellInLevel(level, 2, random);
+  if (!origin) return;
   const frontier = [{ x: origin.x, y: origin.y }];
   const seen = new Set();
   let placed = 0;
@@ -466,7 +683,7 @@ function placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocke
     const key = `${cell.x},${cell.y}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!canPlaceGasPocketAt(cell.x, cell.y, steamPocketMask, boulderPocketMask)) continue;
+    if (!canPlaceGasPocketAt(cell.x, cell.y, level, steamPocketMask, boulderPocketMask)) continue;
     const index = cellIndex(cell.x, cell.y);
     gasPocketMask[index] = 1;
     hazardMask[index] = 0;
@@ -478,13 +695,16 @@ function placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocke
       { x: cell.x - 1, y: cell.y + 1 }, { x: cell.x - 1, y: cell.y - 1 },
     ];
     for (let i = 0; i < neighbors.length; i += 1) {
-      if (random() < 0.82) frontier.push(neighbors[i]);
+      if (isInsideLevel(neighbors[i].x, neighbors[i].y, level, 2) && random() < 0.82) {
+        frontier.push(neighbors[i]);
+      }
     }
   }
 }
 
-function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, random, cellCount) {
-  const origin = getHazardOrigin(random);
+function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, level, random, cellCount) {
+  const origin = randomCellInLevel(level, 2, random);
+  if (!origin) return;
   const frontier = [{ x: origin.x, y: origin.y }];
   const seen = new Set();
   let placed = 0;
@@ -494,7 +714,7 @@ function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPoc
     const key = `${cell.x},${cell.y}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!canPlaceSteamPocketAt(cell.x, cell.y, gasPocketMask, boulderPocketMask)) continue;
+    if (!canPlaceSteamPocketAt(cell.x, cell.y, level, gasPocketMask, boulderPocketMask)) continue;
     const index = cellIndex(cell.x, cell.y);
     steamPocketMask[index] = 1;
     hazardMask[index] = 0;
@@ -507,26 +727,18 @@ function placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPoc
       { x: cell.x - 1, y: cell.y + 1 }, { x: cell.x - 1, y: cell.y - 1 },
     ];
     for (let i = 0; i < neighbors.length; i += 1) {
-      if (random() < 0.78) frontier.push(neighbors[i]);
+      if (isInsideLevel(neighbors[i].x, neighbors[i].y, level, 2) && random() < 0.78) {
+        frontier.push(neighbors[i]);
+      }
     }
   }
 }
 
-function placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, random) {
+function placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, level, random) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    const origin = getHazardOrigin(random);
-    if (!canPlaceBoulderPocketAt(origin.x, origin.y, gasPocketMask, steamPocketMask)) continue;
-    if (Math.hypot(origin.x - START_X, origin.y - START_Y) < BOULDER_MIN_START_DISTANCE) continue;
-    let colBlocked = false;
-    for (let y = 1; y < GRID_H - 1; y += 1) {
-      if (boulderPocketMask[cellIndex(origin.x, y)]) { colBlocked = true; break; }
-    }
-    if (colBlocked) continue;
-    let rowBlocked = false;
-    for (let x = 1; x < GRID_W - 1; x += 1) {
-      if (boulderPocketMask[cellIndex(x, origin.y)]) { rowBlocked = true; break; }
-    }
-    if (rowBlocked) continue;
+    const origin = randomCellInLevel(level, 2, random);
+    if (!origin) return;
+    if (!canPlaceBoulderPocketAt(origin.x, origin.y, level, gasPocketMask, steamPocketMask)) continue;
     const index = cellIndex(origin.x, origin.y);
     boulderPocketMask[index] = 1;
     hazardMask[index] = 0;
@@ -536,33 +748,62 @@ function placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamP
   }
 }
 
-function placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, random) {
-  // Base hides deep — in the bottom zone of the map.
+function applyOuterMetalFrame(metalMask) {
+  for (let y = 0; y < GRID_H; y += 1) {
+    for (let x = 0; x < GRID_W; x += 1) {
+      if (isInsidePlayableArea(x, y)) continue;
+      let touchesPlayable = false;
+      for (let dy = -1; dy <= 1 && !touchesPlayable; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= GRID_W || ny < 0 || ny >= GRID_H) continue;
+          if (isInsidePlayableArea(nx, ny)) {
+            touchesPlayable = true;
+            break;
+          }
+        }
+      }
+      if (touchesPlayable) {
+        metalMask[cellIndex(x, y)] = 1;
+      }
+    }
+  }
+}
+
+function placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, random) {
+  const hostLevels = DEPTH_LEVELS.filter((level) => level.canHostBase);
+  if (hostLevels.length === 0) {
+    throw new Error("No depth level is marked as canHostBase");
+  }
   const candidates = [];
-  for (let y = BASE_ZONE_MIN_Y; y <= BASE_ZONE_MAX_Y; y += 1) {
-    for (let x = 3; x < GRID_W - 3; x += 1) {
-      const idx = cellIndex(x, y);
-      if (
-        !metalMask[idx] &&
-        !gasPocketMask[idx] &&
-        !steamPocketMask[idx] &&
-        !boulderPocketMask[idx]
-      ) {
-        candidates.push({ x, y });
+  for (const level of hostLevels) {
+    for (let y = level.startY + 2; y <= level.endY - 2; y += 1) {
+      for (let x = level.xMin + 2; x <= level.xMax - 2; x += 1) {
+        const idx = cellIndex(x, y);
+        if (!metalMask[idx] && !gasPocketMask[idx] && !steamPocketMask[idx] && !boulderPocketMask[idx] && !beaconMask[idx]) {
+          candidates.push({ x, y });
+        }
       }
     }
   }
   shuffle(candidates, random);
-  if (candidates.length === 0) throw new Error("Unable to place base in bottom zone");
+  if (candidates.length === 0) throw new Error("Unable to place base inside host levels");
   return candidates[0];
 }
 
-function tryPlaceBeacon(x, y, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons) {
-  if (x < 2 || x >= GRID_W - 3 || y < 2 || y >= GRID_H - 3) return false;
+function tryPlaceBeacon(x, y, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base) {
+  if (!isInsideLevel(x, y, level, 1) || !isInsideLevel(x + 1, y + 1, level, 1)) return false;
+  if ((x === base.x && y === base.y) || (x + 1 === base.x && y + 1 === base.y)) return false;
   for (let dy = -1; dy <= 2; dy += 1) {
     for (let dx = -1; dx <= 2; dx += 1) {
-      const idx = cellIndex(x + dx, y + dy);
+      const rx = x + dx;
+      const ry = y + dy;
+      if (!isInsideLevel(rx, ry, level, 0)) return false;
+      const idx = cellIndex(rx, ry);
       if (metalMask[idx] || hazardMask[idx] || gasPocketMask[idx] || steamPocketMask[idx] || boulderPocketMask[idx] || beaconMask[idx]) return false;
+      if (rx === base.x && ry === base.y) return false;
     }
   }
   for (const b of beacons) {
@@ -579,7 +820,6 @@ function tryPlaceBeacon(x, y, beaconMask, metalMask, hazardMask, gasPocketMask, 
       if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) continue;
       const rx = x + dx;
       const ry = y + dy;
-      if (rx < 0 || rx >= GRID_W || ry < 0 || ry >= GRID_H) continue;
       const idx = cellIndex(rx, ry);
       if (!beaconMask[idx]) beaconMask[idx] = 2;
     }
@@ -587,121 +827,63 @@ function tryPlaceBeacon(x, y, beaconMask, metalMask, hazardMask, gasPocketMask, 
   return true;
 }
 
-function placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, random) {
-  // Scan all valid positions below the start area, shuffle, and greedily place.
-  const minY = START_Y + BEACON_MIN_DEPTH;
-  const candidates = [];
-  for (let y = minY; y < GRID_H - 4; y += 1) {
-    for (let x = 2; x < GRID_W - 3; x += 1) {
-      candidates.push({ x, y });
-    }
-  }
-  shuffle(candidates, random);
-  for (let i = 0; i < candidates.length && beacons.length < BEACON_COUNT; i += 1) {
-    tryPlaceBeacon(candidates[i].x, candidates[i].y, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons);
-  }
-}
-
-// Two guaranteed entry beacons: left and right of the player start at shallow depth.
-// They give the player an immediate introduction to the beacon mechanic.
-function placeEntryBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons) {
-  const positions = [
-    { x: START_X - ENTRY_BEACON_X_OFFSET - 1, y: ENTRY_BEACON_Y },  // Left
-    { x: START_X + ENTRY_BEACON_X_OFFSET - 1, y: ENTRY_BEACON_Y },  // Right
-  ];
-
-  for (const { x, y } of positions) {
-    // Clear obstacles in the beacon check area to guarantee placement
-    for (let dy = -1; dy <= 2; dy += 1) {
-      for (let dx = -1; dx <= 2; dx += 1) {
-        const rx = x + dx, ry = y + dy;
-        if (rx < 0 || rx >= GRID_W || ry < 0 || ry >= GRID_H) continue;
-        const idx = cellIndex(rx, ry);
-        metalMask[idx] = 0;
-        hazardMask[idx] = 0;
-        gasPocketMask[idx] = 0;
-        steamPocketMask[idx] = 0;
-        boulderPocketMask[idx] = 0;
+function placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base, random) {
+  for (const level of DEPTH_LEVELS) {
+    const target = level.required.beacons || 0;
+    if (target <= 0) continue;
+    const candidates = collectCandidatesInLevel(level, 1, () => true);
+    shuffle(candidates, random);
+    let placed = 0;
+    for (let i = 0; i < candidates.length && placed < target; i += 1) {
+      if (tryPlaceBeacon(candidates[i].x, candidates[i].y, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base)) {
+        placed += 1;
       }
-    }
-    // Place 2x2 beacon body
-    beacons.push({ x, y });
-    for (let dy = 0; dy < 2; dy += 1) {
-      for (let dx = 0; dx < 2; dx += 1) {
-        beaconMask[cellIndex(x + dx, y + dy)] = 1;
-      }
-    }
-    // Mark border ring as tunnel
-    for (let dy = -1; dy <= 2; dy += 1) {
-      for (let dx = -1; dx <= 2; dx += 1) {
-        if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) continue;
-        const rx = x + dx, ry = y + dy;
-        if (rx < 0 || rx >= GRID_W || ry < 0 || ry >= GRID_H) continue;
-        const idx = cellIndex(rx, ry);
-        if (!beaconMask[idx]) beaconMask[idx] = 2;
-      }
-    }
-  }
-}
-
-function placeNearGold(goldOreMask, random) {
-  const candidates = [];
-  for (let dx = -(START_NEAR_RADIUS + 1); dx <= START_NEAR_RADIUS + 1; dx += 1) {
-    for (let dy = -(START_NEAR_RADIUS + 1); dy <= START_NEAR_RADIUS + 1; dy += 1) {
-      const x = START_X + dx;
-      const y = START_Y + dy;
-      const d = Math.hypot(dx, dy);
-      if (d > START_EASY_RADIUS && d <= START_NEAR_RADIUS && x >= 1 && y >= 1 && x < GRID_W - 1 && y < GRID_H - 1) {
-        candidates.push({ x, y });
-      }
-    }
-  }
-  shuffle(candidates, random);
-  let placed = 0;
-  for (let i = 0; i < candidates.length && placed < START_NEAR_GOLD_COUNT; i += 1) {
-    const idx = cellIndex(candidates[i].x, candidates[i].y);
-    if (!goldOreMask[idx]) {
-      goldOreMask[idx] = 1;
-      placed += 1;
     }
   }
 }
 
 function placePerkTiles(perkMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random) {
-  const placed = [];
-  const targetCount = getTargetPerkTileCount();
-  let attempts = 0;
-  while (placed.length < targetCount && attempts < targetCount * 80) {
-    const x = 2 + Math.floor(random() * (GRID_W - 4));
-    const y = 2 + Math.floor(random() * (GRID_H - 4));
-    const index = cellIndex(x, y);
-    attempts += 1;
-    if (perkMask[index] > 0 || metalMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || beaconMask[index]) continue;
-    if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
-    if (!isFarEnoughFromPlaced(x, y, placed, PERK_MIN_DISTANCE)) continue;
-    if (random() > getCenterPerkDensity(x, y)) continue;
-    perkMask[index] = chooseTilePerkForPosition(x, y, random);
-    placed.push({ x, y });
+  for (const level of DEPTH_LEVELS) {
+    const targetCount = getTargetPerkTileCount(level);
+    const placed = [];
+    let attempts = 0;
+    while (placed.length < targetCount && attempts < targetCount * 90) {
+      const cell = randomCellInLevel(level, 2, random);
+      if (!cell) break;
+      const x = cell.x;
+      const y = cell.y;
+      const index = cellIndex(x, y);
+      attempts += 1;
+      if (perkMask[index] > 0 || metalMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || beaconMask[index]) continue;
+      if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
+      if (!isFarEnoughFromPlaced(x, y, placed, PERK_MIN_DISTANCE)) continue;
+      perkMask[index] = chooseTilePerkForPosition(x, y, random);
+      placed.push({ x, y });
+    }
   }
 }
 
 function placeCrystalTiles(crystalMask, perkMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random) {
-  const placed = [];
-  const targetCount = getTargetCrystalTileCount();
-  let attempts = 0;
-  while (placed.length < targetCount && attempts < targetCount * 90) {
-    const x = 2 + Math.floor(random() * (GRID_W - 4));
-    const y = 2 + Math.floor(random() * (GRID_H - 4));
-    const index = cellIndex(x, y);
-    attempts += 1;
-    if (
-      perkMask[index] > 0 || crystalMask[index] > 0 || perkZoneMask[index] !== -1 ||
-      metalMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || beaconMask[index]
-    ) continue;
-    if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
-    if (!isFarEnoughFromPlaced(x, y, placed, CRYSTAL_MIN_DISTANCE)) continue;
-    crystalMask[index] = chooseCrystalType(random);
-    placed.push({ x, y });
+  for (const level of DEPTH_LEVELS) {
+    const targetCount = getTargetCrystalTileCount(level);
+    const placed = [];
+    let attempts = 0;
+    while (placed.length < targetCount && attempts < targetCount * 100) {
+      const cell = randomCellInLevel(level, 2, random);
+      if (!cell) break;
+      const x = cell.x;
+      const y = cell.y;
+      const index = cellIndex(x, y);
+      attempts += 1;
+      if (
+        perkMask[index] > 0 || crystalMask[index] > 0 || perkZoneMask[index] !== -1 ||
+        metalMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || beaconMask[index]
+      ) continue;
+      if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
+      if (!isFarEnoughFromPlaced(x, y, placed, CRYSTAL_MIN_DISTANCE)) continue;
+      crystalMask[index] = chooseCrystalType(random);
+      placed.push({ x, y });
+    }
   }
 }
 
@@ -709,7 +891,10 @@ function createPerkZoneShape(random) {
   const targetCells = 6 + Math.floor(random() * 4);
   const cells = [{ x: 0, y: 0 }];
   const used = new Set(["0,0"]);
-  let minX = 0; let maxX = 0; let minY = 0; let maxY = 0;
+  let minX = 0;
+  let maxX = 0;
+  let minY = 0;
+  let maxY = 0;
   let growthAttempts = 0;
   while (cells.length < targetCells && growthAttempts < 80) {
     const base = cells[Math.floor(random() * cells.length)];
@@ -719,20 +904,27 @@ function createPerkZoneShape(random) {
     const key = `${nextX},${nextY}`;
     growthAttempts += 1;
     if (used.has(key)) continue;
-    const nextMinX = Math.min(minX, nextX); const nextMaxX = Math.max(maxX, nextX);
-    const nextMinY = Math.min(minY, nextY); const nextMaxY = Math.max(maxY, nextY);
+    const nextMinX = Math.min(minX, nextX);
+    const nextMaxX = Math.max(maxX, nextX);
+    const nextMinY = Math.min(minY, nextY);
+    const nextMaxY = Math.max(maxY, nextY);
     if (nextMaxX - nextMinX > 3 || nextMaxY - nextMinY > 3) continue;
     used.add(key);
     cells.push({ x: nextX, y: nextY });
-    minX = nextMinX; maxX = nextMaxX; minY = nextMinY; maxY = nextMaxY;
+    minX = nextMinX;
+    maxX = nextMaxX;
+    minY = nextMinY;
+    maxY = nextMaxY;
   }
   const normalizedCells = [];
-  let sumX = 0; let sumY = 0;
+  let sumX = 0;
+  let sumY = 0;
   for (let i = 0; i < cells.length; i += 1) {
     const x = cells[i].x - minX;
     const y = cells[i].y - minY;
     normalizedCells.push({ x, y });
-    sumX += x; sumY += y;
+    sumX += x;
+    sumY += y;
   }
   const centroidX = sumX / normalizedCells.length;
   const centroidY = sumY / normalizedCells.length;
@@ -741,7 +933,10 @@ function createPerkZoneShape(random) {
   for (let i = 0; i < normalizedCells.length; i += 1) {
     const cell = normalizedCells[i];
     const dist = Math.hypot(cell.x - centroidX, cell.y - centroidY);
-    if (dist < bestDistance) { bestDistance = dist; iconCell = cell; }
+    if (dist < bestDistance) {
+      bestDistance = dist;
+      iconCell = cell;
+    }
   }
   return {
     cells: normalizedCells,
@@ -755,155 +950,150 @@ function createPerkZoneShape(random) {
 }
 
 function placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random) {
-  const placed = [];
-  const targetCount = getTargetPerkZoneCount();
-  let attempts = 0;
-  while (perkZones.length < targetCount && attempts < targetCount * 120) {
-    const shape = createPerkZoneShape(random);
-    const originX = 1 + Math.floor(random() * Math.max(1, GRID_W - shape.width - 2));
-    const originY = 1 + Math.floor(random() * Math.max(1, GRID_H - shape.height - 2));
-    attempts += 1;
-    const centerX = originX + shape.centerX;
-    const centerY = originY + shape.centerY;
-    if (!isFarEnoughFromPlaced(centerX, centerY, placed, PERK_ZONE_MIN_DISTANCE)) continue;
-    if (random() > getPerkZoneDensity(centerX, centerY)) continue;
-    let blocked = false;
-    const cells = [];
-    for (let i = 0; i < shape.cells.length; i += 1) {
-      const cell = shape.cells[i];
-      const x = originX + cell.x;
-      const y = originY + cell.y;
-      const index = cellIndex(x, y);
-      if (
-        (x === START_X && y === START_Y) || (x === base.x && y === base.y) ||
-        metalMask[index] || perkZoneMask[index] !== -1 ||
-        gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || beaconMask[index]
-      ) { blocked = true; break; }
-      cells.push({ x, y });
-    }
-    if (blocked) continue;
-    const zoneId = perkZones.length;
-    const perkType = chooseTilePerkForPosition(centerX, centerY, random);
-    perkZones.push({
-      x: centerX, y: centerY, cells,
-      iconX: originX + shape.iconX,
-      iconY: originY + shape.iconY,
-      perkType,
-    });
-    placed.push({ x: centerX, y: centerY });
-    for (let i = 0; i < cells.length; i += 1) {
-      perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
-    }
-  }
-}
-
-// ── Safes ─────────────────────────────────────────────────────────────────────
-
-/**
- * Place safes: 5x5 footprint (3x3 interior + metal border).
- * One border cell = door (locked). Key spawned nearby.
- * Returns array of { x, y, doorX, doorY, keyX, keyY, interiorCells }.
- * x,y = top-left of the 5x5 footprint.
- */
-function placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, random) {
-  const placed = [];
-  let attempts = 0;
-
-  while (placed.length < SAFE_COUNT && attempts < SAFE_COUNT * 200) {
-    attempts += 1;
-    // top-left of 5x5 footprint
-    const ox = 4 + Math.floor(random() * (GRID_W - 12));
-    const oy = 4 + Math.floor(random() * (GRID_H - 12));
-    const cx = ox + 2; // center
-    const cy = oy + 2;
-
-    // Distance from start
-    if (Math.abs(cx - START_X) + Math.abs(cy - START_Y) < SAFE_MIN_START_DISTANCE) continue;
-    // Distance from other safes
-    if (!isFarEnoughFromPlaced(cx, cy, placed, SAFE_MIN_DISTANCE)) continue;
-
-    // Check entire 5x5 is clear
-    let blocked = false;
-    for (let dy = 0; dy < 5 && !blocked; dy++) {
-      for (let dx = 0; dx < 5 && !blocked; dx++) {
-        const idx = cellIndex(ox + dx, oy + dy);
-        if (metalMask[idx] || beaconMask[idx] || gasPocketMask[idx] ||
-            steamPocketMask[idx] || boulderPocketMask[idx] || perkZoneMask[idx] !== -1) {
+  for (const level of DEPTH_LEVELS) {
+    const placed = [];
+    const targetCount = level.required.perkZones || 0;
+    let attempts = 0;
+    while (placed.length < targetCount && attempts < targetCount * 180) {
+      const shape = createPerkZoneShape(random);
+      const origin = randomCellInLevel(level, 2, random);
+      if (!origin) break;
+      const originX = clamp(origin.x, level.xMin + 1, level.xMax - shape.width);
+      const originY = clamp(origin.y, level.startY + 1, level.endY - shape.height);
+      attempts += 1;
+      const centerX = originX + shape.centerX;
+      const centerY = originY + shape.centerY;
+      if (!isFarEnoughFromPlaced(centerX, centerY, placed, PERK_ZONE_MIN_DISTANCE)) continue;
+      let blocked = false;
+      const cells = [];
+      for (let i = 0; i < shape.cells.length; i += 1) {
+        const cell = shape.cells[i];
+        const x = originX + cell.x;
+        const y = originY + cell.y;
+        const index = cellIndex(x, y);
+        if (
+          !isInsideLevel(x, y, level, 0) ||
+          (x === START_X && y === START_Y) ||
+          (x === base.x && y === base.y) ||
+          metalMask[index] || perkZoneMask[index] !== -1 ||
+          gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || beaconMask[index]
+        ) {
           blocked = true;
+          break;
         }
+        cells.push({ x, y });
+      }
+      if (blocked) continue;
+      const zoneId = perkZones.length;
+      const perkType = chooseTilePerkForPosition(centerX, centerY, random);
+      perkZones.push({
+        x: centerX,
+        y: centerY,
+        cells,
+        iconX: originX + shape.iconX,
+        iconY: originY + shape.iconY,
+        perkType,
+      });
+      placed.push({ x: centerX, y: centerY });
+      for (let i = 0; i < cells.length; i += 1) {
+        perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
       }
     }
-    if (blocked) continue;
-
-    // Pick a door position on the border (not corner)
-    // Border = edge cells of 5x5
-    const doorSide = Math.floor(random() * 4); // 0=top, 1=right, 2=bottom, 3=left
-    const doorOffset = 1 + Math.floor(random() * 3); // 1,2,3 along side
-    let doorX, doorY;
-    if (doorSide === 0) { doorX = ox + doorOffset; doorY = oy; }
-    else if (doorSide === 1) { doorX = ox + 4; doorY = oy + doorOffset; }
-    else if (doorSide === 2) { doorX = ox + doorOffset; doorY = oy + 4; }
-    else { doorX = ox; doorY = oy + doorOffset; }
-
-    // Place key nearby
-    let keyX = -1, keyY = -1;
-    for (let ka = 0; ka < 100; ka++) {
-      const kx = cx + Math.floor((random() - 0.5) * 2 * SAFE_KEY_MAX_DIST);
-      const ky = cy + Math.floor((random() - 0.5) * 2 * SAFE_KEY_MAX_DIST);
-      if (kx < 2 || kx >= GRID_W - 2 || ky < 2 || ky >= GRID_H - 2) continue;
-      const dist = Math.hypot(kx - cx, ky - cy);
-      if (dist < SAFE_KEY_MIN_DIST || dist > SAFE_KEY_MAX_DIST) continue;
-      const ki = cellIndex(kx, ky);
-      if (metalMask[ki] || beaconMask[ki] || gasPocketMask[ki] || steamPocketMask[ki] || boulderPocketMask[ki]) continue;
-      keyX = kx;
-      keyY = ky;
-      break;
-    }
-    if (keyX === -1) continue; // couldn't place key
-
-    // Stamp the safe into the world
-    const interiorCells = [];
-    for (let dy = 0; dy < 5; dy++) {
-      for (let dx = 0; dx < 5; dx++) {
-        const wx = ox + dx, wy = oy + dy;
-        const idx = cellIndex(wx, wy);
-        const isBorder = dx === 0 || dx === 4 || dy === 0 || dy === 4;
-        if (isBorder) {
-          if (wx === doorX && wy === doorY) {
-            // door tile — keep as hard rock, not metal
-            hardness[idx] = 7; // max tier, very hard
-          } else {
-            metalMask[idx] = 1;
-          }
-        } else {
-          // Interior — clear to tier 1 so it's open once door is opened
-          hardness[idx] = 0;
-          interiorCells.push({ x: wx, y: wy });
-        }
-      }
-    }
-
-    // Clear perks, crystals, hazards from entire 5x5 footprint
-    for (let dy = 0; dy < 5; dy++) {
-      for (let dx = 0; dx < 5; dx++) {
-        const idx = cellIndex(ox + dx, oy + dy);
-        perkMask[idx] = 0;
-        crystalMask[idx] = 0;
-        hazardMask[idx] = 0;
-        if (perkZoneMask[idx] !== -1) perkZoneMask[idx] = -1;
-      }
-    }
-
-    const safe = { x: ox, y: oy, cx, cy, doorX, doorY, keyX, keyY, interiorCells };
-    safes.push(safe);
-    placed.push({ x: cx, y: cy });
   }
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+function placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, base, random) {
+  const placed = [];
+  for (const level of DEPTH_LEVELS) {
+    const target = level.required.safes || 0;
+    let attempts = 0;
+    let placedOnLevel = 0;
+    while (placedOnLevel < target && attempts < target * 260) {
+      attempts += 1;
+      if (level.width < 10 || level.height < 10) break;
+      const ox = level.xMin + 2 + Math.floor(random() * Math.max(1, level.width - 8));
+      const oy = level.startY + 2 + Math.floor(random() * Math.max(1, level.height - 8));
+      const cx = ox + 2;
+      const cy = oy + 2;
+      if (!isInsideLevel(ox, oy, level, 0) || !isInsideLevel(ox + 4, oy + 4, level, 0)) continue;
+      if (Math.abs(cx - START_X) + Math.abs(cy - START_Y) < SAFE_MIN_START_DISTANCE) continue;
+      if (!isFarEnoughFromPlaced(cx, cy, placed, SAFE_MIN_DISTANCE)) continue;
+      let blocked = false;
+      for (let dy = 0; dy < 5 && !blocked; dy += 1) {
+        for (let dx = 0; dx < 5 && !blocked; dx += 1) {
+          const wx = ox + dx;
+          const wy = oy + dy;
+          const idx = cellIndex(wx, wy);
+          if (
+            !isInsideLevel(wx, wy, level, 0) ||
+            (wx === base.x && wy === base.y) ||
+            metalMask[idx] || beaconMask[idx] || gasPocketMask[idx] ||
+            steamPocketMask[idx] || boulderPocketMask[idx] || perkZoneMask[idx] !== -1
+          ) {
+            blocked = true;
+          }
+        }
+      }
+      if (blocked) continue;
+      const doorSide = Math.floor(random() * 4);
+      const doorOffset = 1 + Math.floor(random() * 3);
+      let doorX;
+      let doorY;
+      if (doorSide === 0) { doorX = ox + doorOffset; doorY = oy; }
+      else if (doorSide === 1) { doorX = ox + 4; doorY = oy + doorOffset; }
+      else if (doorSide === 2) { doorX = ox + doorOffset; doorY = oy + 4; }
+      else { doorX = ox; doorY = oy + doorOffset; }
 
-function isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed) {
-  if (x < 3 || x >= GRID_W - 3 || y < 3 || y >= GRID_H - 3) return true;
+      let keyX = -1;
+      let keyY = -1;
+      for (let ka = 0; ka < 120; ka += 1) {
+        const kx = cx + Math.floor((random() - 0.5) * 2 * SAFE_KEY_MAX_DIST);
+        const ky = cy + Math.floor((random() - 0.5) * 2 * SAFE_KEY_MAX_DIST);
+        if (!isInsideLevel(kx, ky, level, 2)) continue;
+        const dist = Math.hypot(kx - cx, ky - cy);
+        if (dist < SAFE_KEY_MIN_DIST || dist > SAFE_KEY_MAX_DIST) continue;
+        const ki = cellIndex(kx, ky);
+        if (metalMask[ki] || beaconMask[ki] || gasPocketMask[ki] || steamPocketMask[ki] || boulderPocketMask[ki]) continue;
+        if (kx === base.x && ky === base.y) continue;
+        keyX = kx;
+        keyY = ky;
+        break;
+      }
+      if (keyX === -1) continue;
+
+      const interiorCells = [];
+      for (let dy = 0; dy < 5; dy += 1) {
+        for (let dx = 0; dx < 5; dx += 1) {
+          const wx = ox + dx;
+          const wy = oy + dy;
+          const idx = cellIndex(wx, wy);
+          const isBorder = dx === 0 || dx === 4 || dy === 0 || dy === 4;
+          if (isBorder) {
+            if (wx === doorX && wy === doorY) {
+              hardness[idx] = 7;
+            } else {
+              metalMask[idx] = 1;
+            }
+          } else {
+            hardness[idx] = 0;
+            interiorCells.push({ x: wx, y: wy });
+          }
+          perkMask[idx] = 0;
+          crystalMask[idx] = 0;
+          hazardMask[idx] = 0;
+          if (perkZoneMask[idx] !== -1) perkZoneMask[idx] = -1;
+        }
+      }
+
+      safes.push({ x: ox, y: oy, cx, cy, doorX, doorY, keyX, keyY, interiorCells });
+      placed.push({ x: cx, y: cy });
+      placedOnLevel += 1;
+    }
+  }
+}
+
+function isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, placed) {
+  if (!isInsidePlayableArea(x, y)) return true;
   const index = cellIndex(x, y);
   if (
     perkMask[index] > 0 || crystalMask[index] > 0 || perkZoneMask[index] !== -1 ||
@@ -912,167 +1102,91 @@ function isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, p
   ) return true;
   if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) return true;
   if (!isFarEnoughFromPlaced(x, y, placed, ARTIFACT_MIN_DISTANCE)) return true;
-  // Artifacts must be below the easy start zone.
-  if (y < START_Y + 15) return true;
-  for (const b of beacons) {
-    if (Math.abs(x - b.x) + Math.abs(y - b.y) < ARTIFACT_MIN_BEACON_DIST) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function buildArtifactBeaconPairs(beacons) {
-  if (beacons.length <= 2) {
-    return [];
-  }
-
-  // Sort beacons by depth (Y) so artifacts spread through depth bands.
-  const sorted = beacons
-    .slice()
-    .sort((a, b) => a.y - b.y);
-
-  const pairs = [];
-  // Pair each beacon with neighbours 1 and 2 steps ahead in depth order.
-  for (let i = 0; i < sorted.length; i += 1) {
-    for (const step of [1, 2]) {
-      const j = (i + step) % sorted.length;
-      const a = sorted[i];
-      const b = sorted[j];
-      const ax = a.x + 0.5, ay = a.y + 0.5;
-      const bx = b.x + 0.5, by = b.y + 0.5;
-      pairs.push({
-        a, b,
-        midX: (ax + bx) * 0.5,
-        midY: (ay + by) * 0.5,
-        span: Math.hypot(bx - ax, by - ay),
-      });
-    }
-  }
-
-  // Deepest midpoints first — artifacts appear throughout the descent.
-  pairs.sort((a, b) => b.midY - a.midY || b.span - a.span);
-  return pairs;
-}
-
-function tryPlaceArtifactBetweenBeacons(pair, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed, random) {
-  const ax = pair.a.x + 0.5;
-  const ay = pair.a.y + 0.5;
-  const bx = pair.b.x + 0.5;
-  const by = pair.b.y + 0.5;
-  const dx = bx - ax;
-  const dy = by - ay;
-  const length = Math.hypot(dx, dy) || 1;
-  const nx = -dy / length;
-  const ny = dx / length;
-
-  for (let attempt = 0; attempt < 18; attempt += 1) {
-    const t = 0.35 + random() * 0.3;
-    const lateral = (random() - 0.5) * Math.min(8, length * 0.28);
-    const radial = (random() - 0.5) * Math.min(6, length * 0.12);
-    const x = Math.round(ax + dx * t + nx * lateral + (dx / length) * radial);
-    const y = Math.round(ay + dy * t + ny * lateral + (dy / length) * radial);
-    if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed)) {
-      continue;
-    }
-    artifactMask[cellIndex(x, y)] = 1;
-    placed.push({ x, y });
-    return true;
-  }
-
   return false;
 }
 
 function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
   const placed = [];
-  const artifactTargetCount = Math.max(0, beacons.length - 2);
-  if (artifactTargetCount === 0) return;
-
-  // Divide the full map depth into equal bands and place one artifact per band.
-  const yMin = START_Y + 20; // skip easy start zone
-  const yMax = GRID_H - 3;
-  const bandH = (yMax - yMin) / artifactTargetCount;
-
-  for (let band = 0; band < artifactTargetCount; band += 1) {
-    const bandYMin = Math.floor(yMin + band * bandH);
-    const bandYMax = Math.floor(yMin + (band + 1) * bandH);
-    let placed_in_band = false;
-
-    for (let attempt = 0; attempt < 300 && !placed_in_band; attempt += 1) {
-      const x = 3 + Math.floor(random() * (GRID_W - 6));
-      const y = bandYMin + Math.floor(random() * (bandYMax - bandYMin));
-      if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, placed)) continue;
+  for (const level of DEPTH_LEVELS) {
+    const target = level.required.artifacts || 0;
+    let placedOnLevel = 0;
+    let attempts = 0;
+    while (placedOnLevel < target && attempts < target * 200) {
+      attempts += 1;
+      const cell = randomCellInLevel(level, 2, random);
+      if (!cell) break;
+      const x = cell.x;
+      const y = cell.y;
+      if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, placed)) {
+        continue;
+      }
+      let tooCloseToBeacon = false;
+      for (const b of beacons) {
+        if (Math.abs(x - b.x) + Math.abs(y - b.y) < ARTIFACT_MIN_BEACON_DIST) {
+          tooCloseToBeacon = true;
+          break;
+        }
+      }
+      if (tooCloseToBeacon) continue;
       artifactMask[cellIndex(x, y)] = 1;
       placed.push({ x, y });
-      placed_in_band = true;
+      placedOnLevel += 1;
     }
   }
 }
 
-/**
- * Generate a complete map for the given seed.
- * Returns plain data arrays — no game state, safe to use from any context.
- *
- * beacons entries: { x, y }  (game.js adds `active: false`)
- * perkZones entries: { x, y, cells, iconX, iconY, perkType }
- *   (game.js adds openedCount, openedMask, arming, armingTimer, collected)
- */
 function placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, safes, base, random) {
   const placed = [];
-  let attempts = 0;
-  while (placed.length < WORM_NEST_COUNT && attempts < WORM_NEST_COUNT * 120) {
-    const x = 3 + Math.floor(random() * (GRID_W - 6));
-    const y = 3 + Math.floor(random() * (GRID_H - 6));
-    attempts += 1;
-    const index = cellIndex(x, y);
-    if (metalMask[index] || beaconMask[index]) continue;
-    if (gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) continue;
-    if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
-    const distFromStart = Math.hypot(x - START_X, y - START_Y);
-    if (distFromStart < WORM_NEST_MIN_START_DISTANCE) continue;
-    if (!isFarEnoughFromPlaced(x, y, placed, WORM_NEST_MIN_DISTANCE)) continue;
-    let tooCloseToBeacon = false;
-    for (const b of beacons) {
-      if (Math.hypot(x - b.x, y - b.y) < WORM_NEST_MIN_BEACON_DIST) {
-        tooCloseToBeacon = true;
-        break;
+  for (const level of DEPTH_LEVELS) {
+    const target = level.required.wormNests || 0;
+    let placedOnLevel = 0;
+    let attempts = 0;
+    while (placedOnLevel < target && attempts < target * 150) {
+      attempts += 1;
+      const cell = randomCellInLevel(level, 2, random);
+      if (!cell) break;
+      const x = cell.x;
+      const y = cell.y;
+      const index = cellIndex(x, y);
+      if (metalMask[index] || beaconMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index]) continue;
+      if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
+      const distFromStart = Math.hypot(x - START_X, y - START_Y);
+      if (distFromStart < WORM_NEST_MIN_START_DISTANCE) continue;
+      if (!isFarEnoughFromPlaced(x, y, placed, WORM_NEST_MIN_DISTANCE)) continue;
+      let tooCloseToBeacon = false;
+      for (const b of beacons) {
+        if (Math.hypot(x - b.x, y - b.y) < WORM_NEST_MIN_BEACON_DIST) {
+          tooCloseToBeacon = true;
+          break;
+        }
       }
-    }
-    if (tooCloseToBeacon) continue;
-    // Also avoid safes
-    let tooCloseToSafe = false;
-    for (const s of safes) {
-      if (Math.hypot(x - s.x, y - s.y) < 8) {
-        tooCloseToSafe = true;
-        break;
+      if (tooCloseToBeacon) continue;
+      let tooCloseToSafe = false;
+      for (const s of safes) {
+        if (Math.hypot(x - s.x, y - s.y) < 8) {
+          tooCloseToSafe = true;
+          break;
+        }
       }
+      if (tooCloseToSafe) continue;
+      placed.push({ x, y });
+      placedOnLevel += 1;
     }
-    if (tooCloseToSafe) continue;
-    placed.push({ x, y });
   }
   return placed;
 }
 
-/**
- * Repair pockets after beacons/safes may have destroyed some cells.
- * For each pocket cell, check if any of its 4-neighbors are also pocket cells.
- * If a pocket cell is completely isolated (no same-type neighbor), remove it.
- * Then, remove pocket cells that overlap with beacon areas.
- */
 function repairPockets(pocketMask, beaconMask) {
-  // First: remove any pocket cell that overlaps a beacon
-  for (let i = 0; i < GRID_W * GRID_H; i++) {
+  for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     if (pocketMask[i] && beaconMask[i]) {
       pocketMask[i] = 0;
     }
   }
-  // Second: remove orphaned pocket cells (no same-type 4-neighbor)
-  // Iterate until stable — removing one cell can orphan another
   let changed = true;
   while (changed) {
     changed = false;
-    for (let y = 1; y < GRID_H - 1; y++) {
-      for (let x = 1; x < GRID_W - 1; x++) {
+    for (let y = 1; y < GRID_H - 1; y += 1) {
+      for (let x = 1; x < GRID_W - 1; x += 1) {
         const idx = cellIndex(x, y);
         if (!pocketMask[idx]) continue;
         const hasNeighbor =
@@ -1089,70 +1203,139 @@ function repairPockets(pocketMask, beaconMask) {
   }
 }
 
+function validateLevelRequirements(map) {
+  for (const level of DEPTH_LEVELS) {
+    const beaconCount = map.beacons.filter((b) => isInsideLevel(b.x, b.y, level, 0)).length;
+    const perkZoneCount = map.perkZones.filter((zone) => isInsideLevel(Math.round(zone.x), Math.round(zone.y), level, 0)).length;
+    const safeCount = map.safes.filter((safe) => isInsideLevel(safe.cx, safe.cy, level, 0)).length;
+    const wormCount = map.wormNests.filter((nest) => isInsideLevel(nest.x, nest.y, level, 0)).length;
+    const artifactCount = collectCandidatesInLevel(level, 0, (x, y) => map.artifactMask[cellIndex(x, y)] > 0).length;
+    const crystalCount = collectCandidatesInLevel(level, 0, (x, y) => map.crystalMask[cellIndex(x, y)] > 0).length;
+
+    const expectedBeaconCount = level.required.beacons || 0;
+    if (beaconCount < expectedBeaconCount) {
+      throw new Error(`Level ${level.level} beacon count too low: ${beaconCount}/${expectedBeaconCount}`);
+    }
+    if (perkZoneCount < (level.required.perkZones || 0)) {
+      throw new Error(`Level ${level.level} perk zone count too low: ${perkZoneCount}/${level.required.perkZones || 0}`);
+    }
+    if (safeCount < (level.required.safes || 0)) {
+      throw new Error(`Level ${level.level} safe count too low: ${safeCount}/${level.required.safes || 0}`);
+    }
+    if (wormCount < (level.required.wormNests || 0)) {
+      throw new Error(`Level ${level.level} worm nest count too low: ${wormCount}/${level.required.wormNests || 0}`);
+    }
+    if (artifactCount < (level.required.artifacts || 0)) {
+      throw new Error(`Level ${level.level} artifact count too low: ${artifactCount}/${level.required.artifacts || 0}`);
+    }
+    if (crystalCount < (level.required.crystals || 0)) {
+      throw new Error(`Level ${level.level} crystal count too low: ${crystalCount}/${level.required.crystals || 0}`);
+    }
+  }
+
+  const hostLevels = DEPTH_LEVELS.filter((level) => level.canHostBase);
+  if (!hostLevels.some((level) => isInsideLevel(map.base.x, map.base.y, level, 0))) {
+    throw new Error("Base spawned outside host levels");
+  }
+}
+
+// ── Main export ─────────────────────────────────────────────────────────────
+
+/**
+ * Generate a complete map for the given seed.
+ * Returns plain data arrays — no game state, safe to use from any context.
+ *
+ * beacons entries: { x, y }  (game.js adds `active: false`)
+ * perkZones entries: { x, y, cells, iconX, iconY, perkType }
+ *   (game.js adds openedCount, openedMask, arming, armingTimer, collected)
+ */
 export function generateMap(seed) {
   const random = mulberry32(seed);
 
-  const hardness       = buildHardness(random);
-  const hazardMask     = new Uint8Array(GRID_W * GRID_H);
-  const metalMask      = new Uint8Array(GRID_W * GRID_H);
-  const goldOreMask   = new Uint8Array(GRID_W * GRID_H);
-  const gasPocketMask  = new Uint8Array(GRID_W * GRID_H);
+  const hardness = buildHardness(random);
+  const hazardMask = new Uint8Array(GRID_W * GRID_H);
+  const metalMask = new Uint8Array(GRID_W * GRID_H);
+  const goldOreMask = new Uint8Array(GRID_W * GRID_H);
+  const gasPocketMask = new Uint8Array(GRID_W * GRID_H);
   const steamPocketMask = new Uint8Array(GRID_W * GRID_H);
   const boulderPocketMask = new Uint8Array(GRID_W * GRID_H);
-  const beaconMask     = new Uint8Array(GRID_W * GRID_H);
-  const perkMask       = new Uint8Array(GRID_W * GRID_H);
-  const crystalMask    = new Uint8Array(GRID_W * GRID_H);
-  const perkZoneMask   = new Int32Array(GRID_W * GRID_H).fill(-1);
-  const artifactMask   = new Uint8Array(GRID_W * GRID_H);
+  const beaconMask = new Uint8Array(GRID_W * GRID_H);
+  const perkMask = new Uint8Array(GRID_W * GRID_H);
+  const crystalMask = new Uint8Array(GRID_W * GRID_H);
+  const perkZoneMask = new Int32Array(GRID_W * GRID_H).fill(-1);
+  const artifactMask = new Uint8Array(GRID_W * GRID_H);
 
-  const beacons   = [];
+  const beacons = [];
   const perkZones = [];
-  const safes     = [];
+  const safes = [];
 
-  const area = GRID_W * GRID_H;
-  const hazardBlobGroups = Math.max(12, Math.round(area / 3000));
-  const hazardVeinGroups = Math.max(12, Math.round(area / 3000));
+  applyOuterMetalFrame(metalMask);
 
-  for (let i = 0; i < hazardBlobGroups; i += 1) placeHazardBlob(hazardMask, random, 4 + Math.floor(random() * 17));
-  for (let i = 0; i < hazardVeinGroups; i += 1)  placeHazardVein(hazardMask, random, 4 + Math.floor(random() * 37));
-  for (let i = 0; i < METAL_VEIN_GROUPS;    i += 1) placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, random, 12 + Math.floor(random() * 22));
-  for (let i = 0; i < GOLD_ORE_GROUPS;     i += 1) placeGoldOreVein(goldOreMask, random, 4 + Math.floor(random() * 7));
-  placeNearGold(goldOreMask, random);
-  for (let i = 0; i < GAS_POCKET_GROUPS;    i += 1) placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, random, 4 + Math.floor(random() * 17));
-  for (let i = 0; i < STEAM_POCKET_GROUPS;  i += 1) placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, random, 3 + Math.floor(random() * 7));
-  for (let i = 0; i < BOULDER_POCKET_GROUPS; i += 1) placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, random);
+  for (const level of DEPTH_LEVELS) {
+    for (let i = 0; i < level.rules.hazardBlobGroups; i += 1) {
+      placeHazardBlob(hazardMask, level, random, 4 + Math.floor(random() * 14));
+    }
+    for (let i = 0; i < level.rules.hazardVeinGroups; i += 1) {
+      placeHazardVein(hazardMask, level, random, 6 + Math.floor(random() * 18));
+    }
+    for (let i = 0; i < level.rules.metalVeinGroups; i += 1) {
+      placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, 10 + Math.floor(random() * 16));
+    }
+    for (let i = 0; i < level.rules.goldOreGroups; i += 1) {
+      const minTiles = level.rules.goldOreMinTiles;
+      const maxTiles = level.rules.goldOreMaxTiles;
+      const blockCount = minTiles + Math.floor(random() * (maxTiles - minTiles + 1));
+      placeGoldOreVein(goldOreMask, level, random, blockCount);
+    }
+    for (let i = 0; i < level.rules.gasPocketGroups; i += 1) {
+      placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, level, random, 4 + Math.floor(random() * 12));
+    }
+    for (let i = 0; i < level.rules.steamPocketGroups; i += 1) {
+      placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, level, random, 3 + Math.floor(random() * 8));
+    }
+    for (let i = 0; i < level.rules.boulderPocketGroups; i += 1) {
+      placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, level, random);
+    }
+  }
 
-  const base = placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, random);
-
-  placeEntryBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons);
-  placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, random);
+  const base = placeBase(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, random);
+  placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base, random);
   for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     if (beaconMask[i] >= 1) hardness[i] = 0;
   }
+
+  placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, base, random);
   placePerkTiles(perkMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placeCrystalTiles(crystalMask, perkMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
   placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
-  placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, random);
   const wormNests = placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, safes, base, random);
 
-  // Repair pockets: remove any pocket cells that were destroyed by beacons/safes
-  // A pocket cell is orphaned if it has no pocket neighbor of the same type
-  // (i.e. it became isolated by beacon clearing). Remove such cells.
   repairPockets(gasPocketMask, beaconMask);
   repairPockets(steamPocketMask, beaconMask);
-  // Boulder pockets are intentionally single cells — repairPockets would remove them all.
-  // Only clear overlaps with beacons.
-  for (let i = 0; i < GRID_W * GRID_H; i++) {
+  for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     if (boulderPocketMask[i] && beaconMask[i]) boulderPocketMask[i] = 0;
   }
 
-  return {
-    hardness, hazardMask, metalMask, goldOreMask,
-    gasPocketMask, steamPocketMask, boulderPocketMask,
-    beaconMask, beacons,
-    perkMask, crystalMask, perkZones,
-    artifactMask, safes, wormNests,
+  const map = {
+    hardness,
+    hazardMask,
+    metalMask,
+    goldOreMask,
+    gasPocketMask,
+    steamPocketMask,
+    boulderPocketMask,
+    beaconMask,
+    beacons,
+    perkMask,
+    crystalMask,
+    perkZones,
+    artifactMask,
+    safes,
+    wormNests,
     base,
   };
+
+  validateLevelRequirements(map);
+  return map;
 }
