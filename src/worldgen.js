@@ -74,8 +74,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 44,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0 },
-    rules: { hazardBlobGroups: 1, hazardVeinGroups: 1, metalVeinGroups: 1, goldOreGroups: 8, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 0, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 43, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -1.2 },
+    rules: { beacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0, thornBlob: [1, 4, 17], thornVein: [1, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [1, 10, 25], goldOre: [8, 4, 10], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 43, hardnessBias: -1.2 },
   },
   {
     id: 2,
@@ -83,8 +82,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 52,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 2, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1 },
-    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 10, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 8, maxCrystals: 52, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -0.8 },
+    rules: { beacons: 2, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 10, 25], goldOre: [10, 4, 10], gasPocket: [1, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 8, maxCrystals: 52, hardnessBias: -0.8 },
   },
   {
     id: 3,
@@ -92,8 +90,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 60,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 2, perkZones: 2, safes: 1, wormNests: 1, artifacts: 2 },
-    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 12, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 1, boulderPocketGroups: 0, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 10, maxCrystals: 69, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: -0.4 },
+    rules: { beacons: 2, perkZones: 2, safes: 1, wormNests: 1, artifacts: 2, thornBlob: [1, 4, 17], thornVein: [1, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [12, 4, 10], gasPocket: [1, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 10, maxCrystals: 69, hardnessBias: -0.4 },
   },
   {
     id: 4,
@@ -101,8 +98,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 68,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 2 },
-    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 1, boulderPocketGroups: 1, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 12, maxCrystals: 79, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.0 },
+    rules: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 2, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [14, 4, 10], gasPocket: [2, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 1, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 12, maxCrystals: 79, hardnessBias: 0.0 },
   },
   {
     id: 5,
@@ -110,8 +106,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 76,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 3, safes: 1, wormNests: 1, artifacts: 3 },
-    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 1, perkTileDensity: 0.9, perkZoneDensity: 0.85, minCrystals: 12, maxCrystals: 88, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.5 },
+    rules: { beacons: 3, perkZones: 3, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [16, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 1, perkTileDensity: 0.9, perkZoneDensity: 0.85, minCrystals: 12, maxCrystals: 88, hardnessBias: 0.5 },
   },
   {
     id: 6,
@@ -119,8 +114,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 84,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3 },
-    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 2, goldOreGroups: 18, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.85, perkZoneDensity: 0.8, minCrystals: 14, maxCrystals: 101, hazardTypes: [HAZARD_TYPES.VOLATILE, HAZARD_TYPES.SPIKE], hardnessBias: 0.9 },
+    rules: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [2, 4, 17], bombVein: [2, 6, 23], metalVein: [2, 10, 25], goldOre: [18, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.85, perkZoneDensity: 0.8, minCrystals: 14, maxCrystals: 101, hardnessBias: 0.9 },
   },
   {
     id: 7,
@@ -128,8 +122,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 74,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3 },
-    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.8, perkZoneDensity: 0.75, minCrystals: 12, maxCrystals: 78, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.2 },
+    rules: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [0, 4, 17], thornVein: [0, 6, 23], bombBlob: [4, 4, 17], bombVein: [4, 6, 23], metalVein: [1, 10, 25], goldOre: [16, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.8, perkZoneDensity: 0.75, minCrystals: 12, maxCrystals: 78, hardnessBias: 1.2 },
   },
   {
     id: 8,
@@ -137,8 +130,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 64,
     canHostBase: true,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 3 },
-    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 10, maxCrystals: 65, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.5 },
+    rules: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 3, thornBlob: [0, 4, 17], thornVein: [0, 6, 23], bombBlob: [4, 4, 17], bombVein: [4, 6, 23], metalVein: [1, 10, 25], goldOre: [14, 4, 10], gasPocket: [1, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 10, maxCrystals: 65, hardnessBias: 1.5 },
   },
 ];
 
@@ -148,17 +140,37 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function normalizeHazardTypes(hazardTypes) {
-  if (!Array.isArray(hazardTypes) || hazardTypes.length === 0) {
-    throw new Error("hazardTypes must be a non-empty array");
+function splitLegacyGroupCount(total, allowThorns, allowBombs) {
+  if (!allowThorns && !allowBombs) {
+    return { thorns: 0, bombs: 0 };
   }
-  return hazardTypes.map((value) => {
-    const num = Number(value);
-    if (num !== HAZARD_TYPES.SPIKE && num !== HAZARD_TYPES.VOLATILE) {
-      throw new Error(`Unsupported hazard type: ${value}`);
-    }
-    return num;
-  });
+  if (allowThorns && allowBombs) {
+    return { thorns: Math.ceil(total / 2), bombs: Math.floor(total / 2) };
+  }
+  if (allowThorns) {
+    return { thorns: total, bombs: 0 };
+  }
+  return { thorns: 0, bombs: total };
+}
+
+function normalizeTriplet(value, fallback, label) {
+  const source = Array.isArray(value) ? value : fallback;
+  if (!Array.isArray(source) || source.length !== 3) {
+    throw new Error(`${label} must be [groups, minTiles, maxTiles]`);
+  }
+  const groups = Math.round(Number(source[0]));
+  const minTiles = Math.round(Number(source[1]));
+  const maxTiles = Math.round(Number(source[2]));
+  if (!Number.isFinite(groups) || groups < 0) {
+    throw new Error(`${label}[0] groups must be at least 0`);
+  }
+  if (!Number.isFinite(minTiles) || minTiles < 1) {
+    throw new Error(`${label}[1] minTiles must be at least 1`);
+  }
+  if (!Number.isFinite(maxTiles) || maxTiles < minTiles) {
+    throw new Error(`${label}[2] maxTiles must be >= minTiles`);
+  }
+  return [groups, minTiles, maxTiles];
 }
 
 function validateLevelLayout(layout) {
@@ -183,15 +195,104 @@ function validateLevelLayout(layout) {
     }
     totalHeight += height;
     if (level.canHostBase) hostBaseCount += 1;
-    if (!level.required || typeof level.required !== "object") {
-      throw new Error(`Level ${i + 1} required must be an object`);
-    }
     if (!level.rules || typeof level.rules !== "object") {
       throw new Error(`Level ${i + 1} rules must be an object`);
     }
-    level.rules.hazardTypes = normalizeHazardTypes(level.rules.hazardTypes);
-    const goldOreMinTiles = Math.round(Number(level.rules.goldOreMinTiles));
-    const goldOreMaxTiles = Math.round(Number(level.rules.goldOreMaxTiles));
+    if (!level.required || typeof level.required !== "object") {
+      level.required = {};
+    }
+    const requiredKeys = ["beacons", "perkZones", "safes", "wormNests", "artifacts"];
+    for (const key of requiredKeys) {
+      if (!Number.isFinite(level.rules[key]) && Number.isFinite(level.required[key])) {
+        level.rules[key] = level.required[key];
+      }
+      if (!Number.isFinite(level.rules[key])) {
+        level.rules[key] = 0;
+      }
+      level.rules[key] = Math.round(Number(level.rules[key]));
+      if (!Number.isFinite(level.rules[key]) || level.rules[key] < 0) {
+        throw new Error(`Level ${i + 1} ${key} must be at least 0`);
+      }
+    }
+    const legacyTypes = Array.isArray(level.rules.thornTypes)
+      ? level.rules.thornTypes
+      : (Array.isArray(level.rules.hazardTypes) ? level.rules.hazardTypes : [HAZARD_TYPES.SPIKE]);
+    const allowThorns = legacyTypes.includes(HAZARD_TYPES.SPIKE);
+    const allowBombs = legacyTypes.includes(HAZARD_TYPES.VOLATILE);
+    const legacyBlobSplit = splitLegacyGroupCount(Math.round(Number(level.rules.hazardBlobGroups)) || 0, allowThorns, allowBombs);
+    const legacyVeinSplit = splitLegacyGroupCount(Math.round(Number(level.rules.hazardVeinGroups)) || 0, allowThorns, allowBombs);
+    const thornBlob = normalizeTriplet(
+      level.rules.thornBlob,
+      [
+        Number.isFinite(level.rules.thornBlobGroups) ? level.rules.thornBlobGroups : legacyBlobSplit.thorns,
+        Number.isFinite(level.rules.thornBlobMinTiles) ? level.rules.thornBlobMinTiles : (Number.isFinite(level.rules.hazardBlobMinTiles) ? level.rules.hazardBlobMinTiles : 4),
+        Number.isFinite(level.rules.thornBlobMaxTiles) ? level.rules.thornBlobMaxTiles : (Number.isFinite(level.rules.hazardBlobMaxTiles) ? level.rules.hazardBlobMaxTiles : 17),
+      ],
+      `Level ${i + 1} thornBlob`,
+    );
+    const bombBlob = normalizeTriplet(
+      level.rules.bombBlob,
+      [
+        Number.isFinite(level.rules.bombBlobGroups) ? level.rules.bombBlobGroups : legacyBlobSplit.bombs,
+        Number.isFinite(level.rules.bombBlobMinTiles) ? level.rules.bombBlobMinTiles : (Number.isFinite(level.rules.hazardBlobMinTiles) ? level.rules.hazardBlobMinTiles : 4),
+        Number.isFinite(level.rules.bombBlobMaxTiles) ? level.rules.bombBlobMaxTiles : (Number.isFinite(level.rules.hazardBlobMaxTiles) ? level.rules.hazardBlobMaxTiles : 17),
+      ],
+      `Level ${i + 1} bombBlob`,
+    );
+    const thornVein = normalizeTriplet(
+      level.rules.thornVein,
+      [
+        Number.isFinite(level.rules.thornVeinGroups) ? level.rules.thornVeinGroups : legacyVeinSplit.thorns,
+        Number.isFinite(level.rules.thornVeinMinTiles) ? level.rules.thornVeinMinTiles : (Number.isFinite(level.rules.hazardVeinMinTiles) ? level.rules.hazardVeinMinTiles : 6),
+        Number.isFinite(level.rules.thornVeinMaxTiles) ? level.rules.thornVeinMaxTiles : (Number.isFinite(level.rules.hazardVeinMaxTiles) ? level.rules.hazardVeinMaxTiles : 23),
+      ],
+      `Level ${i + 1} thornVein`,
+    );
+    const bombVein = normalizeTriplet(
+      level.rules.bombVein,
+      [
+        Number.isFinite(level.rules.bombVeinGroups) ? level.rules.bombVeinGroups : legacyVeinSplit.bombs,
+        Number.isFinite(level.rules.bombVeinMinTiles) ? level.rules.bombVeinMinTiles : (Number.isFinite(level.rules.hazardVeinMinTiles) ? level.rules.hazardVeinMinTiles : 6),
+        Number.isFinite(level.rules.bombVeinMaxTiles) ? level.rules.bombVeinMaxTiles : (Number.isFinite(level.rules.hazardVeinMaxTiles) ? level.rules.hazardVeinMaxTiles : 23),
+      ],
+      `Level ${i + 1} bombVein`,
+    );
+    const metalVein = normalizeTriplet(
+      level.rules.metalVein,
+      [
+        Number.isFinite(level.rules.metalVeinGroups) ? level.rules.metalVeinGroups : 0,
+        Number.isFinite(level.rules.metalVeinMinTiles) ? level.rules.metalVeinMinTiles : 10,
+        Number.isFinite(level.rules.metalVeinMaxTiles) ? level.rules.metalVeinMaxTiles : 25,
+      ],
+      `Level ${i + 1} metalVein`,
+    );
+    const goldOre = normalizeTriplet(
+      level.rules.goldOre,
+      [
+        Number.isFinite(level.rules.goldOreGroups) ? level.rules.goldOreGroups : 0,
+        Number.isFinite(level.rules.goldOreMinTiles) ? level.rules.goldOreMinTiles : 4,
+        Number.isFinite(level.rules.goldOreMaxTiles) ? level.rules.goldOreMaxTiles : 10,
+      ],
+      `Level ${i + 1} goldOre`,
+    );
+    const gasPocket = normalizeTriplet(
+      level.rules.gasPocket,
+      [
+        Number.isFinite(level.rules.gasPocketGroups) ? level.rules.gasPocketGroups : 0,
+        Number.isFinite(level.rules.gasPocketMinTiles) ? level.rules.gasPocketMinTiles : 4,
+        Number.isFinite(level.rules.gasPocketMaxTiles) ? level.rules.gasPocketMaxTiles : 15,
+      ],
+      `Level ${i + 1} gasPocket`,
+    );
+    const steamPocket = normalizeTriplet(
+      level.rules.steamPocket,
+      [
+        Number.isFinite(level.rules.steamPocketGroups) ? level.rules.steamPocketGroups : 0,
+        Number.isFinite(level.rules.steamPocketMinTiles) ? level.rules.steamPocketMinTiles : 3,
+        Number.isFinite(level.rules.steamPocketMaxTiles) ? level.rules.steamPocketMaxTiles : 10,
+      ],
+      `Level ${i + 1} steamPocket`,
+    );
     const legacyRequiredCrystals = Math.round(Number(level.required.crystals));
     const legacyCrystalDensity = Number(level.rules.crystalDensity);
     if (!Number.isFinite(level.rules.minCrystals) && Number.isFinite(legacyRequiredCrystals)) {
@@ -209,22 +310,59 @@ function validateLevelLayout(layout) {
     }
     const minCrystals = Math.round(Number(level.rules.minCrystals));
     const maxCrystals = Math.round(Number(level.rules.maxCrystals));
-    if (!Number.isFinite(goldOreMinTiles) || goldOreMinTiles < 1) {
-      throw new Error(`Level ${i + 1} goldOreMinTiles must be at least 1`);
-    }
-    if (!Number.isFinite(goldOreMaxTiles) || goldOreMaxTiles < goldOreMinTiles) {
-      throw new Error(`Level ${i + 1} goldOreMaxTiles must be >= goldOreMinTiles`);
-    }
     if (!Number.isFinite(minCrystals) || minCrystals < 0) {
       throw new Error(`Level ${i + 1} minCrystals must be at least 0`);
     }
     if (!Number.isFinite(maxCrystals) || maxCrystals < minCrystals) {
       throw new Error(`Level ${i + 1} maxCrystals must be >= minCrystals`);
     }
-    level.rules.goldOreMinTiles = goldOreMinTiles;
-    level.rules.goldOreMaxTiles = goldOreMaxTiles;
+    level.rules.thornBlob = thornBlob;
+    level.rules.bombBlob = bombBlob;
+    level.rules.thornVein = thornVein;
+    level.rules.bombVein = bombVein;
+    level.rules.metalVein = metalVein;
+    level.rules.goldOre = goldOre;
+    level.rules.gasPocket = gasPocket;
+    level.rules.steamPocket = steamPocket;
     level.rules.minCrystals = minCrystals;
     level.rules.maxCrystals = maxCrystals;
+    delete level.rules.thornTypes;
+    delete level.rules.hazardTypes;
+    delete level.rules.thornBlobGroups;
+    delete level.rules.thornBlobMinTiles;
+    delete level.rules.thornBlobMaxTiles;
+    delete level.rules.bombBlobGroups;
+    delete level.rules.bombBlobMinTiles;
+    delete level.rules.bombBlobMaxTiles;
+    delete level.rules.thornVeinGroups;
+    delete level.rules.thornVeinMinTiles;
+    delete level.rules.thornVeinMaxTiles;
+    delete level.rules.bombVeinGroups;
+    delete level.rules.bombVeinMinTiles;
+    delete level.rules.bombVeinMaxTiles;
+    delete level.rules.metalVeinGroups;
+    delete level.rules.metalVeinMinTiles;
+    delete level.rules.metalVeinMaxTiles;
+    delete level.rules.goldOreGroups;
+    delete level.rules.goldOreMinTiles;
+    delete level.rules.goldOreMaxTiles;
+    delete level.rules.gasPocketGroups;
+    delete level.rules.gasPocketMinTiles;
+    delete level.rules.gasPocketMaxTiles;
+    delete level.rules.steamPocketGroups;
+    delete level.rules.steamPocketMinTiles;
+    delete level.rules.steamPocketMaxTiles;
+    delete level.rules.hazardBlobGroups;
+    delete level.rules.hazardBlobMinTiles;
+    delete level.rules.hazardBlobMaxTiles;
+    delete level.rules.hazardVeinGroups;
+    delete level.rules.hazardVeinMinTiles;
+    delete level.rules.hazardVeinMaxTiles;
+    delete level.required.beacons;
+    delete level.required.perkZones;
+    delete level.required.safes;
+    delete level.required.wormNests;
+    delete level.required.artifacts;
     delete level.required.crystals;
     delete level.rules.crystalDensity;
   }
@@ -264,7 +402,7 @@ const INITIAL_DEPTH_LEVELS = buildDepthLevels(currentLevelLayout);
 export const DEPTH_LEVELS = [...INITIAL_DEPTH_LEVELS];
 export const GRID_H = INITIAL_DEPTH_LEVELS[INITIAL_DEPTH_LEVELS.length - 1].endY + 1;
 export let BEACON_COUNT = INITIAL_DEPTH_LEVELS.reduce(
-  (sum, level) => sum + (level.required.beacons || 0),
+  (sum, level) => sum + (level.rules.beacons || 0),
   0,
 );
 
@@ -284,7 +422,7 @@ function rebuildGenerationRuntime() {
   }
   PLAYABLE_TILE_COUNT = DEPTH_LEVELS.reduce((sum, level) => sum + level.area, 0);
   BEACON_COUNT = DEPTH_LEVELS.reduce(
-    (sum, level) => sum + (level.required.beacons || 0),
+    (sum, level) => sum + (level.rules.beacons || 0),
     0,
   );
 }
@@ -418,7 +556,7 @@ export function getTargetPerkTileCount(level = null) {
 
 export function getTargetPerkZoneCount(level = null) {
   if (level) {
-    return Math.max(level.required.perkZones || 0, Math.round((level.area / TILES_PER_PERK_ZONE) * level.rules.perkZoneDensity));
+    return Math.max(level.rules.perkZones || 0, Math.round((level.area / TILES_PER_PERK_ZONE) * level.rules.perkZoneDensity));
   }
   return DEPTH_LEVELS.reduce((sum, item) => sum + getTargetPerkZoneCount(item), 0);
 }
@@ -487,37 +625,62 @@ function buildHardness(random) {
 
   for (let i = 0; i < DEPTH_LEVELS.length; i += 1) {
     const level = DEPTH_LEVELS[i];
+    const [thornBlobCount, thornBlobMinTiles, thornBlobMaxTiles] = level.rules.thornBlob;
+    const [bombBlobCount, bombBlobMinTiles, bombBlobMaxTiles] = level.rules.bombBlob;
+    const [thornVeinCount, thornVeinMinTiles, thornVeinMaxTiles] = level.rules.thornVein;
+    const [bombVeinCount, bombVeinMinTiles, bombVeinMaxTiles] = level.rules.bombVein;
     forEachCellInLevel(level, (x, y) => {
       const depthRatio = getLevelDepthRatio(level, y);
       const localRatio = (y - level.startY) / Math.max(1, level.height - 1);
       danger[cellIndex(x, y)] = 0.95 + depthRatio * 4.9 + localRatio * 1.2 + level.rules.hardnessBias;
     });
 
-    const blobCount = Math.max(1, level.rules.hazardBlobGroups + Math.round(level.area / 1400));
-    for (let n = 0; n < blobCount; n += 1) {
+    for (let n = 0; n < thornBlobCount; n += 1) {
       const origin = randomCellInLevel(level, 2, random);
       if (!origin) continue;
+      const blockCount = thornBlobMinTiles + Math.floor(random() * (thornBlobMaxTiles - thornBlobMinTiles + 1));
+      const radius = Math.max(1.5, Math.sqrt(blockCount) * 0.9);
       addDangerBlob(
         danger,
         level,
         origin.x,
         origin.y,
-        6 + random() * Math.max(8, level.width * 0.18),
+        radius,
         -1.2 + random() * 2.8,
       );
     }
 
-    const softVeins = Math.max(1, level.rules.hazardVeinGroups);
-    const hardVeins = Math.max(1, level.rules.hazardVeinGroups);
-    for (let n = 0; n < softVeins; n += 1) {
+    for (let n = 0; n < bombBlobCount; n += 1) {
       const origin = randomCellInLevel(level, 2, random);
       if (!origin) continue;
-      addDangerVein(danger, level, origin.x, origin.y, 8 + Math.floor(random() * 16), 1.2 + random() * 1.6, -0.8 - random() * 0.4, random);
+      const blockCount = bombBlobMinTiles + Math.floor(random() * (bombBlobMaxTiles - bombBlobMinTiles + 1));
+      const radius = Math.max(1.5, Math.sqrt(blockCount) * 0.9);
+      addDangerBlob(
+        danger,
+        level,
+        origin.x,
+        origin.y,
+        radius,
+        -1.2 + random() * 2.8,
+      );
     }
-    for (let n = 0; n < hardVeins; n += 1) {
+
+    for (let n = 0; n < thornVeinCount; n += 1) {
       const origin = randomCellInLevel(level, 2, random);
       if (!origin) continue;
-      addDangerVein(danger, level, origin.x, origin.y, 10 + Math.floor(random() * 18), 1.0 + random() * 1.2, 0.9 + random() * 0.8, random);
+      const blockCount = thornVeinMinTiles + Math.floor(random() * (thornVeinMaxTiles - thornVeinMinTiles + 1));
+      const depthBias = -0.8 + (n / Math.max(1, thornVeinCount - 1)) * 2.1;
+      const intensity = 1.0 + random() * 1.8;
+      addDangerVein(danger, level, origin.x, origin.y, blockCount, intensity, depthBias, random);
+    }
+
+    for (let n = 0; n < bombVeinCount; n += 1) {
+      const origin = randomCellInLevel(level, 2, random);
+      if (!origin) continue;
+      const blockCount = bombVeinMinTiles + Math.floor(random() * (bombVeinMaxTiles - bombVeinMinTiles + 1));
+      const depthBias = -0.8 + (n / Math.max(1, bombVeinCount - 1)) * 2.1;
+      const intensity = 1.0 + random() * 1.8;
+      addDangerVein(danger, level, origin.x, origin.y, blockCount, intensity, depthBias, random);
     }
   }
 
@@ -540,11 +703,6 @@ function buildHardness(random) {
 
 // ── Placement helpers ───────────────────────────────────────────────────────
 
-function chooseHazardType(random, level) {
-  const allowed = level.rules.hazardTypes;
-  return allowed[Math.floor(random() * allowed.length)];
-}
-
 function isPocketNeighbor(x, y, mask) {
   for (let dy = -1; dy <= 1; dy += 1) {
     for (let dx = -1; dx <= 1; dx += 1) {
@@ -557,16 +715,37 @@ function isPocketNeighbor(x, y, mask) {
   return false;
 }
 
-function canPlaceHazardAt(x, y, level) {
-  return isInsideLevel(x, y, level, 1) && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+function canPlaceHazardAt(x, y, level, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, hazardMask) {
+  if (!isInsideLevel(x, y, level, 1)) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  const index = cellIndex(x, y);
+  if (metalMask[index] || goldOreMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || hazardMask[index]) {
+    return false;
+  }
+  return true;
 }
 
-function canPlaceMetalAt(x, y, level) {
-  return isInsideLevel(x, y, level, 1) && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+function canPlaceMetalAt(x, y, level, hazardMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, metalMask) {
+  if (!isInsideLevel(x, y, level, 1)) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  const index = cellIndex(x, y);
+  if (hazardMask[index] || goldOreMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || metalMask[index]) {
+    return false;
+  }
+  return true;
 }
 
-function canPlaceGoldOreAt(x, y, level) {
-  return isInsideLevel(x, y, level, 1) && !(x === START_X && y === START_Y) && !isInStartEasyRadius(x, y);
+function canPlaceGoldOreAt(x, y, level, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, goldOreMask) {
+  if (!isInsideLevel(x, y, level, 1)) return false;
+  if (x === START_X && y === START_Y) return false;
+  if (isInStartEasyRadius(x, y)) return false;
+  const index = cellIndex(x, y);
+  if (metalMask[index] || hazardMask[index] || gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || goldOreMask[index]) {
+    return false;
+  }
+  return true;
 }
 
 function canPlaceGasPocketAt(x, y, level, steamPocketMask, boulderPocketMask) {
@@ -596,10 +775,9 @@ function canPlaceBoulderPocketAt(x, y, level, gasPocketMask, steamPocketMask) {
   return true;
 }
 
-function placeHazardBlob(hazardMask, level, random, blockCount) {
+function placeHazardBlob(hazardMask, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount, hazardType) {
   const origin = randomCellInLevel(level, 2, random);
   if (!origin) return;
-  const hazardType = chooseHazardType(random, level);
   const frontier = [{ x: origin.x, y: origin.y }];
   const seen = new Set();
   let placed = 0;
@@ -609,7 +787,7 @@ function placeHazardBlob(hazardMask, level, random, blockCount) {
     const key = `${cell.x},${cell.y}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!canPlaceHazardAt(cell.x, cell.y, level)) continue;
+    if (!canPlaceHazardAt(cell.x, cell.y, level, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, hazardMask)) continue;
     hazardMask[cellIndex(cell.x, cell.y)] = hazardType;
     placed += 1;
     const neighbors = [
@@ -626,10 +804,9 @@ function placeHazardBlob(hazardMask, level, random, blockCount) {
   }
 }
 
-function placeHazardVein(hazardMask, level, random, blockCount) {
+function placeHazardVein(hazardMask, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount, hazardType) {
   const origin = randomCellInLevel(level, 2, random);
   if (!origin) return;
-  const hazardType = chooseHazardType(random, level);
   let x = origin.x;
   let y = origin.y;
   let angle = random() * Math.PI * 2;
@@ -639,7 +816,7 @@ function placeHazardVein(hazardMask, level, random, blockCount) {
     attempts += 1;
     const ix = Math.round(x);
     const iy = Math.round(y);
-    if (canPlaceHazardAt(ix, iy, level)) {
+    if (canPlaceHazardAt(ix, iy, level, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, hazardMask)) {
       hazardMask[cellIndex(ix, iy)] = hazardType;
       placed += 1;
     }
@@ -649,7 +826,7 @@ function placeHazardVein(hazardMask, level, random, blockCount) {
   }
 }
 
-function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount) {
+function placeMetalVein(metalMask, hazardMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount) {
   const origin = randomCellInLevel(level, 2, random);
   if (!origin) return;
   let x = origin.x;
@@ -661,13 +838,9 @@ function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, b
     attempts += 1;
     const ix = Math.round(x);
     const iy = Math.round(y);
-    if (canPlaceMetalAt(ix, iy, level)) {
+    if (canPlaceMetalAt(ix, iy, level, hazardMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, metalMask)) {
       const index = cellIndex(ix, iy);
       metalMask[index] = 1;
-      hazardMask[index] = 0;
-      gasPocketMask[index] = 0;
-      steamPocketMask[index] = 0;
-      boulderPocketMask[index] = 0;
       placed += 1;
     }
     angle += (random() - 0.5) * 0.55;
@@ -676,7 +849,7 @@ function placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, b
   }
 }
 
-function placeGoldOreVein(goldOreMask, level, random, blockCount) {
+function placeGoldOreVein(goldOreMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount) {
   const origin = randomCellInLevel(level, 2, random);
   if (!origin) return;
   let x = origin.x;
@@ -688,7 +861,7 @@ function placeGoldOreVein(goldOreMask, level, random, blockCount) {
     attempts += 1;
     const ix = Math.round(x);
     const iy = Math.round(y);
-    if (canPlaceGoldOreAt(ix, iy, level)) {
+    if (canPlaceGoldOreAt(ix, iy, level, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, goldOreMask)) {
       goldOreMask[cellIndex(ix, iy)] = 1;
       placed += 1;
     }
@@ -856,7 +1029,7 @@ function tryPlaceBeacon(x, y, level, beaconMask, metalMask, hazardMask, gasPocke
 
 function placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base, random) {
   for (const level of DEPTH_LEVELS) {
-    const target = level.required.beacons || 0;
+    const target = level.rules.beacons || 0;
     if (target <= 0) continue;
     const candidates = collectCandidatesInLevel(level, 1, () => true);
     shuffle(candidates, random);
@@ -979,7 +1152,7 @@ function createPerkZoneShape(random) {
 function placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random) {
   for (const level of DEPTH_LEVELS) {
     const placed = [];
-    const targetCount = level.required.perkZones || 0;
+    const targetCount = level.rules.perkZones || 0;
     let attempts = 0;
     while (placed.length < targetCount && attempts < targetCount * 180) {
       const shape = createPerkZoneShape(random);
@@ -1032,7 +1205,7 @@ function placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask,
 function placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, base, random) {
   const placed = [];
   for (const level of DEPTH_LEVELS) {
-    const target = level.required.safes || 0;
+    const target = level.rules.safes || 0;
     let attempts = 0;
     let placedOnLevel = 0;
     while (placedOnLevel < target && attempts < target * 260) {
@@ -1135,7 +1308,7 @@ function isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, p
 function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
   const placed = [];
   for (const level of DEPTH_LEVELS) {
-    const target = level.required.artifacts || 0;
+    const target = level.rules.artifacts || 0;
     let placedOnLevel = 0;
     let attempts = 0;
     while (placedOnLevel < target && attempts < target * 200) {
@@ -1165,7 +1338,7 @@ function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metal
 function placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, safes, base, random) {
   const placed = [];
   for (const level of DEPTH_LEVELS) {
-    const target = level.required.wormNests || 0;
+    const target = level.rules.wormNests || 0;
     let placedOnLevel = 0;
     let attempts = 0;
     while (placedOnLevel < target && attempts < target * 150) {
@@ -1239,21 +1412,21 @@ function validateLevelRequirements(map) {
     const artifactCount = collectCandidatesInLevel(level, 0, (x, y) => map.artifactMask[cellIndex(x, y)] > 0).length;
     const crystalCount = collectCandidatesInLevel(level, 0, (x, y) => map.crystalMask[cellIndex(x, y)] > 0).length;
 
-    const expectedBeaconCount = level.required.beacons || 0;
+    const expectedBeaconCount = level.rules.beacons || 0;
     if (beaconCount < expectedBeaconCount) {
       throw new Error(`Level ${level.level} beacon count too low: ${beaconCount}/${expectedBeaconCount}`);
     }
-    if (perkZoneCount < (level.required.perkZones || 0)) {
-      throw new Error(`Level ${level.level} perk zone count too low: ${perkZoneCount}/${level.required.perkZones || 0}`);
+    if (perkZoneCount < (level.rules.perkZones || 0)) {
+      throw new Error(`Level ${level.level} perk zone count too low: ${perkZoneCount}/${level.rules.perkZones || 0}`);
     }
-    if (safeCount < (level.required.safes || 0)) {
-      throw new Error(`Level ${level.level} safe count too low: ${safeCount}/${level.required.safes || 0}`);
+    if (safeCount < (level.rules.safes || 0)) {
+      throw new Error(`Level ${level.level} safe count too low: ${safeCount}/${level.rules.safes || 0}`);
     }
-    if (wormCount < (level.required.wormNests || 0)) {
-      throw new Error(`Level ${level.level} worm nest count too low: ${wormCount}/${level.required.wormNests || 0}`);
+    if (wormCount < (level.rules.wormNests || 0)) {
+      throw new Error(`Level ${level.level} worm nest count too low: ${wormCount}/${level.rules.wormNests || 0}`);
     }
-    if (artifactCount < (level.required.artifacts || 0)) {
-      throw new Error(`Level ${level.level} artifact count too low: ${artifactCount}/${level.required.artifacts || 0}`);
+    if (artifactCount < (level.rules.artifacts || 0)) {
+      throw new Error(`Level ${level.level} artifact count too low: ${artifactCount}/${level.rules.artifacts || 0}`);
     }
     if (crystalCount < level.rules.minCrystals) {
       throw new Error(`Level ${level.level} crystal count too low: ${crystalCount}/${level.rules.minCrystals}`);
@@ -1299,29 +1472,58 @@ export function generateMap(seed) {
   applyOuterMetalFrame(metalMask);
 
   for (const level of DEPTH_LEVELS) {
-    for (let i = 0; i < level.rules.hazardBlobGroups; i += 1) {
-      placeHazardBlob(hazardMask, level, random, 4 + Math.floor(random() * 14));
+    const [thornBlobGroups, thornBlobMinTiles, thornBlobMaxTiles] = level.rules.thornBlob;
+    const [bombBlobGroups, bombBlobMinTiles, bombBlobMaxTiles] = level.rules.bombBlob;
+    const [thornVeinGroups, thornVeinMinTiles, thornVeinMaxTiles] = level.rules.thornVein;
+    const [bombVeinGroups, bombVeinMinTiles, bombVeinMaxTiles] = level.rules.bombVein;
+    const [metalVeinGroups, metalVeinMinTiles, metalVeinMaxTiles] = level.rules.metalVein;
+    const [goldOreGroups, goldOreMinTiles, goldOreMaxTiles] = level.rules.goldOre;
+    const [gasPocketGroups, gasPocketMinTiles, gasPocketMaxTiles] = level.rules.gasPocket;
+    const [steamPocketGroups, steamPocketMinTiles, steamPocketMaxTiles] = level.rules.steamPocket;
+    for (let i = 0; i < gasPocketGroups; i += 1) {
+      const cellCount = gasPocketMinTiles + Math.floor(random() * (gasPocketMaxTiles - gasPocketMinTiles + 1));
+      placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, level, random, cellCount);
     }
-    for (let i = 0; i < level.rules.hazardVeinGroups; i += 1) {
-      placeHazardVein(hazardMask, level, random, 6 + Math.floor(random() * 18));
-    }
-    for (let i = 0; i < level.rules.metalVeinGroups; i += 1) {
-      placeMetalVein(metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, 10 + Math.floor(random() * 16));
-    }
-    for (let i = 0; i < level.rules.goldOreGroups; i += 1) {
-      const minTiles = level.rules.goldOreMinTiles;
-      const maxTiles = level.rules.goldOreMaxTiles;
-      const blockCount = minTiles + Math.floor(random() * (maxTiles - minTiles + 1));
-      placeGoldOreVein(goldOreMask, level, random, blockCount);
-    }
-    for (let i = 0; i < level.rules.gasPocketGroups; i += 1) {
-      placeGasPocket(gasPocketMask, hazardMask, steamPocketMask, boulderPocketMask, level, random, 4 + Math.floor(random() * 12));
-    }
-    for (let i = 0; i < level.rules.steamPocketGroups; i += 1) {
-      placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, level, random, 3 + Math.floor(random() * 8));
+    for (let i = 0; i < steamPocketGroups; i += 1) {
+      const cellCount = steamPocketMinTiles + Math.floor(random() * (steamPocketMaxTiles - steamPocketMinTiles + 1));
+      placeSteamPocket(steamPocketMask, hazardMask, gasPocketMask, boulderPocketMask, level, random, cellCount);
     }
     for (let i = 0; i < level.rules.boulderPocketGroups; i += 1) {
       placeBoulderPocket(boulderPocketMask, hazardMask, gasPocketMask, steamPocketMask, level, random);
+    }
+    for (let i = 0; i < thornBlobGroups; i += 1) {
+      const minTiles = thornBlobMinTiles;
+      const maxTiles = thornBlobMaxTiles;
+      const blockCount = minTiles + Math.floor(random() * (maxTiles - minTiles + 1));
+      placeHazardBlob(hazardMask, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount, HAZARD_TYPES.SPIKE);
+    }
+    for (let i = 0; i < bombBlobGroups; i += 1) {
+      const minTiles = bombBlobMinTiles;
+      const maxTiles = bombBlobMaxTiles;
+      const blockCount = minTiles + Math.floor(random() * (maxTiles - minTiles + 1));
+      placeHazardBlob(hazardMask, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount, HAZARD_TYPES.VOLATILE);
+    }
+    for (let i = 0; i < thornVeinGroups; i += 1) {
+      const minTiles = thornVeinMinTiles;
+      const maxTiles = thornVeinMaxTiles;
+      const blockCount = minTiles + Math.floor(random() * (maxTiles - minTiles + 1));
+      placeHazardVein(hazardMask, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount, HAZARD_TYPES.SPIKE);
+    }
+    for (let i = 0; i < bombVeinGroups; i += 1) {
+      const minTiles = bombVeinMinTiles;
+      const maxTiles = bombVeinMaxTiles;
+      const blockCount = minTiles + Math.floor(random() * (maxTiles - minTiles + 1));
+      placeHazardVein(hazardMask, metalMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount, HAZARD_TYPES.VOLATILE);
+    }
+    for (let i = 0; i < metalVeinGroups; i += 1) {
+      const blockCount = metalVeinMinTiles + Math.floor(random() * (metalVeinMaxTiles - metalVeinMinTiles + 1));
+      placeMetalVein(metalMask, hazardMask, goldOreMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount);
+    }
+    for (let i = 0; i < goldOreGroups; i += 1) {
+      const minTiles = goldOreMinTiles;
+      const maxTiles = goldOreMaxTiles;
+      const blockCount = minTiles + Math.floor(random() * (maxTiles - minTiles + 1));
+      placeGoldOreVein(goldOreMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, level, random, blockCount);
     }
   }
 
