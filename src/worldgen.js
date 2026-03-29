@@ -74,8 +74,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 44,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0, crystals: 8 },
-    rules: { hazardBlobGroups: 1, hazardVeinGroups: 1, metalVeinGroups: 1, goldOreGroups: 8, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 0, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, crystalDensity: 0.9, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -1.2 },
+    required: { beacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0 },
+    rules: { hazardBlobGroups: 1, hazardVeinGroups: 1, metalVeinGroups: 1, goldOreGroups: 8, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 0, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 43, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -1.2 },
   },
   {
     id: 2,
@@ -83,8 +83,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 52,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 2, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, crystals: 8 },
-    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 10, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, crystalDensity: 0.85, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -0.8 },
+    required: { beacons: 2, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1 },
+    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 10, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 0, boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 8, maxCrystals: 52, hazardTypes: [HAZARD_TYPES.SPIKE], hardnessBias: -0.8 },
   },
   {
     id: 3,
@@ -92,8 +92,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 60,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 2, perkZones: 2, safes: 1, wormNests: 1, artifacts: 2, crystals: 10 },
-    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 12, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 1, boulderPocketGroups: 0, perkTileDensity: 1.0, perkZoneDensity: 0.95, crystalDensity: 0.9, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: -0.4 },
+    required: { beacons: 2, perkZones: 2, safes: 1, wormNests: 1, artifacts: 2 },
+    rules: { hazardBlobGroups: 2, hazardVeinGroups: 2, metalVeinGroups: 2, goldOreGroups: 12, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 1, boulderPocketGroups: 0, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 10, maxCrystals: 69, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: -0.4 },
   },
   {
     id: 4,
@@ -101,8 +101,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 68,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 2, crystals: 12 },
-    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 1, boulderPocketGroups: 1, perkTileDensity: 0.95, perkZoneDensity: 0.9, crystalDensity: 0.85, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.0 },
+    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 2 },
+    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 1, boulderPocketGroups: 1, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 12, maxCrystals: 79, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.0 },
   },
   {
     id: 5,
@@ -110,8 +110,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 76,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 3, safes: 1, wormNests: 1, artifacts: 3, crystals: 12 },
-    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 1, perkTileDensity: 0.9, perkZoneDensity: 0.85, crystalDensity: 0.8, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.5 },
+    required: { beacons: 3, perkZones: 3, safes: 1, wormNests: 1, artifacts: 3 },
+    rules: { hazardBlobGroups: 3, hazardVeinGroups: 3, metalVeinGroups: 2, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 1, perkTileDensity: 0.9, perkZoneDensity: 0.85, minCrystals: 12, maxCrystals: 88, hazardTypes: [HAZARD_TYPES.SPIKE, HAZARD_TYPES.VOLATILE], hardnessBias: 0.5 },
   },
   {
     id: 6,
@@ -119,8 +119,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 84,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, crystals: 14 },
-    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 2, goldOreGroups: 18, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.85, perkZoneDensity: 0.8, crystalDensity: 0.78, hazardTypes: [HAZARD_TYPES.VOLATILE, HAZARD_TYPES.SPIKE], hardnessBias: 0.9 },
+    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3 },
+    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 2, goldOreGroups: 18, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.85, perkZoneDensity: 0.8, minCrystals: 14, maxCrystals: 101, hazardTypes: [HAZARD_TYPES.VOLATILE, HAZARD_TYPES.SPIKE], hardnessBias: 0.9 },
   },
   {
     id: 7,
@@ -128,8 +128,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 74,
     canHostBase: false,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, crystals: 12 },
-    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.8, perkZoneDensity: 0.75, crystalDensity: 0.72, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.2 },
+    required: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3 },
+    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 16, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 2, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.8, perkZoneDensity: 0.75, minCrystals: 12, maxCrystals: 78, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.2 },
   },
   {
     id: 8,
@@ -137,8 +137,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 64,
     canHostBase: true,
     frame: "metal",
-    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 3, crystals: 10 },
-    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.75, perkZoneDensity: 0.7, crystalDensity: 0.68, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.5 },
+    required: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 3 },
+    rules: { hazardBlobGroups: 4, hazardVeinGroups: 4, metalVeinGroups: 1, goldOreGroups: 14, goldOreMinTiles: 4, goldOreMaxTiles: 10, gasPocketGroups: 1, steamPocketGroups: 2, boulderPocketGroups: 2, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 10, maxCrystals: 65, hazardTypes: [HAZARD_TYPES.VOLATILE], hardnessBias: 1.5 },
   },
 ];
 
@@ -192,14 +192,41 @@ function validateLevelLayout(layout) {
     level.rules.hazardTypes = normalizeHazardTypes(level.rules.hazardTypes);
     const goldOreMinTiles = Math.round(Number(level.rules.goldOreMinTiles));
     const goldOreMaxTiles = Math.round(Number(level.rules.goldOreMaxTiles));
+    const legacyRequiredCrystals = Math.round(Number(level.required.crystals));
+    const legacyCrystalDensity = Number(level.rules.crystalDensity);
+    if (!Number.isFinite(level.rules.minCrystals) && Number.isFinite(legacyRequiredCrystals)) {
+      level.rules.minCrystals = legacyRequiredCrystals;
+    }
+    if (!Number.isFinite(level.rules.maxCrystals)) {
+      if (Number.isFinite(legacyCrystalDensity)) {
+        level.rules.maxCrystals = Math.max(
+          Number(level.rules.minCrystals) || 0,
+          Math.round((width * height / TILES_PER_CRYSTAL_TILE) * legacyCrystalDensity),
+        );
+      } else if (Number.isFinite(legacyRequiredCrystals)) {
+        level.rules.maxCrystals = legacyRequiredCrystals;
+      }
+    }
+    const minCrystals = Math.round(Number(level.rules.minCrystals));
+    const maxCrystals = Math.round(Number(level.rules.maxCrystals));
     if (!Number.isFinite(goldOreMinTiles) || goldOreMinTiles < 1) {
       throw new Error(`Level ${i + 1} goldOreMinTiles must be at least 1`);
     }
     if (!Number.isFinite(goldOreMaxTiles) || goldOreMaxTiles < goldOreMinTiles) {
       throw new Error(`Level ${i + 1} goldOreMaxTiles must be >= goldOreMinTiles`);
     }
+    if (!Number.isFinite(minCrystals) || minCrystals < 0) {
+      throw new Error(`Level ${i + 1} minCrystals must be at least 0`);
+    }
+    if (!Number.isFinite(maxCrystals) || maxCrystals < minCrystals) {
+      throw new Error(`Level ${i + 1} maxCrystals must be >= minCrystals`);
+    }
     level.rules.goldOreMinTiles = goldOreMinTiles;
     level.rules.goldOreMaxTiles = goldOreMaxTiles;
+    level.rules.minCrystals = minCrystals;
+    level.rules.maxCrystals = maxCrystals;
+    delete level.required.crystals;
+    delete level.rules.crystalDensity;
   }
 
   if (totalHeight !== PLAYABLE_HEIGHT) {
@@ -398,7 +425,7 @@ export function getTargetPerkZoneCount(level = null) {
 
 export function getTargetCrystalTileCount(level = null) {
   if (level) {
-    return Math.max(level.required.crystals || 0, Math.round((level.area / TILES_PER_CRYSTAL_TILE) * level.rules.crystalDensity));
+    return level.rules.minCrystals;
   }
   return DEPTH_LEVELS.reduce((sum, item) => sum + getTargetCrystalTileCount(item), 0);
 }
@@ -865,7 +892,7 @@ function placePerkTiles(perkMask, metalMask, gasPocketMask, steamPocketMask, bou
 
 function placeCrystalTiles(crystalMask, perkMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random) {
   for (const level of DEPTH_LEVELS) {
-    const targetCount = getTargetCrystalTileCount(level);
+    const targetCount = level.rules.minCrystals + Math.floor(random() * (level.rules.maxCrystals - level.rules.minCrystals + 1));
     const placed = [];
     let attempts = 0;
     while (placed.length < targetCount && attempts < targetCount * 100) {
@@ -1228,8 +1255,8 @@ function validateLevelRequirements(map) {
     if (artifactCount < (level.required.artifacts || 0)) {
       throw new Error(`Level ${level.level} artifact count too low: ${artifactCount}/${level.required.artifacts || 0}`);
     }
-    if (crystalCount < (level.required.crystals || 0)) {
-      throw new Error(`Level ${level.level} crystal count too low: ${crystalCount}/${level.required.crystals || 0}`);
+    if (crystalCount < level.rules.minCrystals) {
+      throw new Error(`Level ${level.level} crystal count too low: ${crystalCount}/${level.rules.minCrystals}`);
     }
   }
 

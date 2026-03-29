@@ -343,6 +343,9 @@ When a recipe of `3` crystals of the correct types is completed, a tile perk rew
 - Зеленый → HP+
 - Синий → Скорость (+10% speed)
 
+The recipe is generated from crystals that exist on the current depth level.
+Picking up a wrong crystal no longer resets the recipe; instead, the drill is stunned for `1` second.
+
 `Радарный модуль` marks the nearest crystal of each color on the radar ring.
 
 ## Block Visuals

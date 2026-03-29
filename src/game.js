@@ -1797,10 +1797,45 @@ function clearCrystalRecipe() {
   state.crystalStatusText = "";
 }
 
+function getDepthLevelForCell(x, y) {
+  for (let i = 0; i < DEPTH_LEVELS.length; i += 1) {
+    const level = DEPTH_LEVELS[i];
+    if (x >= level.xMin && x <= level.xMax && y >= level.startY && y <= level.endY) {
+      return level;
+    }
+  }
+  return null;
+}
+
+function buildCrystalRecipePool(level, firstCrystalType) {
+  const pool = [firstCrystalType];
+  if (!level) {
+    return pool;
+  }
+  for (let y = level.startY; y <= level.endY; y += 1) {
+    for (let x = level.xMin; x <= level.xMax; x += 1) {
+      const crystalType = state.crystalMask[cellIndex(x, y)];
+      if (crystalType > 0) {
+        pool.push(crystalType);
+      }
+    }
+  }
+  return pool;
+}
+
 function startCrystalRecipe(firstCrystalType) {
   state.crystalRecipe = [firstCrystalType];
+  const level = getDepthLevelForCell(state.drill.x, state.drill.y);
+  const recipePool = buildCrystalRecipePool(level, firstCrystalType);
   for (let i = 1; i < CRYSTAL_RECIPE_LENGTH; i += 1) {
-    state.crystalRecipe.push(chooseCrystalType(state.worldRandom));
+    if (recipePool.length <= 0) {
+      state.crystalRecipe.push(chooseCrystalType(state.worldRandom));
+      continue;
+    }
+    const pickIndex = Math.floor(state.worldRandom() * recipePool.length);
+    const pickedCrystalType = recipePool[pickIndex] || firstCrystalType;
+    state.crystalRecipe.push(pickedCrystalType);
+    recipePool.splice(pickIndex, 1);
   }
   state.crystalCollected = [0, 0, 0, 0, 0, 0];
   state.crystalCollected[firstCrystalType] = 1;
@@ -1823,7 +1858,6 @@ function awardBonusGoldPerkChoice() {
 function grantCrystalRecipeReward(firstCrystalType, x, y) {
   const firstPerkType = CRYSTAL_REWARD_TILE_PERKS[firstCrystalType] || 1;
   const secondPerkType = getRandomTilePerkExcluding([firstPerkType]);
-  state.perkRerolls += 1;
   runFuelEvent(() => {
     applyTilePerk(firstPerkType, x, y, false);
     applyTilePerk(secondPerkType, x, y, false);
@@ -1877,8 +1911,7 @@ function collectCrystalTile(x, y, index, crystalType) {
     return;
   }
 
-  showPerkToast("Рецепт сорван");
-  clearCrystalRecipe();
+  applyStun(1, "Неверный кристалл");
 }
 
 function getDistanceToBase(x, y) {
@@ -6007,6 +6040,7 @@ function updateDrill(dt) {
   state.drill.moveResumeTimer = Math.max(0, state.drill.moveResumeTimer - dt);
 
   if (state.stunTimer > 0) {
+    state.fuel = Math.max(0, state.fuel - 5 * dt);
     state.drill.progress = 0;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 6);
     state.drill.strikeLatch = false;
@@ -8945,6 +8979,9 @@ function renderHud() {
     for (let i = 0; i < state.crystalRecipe.length; i += 1) {
       const crystalType = state.crystalRecipe[i];
       const crystal = CRYSTAL_TYPES[crystalType];
+      if (!crystal) {
+        continue;
+      }
       const cx = recipeX + 118 + i * 26;
       const cy = top + panelHeight * 0.5;
       const completed = usedCounts[crystalType] < state.crystalCollected[crystalType];
