@@ -287,6 +287,8 @@ const state = {
   critChance: 0,
   critMultiplier: 1.5,
   heatRate: 1,
+  effectDurationRate: 1,
+  concentration: 1,
   fuelDrainRate: 1,
   armor: 0,
   depth: 0,
@@ -1979,6 +1981,8 @@ function setupField(seedOverride = null) {
   state.critChance = 0;
   state.critMultiplier = 1.5;
   state.heatRate = 1;
+  state.effectDurationRate = 1;
+  state.concentration = 1;
   state.fuelDrainRate = 1;
   state.armor = 0;
   state.gold = 0;
@@ -2880,6 +2884,26 @@ function removeShopPerk(effectId, rarityMult) {
   }
 }
 
+function getShopStatsSnapshot() {
+  return {
+    drillPower: state.drillPower,
+    strikeSpeed: state.strikeSpeed,
+    maxHp: state.maxHp,
+    maxFuel: state.maxFuel,
+    maxHeat: state.maxHeat,
+    visionRadius: state.visionRadius,
+    luck: state.luck,
+    critChance: state.critChance,
+    critMultiplier: state.critMultiplier,
+    heatRate: state.heatRate,
+    effectDurationRate: state.effectDurationRate,
+    concentration: state.concentration,
+    fuelDrainRate: state.fuelDrainRate,
+    miningGoldBonusMultiplier: state.miningGoldBonusMultiplier,
+    fuelPickupBonus: state.fuelPickupBonus,
+  };
+}
+
 function applyItemEffect(effect, rarityMult) {
   if (!effect || !effect.stat) return;
   const value = effect.value * (rarityMult || 1);
@@ -3261,7 +3285,7 @@ function bindUi() {
       resetPad();
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
-      openShop(state.gold, null, state.luck);
+      openShop(state.gold, null, state.luck, getShopStatsSnapshot());
     });
   }
 
@@ -3270,27 +3294,27 @@ function bindUi() {
     state.gold = Math.max(0, state.gold - cost);
     if (isMerge) removeShopPerk(effectId, oldRarityMultiplier);
     applyShopPerk(effectId, rarityMultiplier);
-    renderShop(state.gold);
+    renderShop(state.gold, getShopStatsSnapshot());
   });
 
   document.addEventListener("shop:purchase-item", (e) => {
     const { effect, cost, rarityMultiplier } = e.detail;
     state.gold = Math.max(0, state.gold - cost);
     applyItemEffect(effect, rarityMultiplier);
-    renderShop(state.gold);
+    renderShop(state.gold, getShopStatsSnapshot());
   });
 
   document.addEventListener("shop:recycle", (e) => {
     const { effectId, rarityMultiplier, refund } = e.detail;
     removeShopPerk(effectId, rarityMultiplier);
     state.gold += refund;
-    renderShop(state.gold);
+    renderShop(state.gold, getShopStatsSnapshot());
   });
 
   document.addEventListener("shop:reroll", (e) => {
     const { cost } = e.detail;
     state.gold = Math.max(0, state.gold - cost);
-    renderShop(state.gold);
+    renderShop(state.gold, getShopStatsSnapshot());
   });
 
   document.addEventListener("shop:synergies-changed", (e) => {
@@ -3367,7 +3391,7 @@ function bindUi() {
   if (debugAddGold) {
     debugAddGold.addEventListener("click", () => {
       state.gold += 500;
-      renderShop(state.gold);
+      renderShop(state.gold, getShopStatsSnapshot());
       showPerkToast("+500 золота");
     });
   }
@@ -3564,7 +3588,7 @@ function bindUi() {
       syncDebugPerkOverlay();
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
-      openShop(state.gold, null, state.luck);
+      openShop(state.gold, null, state.luck, getShopStatsSnapshot());
     });
   }
 
@@ -4093,7 +4117,7 @@ function openNextArtifactChoice() {
     const beacon = state.artifactChoicePendingBeacon;
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
-    openShop(state.gold, beacon ? beacon.y : null, state.luck);
+    openShop(state.gold, beacon ? beacon.y : null, state.luck, getShopStatsSnapshot());
     return;
   }
   const locked = getLockedCategories();
@@ -4672,22 +4696,32 @@ function checkGoldPerkUnlock() {
   state.nextGoldPerkAt += getGoldPerkCost(state.goldPerkLevel);
 }
 
-function activateDrillOverdrive(duration, toastText = "") {
+function getScaledEffectDuration(duration) {
   if (duration <= 0) {
-    return;
+    return 0;
   }
-  state.overhealDrillTimer = Math.max(state.overhealDrillTimer, duration);
-  state.overdriveDisplayDuration = Math.max(state.overdriveDisplayDuration, duration);
+  return Math.max(0.1, duration * Math.max(0, state.effectDurationRate || 0));
+}
+
+function activateDrillOverdrive(duration, toastText = "") {
+  const actualDuration = getScaledEffectDuration(duration);
+  if (actualDuration <= 0) {
+    return 0;
+  }
+  state.overhealDrillTimer = Math.max(state.overhealDrillTimer, actualDuration);
+  state.overdriveDisplayDuration = Math.max(state.overdriveDisplayDuration, actualDuration);
   if (toastText) {
     showPerkToast(toastText);
   }
+  return actualDuration;
 }
 
 function applyStun(duration, toastText = "") {
   if (duration <= 0) {
     return;
   }
-  const actualDuration = Math.max(0.5, duration - state.stunReduction);
+  const concentration = Math.max(0.1, state.concentration || 1);
+  const actualDuration = Math.max(0.5, duration / concentration - state.stunReduction);
   state.stunTimer = Math.max(state.stunTimer, actualDuration);
   state.stunDisplayDuration = Math.max(state.stunDisplayDuration, actualDuration);
   if (toastText) {
@@ -4698,8 +4732,7 @@ function applyStun(duration, toastText = "") {
 function triggerOverflowSurge() {
   state.resolvingOverflowBomb = true;
   try {
-    activateDrillOverdrive(OVERFLOW_OVERDRIVE_DURATION, "Перегрузка");
-    state.overflowOverdriveTimer = OVERFLOW_OVERDRIVE_DURATION;
+    state.overflowOverdriveTimer = activateDrillOverdrive(OVERFLOW_OVERDRIVE_DURATION, "Перегрузка");
   } finally {
     state.resolvingOverflowBomb = false;
   }
@@ -6937,7 +6970,7 @@ function activateLoopCharge(cellCount) {
   if (state.loopChargeLevel <= 0 || cellCount <= 0) {
     return;
   }
-  state.loopChargeDuration = Math.max(3, Math.min(6, 2 + state.loopChargeLevel));
+  state.loopChargeDuration = getScaledEffectDuration(Math.max(3, Math.min(6, 2 + state.loopChargeLevel)));
   state.loopChargeTimer = state.loopChargeDuration;
   state.loopChargeDamageBonus = cellCount * 0.05;
   showPerkToast(`Контурный заряд +${Math.round(state.loopChargeDamageBonus * 100)}%`);
@@ -8042,7 +8075,7 @@ function updateBeaconActivationAnim() {
   } else {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
-    openShop(state.gold, pa.beaconY ?? null, state.luck);
+    openShop(state.gold, pa.beaconY ?? null, state.luck, getShopStatsSnapshot());
   }
 }
 

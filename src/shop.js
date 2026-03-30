@@ -26,6 +26,7 @@ let rerollCount = 0;
 let shopLevel = 0;
 let currentGoldCache = 0;
 let currentLuckCache = 0;
+let currentStatsCache = null;
 let onCloseCallback = null;
 let selectedOfferingIdx = -1;
 let selectedSlotIdx = -1;    // slot selected for manual merge
@@ -41,11 +42,12 @@ export function initShop(callbacks = {}) {
   bindEvents();
 }
 
-export function openShop(currentGold, beaconY, luck = 0) {
+export function openShop(currentGold, beaconY, luck = 0, stats = null) {
   const overlay = document.getElementById("shopModal");
   if (!overlay) return;
   currentGoldCache = currentGold;
   currentLuckCache = luck;
+  currentStatsCache = stats;
   shopLevel = beaconY != null ? getShopLevelFromY(beaconY) : 5;
   rerollCount = 0;
   selectedOfferingIdx = -1;
@@ -54,7 +56,7 @@ export function openShop(currentGold, beaconY, luck = 0) {
   overlay.hidden = false;
   overlay.style.cssText =
     "position:absolute;inset:0;z-index:9998;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;";
-  renderShop(currentGold);
+  renderShop(currentGold, stats);
 }
 
 export function closeShop() {
@@ -68,10 +70,14 @@ export function closeShop() {
   onCloseCallback?.();
 }
 
-export function renderShop(currentGold) {
+export function renderShop(currentGold, stats = null) {
   currentGoldCache = currentGold;
+  if (stats) {
+    currentStatsCache = stats;
+  }
   const goldEl = document.getElementById("shopGoldValue");
   if (goldEl) goldEl.textContent = Math.floor(currentGold);
+  renderStats();
   renderOfferings();
   renderSlots();
   renderRerollButton();
@@ -119,6 +125,7 @@ export function resetShopState() {
   currentOfferings = [];
   rerollCount = 0;
   shopLevel = 0;
+  currentStatsCache = null;
   lockedSlots = new Set();
   prevTagCounts = {};
 }
@@ -400,38 +407,93 @@ function buildDOM() {
   if (!overlay) return;
 
   overlay.innerHTML = `
-    <div class="shop-panel">
-      <div class="shop-head">
-        <span class="shop-head__title">Магазин</span>
-        <span class="shop-head__gold">
-          <span class="shop-head__gold-icon"></span>
-          <span id="shopGoldValue">0</span>
-        </span>
-        <button id="shopReroll" class="shop-reroll" type="button">Перебросить</button>
-        <button id="shopClose" class="shop-close" type="button">✕</button>
-      </div>
-      <div class="shop-offerings" id="shopOfferings"></div>
-      <div class="shop-detail" id="shopDetail" hidden>
-        <div class="shop-detail__row">
-          <div class="shop-detail__icon" id="shopDetailIcon"></div>
-          <div class="shop-detail__info">
-            <div class="shop-detail__name" id="shopDetailName"></div>
-            <div class="shop-detail__desc" id="shopDetailDesc"></div>
-            <div class="shop-detail__tags" id="shopDetailTags"></div>
+    <div class="shop-stack">
+      <div class="shop-panel">
+        <div class="shop-head">
+          <span class="shop-head__title">Магазин</span>
+          <span class="shop-head__gold">
+            <span class="shop-head__gold-icon"></span>
+            <span id="shopGoldValue">0</span>
+          </span>
+          <button id="shopReroll" class="shop-reroll" type="button">Перебросить</button>
+          <button id="shopClose" class="shop-close" type="button">✕</button>
+        </div>
+        <div class="shop-offerings" id="shopOfferings"></div>
+        <div class="shop-detail" id="shopDetail" hidden>
+          <div class="shop-detail__row">
+            <div class="shop-detail__icon" id="shopDetailIcon"></div>
+            <div class="shop-detail__info">
+              <div class="shop-detail__name" id="shopDetailName"></div>
+              <div class="shop-detail__desc" id="shopDetailDesc"></div>
+              <div class="shop-detail__tags" id="shopDetailTags"></div>
+            </div>
+          </div>
+          <div class="shop-detail__footer">
+            <div class="shop-detail__rarity" id="shopDetailRarity"></div>
+            <div class="shop-detail__actions">
+              <button class="shop-detail__buy" id="shopDetailBuy" type="button"></button>
+              <button class="shop-detail__lock" id="shopDetailLock" type="button" hidden></button>
+              <button class="shop-detail__sell" id="shopDetailSell" type="button" hidden></button>
+            </div>
           </div>
         </div>
-        <div class="shop-detail__footer">
-          <div class="shop-detail__rarity" id="shopDetailRarity"></div>
-          <div class="shop-detail__actions">
-            <button class="shop-detail__buy" id="shopDetailBuy" type="button"></button>
-            <button class="shop-detail__lock" id="shopDetailLock" type="button" hidden></button>
-            <button class="shop-detail__sell" id="shopDetailSell" type="button" hidden></button>
-          </div>
-        </div>
+        <div class="shop-slots" id="shopSlots"></div>
       </div>
-      <div class="shop-slots" id="shopSlots"></div>
+      <div class="shop-stats" id="shopStats"></div>
     </div>
   `;
+}
+
+function formatStatValue(value, mode = "number") {
+  if (!Number.isFinite(value)) return "0";
+  if (mode === "percent") {
+    const rounded = Math.round(value * 100);
+    return `${rounded > 0 ? "+" : ""}${rounded}%`;
+  }
+  if (mode === "multiplier") {
+    return `x${value.toFixed(2)}`;
+  }
+  if (mode === "fixed1") {
+    return value % 1 === 0 ? String(Math.round(value)) : value.toFixed(1);
+  }
+  return String(Math.round(value));
+}
+
+function renderStats() {
+  const container = document.getElementById("shopStats");
+  if (!container) return;
+  const stats = currentStatsCache;
+  if (!stats) {
+    container.innerHTML = "";
+    container.hidden = true;
+    return;
+  }
+
+  const items = [
+    { label: "DMG", value: formatStatValue(stats.drillPower, "fixed1") },
+    { label: "SPD", value: formatStatValue(stats.strikeSpeed - 1, "percent") },
+    { label: "HP", value: formatStatValue(stats.maxHp) },
+    { label: "FUEL", value: formatStatValue(stats.maxFuel) },
+    { label: "HEAT", value: formatStatValue(stats.maxHeat) },
+    { label: "H+", value: formatStatValue(stats.heatRate, "multiplier") },
+    { label: "DUR", value: formatStatValue(stats.effectDurationRate, "multiplier") },
+    { label: "CON", value: formatStatValue(stats.concentration, "multiplier") },
+    { label: "CONS", value: formatStatValue(stats.fuelDrainRate, "multiplier") },
+    { label: "VIS", value: formatStatValue(stats.visionRadius) },
+    { label: "LUCK", value: formatStatValue(stats.luck) },
+    { label: "CRIT", value: formatStatValue(stats.critChance, "percent") },
+    { label: "xCRIT", value: formatStatValue(stats.critMultiplier, "multiplier") },
+    { label: "GOLD", value: formatStatValue(stats.miningGoldBonusMultiplier, "percent") },
+    { label: "PICK", value: formatStatValue(stats.fuelPickupBonus) },
+  ];
+
+  container.hidden = false;
+  container.innerHTML = items.map((item) => `
+    <div class="shop-stats__item">
+      <span class="shop-stats__label">${item.label}</span>
+      <span class="shop-stats__value">${item.value}</span>
+    </div>
+  `).join("");
 }
 
 function renderOfferings() {
