@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <title>Dig Path Prototype</title>
-    <link rel="stylesheet" href="./styles.css?v=20260329-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260330-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -127,11 +127,16 @@
             <div class="debug-generation">
               <div class="debug-generation__actions">
                 <button id="debugGenApply" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">Apply + Regen</button>
-                <button id="debugGenRegen" type="button" class="debug-perk-menu__button">Regen Current Seed</button>
+                <button id="debugGenRandomSeed" type="button" class="debug-perk-menu__button">Random Seed</button>
+                <button id="debugGenCopyJson" type="button" class="debug-perk-menu__button">Copy JSON</button>
                 <button id="debugGenReset" type="button" class="debug-perk-menu__button">Reset Defaults</button>
               </div>
               <div id="debugGenStatus" class="debug-generation__status"></div>
-              <textarea id="debugGenerationEditor" class="debug-generation__editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+              <div id="debugGenerationQuickEditor" class="debug-generation__quick"></div>
+              <details id="debugGenerationAdvanced" class="debug-generation__advanced">
+                <summary class="debug-generation__advanced-summary">Advanced JSON</summary>
+                <textarea id="debugGenerationEditor" class="debug-generation__editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+              </details>
             </div>
           </div>
         </div>
@@ -154,6 +159,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js?v=55"></script>
+    <script type="module" src="./src/game.js?v=57"></script>
   </body>
 </html>

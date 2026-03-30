@@ -326,6 +326,9 @@ const state = {
   generationEditorText: "",
   generationEditorStatus: "",
   generationEditorStatusTone: "",
+  generationEditorFocused: false,
+  generationEditorExpanded: false,
+  debugMapRequestRender: null,
   debugMapGenerationPanelCollapsed: false,
   crystalRewardModalOpen: false,
   crystalRewardCloseReady: false,
@@ -1126,6 +1129,313 @@ function clearStoredGenerationConfig() {
   localStorage.removeItem(GENERATION_CONFIG_STORAGE_KEY);
 }
 
+const GENERATION_QUICK_FIELDS = [
+  { label: "Height", source: "height", min: 8, step: 1 },
+  { label: "Width", source: "width", min: 6, max: GRID_W - 2, step: 1 },
+  { label: "Perk Zone Count", source: "rules.perkZones", min: 0, step: 1 },
+  { label: "Safe Count", source: "rules.safes", min: 0, step: 1 },
+  { label: "Worm Nest Count", source: "rules.wormNests", min: 0, step: 1 },
+  { label: "Artifact Count", source: "rules.artifacts", min: 0, step: 1 },
+  { label: "Minimum Crystals", source: "rules.minCrystals", min: 0, step: 1 },
+  { label: "Maximum Crystals", source: "rules.maxCrystals", min: 0, step: 1 },
+];
+
+const GENERATION_TRIPLET_FIELDS = [
+  { label: "Thorn Blob", source: "rules.thornBlob" },
+  { label: "Thorn Vein", source: "rules.thornVein" },
+  { label: "Bomb Blob", source: "rules.bombBlob" },
+  { label: "Bomb Vein", source: "rules.bombVein" },
+  { label: "Metal Vein", source: "rules.metalVein" },
+  { label: "Gold Ore", source: "rules.goldOre" },
+  { label: "Gas Pocket", source: "rules.gasPocket" },
+  { label: "Steam Pocket", source: "rules.steamPocket" },
+];
+
+function setGenerationEditingActive(active, statusText = "") {
+  state.generationEditorFocused = active;
+  state.timeAcc = 0;
+  if (statusText) {
+    state.generationEditorStatus = statusText;
+    state.generationEditorStatusTone = "ok";
+    syncGenerationStatusOnly();
+  }
+}
+
+function syncGenerationPauseState(statusText = "") {
+  state.timeAcc = 0;
+  if (statusText) {
+    state.generationEditorStatus = statusText;
+    state.generationEditorStatusTone = "ok";
+    syncGenerationStatusOnly();
+  }
+}
+
+function syncGenerationStatusOnly() {
+  const status = document.getElementById("debugGenStatus");
+  if (!status) {
+    return;
+  }
+  status.textContent = state.generationEditorStatus || `Current seed: ${state.worldSeed}. Apply regenerates the same seed with the edited config.`;
+  if (state.generationEditorStatusTone) {
+    status.dataset.tone = state.generationEditorStatusTone;
+  } else {
+    delete status.dataset.tone;
+  }
+}
+
+function isGenerationEditorVisible() {
+  const overlay = document.getElementById("debugPerkMenu");
+  const section = document.getElementById("debugGenerationSection");
+  if (!overlay || !section) {
+    return false;
+  }
+  if (overlay.hidden || section.hidden) {
+    return false;
+  }
+  if (overlay.style.display === "none" || overlay.style.visibility === "hidden") {
+    return false;
+  }
+  return true;
+}
+
+function getValueByPath(target, source) {
+  const parts = source.split(".");
+  let current = target;
+  for (let i = 0; i < parts.length; i += 1) {
+    current = current?.[parts[i]];
+  }
+  return current;
+}
+
+function setValueByPath(target, source, value) {
+  const parts = source.split(".");
+  let current = target;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    if (!current[parts[i]] || typeof current[parts[i]] !== "object") {
+      current[parts[i]] = {};
+    }
+    current = current[parts[i]];
+  }
+  current[parts[parts.length - 1]] = value;
+}
+
+function getTripletValue(target, source, index) {
+  const value = getValueByPath(target, source);
+  if (!Array.isArray(value)) {
+    return 0;
+  }
+  return Number.isFinite(Number(value[index])) ? Math.round(Number(value[index])) : 0;
+}
+
+function setTripletValue(target, source, index, nextValue) {
+  const value = getValueByPath(target, source);
+  const triplet = Array.isArray(value) ? [...value] : [0, 0, 0];
+  triplet[index] = nextValue;
+  setValueByPath(target, source, triplet);
+}
+
+function tryCopyText(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, text.length);
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+  document.body.removeChild(textarea);
+  return copied;
+}
+
+function tryParseGenerationEditorText() {
+  try {
+    return JSON.parse(state.generationEditorText || "[]");
+  } catch {
+    return null;
+  }
+}
+
+function renderGenerationQuickEditor() {
+  const root = document.getElementById("debugGenerationQuickEditor");
+  if (!root) {
+    return;
+  }
+  const config = tryParseGenerationEditorText() || getGenerationConfig();
+  if (!Array.isArray(config) || config.length === 0) {
+    root.innerHTML = "";
+    return;
+  }
+  const totalHeight = config.reduce((sum, level) => sum + (Math.round(Number(level.height)) || 0), 0);
+  const hostBaseCount = config.filter((level) => !!level.canHostBase).length;
+  root.innerHTML = "";
+
+  const summary = document.createElement("div");
+  summary.className = "debug-generation__summary";
+  summary.innerHTML = [
+    `<div class="debug-generation__pill">Levels: ${config.length}</div>`,
+    `<div class="debug-generation__pill">Total height: ${totalHeight}</div>`,
+    `<div class="debug-generation__pill">Base hosts: ${hostBaseCount}</div>`,
+  ].join("");
+  root.appendChild(summary);
+
+  const levels = document.createElement("div");
+  levels.className = "debug-generation__levels";
+  for (let i = 0; i < config.length; i += 1) {
+    const level = config[i];
+    const card = document.createElement("details");
+    card.className = "debug-generation__level";
+    if (i === 0) {
+      card.open = true;
+    }
+    const beacons = Number(level?.rules?.beacons) || 0;
+    const upper = Number(level?.rules?.upperBeacons) || 0;
+    const lower = Number(level?.rules?.lowerBeacons) || 0;
+    card.innerHTML = `
+      <summary class="debug-generation__level-summary">
+        <div class="debug-generation__level-header">
+          <div class="debug-generation__level-title">Level ${i + 1}</div>
+      <div class="debug-generation__level-meta">Beacon split: upper ${upper}, lower ${lower}, flexible ${Math.max(0, beacons - upper - lower)}</div>
+        </div>
+      </summary>
+      <div class="debug-generation__level-body">
+        <label class="debug-generation__level-meta">
+          <input type="checkbox" data-level-index="${i}" data-source="canHostBase" ${level.canHostBase ? "checked" : ""}>
+          Base host
+        </label>
+        <div class="debug-generation__grid"></div>
+        <div class="debug-generation__triplet">
+          <div class="debug-generation__triplet-title">Beacon Placement</div>
+          <div class="debug-generation__triplet-grid">
+            <label class="debug-generation__field">
+              <span class="debug-generation__field-label">Beacon Count</span>
+              <input
+                class="debug-generation__field-input"
+                type="number"
+                inputmode="numeric"
+                data-level-index="${i}"
+                data-source="rules.beacons"
+                min="0"
+                step="1"
+                value="${beacons}"
+              >
+            </label>
+            <label class="debug-generation__field">
+              <span class="debug-generation__field-label">Upper Beacons</span>
+              <input
+                class="debug-generation__field-input"
+                type="number"
+                inputmode="numeric"
+                data-level-index="${i}"
+                data-source="rules.upperBeacons"
+                min="0"
+                step="1"
+                value="${upper}"
+              >
+            </label>
+            <label class="debug-generation__field">
+              <span class="debug-generation__field-label">Lower Beacons</span>
+              <input
+                class="debug-generation__field-input"
+                type="number"
+                inputmode="numeric"
+                data-level-index="${i}"
+                data-source="rules.lowerBeacons"
+                min="0"
+                step="1"
+                value="${lower}"
+              >
+            </label>
+          </div>
+        </div>
+        <div class="debug-generation__triplets"></div>
+      </div>
+    `;
+    const grid = card.querySelector(".debug-generation__grid");
+    const triplets = card.querySelector(".debug-generation__triplets");
+    for (let j = 0; j < GENERATION_QUICK_FIELDS.length; j += 1) {
+      const field = GENERATION_QUICK_FIELDS[j];
+      const fieldWrap = document.createElement("label");
+      fieldWrap.className = "debug-generation__field";
+      const value = getValueByPath(level, field.source);
+      fieldWrap.innerHTML = `
+        <span class="debug-generation__field-label">${field.label}</span>
+        <input
+          class="debug-generation__field-input"
+          type="number"
+          inputmode="numeric"
+          data-level-index="${i}"
+          data-source="${field.source}"
+          min="${field.min ?? 0}"
+          ${field.max !== undefined ? `max="${field.max}"` : ""}
+          step="${field.step ?? 1}"
+          value="${Number.isFinite(Number(value)) ? Math.round(Number(value)) : 0}"
+        >
+      `;
+      grid?.appendChild(fieldWrap);
+    }
+    for (let j = 0; j < GENERATION_TRIPLET_FIELDS.length; j += 1) {
+      const field = GENERATION_TRIPLET_FIELDS[j];
+      const wrap = document.createElement("div");
+      wrap.className = "debug-generation__triplet";
+      wrap.innerHTML = `
+        <div class="debug-generation__triplet-title">${field.label}</div>
+        <div class="debug-generation__triplet-grid">
+          <label class="debug-generation__field">
+            <span class="debug-generation__field-label">Groups</span>
+            <input
+              class="debug-generation__field-input"
+              type="number"
+              inputmode="numeric"
+              data-level-index="${i}"
+              data-source="${field.source}"
+              data-triplet-index="0"
+              min="0"
+              step="1"
+              value="${getTripletValue(level, field.source, 0)}"
+            >
+          </label>
+          <label class="debug-generation__field">
+            <span class="debug-generation__field-label">Min</span>
+            <input
+              class="debug-generation__field-input"
+              type="number"
+              inputmode="numeric"
+              data-level-index="${i}"
+              data-source="${field.source}"
+              data-triplet-index="1"
+              min="0"
+              step="1"
+              value="${getTripletValue(level, field.source, 1)}"
+            >
+          </label>
+          <label class="debug-generation__field">
+            <span class="debug-generation__field-label">Max</span>
+            <input
+              class="debug-generation__field-input"
+              type="number"
+              inputmode="numeric"
+              data-level-index="${i}"
+              data-source="${field.source}"
+              data-triplet-index="2"
+              min="0"
+              step="1"
+              value="${getTripletValue(level, field.source, 2)}"
+            >
+          </label>
+        </div>
+      `;
+      triplets?.appendChild(wrap);
+    }
+    levels.appendChild(card);
+  }
+  root.appendChild(levels);
+}
+
 function bindGenerationDebugControls() {
   const debugGenerationSection = document.getElementById("debugGenerationSection");
   if (debugGenerationSection) {
@@ -1141,7 +1451,76 @@ function bindGenerationDebugControls() {
       state.generationEditorStatusTone = "";
       syncGenerationDebugEditor();
     });
+    debugGenerationEditor.addEventListener("focus", () => {
+      setGenerationEditingActive(true, "Editing mode: simulation paused to reduce heat and battery drain.");
+    });
+    debugGenerationEditor.addEventListener("blur", () => {
+      setGenerationEditingActive(false, state.generationEditorExpanded ? "Advanced JSON open: simulation remains paused." : "Editing finished. Simulation resumed.");
+    });
     debugGenerationEditor.dataset.bound = "1";
+  }
+
+  const debugGenerationAdvanced = document.getElementById("debugGenerationAdvanced");
+  if (debugGenerationAdvanced && !debugGenerationAdvanced.dataset.bound) {
+    state.generationEditorExpanded = debugGenerationAdvanced.open;
+    debugGenerationAdvanced.addEventListener("toggle", () => {
+      state.generationEditorExpanded = debugGenerationAdvanced.open;
+      syncGenerationPauseState(
+        debugGenerationAdvanced.open
+          ? "Advanced JSON open: simulation paused to reduce heat and battery drain."
+          : (document.activeElement?.id === "debugGenerationEditor"
+              ? "Editing mode: simulation paused to reduce heat and battery drain."
+              : "Advanced JSON closed. Simulation resumed.")
+      );
+    });
+    debugGenerationAdvanced.dataset.bound = "1";
+  }
+
+  const debugGenerationQuickEditor = document.getElementById("debugGenerationQuickEditor");
+  if (debugGenerationQuickEditor && !debugGenerationQuickEditor.dataset.bound) {
+    debugGenerationQuickEditor.addEventListener("input", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) {
+        return;
+      }
+      const levelIndex = Number(target.dataset.levelIndex);
+      const source = target.dataset.source || "";
+      const config = tryParseGenerationEditorText() || getGenerationConfig();
+      if (!Array.isArray(config) || !config[levelIndex] || !source) {
+        return;
+      }
+      if (target.type === "checkbox") {
+        setValueByPath(config[levelIndex], source, target.checked);
+      } else {
+        const nextValue = Math.round(Number(target.value));
+        if (!Number.isFinite(nextValue)) {
+          return;
+        }
+        const tripletIndex = Number(target.dataset.tripletIndex);
+        if (Number.isFinite(tripletIndex)) {
+          setTripletValue(config[levelIndex], source, tripletIndex, nextValue);
+        } else {
+          setValueByPath(config[levelIndex], source, nextValue);
+        }
+      }
+      state.generationEditorText = JSON.stringify(config, null, 2);
+      state.generationEditorStatus = "Generation config edited but not applied.";
+      state.generationEditorStatusTone = "";
+      syncGenerationDebugEditor();
+    });
+    debugGenerationQuickEditor.addEventListener("focusin", () => {
+      setGenerationEditingActive(true, "Editing mode: simulation paused to reduce heat and battery drain.");
+    });
+    debugGenerationQuickEditor.addEventListener("focusout", () => {
+      requestAnimationFrame(() => {
+        const root = document.getElementById("debugGenerationQuickEditor");
+        if (root?.contains(document.activeElement)) {
+          return;
+        }
+        setGenerationEditingActive(false, "Editing finished. Simulation resumed.");
+      });
+    });
+    debugGenerationQuickEditor.dataset.bound = "1";
   }
 
   const debugGenApply = document.getElementById("debugGenApply");
@@ -1177,15 +1556,59 @@ function bindGenerationDebugControls() {
     debugGenReset.dataset.bound = "1";
   }
 
-  const debugGenRegen = document.getElementById("debugGenRegen");
-  if (debugGenRegen && !debugGenRegen.dataset.bound) {
-    debugGenRegen.addEventListener("click", () => {
-      state.generationEditorStatus = "Current seed regenerated with active generation config.";
+  const debugGenRandomSeed = document.getElementById("debugGenRandomSeed");
+  if (debugGenRandomSeed && !debugGenRandomSeed.dataset.bound) {
+    debugGenRandomSeed.addEventListener("click", () => {
+      const nextSeed = newWorldSeed();
+      state.worldSeed = nextSeed;
+      state.generationEditorStatus = `Random seed generated: ${nextSeed}.`;
       state.generationEditorStatusTone = "ok";
       regenerateCurrentSeed(true);
     });
-    debugGenRegen.dataset.bound = "1";
+    debugGenRandomSeed.dataset.bound = "1";
   }
+
+  const debugGenCopyJson = document.getElementById("debugGenCopyJson");
+  if (debugGenCopyJson && !debugGenCopyJson.dataset.bound) {
+    debugGenCopyJson.addEventListener("click", () => {
+      const text = state.generationEditorText || JSON.stringify(getGenerationConfig(), null, 2);
+      const editor = document.getElementById("debugGenerationEditor");
+      const advanced = document.getElementById("debugGenerationAdvanced");
+      const onCopySuccess = () => {
+        state.generationEditorStatus = "Generation JSON copied to clipboard.";
+        state.generationEditorStatusTone = "ok";
+        syncGenerationDebugEditor();
+      };
+      const onCopyFailure = (error = null) => {
+        if (tryCopyText(text)) {
+          state.generationEditorStatus = "Generation JSON copied to clipboard.";
+          state.generationEditorStatusTone = "ok";
+        } else {
+          state.generationEditorText = text;
+          if (advanced) {
+            advanced.open = true;
+          }
+          requestAnimationFrame(() => {
+            editor?.focus({ preventScroll: false });
+            editor?.select();
+            editor?.setSelectionRange(0, text.length);
+          });
+          state.generationEditorStatus = error
+            ? `Copy failed: ${error.message || error}. Advanced JSON selected for manual copy.`
+            : "Clipboard copy failed. Advanced JSON selected for manual copy.";
+          state.generationEditorStatusTone = "error";
+        }
+        syncGenerationDebugEditor();
+      };
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(onCopySuccess).catch(onCopyFailure);
+      } else {
+        onCopyFailure();
+      }
+    });
+    debugGenCopyJson.dataset.bound = "1";
+  }
+
 }
 
 function syncDebugMapGenerationPanelCollapse() {
@@ -1232,8 +1655,9 @@ function showDebugMapGenerationPanel() {
     "backdrop-filter:none",
   ].join(";");
   panel.style.maxWidth = "min(560px, calc(100vw - 24px))";
-  panel.style.maxHeight = "calc(100vh - 24px)";
-  panel.style.overflow = "auto";
+  panel.style.maxHeight = "calc(100dvh - 24px)";
+  panel.style.overflowY = "auto";
+  panel.style.webkitOverflowScrolling = "touch";
 
   overlay.querySelectorAll(".debug-perk-menu__section").forEach((section) => {
     section.hidden = section.id !== "debugGenerationSection";
@@ -3317,27 +3741,24 @@ function buildDebugPerkButtons() {
 
 function syncGenerationDebugEditor() {
   const editor = document.getElementById("debugGenerationEditor");
-  const status = document.getElementById("debugGenStatus");
+  const quickEditor = document.getElementById("debugGenerationQuickEditor");
   if (editor && document.activeElement !== editor) {
     if (!state.generationEditorText) {
       state.generationEditorText = JSON.stringify(getGenerationConfig(), null, 2);
     }
     editor.value = state.generationEditorText;
   }
-  if (status) {
-    status.textContent = state.generationEditorStatus || `Current seed: ${state.worldSeed}. Apply regenerates the same seed with the edited config.`;
-    if (state.generationEditorStatusTone) {
-      status.dataset.tone = state.generationEditorStatusTone;
-    } else {
-      delete status.dataset.tone;
-    }
+  if (!quickEditor?.contains(document.activeElement)) {
+    renderGenerationQuickEditor();
   }
+  syncGenerationStatusOnly();
 }
 
 function regenerateCurrentSeed(reopenDebugMenu = false) {
   const seed = state.worldSeed || newWorldSeed();
   setupField(seed);
   revealFullMapInDebugMode();
+  state.debugMapRequestRender?.();
   if (reopenDebugMenu) {
     if (DEBUG_MODE && state.debugMapActive) {
       showDebugMapGenerationPanel();
@@ -3397,14 +3818,14 @@ function syncDebugPerkOverlay() {
     overlay.hidden = false;
     overlay.removeAttribute("hidden");
     overlay.style.cssText = [
-      "position:absolute",
+      "position:fixed",
       "inset:0",
       "z-index:9999",
       "display:flex",
       "visibility:visible",
       "pointer-events:auto",
       "opacity:1",
-      "align-items:center",
+      "align-items:flex-start",
       "justify-content:center",
       "padding:20px",
       "background:rgba(20,8,6,0.88)",
@@ -3832,6 +4253,13 @@ function frame(ts) {
   try {
     if (!state.lastTs) {
       state.lastTs = ts;
+    }
+
+    if (state.debugMapActive && !state.debugMapGenerationPanelCollapsed) {
+      state.lastTs = ts;
+      state.timeAcc = 0;
+      setTimeout(() => requestAnimationFrame(frame), 250);
+      return;
     }
 
     let delta = ts - state.lastTs;
@@ -9591,41 +10019,42 @@ function renderVisionMask(camera) {
 
 // ── Debug map mode (?debug-map query param) ──────────────────────────────────
 function initDebugMapMode() {
-  // Hide all HTML UI overlays except the generation editor, keep canvas
-  document.querySelectorAll(".app-shell > *:not(#game):not(#debugPerkMenu)").forEach((el) => { el.hidden = true; });
-  state.canvas.style.cssText = "position:fixed;top:0;left:0;cursor:grab;touch-action:none;display:block;";
+  try {
+    // Hide all HTML UI overlays except the generation editor and fatal error, keep canvas
+    document.querySelectorAll(".app-shell > *:not(#game):not(#debugPerkMenu):not(#fatalError)").forEach((el) => { el.hidden = true; });
+    state.canvas.style.cssText = "position:fixed;top:0;left:0;cursor:grab;touch-action:none;display:block;";
 
-  // Init game subsystems (sprites + map) without starting the game loop
-  loadStoredGenerationConfig();
-  state.ctx = state.canvas.getContext("2d");
-  state.sprites = createSpriteAtlas();
-  resize();
-  setupField(); // generates map using seed from URL (?seed=) or random
-  showDebugMapGenerationPanel();
+    // Init game subsystems (sprites + map) without starting the game loop
+    loadStoredGenerationConfig();
+    state.ctx = state.canvas.getContext("2d");
+    state.sprites = createSpriteAtlas();
+    resize();
+    setupField(); // generates map using seed from URL (?seed=) or random
+    showDebugMapGenerationPanel();
 
-  // Enter debug map mode — getCamera() and getCameraZoom() will use debugMapCamera
-  state.debugMapActive = true;
-  revealFullMapInDebugMode();
+    // Enter debug map mode — getCamera() and getCameraZoom() will use debugMapCamera
+    state.debugMapActive = true;
+    revealFullMapInDebugMode();
 
-  // Initial camera: fit whole map on screen, centered
-  const mapW = GRID_W * TILE_SIZE;
-  const mapH = GRID_H * TILE_SIZE;
-  const fitZoom = Math.min(state.width / mapW, state.height / mapH) * 0.97;
-  state.debugMapCamera.zoom = fitZoom;
-  state.debugMapCamera.x = (mapW - state.width / fitZoom) / 2;
-  state.debugMapCamera.y = (mapH - state.height / fitZoom) / 2;
+    // Initial camera: fit whole map on screen, centered
+    const mapW = GRID_W * TILE_SIZE;
+    const mapH = GRID_H * TILE_SIZE;
+    const fitZoom = Math.min(state.width / mapW, state.height / mapH) * 0.97;
+    state.debugMapCamera.zoom = fitZoom;
+    state.debugMapCamera.x = (mapW - state.width / fitZoom) / 2;
+    state.debugMapCamera.y = (mapH - state.height / fitZoom) / 2;
 
-  // Marker layers — drawn on top of real game tiles
-  const MARKERS = [
-    { id: "beacon",   label: "Маяк",     color: "#ff8800", visible: true },
-    { id: "artifact", label: "Артефакт", color: "#ffff50", visible: true },
-    { id: "safe",     label: "Сейф",     color: "#8888ff", visible: true },
-    { id: "worm",     label: "Червь",    color: "#ff4444", visible: true },
-    { id: "boulder",  label: "Камень",   color: "#c8a040", visible: true },
-    { id: "base",     label: "База",     color: "#00ff88", visible: true },
-    { id: "start",    label: "Старт",    color: "#ffffff", visible: true },
-  ];
-  function markerOn(id) { return MARKERS.find((m) => m.id === id)?.visible ?? true; }
+    // Marker layers — drawn on top of real game tiles
+    const MARKERS = [
+      { id: "beacon",   label: "Маяк",     color: "#ff8800", visible: true },
+      { id: "artifact", label: "Артефакт", color: "#ffff50", visible: true },
+      { id: "safe",     label: "Сейф",     color: "#8888ff", visible: true },
+      { id: "worm",     label: "Червь",    color: "#ff4444", visible: true },
+      { id: "boulder",  label: "Камень",   color: "#c8a040", visible: true },
+      { id: "base",     label: "База",     color: "#00ff88", visible: true },
+      { id: "start",    label: "Старт",    color: "#ffffff", visible: true },
+    ];
+    function markerOn(id) { return MARKERS.find((m) => m.id === id)?.visible ?? true; }
 
   // Draw colored dot markers on top of the real tile render
   function drawMarkers() {
@@ -9697,17 +10126,24 @@ function initDebugMapMode() {
     ctx.restore();
   }
 
-  // RAF loop — render game tiles + overlay markers, no game update
-  function debugFrame() {
-    render();
-    drawMarkers();
-    requestAnimationFrame(debugFrame);
-  }
-  requestAnimationFrame(debugFrame);
+    let debugMapRenderQueued = false;
+    function scheduleDebugMapRender() {
+      if (debugMapRenderQueued) {
+        return;
+      }
+      debugMapRenderQueued = true;
+      requestAnimationFrame(() => {
+        debugMapRenderQueued = false;
+        render();
+        drawMarkers();
+      });
+    }
+    state.debugMapRequestRender = scheduleDebugMapRender;
+    scheduleDebugMapRender();
 
-  // ── Pan ──
-  let dragging = false, dragSX = 0, dragSY = 0, dragCX = 0, dragCY = 0;
-  state.canvas.addEventListener("mousedown", (e) => {
+    // ── Pan ──
+    let dragging = false, dragSX = 0, dragSY = 0, dragCX = 0, dragCY = 0;
+    state.canvas.addEventListener("mousedown", (e) => {
     dragging = true; state.canvas.style.cursor = "grabbing";
     dragSX = e.clientX; dragSY = e.clientY;
     dragCX = state.debugMapCamera.x; dragCY = state.debugMapCamera.y;
@@ -9717,6 +10153,7 @@ function initDebugMapMode() {
     const zoom = state.debugMapCamera.zoom;
     state.debugMapCamera.x = dragCX - (e.clientX - dragSX) / zoom;
     state.debugMapCamera.y = dragCY - (e.clientY - dragSY) / zoom;
+    scheduleDebugMapRender();
   });
   window.addEventListener("mouseup", () => { dragging = false; state.canvas.style.cursor = "grab"; });
 
@@ -9732,6 +10169,7 @@ function initDebugMapMode() {
     state.debugMapCamera.zoom = newZoom;
     state.debugMapCamera.x = worldX - e.clientX / newZoom;
     state.debugMapCamera.y = worldY - e.clientY / newZoom;
+    scheduleDebugMapRender();
   }, { passive: false });
 
   // ── Touch pan + pinch zoom ──
@@ -9755,6 +10193,7 @@ function initDebugMapMode() {
     if (e.touches.length === 1 && dragging) {
       state.debugMapCamera.x = dragCX - (e.touches[0].clientX - dragSX) / zoom;
       state.debugMapCamera.y = dragCY - (e.touches[0].clientY - dragSY) / zoom;
+      scheduleDebugMapRender();
     } else if (e.touches.length === 2) {
       const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
@@ -9766,6 +10205,7 @@ function initDebugMapMode() {
       state.debugMapCamera.x = worldX - mx / newZoom;
       state.debugMapCamera.y = worldY - my / newZoom;
       lastDist = dist; lastMX = mx; lastMY = my;
+      scheduleDebugMapRender();
     }
   }, { passive: false });
   state.canvas.addEventListener("touchend", (e) => { if (e.touches.length < 2) dragging = false; });
@@ -9803,6 +10243,7 @@ function initDebugMapMode() {
     state.debugMapCamera.zoom = targetZoom;
     state.debugMapCamera.x = (tx + 0.5) * TILE_SIZE - state.width  / (2 * targetZoom);
     state.debugMapCamera.y = (ty + 0.5) * TILE_SIZE - state.height / (2 * targetZoom);
+    scheduleDebugMapRender();
   }
 
   // ── Legend overlay ──
@@ -9840,6 +10281,7 @@ function initDebugMapMode() {
     toggleBtn.addEventListener("click", () => {
       marker.visible = !marker.visible;
       updateToggle(marker, swatch, toggleBtn);
+      scheduleDebugMapRender();
     });
 
     // Go-to button
@@ -9872,7 +10314,11 @@ function initDebugMapMode() {
       state.debugMapCamera.x = (mapW - state.width / newFitZoom) / 2;
       state.debugMapCamera.y = (mapH - state.height / newFitZoom) / 2;
     }
-  });
+    scheduleDebugMapRender();
+    });
+  } catch (error) {
+    reportFatalError(error, "initDebugMapMode");
+  }
 }
 
 if (new URLSearchParams(location.search).has("debug-map")) {
