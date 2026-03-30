@@ -74,7 +74,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 44,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0, thornBlob: [1, 4, 17], thornVein: [1, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [1, 10, 25], goldOre: [8, 4, 10], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 43, hardnessBias: -1.2 },
+    rules: { beacons: 1, upperBeacons: 0, lowerBeacons: 0, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0, thornBlob: [1, 4, 17], thornVein: [1, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [1, 10, 25], goldOre: [8, 4, 10], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 43, hardnessBias: -1.2 },
   },
   {
     id: 2,
@@ -82,7 +82,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 52,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 2, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 10, 25], goldOre: [10, 4, 10], gasPocket: [1, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 8, maxCrystals: 52, hardnessBias: -0.8 },
+    rules: { beacons: 2, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 10, 25], goldOre: [10, 4, 10], gasPocket: [1, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 8, maxCrystals: 52, hardnessBias: -0.8 },
   },
   {
     id: 3,
@@ -90,7 +90,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 60,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 2, perkZones: 2, safes: 1, wormNests: 1, artifacts: 2, thornBlob: [1, 4, 17], thornVein: [1, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [12, 4, 10], gasPocket: [1, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 10, maxCrystals: 69, hardnessBias: -0.4 },
+    rules: { beacons: 2, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 1, wormNests: 1, artifacts: 2, thornBlob: [1, 4, 17], thornVein: [1, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [12, 4, 10], gasPocket: [1, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 10, maxCrystals: 69, hardnessBias: -0.4 },
   },
   {
     id: 4,
@@ -98,7 +98,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 68,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 2, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [14, 4, 10], gasPocket: [2, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 1, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 12, maxCrystals: 79, hardnessBias: 0.0 },
+    rules: { beacons: 3, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 0, wormNests: 1, artifacts: 2, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [14, 4, 10], gasPocket: [2, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 1, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 12, maxCrystals: 79, hardnessBias: 0.0 },
   },
   {
     id: 5,
@@ -106,7 +106,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 76,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 3, perkZones: 3, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [16, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 1, perkTileDensity: 0.9, perkZoneDensity: 0.85, minCrystals: 12, maxCrystals: 88, hardnessBias: 0.5 },
+    rules: { beacons: 3, upperBeacons: 0, lowerBeacons: 0, perkZones: 3, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [1, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 25], goldOre: [16, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 1, perkTileDensity: 0.9, perkZoneDensity: 0.85, minCrystals: 12, maxCrystals: 88, hardnessBias: 0.5 },
   },
   {
     id: 6,
@@ -114,7 +114,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 84,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [2, 4, 17], bombVein: [2, 6, 23], metalVein: [2, 10, 25], goldOre: [18, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.85, perkZoneDensity: 0.8, minCrystals: 14, maxCrystals: 101, hardnessBias: 0.9 },
+    rules: { beacons: 3, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [2, 4, 17], bombVein: [2, 6, 23], metalVein: [2, 10, 25], goldOre: [18, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.85, perkZoneDensity: 0.8, minCrystals: 14, maxCrystals: 101, hardnessBias: 0.9 },
   },
   {
     id: 7,
@@ -122,7 +122,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 74,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 3, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [0, 4, 17], thornVein: [0, 6, 23], bombBlob: [4, 4, 17], bombVein: [4, 6, 23], metalVein: [1, 10, 25], goldOre: [16, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.8, perkZoneDensity: 0.75, minCrystals: 12, maxCrystals: 78, hardnessBias: 1.2 },
+    rules: { beacons: 3, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 1, wormNests: 1, artifacts: 3, thornBlob: [0, 4, 17], thornVein: [0, 6, 23], bombBlob: [4, 4, 17], bombVein: [4, 6, 23], metalVein: [1, 10, 25], goldOre: [16, 4, 10], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.8, perkZoneDensity: 0.75, minCrystals: 12, maxCrystals: 78, hardnessBias: 1.2 },
   },
   {
     id: 8,
@@ -130,7 +130,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 64,
     canHostBase: true,
     frame: "metal",
-    rules: { beacons: 3, perkZones: 2, safes: 0, wormNests: 1, artifacts: 3, thornBlob: [0, 4, 17], thornVein: [0, 6, 23], bombBlob: [4, 4, 17], bombVein: [4, 6, 23], metalVein: [1, 10, 25], goldOre: [14, 4, 10], gasPocket: [1, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 10, maxCrystals: 65, hardnessBias: 1.5 },
+    rules: { beacons: 3, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 0, wormNests: 1, artifacts: 3, thornBlob: [0, 4, 17], thornVein: [0, 6, 23], bombBlob: [4, 4, 17], bombVein: [4, 6, 23], metalVein: [1, 10, 25], goldOre: [14, 4, 10], gasPocket: [1, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 2, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 10, maxCrystals: 65, hardnessBias: 1.5 },
   },
 ];
 
@@ -201,7 +201,7 @@ function validateLevelLayout(layout) {
     if (!level.required || typeof level.required !== "object") {
       level.required = {};
     }
-    const requiredKeys = ["beacons", "perkZones", "safes", "wormNests", "artifacts"];
+    const requiredKeys = ["beacons", "upperBeacons", "lowerBeacons", "perkZones", "safes", "wormNests", "artifacts"];
     for (const key of requiredKeys) {
       if (!Number.isFinite(level.rules[key]) && Number.isFinite(level.required[key])) {
         level.rules[key] = level.required[key];
@@ -213,6 +213,9 @@ function validateLevelLayout(layout) {
       if (!Number.isFinite(level.rules[key]) || level.rules[key] < 0) {
         throw new Error(`Level ${i + 1} ${key} must be at least 0`);
       }
+    }
+    if (level.rules.upperBeacons + level.rules.lowerBeacons > level.rules.beacons) {
+      throw new Error(`Level ${i + 1} upperBeacons + lowerBeacons must be <= beacons`);
     }
     const legacyTypes = Array.isArray(level.rules.thornTypes)
       ? level.rules.thornTypes
@@ -1027,17 +1030,76 @@ function tryPlaceBeacon(x, y, level, beaconMask, metalMask, hazardMask, gasPocke
   return true;
 }
 
+function collectBeaconCandidates(level, half) {
+  return collectCandidatesInLevel(level, 1, (x, y) => {
+    if (half === "upper") {
+      return y < level.startY + Math.floor(level.height / 2);
+    }
+    if (half === "lower") {
+      return y >= level.startY + Math.floor(level.height / 2);
+    }
+    return true;
+  });
+}
+
+function placeBeaconFromCandidates(candidates, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base) {
+  for (let i = 0; i < candidates.length; i += 1) {
+    if (tryPlaceBeacon(candidates[i].x, candidates[i].y, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function placeBeacons(beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base, random) {
   for (const level of DEPTH_LEVELS) {
     const target = level.rules.beacons || 0;
     if (target <= 0) continue;
-    const candidates = collectCandidatesInLevel(level, 1, () => true);
-    shuffle(candidates, random);
+    const upperCandidates = collectBeaconCandidates(level, "upper");
+    const lowerCandidates = collectBeaconCandidates(level, "lower");
+    const fallbackCandidates = collectBeaconCandidates(level, "any");
+    shuffle(upperCandidates, random);
+    shuffle(lowerCandidates, random);
+    shuffle(fallbackCandidates, random);
+
     let placed = 0;
-    for (let i = 0; i < candidates.length && placed < target; i += 1) {
-      if (tryPlaceBeacon(candidates[i].x, candidates[i].y, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base)) {
-        placed += 1;
+    let preferredUpperPlaced = 0;
+    let preferredLowerPlaced = 0;
+
+    const upperTarget = Math.min(level.rules.upperBeacons || 0, target);
+    const lowerTarget = Math.min(level.rules.lowerBeacons || 0, Math.max(0, target - upperTarget));
+    const fallbackTarget = Math.max(0, target - upperTarget - lowerTarget);
+
+    while (preferredUpperPlaced < upperTarget) {
+      if (!placeBeaconFromCandidates(upperCandidates, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base)) {
+        break;
       }
+      preferredUpperPlaced += 1;
+      placed += 1;
+    }
+
+    while (preferredLowerPlaced < lowerTarget) {
+      if (!placeBeaconFromCandidates(lowerCandidates, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base)) {
+        break;
+      }
+      preferredLowerPlaced += 1;
+      placed += 1;
+    }
+
+    let fallbackPlaced = 0;
+    while (fallbackPlaced < fallbackTarget) {
+      if (!placeBeaconFromCandidates(fallbackCandidates, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base)) {
+        break;
+      }
+      fallbackPlaced += 1;
+      placed += 1;
+    }
+
+    while (placed < target) {
+      if (!placeBeaconFromCandidates(fallbackCandidates, level, beaconMask, metalMask, hazardMask, gasPocketMask, steamPocketMask, boulderPocketMask, beacons, base)) {
+        break;
+      }
+      placed += 1;
     }
   }
 }
