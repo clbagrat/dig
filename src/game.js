@@ -6957,7 +6957,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         ? { type: "artifactChoice", remaining: artifactRemaining, beacon }
         : { type: "shop", beaconY: beacon.y };
       showPerkToast("Маяк активирован!");
-      addFuel(state.maxFuel - state.fuel, beacon.x, beacon.y);
+      addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
       healPlayer(1, "Маяк");
       state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
     }
