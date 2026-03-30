@@ -125,9 +125,55 @@ const LEVEL_REWARD_DEFS = {
 const LEVEL_REWARD_REPEAT_PATTERN = [3, 5, 6];
 
 // Reusable buffers for visibility BFS — avoids per-frame allocations
-const _visFogDistance = new Int16Array(GRID_W * GRID_H);
-const _visBfsQueue = new Int32Array(GRID_W * GRID_H);
-const _visFogQueue = new Int32Array(GRID_W * GRID_H);
+let _visFogDistance = new Int16Array(GRID_W * GRID_H);
+let _visBfsQueue = new Int32Array(GRID_W * GRID_H);
+let _visFogQueue = new Int32Array(GRID_W * GRID_H);
+
+function createGridStateBuffers() {
+  const cellCount = GRID_W * GRID_H;
+  return {
+    pathIndexByCell: new Int16Array(cellCount),
+    tunnelMask: new Uint8Array(cellCount),
+    perkMask: new Uint8Array(cellCount),
+    crystalMask: new Uint8Array(cellCount),
+    perkZoneMask: new Int16Array(cellCount),
+    hardness: new Uint8Array(cellCount),
+    hazardMask: new Uint8Array(cellCount),
+    hazardTriggeredMask: new Uint8Array(cellCount),
+    metalMask: new Uint8Array(cellCount),
+    goldOreMask: new Uint8Array(cellCount),
+    gasPocketMask: new Uint8Array(cellCount),
+    gasMask: new Uint8Array(cellCount),
+    steamPocketMask: new Uint8Array(cellCount),
+    steamMask: new Uint8Array(cellCount),
+    boulderPocketMask: new Uint8Array(cellCount),
+    beaconMask: new Uint8Array(cellCount),
+    artifactMask: new Uint8Array(cellCount),
+    safeDoorMask: new Int16Array(cellCount),
+    keyMask: new Uint8Array(cellCount),
+    safeInteriorMask: new Int16Array(cellCount),
+    health: new Float32Array(cellCount),
+    crackAngle: new Float32Array(cellCount),
+    loopGoldMask: new Float32Array(cellCount),
+    droppedGoldMask: new Float32Array(cellCount),
+    xpPickupMask: new Uint16Array(cellCount),
+    visibleMask: new Uint8Array(cellCount),
+    visibleAlpha: new Float32Array(cellCount),
+    visibleTargetAlpha: new Float32Array(cellCount),
+  };
+}
+
+function ensureGridBuffers() {
+  const cellCount = GRID_W * GRID_H;
+  if (_visFogDistance.length !== cellCount) {
+    _visFogDistance = new Int16Array(cellCount);
+    _visBfsQueue = new Int32Array(cellCount);
+    _visFogQueue = new Int32Array(cellCount);
+  }
+  if (state.pathIndexByCell.length !== cellCount) {
+    Object.assign(state, createGridStateBuffers());
+  }
+}
 
 const HAZARD_TYPES = {
   SPIKE: 1,
@@ -292,27 +338,10 @@ const state = {
   goldPerkLevel: 0,
   perkChoices: [],
   pathTiles: [],
-  pathIndexByCell: new Int16Array(GRID_W * GRID_H),
-  tunnelMask: new Uint8Array(GRID_W * GRID_H),
-  perkMask: new Uint8Array(GRID_W * GRID_H),
-  crystalMask: new Uint8Array(GRID_W * GRID_H),
-  perkZoneMask: new Int16Array(GRID_W * GRID_H),
   perkZones: [],
-  hardness: new Uint8Array(GRID_W * GRID_H),
-  hazardMask: new Uint8Array(GRID_W * GRID_H),
-  hazardTriggeredMask: new Uint8Array(GRID_W * GRID_H),
-  metalMask: new Uint8Array(GRID_W * GRID_H),
-  goldOreMask: new Uint8Array(GRID_W * GRID_H),
-  gasPocketMask: new Uint8Array(GRID_W * GRID_H),
-  gasMask: new Uint8Array(GRID_W * GRID_H),
   gasClouds: [],
-  steamPocketMask: new Uint8Array(GRID_W * GRID_H),
-  steamMask: new Uint8Array(GRID_W * GRID_H),
   steamJets: [],
-  boulderPocketMask: new Uint8Array(GRID_W * GRID_H),
   boulders: [],
-  beaconMask: new Uint8Array(GRID_W * GRID_H),
-  artifactMask: new Uint8Array(GRID_W * GRID_H),
   artifactCount: 0,
   artifactChoiceOpen: false,
   artifactChoiceCategories: [],
@@ -320,9 +349,6 @@ const state = {
   artifactChoiceRemaining: 0,
   // Safe/key system
   safes: [],
-  safeDoorMask: new Int16Array(GRID_W * GRID_H),  // >0 = locked door (safeIdx+1), <0 = opened
-  keyMask: new Uint8Array(GRID_W * GRID_H),        // >0 = key for safe (safeIdx+1)
-  safeInteriorMask: new Int16Array(GRID_W * GRID_H), // >0 = safe interior (safeIdx+1)
   heldKeyForSafe: -1,      // index of safe this key belongs to, -1 = no key
   keyBumpTime: 0,
   keyBumpDir: null,
@@ -333,14 +359,6 @@ const state = {
   wormNests: [],
   activeWorms: [],
   beacons: [],
-  health: new Float32Array(GRID_W * GRID_H),
-  crackAngle: new Float32Array(GRID_W * GRID_H),
-  loopGoldMask: new Float32Array(GRID_W * GRID_H),
-  droppedGoldMask: new Float32Array(GRID_W * GRID_H),
-  xpPickupMask: new Uint16Array(GRID_W * GRID_H),
-  visibleMask: new Uint8Array(GRID_W * GRID_H),
-  visibleAlpha: new Float32Array(GRID_W * GRID_H),
-  visibleTargetAlpha: new Float32Array(GRID_W * GRID_H),
   signalMovesLeft: 0,
   signalMovesMax: 0,
   signalPrevX: START_X,
@@ -421,6 +439,11 @@ const state = {
     value: 0,
     time: 0,
   },
+  depthTitle: {
+    text: "",
+    time: 0,
+  },
+  currentDepthLevel: 1,
   damageFlash: 0,
   fatalErrorText: "",
   goldHitRect: null,
@@ -428,6 +451,7 @@ const state = {
   effects: [],
   tileAnimations: [],
   tileAnimDest: new Set(),
+  ...createGridStateBuffers(),
   visibilityDirty: true,
   chainExplosions: [],
   base: {
@@ -1470,6 +1494,7 @@ function revealSteamPocket(x, y, dirX, dirY) {
 }
 
 function setupField(seedOverride = null) {
+  ensureGridBuffers();
   state.pathIndexByCell.fill(-1);
   state.perkMask.fill(0);
   state.crystalMask.fill(0);
@@ -1629,6 +1654,8 @@ function setupField(seedOverride = null) {
   state.xpParticles.length = 0;
   state.goldToast.value = 0;
   state.goldToast.time = 0;
+  state.depthTitle.text = "";
+  state.depthTitle.time = 0;
   state.damageFlash = 0;
   state.goldHitRect = null;
   state.effects.length = 0;
@@ -1733,6 +1760,7 @@ function setupField(seedOverride = null) {
 
   state.base.renderX = state.base.x;
   state.base.renderY = state.base.y;
+  state.currentDepthLevel = getDepthLevelForCell(state.drill.x, state.drill.y)?.level || 1;
   {
     const zoom = getCameraZoom();
     const viewWidth = state.width / zoom;
@@ -1805,6 +1833,23 @@ function getDepthLevelForCell(x, y) {
     }
   }
   return null;
+}
+
+function showDepthTitle(level) {
+  if (!Number.isFinite(level) || level <= 0) {
+    return;
+  }
+  state.depthTitle.text = `Глубина ${level}`;
+  state.depthTitle.time = 1.8;
+}
+
+function updateDepthLevelTransition() {
+  const levelNumber = getDepthLevelForCell(state.drill.x, state.drill.y)?.level || 0;
+  if (levelNumber <= 0 || levelNumber === state.currentDepthLevel) {
+    return;
+  }
+  state.currentDepthLevel = levelNumber;
+  showDepthTitle(levelNumber);
 }
 
 function buildCrystalRecipePool(level, firstCrystalType) {
@@ -3868,6 +3913,7 @@ function update(dt) {
   updateChainExplosions(dt);
   updateEffects(dt);
   updateGoldParticles(dt);
+  updateDepthLevelTransition();
   if (state.visibilityDirty) {
     rebuildVisibilityMask();
     state.visibilityDirty = false;
@@ -3929,6 +3975,7 @@ function update(dt) {
   state.fuelToast.time = Math.max(0, state.fuelToast.time - dt);
   state.hpToast.time = Math.max(0, state.hpToast.time - dt);
   state.goldToast.time = Math.max(0, state.goldToast.time - dt);
+  state.depthTitle.time = Math.max(0, state.depthTitle.time - dt);
   state.damageFlash = Math.max(0, state.damageFlash - dt * 2.4);
   if (state.pendingPerkChoice) {
     state.pendingPerkDelay = Math.max(0, state.pendingPerkDelay - dt);
@@ -7297,6 +7344,7 @@ function render() {
   }
   ctx.restore();
   if (!state.debugMapActive) renderHud();
+  renderDepthTitle();
 
   if (state.damageFlash > 0) {
     ctx.fillStyle = `rgba(255, 64, 64, ${0.16 * state.damageFlash})`;
@@ -8944,6 +8992,38 @@ function renderGoldToast(camera) {
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#f0df84";
+  ctx.fillText(text, x, y + 1);
+  ctx.restore();
+}
+
+function renderDepthTitle() {
+  if (state.depthTitle.time <= 0 || !state.depthTitle.text || state.debugMapActive) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const duration = 1.8;
+  const progress = 1 - clamp(state.depthTitle.time / duration, 0, 1);
+  const fadeIn = clamp(progress / 0.18, 0, 1);
+  const fadeOut = clamp(state.depthTitle.time / 0.45, 0, 1);
+  const alpha = Math.min(fadeIn, fadeOut);
+  const x = state.width * 0.5;
+  const y = 90 - (1 - alpha) * 12;
+  const text = state.depthTitle.text;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 28px ${HUD_FONT}`;
+  const width = Math.max(180, ctx.measureText(text).width + 40);
+  drawRoundedRectPath(x - width * 0.5, y - 24, width, 48, 18);
+  ctx.fillStyle = "rgba(19, 12, 8, 0.82)";
+  ctx.strokeStyle = "rgba(255, 207, 122, 0.32)";
+  ctx.lineWidth = 1.5;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffdf9b";
   ctx.fillText(text, x, y + 1);
   ctx.restore();
 }

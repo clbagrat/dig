@@ -370,8 +370,8 @@ function validateLevelLayout(layout) {
     delete level.rules.crystalDensity;
   }
 
-  if (totalHeight !== PLAYABLE_HEIGHT) {
-    throw new Error(`Total height must stay equal to ${PLAYABLE_HEIGHT} tiles`);
+  if (totalHeight < 8) {
+    throw new Error("Total height must be at least 8 tiles");
   }
   if (hostBaseCount < 1) {
     throw new Error("At least one level must have canHostBase=true");
@@ -403,7 +403,7 @@ function buildDepthLevels(layout) {
 
 const INITIAL_DEPTH_LEVELS = buildDepthLevels(currentLevelLayout);
 export const DEPTH_LEVELS = [...INITIAL_DEPTH_LEVELS];
-export const GRID_H = INITIAL_DEPTH_LEVELS[INITIAL_DEPTH_LEVELS.length - 1].endY + 1;
+export let GRID_H = INITIAL_DEPTH_LEVELS[INITIAL_DEPTH_LEVELS.length - 1].endY + 1;
 export let BEACON_COUNT = INITIAL_DEPTH_LEVELS.reduce(
   (sum, level) => sum + (level.rules.beacons || 0),
   0,
@@ -415,9 +415,7 @@ const LEVEL_BY_ID = new Map(INITIAL_DEPTH_LEVELS.map((level) => [level.id, level
 function rebuildGenerationRuntime() {
   validateLevelLayout(currentLevelLayout);
   const levels = buildDepthLevels(currentLevelLayout);
-  if (levels[levels.length - 1].endY + 1 !== GRID_H) {
-    throw new Error(`Generation config must preserve total map height ${GRID_H}`);
-  }
+  GRID_H = levels[levels.length - 1].endY + 1;
   DEPTH_LEVELS.splice(0, DEPTH_LEVELS.length, ...levels);
   LEVEL_BY_ID.clear();
   for (const level of DEPTH_LEVELS) {
