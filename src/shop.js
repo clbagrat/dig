@@ -19,7 +19,7 @@ const RECYCLE_RETURN = 0.25;   // 25% gold back on recycle
 
 let unlockedCategories = new Set(INITIAL_CATEGORIES);
 let maxSlots = INITIAL_SLOTS;
-let equippedParts = [];      // [{id, rarity}]
+let equippedParts = getStarterEquipment();      // [{id, rarity}]
 let purchasedItems = [];     // [{id, rarity}] — flat list, no limit
 let currentOfferings = [];   // [{good, rarity}] × OFFERINGS_COUNT
 let rerollCount = 0;
@@ -33,6 +33,10 @@ let selectedSlotIdx = -1;    // slot selected for manual merge
 let replaceMode = false;     // true when choosing slot to replace
 let lockedSlots = new Set(); // offering slot indices that are locked
 let prevTagCounts = {};      // previous tag counts for synergy delta
+
+function getStarterEquipment() {
+  return [{ id: "basic_drill", rarity: RARITY.COMMON }];
+}
 
 // ── Public API ───────────────────────────────────────────────────────────────────
 
@@ -89,6 +93,12 @@ export function getEquipmentLevel(effectId) {
   return part ? RARITY_EFFECT_MULT[part.rarity] : 0;
 }
 
+export function getEquipmentLevels(effectId) {
+  return equippedParts
+    .filter((part) => part.id === effectId)
+    .map((part) => RARITY_EFFECT_MULT[part.rarity]);
+}
+
 export function getItemStacks(effectId) {
   return purchasedItems.filter(p => p.id === effectId).length;
 }
@@ -120,7 +130,7 @@ export function getLockedCategories() {
 export function resetShopState() {
   unlockedCategories = new Set(INITIAL_CATEGORIES);
   maxSlots = INITIAL_SLOTS;
-  equippedParts = [];
+  equippedParts = getStarterEquipment();
   purchasedItems = [];
   currentOfferings = [];
   rerollCount = 0;
@@ -225,6 +235,9 @@ function getOfferingCost(offering) {
 }
 
 function getRerollCost() {
+  if (ALL_GOODS.length === 0) {
+    return 0;
+  }
   const base = Math.max(3, Math.floor(shopLevel * 0.75)) + 1;
   const increment = Math.max(1, Math.floor(shopLevel * 0.4));
   return base + increment * rerollCount;
@@ -444,6 +457,10 @@ function buildDOM() {
   `;
 }
 
+function hasShopContent() {
+  return ALL_GOODS.length > 0;
+}
+
 function formatStatValue(value, mode = "number") {
   if (!Number.isFinite(value)) return "0";
   if (mode === "percent") {
@@ -457,6 +474,29 @@ function formatStatValue(value, mode = "number") {
     return value % 1 === 0 ? String(Math.round(value)) : value.toFixed(1);
   }
   return String(Math.round(value));
+}
+
+function getRarityTierValue(values, rarity) {
+  return values[Math.max(0, Math.min(values.length - 1, rarity))] || 0;
+}
+
+function getGoodDescription(good, rarity = RARITY.COMMON) {
+  if (!good) {
+    return "";
+  }
+  if (good.id === "basic_drill") {
+    const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
+    const damageScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
+    return `Урон ${flatDamage} (${damageScale}% dmg).`;
+  }
+  if (good.id === "lucky_pickaxe") {
+    const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
+    const damageScale = getRarityTierValue([0, 10, 20, 30, 40], rarity);
+    const luckScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
+    const oreGain = getRarityTierValue([0, 1, 2, 3, 4], rarity);
+    return `Урон ${flatDamage} (${damageScale}% dmg, ${luckScale}% luck). При ударе по золотой жиле увеличит ее ценность на ${oreGain}.`;
+  }
+  return good.desc || "";
 }
 
 function renderStats() {
@@ -500,6 +540,17 @@ function renderOfferings() {
   const container = document.getElementById("shopOfferings");
   if (!container) return;
   container.innerHTML = "";
+
+  if (!hasShopContent()) {
+    const empty = document.createElement("div");
+    empty.className = "shop-empty";
+    empty.innerHTML = `
+      <div class="shop-empty__title">Магазин пуст</div>
+      <div class="shop-empty__text">Все предметы и экипировка удалены из игры.</div>
+    `;
+    container.appendChild(empty);
+    return;
+  }
 
   for (let i = 0; i < OFFERINGS_COUNT; i++) {
     const offering = currentOfferings[i];
@@ -549,6 +600,11 @@ function renderOfferings() {
 function renderSlots() {
   const container = document.getElementById("shopSlots");
   if (!container) return;
+  container.hidden = !hasShopContent();
+  if (!hasShopContent()) {
+    container.innerHTML = "";
+    return;
+  }
   container.innerHTML = "";
 
   for (let i = 0; i < maxSlots; i++) {
@@ -583,6 +639,12 @@ function renderSlots() {
 function renderRerollButton() {
   const btn = document.getElementById("shopReroll");
   if (!btn) return;
+  if (!hasShopContent()) {
+    btn.hidden = true;
+    btn.disabled = true;
+    return;
+  }
+  btn.hidden = false;
   const cost = getRerollCost();
   const canAfford = currentGoldCache >= cost;
   btn.textContent = `Перебросить — ${cost} ●`;
@@ -593,6 +655,10 @@ function renderRerollButton() {
 function renderDetail() {
   const detail = document.getElementById("shopDetail");
   if (!detail) return;
+  if (!hasShopContent()) {
+    detail.hidden = true;
+    return;
+  }
 
   // Slot selected for manual merge
   if (selectedSlotIdx >= 0 && selectedOfferingIdx < 0) {
@@ -609,8 +675,7 @@ function renderDetail() {
     detail.hidden = false;
     document.getElementById("shopDetailIcon").textContent = def.icon;
     document.getElementById("shopDetailName").textContent = def.name;
-    let desc = def.desc;
-    if (mult !== 1) desc += ` (×${mult})`;
+    const desc = getGoodDescription(def, part.rarity);
     document.getElementById("shopDetailDesc").textContent = desc;
 
     const tagsEl = document.getElementById("shopDetailTags");
@@ -677,10 +742,7 @@ function renderDetail() {
   document.getElementById("shopDetailName").textContent = offering.good.name;
 
   // Description with rarity multiplier
-  let desc = offering.good.desc;
-  if (mult !== 1) {
-    desc += ` (×${mult})`;
-  }
+  const desc = getGoodDescription(offering.good, offering.rarity);
   document.getElementById("shopDetailDesc").textContent = desc;
 
   // Tags for equipment

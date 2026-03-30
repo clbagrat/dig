@@ -96,8 +96,11 @@ Current durability / gold:
 - Tier 6: `420 hp`, `14 gold`
 - Tier 7: `600 hp`, `18 gold`
 
-The current drill power starts at `1`.
-Since damage is discrete, real hit counts depend on current drill power and upgrades.
+Current baseline:
+- base drill hit damage: `10`
+- `damage` stat starts at `10`
+- the `damage` stat does not increase the base hit by itself
+- `damage` matters only for equipment or effects that explicitly scale from `dmg`
 
 ## Movement And Drilling
 
@@ -131,7 +134,8 @@ Gold is earned from destroyed rock and scrap ore.
 
 Gold is spent in the beacon shop:
 - each beacon opens a shop when activated
-- shop contains upgrade trees unlocked progressively via artifacts
+- the shop can offer equipment from unlocked categories
+- the driller starts the run with one equipped `common` copy of `Просто дрель`
 
 ## Experience And Levels
 
@@ -248,60 +252,18 @@ Activation:
 Gameplay role:
 - once activated, a beacon shows the direction to the base (similar to radar)
 
-## Shop And Upgrade Trees
+## Shop
 
 The shop opens after each beacon activation.
-It contains upgrade trees organized by theme.
-The first tree (`Статы`) is always unlocked.
-Other trees are locked and become available when the player delivers an artifact to a beacon.
+It currently contains a minimal equipment pool.
 
-### Always Unlocked: Статы
+Current available categories:
+- `Базовое`
+- `Экономика`
 
-| Node | Effect per level | Max |
-|---|---|---|
-| Мощность бура | +0.15 strike speed | 3 |
-| Скорость бура | +0.2 strike speed | 3 |
-| Усиленный корпус | +1 max HP, heal 2 | 3 |
-| Расширенный бак | +60 max fuel | 3 |
-
-### Unlockable Trees (via Artifacts)
-
-**Экстра бур**
-- `Боковые буры` — each strike also hits side cells (max 2)
-- `Длинный бур` — +20% damage to next forward tile per level (max 3)
-- `Диагональные буры` — +20% damage to forward diagonals per level (max 3)
-- `Шиповой форсаж` — broken spikes give overdrive buff 6/9/12 sec (max 3, requires Боковые буры)
-
-**Топливо**
-- `Топливный контур` — any tile perk gives +50 fuel (max 1)
-- `Рециркулятор` — +2 gold and +2 fuel per destroyed block (max 2)
-- `Форсаж на нуле` — lower fuel = faster next strike (max 3)
-- `Перегрузка` — fuel overflow gives forced charge then explosion + stun; max fuel −150 (max 1, requires Рециркулятор)
-- `Усиленный бак` — Бак gives more fuel but increases passive drain (max 3, requires Форсаж на нуле)
-- `Рекуперация контура` — returning through own contour gives fuel per step (max 3)
-
-**Контур**
-- `Контурный заряд` — closing a contour gives temp drill damage bonus (max 4)
-- `Контурный трофей` — large contour may create a random perk inside (max 2, requires Контурный заряд)
-- `Автоконтур` — −1 sec to auto-close delay (max 3, requires Контурный заряд)
-- `Контурный резонанс` — +1% damage per contour length unit (max 4, requires Контурный заряд)
-
-**Нагрев**
-- `Теплоотвод` — +20 to heat limit before overheat (max 3)
-- `Накал бура` — +20% drill damage based on current heat level (max 3, requires Теплоотвод)
-- `Термозаряд` — +1 damage and +0.5 radius to overheat explosion (max 3, requires Теплоотвод)
-- `Разгонные демпферы` — reduce stun duration, speed up heat gain (max 3, requires Теплоотвод)
-- `Импульс остывания` — full cooldown gives 5 sec radar (max 3)
-
-**Выживание**
-- `Перелив адреналина` — overheal gives buff up to 10 sec (max 3)
-- `Ломосбор` — +2 gold per destroyed block (max 3)
-- `Кристальный катализатор` — crystals give gold, then fuel, then HP (max 3, requires Ломосбор)
-
-**Ракеты**
-- `Саперный заряд` — every 15 blocks fires a rocket at distance 3 (max 3)
-- `Терморакеты` — overheat fires rockets at distance 1–3 (max 3, requires Саперный заряд)
-- `Охлаждающие ракеты` — every N cooled heat fires a rocket (max 3, requires Саперный заряд)
+Current available equipment:
+- `Просто дрель` — adds `10 / 15 / 20 / 25` damage plus `10% / 15% / 20% / 25%` of the `dmg` stat
+- `Кирка счастливчика` — adds bonus damage to every drill hit, and hits on gold ore increase that vein's final gold value
 
 ## Overflow / Remote Bomb Rules
 
@@ -321,8 +283,6 @@ There are multiple remote bomb style systems.
 
 Fuel gains can come from several stacked sources:
 - direct tile perk (Бак)
-- `Топливный контур` bonus
-- `Рециркулятор` per-block fuel
 - chained perk rewards
 
 To prevent abuse and recursion:
@@ -411,6 +371,6 @@ The current prototype is centered on:
 - uncertain search,
 - constrained fuel routing,
 - local tactical perk spikes,
-- contour drawing to activate beacons and unlock upgrade trees,
-- long-form gold progression through the shop,
+- contour drawing to activate beacons,
+- long-form gold collection without shop upgrades,
 - and a target that stays hidden until found.

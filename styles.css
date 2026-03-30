@@ -1548,6 +1548,28 @@ strong {
   flex-shrink: 0;
 }
 
+.shop-empty {
+  grid-column: 1 / -1;
+  padding: 16px 14px;
+  border: 1px solid rgba(215, 159, 73, 0.18);
+  border-radius: 12px;
+  background: rgba(22, 11, 5, 0.7);
+  text-align: center;
+}
+
+.shop-empty__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.shop-empty__text {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .shop-card {
   display: flex;
   flex-direction: column;

@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevel, addSlot, unlockCategory, getLockedCategories, resetShopState } from "./shop.js?v=41";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState } from "./shop.js?v=41";
 import { CATEGORIES, TAG_SYNERGIES } from "./items-catalog.js?v=1";
 import {
   generateMap,
@@ -21,6 +21,7 @@ const MAX_FRAME_MS = 100;
 const START_FUEL = 350;
 const START_HP = 4;
 const MAX_HEAT = 100;
+const BASE_DRILL_DAMAGE = 10;
 const IDLE_FUEL_DRAIN = 0.8;
 const DRILL_FUEL_DRAIN = 8;
 const STRIKE_CYCLE_SPEED = 8;
@@ -376,7 +377,7 @@ const state = {
   crystalProgress: 0,
   crystalStatusText: "",
   strikeSpeed: 1,
-  drillPower: 1,
+  drillPower: 10,
   miningGoldBonusMultiplier: 0,
   goldBonus: 0,
   fuelPickupBonus: 0,
@@ -2024,7 +2025,7 @@ function setupField(seedOverride = null) {
   state.signalDirX = 0;
   state.signalDirY = -1;
   state.strikeSpeed = 1;
-  state.drillPower = 1;
+  state.drillPower = 10;
   state.miningGoldBonusMultiplier = 0;
   state.goldBonus = 0;
   state.fuelPickupBonus = 0;
@@ -2484,7 +2485,7 @@ function collectPerkZone(zone) {
   showPerkToast(state.perkText);
 
   if (zone.perkType === 4) {
-    explodeAt(Math.round(zone.x), Math.round(zone.y), state.drillPower * 10, 3);
+    explodeAt(Math.round(zone.x), Math.round(zone.y), BASE_DRILL_DAMAGE, 3);
     return;
   }
 
@@ -2536,7 +2537,7 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       const targetY = clamp(y + state.drill.facingY * 2, 1, GRID_H - 2);
       spawnRocketEffect(x, y, targetX, targetY, {
         kind: "radiusBomb",
-        damage: state.drillPower * 10,
+        damage: BASE_DRILL_DAMAGE,
         radius: 2,
       });
       state.perkText = "Бомба";
@@ -2837,6 +2838,12 @@ function applyShopPerk(effectId, rarityMult) {
       state.crystalCatalystLevel = Math.min(3, (state.crystalCatalystLevel || 0) + 1);
       showPerkToast("Кристальный катализатор");
       break;
+    case "basic_drill":
+      showPerkToast("Просто дрель");
+      break;
+    case "lucky_pickaxe":
+      showPerkToast("Кирка счастливчика");
+      break;
     default:
       break;
   }
@@ -2880,6 +2887,8 @@ function removeShopPerk(effectId, rarityMult) {
     case "adrenaline": state.overhealOverdriveDuration = Math.max(0, (state.overhealOverdriveDuration || 0) - Math.round(2 * m)); if (state.overhealOverdriveDuration <= 0) state.overhealOverdrive = false; break;
     case "ore_collector": state.goldBonus -= Math.round(2 * m); break;
     case "crystal_catalyst": state.crystalCatalystLevel = Math.max(0, (state.crystalCatalystLevel || 0) - 1); break;
+    case "basic_drill": break;
+    case "lucky_pickaxe": break;
     default: break;
   }
 }
@@ -5312,7 +5321,10 @@ function getStrikeDamage() {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
-  let damage = (state.drill.rate / STRIKE_CYCLE_SPEED) * state.drillPower * 10 * chargeBoost * heatBoost * contourBoost;
+  let damage =
+    BASE_DRILL_DAMAGE * chargeBoost * heatBoost * contourBoost +
+    getBasicDrillDamageBonus() +
+    getLuckyPickaxeDamageBonus();
   // Crit
   if (state.critChance > 0 && Math.random() * 100 < state.critChance) {
     damage *= state.critMultiplier;
@@ -5321,6 +5333,49 @@ function getStrikeDamage() {
     state._lastStrikeWasCrit = false;
   }
   return damage;
+}
+
+function getEquipmentTiers(effectId) {
+  return getEquipmentLevels(effectId).map((rarityMult) => {
+    if (rarityMult >= 3) return 4;
+    if (rarityMult >= 2) return 3;
+    if (rarityMult >= 1.5) return 2;
+    if (rarityMult >= 1) return 1;
+    return 0;
+  }).filter((tier) => tier > 0);
+}
+
+function sumEquipmentTierValues(effectId, values) {
+  let total = 0;
+  for (const tier of getEquipmentTiers(effectId)) {
+    total += values[tier] || 0;
+  }
+  return total;
+}
+
+function getBasicDrillDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("basic_drill")) {
+    const flat = [0, 10, 15, 20, 25][tier] || 0;
+    const damageScale = [0, 0.10, 0.15, 0.20, 0.25][tier] || 0;
+    total += flat + state.drillPower * damageScale;
+  }
+  return total;
+}
+
+function getLuckyPickaxeDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("lucky_pickaxe")) {
+    const flat = [0, 10, 15, 20, 25][tier] || 0;
+    const damageScale = [0, 0.10, 0.20, 0.30, 0.40][tier] || 0;
+    const luckScale = [0, 0.10, 0.15, 0.20, 0.25][tier] || 0;
+    total += flat + state.drillPower * damageScale + state.luck * luckScale;
+  }
+  return total;
+}
+
+function getLuckyPickaxeOreGain() {
+  return sumEquipmentTierValues("lucky_pickaxe", [0, 1, 2, 3, 4]);
 }
 
 function getXpNeededForLevel(level) {
@@ -5972,11 +6027,11 @@ function triggerHazardEffect(hazardType, x, y, options = {}) {
         kind: "volatile",
         x,
         y,
-        damage: Math.max(1, state.drillPower * 3),
+        damage: Math.max(1, BASE_DRILL_DAMAGE * 0.3),
         radius: 1.25,
       });
     } else {
-      explodeAt(x, y, Math.max(1, state.drillPower * 3), 1.25, { cause: "explosion" });
+      explodeAt(x, y, Math.max(1, BASE_DRILL_DAMAGE * 0.3), 1.25, { cause: "explosion" });
     }
   }
 }
@@ -6008,6 +6063,12 @@ function damageCell(x, y, damage, options = {}) {
   }
   if (!state.hardness[index]) {
     return false;
+  }
+  if (options.byDrill && state.goldOreMask[index]) {
+    const oreGain = getLuckyPickaxeOreGain();
+    if (oreGain > 0) {
+      state.droppedGoldMask[index] += oreGain;
+    }
   }
   const hazardType = state.hazardMask[index];
   const allowHazardChain = options.allowHazardChain && hazardType === HAZARD_TYPES.VOLATILE;
