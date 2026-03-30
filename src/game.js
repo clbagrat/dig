@@ -1084,12 +1084,16 @@ function spawnDamageNumberEffect(x, y, value) {
 
 const mulberry32 = _mulberry32;
 
-function newWorldSeed() {
+function getSeedFromUrl() {
   const urlSeed = new URLSearchParams(location.search).get("seed");
   if (urlSeed) {
     const n = Number(urlSeed) >>> 0;
     if (n) return n;
   }
+  return null;
+}
+
+function newWorldSeed() {
   if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
     const buf = new Uint32Array(1);
     globalThis.crypto.getRandomValues(buf);
@@ -2105,7 +2109,7 @@ function setupField(seedOverride = null) {
   state.drill.digDelayTimer = 0;
   state.drill.digDelayDx = 0;
   state.drill.digDelayDy = 0;
-  state.worldSeed = seedOverride ?? newWorldSeed();
+  state.worldSeed = seedOverride ?? getSeedFromUrl() ?? newWorldSeed();
   state.worldRandom = mulberry32(state.worldSeed);
   window.__worldSeed = state.worldSeed;
   console.log("World seed:", state.worldSeed);

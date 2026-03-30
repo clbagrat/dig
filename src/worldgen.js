@@ -71,10 +71,10 @@ const DEFAULT_LEVEL_LAYOUT = [
   {
     id: 1,
     height: 24,
-    width: 44,
+    width: 20,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 1, upperBeacons: 0, lowerBeacons: 0, perkZones: 1, safes: 0, wormNests: 0, artifacts: 0, thornBlob: [1, 4, 17], thornVein: [1, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [1, 10, 25], goldOre: [8, 4, 10], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 43, hardnessBias: -1.2 },
+    rules: { beacons: 1, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [0, 4, 17], thornVein: [1, 3, 5], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [0, 10, 25], goldOre: [5, 2, 2], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 8, hardnessBias: -1.2 },
   },
   {
     id: 2,
