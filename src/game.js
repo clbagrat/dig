@@ -8875,14 +8875,7 @@ function renderSteamJets(camera) {
   ctx.restore();
 }
 
-function renderSteamStack(x, y, ctx) {
-  ctx.fillStyle = "rgba(255, 232, 206, 0.2)";
-  ctx.beginPath();
-  ctx.arc(x, y, 5, 0, Math.PI * 2);
-  ctx.arc(x + 7, y - 6, 4, 0, Math.PI * 2);
-  ctx.arc(x - 5, y - 8, 3, 0, Math.PI * 2);
-  ctx.fill();
-}
+function renderSteamStack() {}
 
 function renderCog(cx, cy, radius, ctx) {
   ctx.fillStyle = "#c4914e";
@@ -8980,28 +8973,7 @@ function renderDrill(camera) {
   const angle = state.drill.facingX > 0 ? Math.PI * 0.5 : state.drill.facingX < 0 ? -Math.PI * 0.5 : state.drill.facingY < 0 ? Math.PI : 0;
   ctx.save();
   ctx.translate(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.5);
-  if (idleCharge > 0.01) {
-    const pulse = 0.55 + Math.sin((state.lastTs || 0) * 0.012) * 0.15;
-    ctx.fillStyle = `rgba(109, 239, 255, ${0.08 + idleCharge * 0.14 * pulse})`;
-    ctx.beginPath();
-    ctx.arc(0, 0, TILE_SIZE * (0.34 + idleCharge * 0.24), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = `rgba(132, 241, 255, ${0.22 + idleCharge * 0.5})`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, TILE_SIZE * (0.28 + idleCharge * 0.18), 0, Math.PI * 2);
-    ctx.stroke();
-    for (let i = 0; i < 3; i += 1) {
-      const angle = (state.lastTs || 0) * 0.01 + i * ((Math.PI * 2) / 3);
-      const radius = TILE_SIZE * (0.18 + idleCharge * 0.22);
-      const sx = Math.cos(angle) * radius;
-      const sy = Math.sin(angle) * radius;
-      ctx.fillStyle = `rgba(187, 247, 255, ${0.35 + idleCharge * 0.45})`;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 1.7 + idleCharge * 1.1, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
+
   ctx.rotate(angle);
   ctx.drawImage(state.sprites.drillFrames[frame], -TILE_SIZE * 0.5, -TILE_SIZE * 0.5, TILE_SIZE, TILE_SIZE);
   ctx.restore();
