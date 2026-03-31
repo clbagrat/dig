@@ -92,7 +92,7 @@ export const ALL_ITEMS = [
     baseCost: 30,
     effect: {
       stat: "speedOfAutoClose",
-      effectByRarity: [null, 1, 2, 3, 4],
+      effectByRarity: [null, 3, 5, 8, 10],
     },
   },
   {
