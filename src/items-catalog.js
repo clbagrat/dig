@@ -37,12 +37,24 @@ export const CATEGORIES = [
   { id: "basic", name: "Базовое", icon: "D" },
   { id: "economy", name: "Экономика", icon: "●" },
   { id: "maintenance", name: "Обслуживание", icon: "💧" },
+  { id: "heat", name: "Нагрев", icon: "🔥" },
 ];
 
 export const INITIAL_CATEGORIES = ["basic", "economy"];
 export const TAG_SYNERGIES = {};
 
 export const ALL_EQUIPMENT = [
+  {
+    id: "thermo_drill",
+    type: "equipment",
+    name: "Термобур",
+    icon: "🔥",
+    desc: "Урон 20 (+15% dmg). +1 урона за каждые 10 heat.",
+    category: "heat",
+    tags: ["heat"],
+    minRarity: 2,
+    baseCost: 40,
+  },
   {
     id: "basic_drill",
     type: "equipment",

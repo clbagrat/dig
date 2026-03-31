@@ -485,6 +485,12 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
   if (!good) {
     return "";
   }
+  if (good.id === "thermo_drill") {
+    const flat = getRarityTierValue([0, 0, 20, 25, 30], rarity);
+    const drillScale = getRarityTierValue([0, 0, 15, 20, 25], rarity);
+    const heatBonus = getRarityTierValue([0, 0, 1, 2, 3], rarity);
+    return `Урон ${flat} (+${drillScale}% dmg). +${heatBonus} урона за каждые 10 heat.`;
+  }
   if (good.id === "basic_drill") {
     const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
     const damageScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);

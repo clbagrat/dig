@@ -5278,7 +5278,8 @@ function getStrikeDamage() {
   let damage =
     BASE_DRILL_DAMAGE * chargeBoost * contourBoost +
     getBasicDrillDamageBonus() +
-    getLuckyPickaxeDamageBonus();
+    getLuckyPickaxeDamageBonus() +
+    getThermoDrillDamageBonus();
   // Crit
   if (state.critChance > 0 && Math.random() * 100 < state.critChance) {
     damage *= state.critMultiplier;
@@ -5324,6 +5325,17 @@ function getLuckyPickaxeDamageBonus() {
     const damageScale = [0, 0.10, 0.20, 0.30, 0.40][tier] || 0;
     const luckScale = [0, 0.10, 0.15, 0.20, 0.25][tier] || 0;
     total += flat + state.drillPower * damageScale + state.luck * luckScale;
+  }
+  return total;
+}
+
+function getThermoDrillDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("thermo_drill")) {
+    const flat = [0, 0, 20, 25, 30][tier] || 0;
+    const drillScale = [0, 0, 0.15, 0.20, 0.25][tier] || 0;
+    const heatBonus = [0, 0, 1, 2, 3][tier] || 0;
+    total += flat + state.drillPower * drillScale + Math.floor(state.heat / 10) * heatBonus;
   }
   return total;
 }
