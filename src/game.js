@@ -3694,6 +3694,7 @@ function buildDebugPerkButtons() {
       { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "miningGoldBonusMultiplier", label: "miningGoldBonus", step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
+      { key: "idleAutoCloseDelay",   label: "autoCloseDelay (сек)",  step: 1,    fmt: v => v.toFixed(0) },
     ];
     statsRoot.innerHTML = "";
     for (const def of CORE_STATS) {
