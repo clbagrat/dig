@@ -8034,7 +8034,7 @@ function renderAutoClosePreview(camera) {
     if (state.idleTime < IDLE_AUTO_CLOSE_PREVIEW_DELAY) {
       return;
     }
-    const duration = Math.max(0.01, state.idleAutoCloseDelay - IDLE_AUTO_CLOSE_PREVIEW_DELAY);
+    const duration = Math.max(0.01, state.idleAutoCloseDelay / Math.max(0.1, state.speedOfAutoClose) - IDLE_AUTO_CLOSE_PREVIEW_DELAY);
     reveal = clamp((state.idleTime - IDLE_AUTO_CLOSE_PREVIEW_DELAY) / duration, 0, 1);
   }
   if (reveal <= 0) {
