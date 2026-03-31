@@ -526,7 +526,7 @@ function renderStats() {
   }
 
   const items = [
-    { label: "DMG", value: formatStatValue(stats.drillPower, "fixed1") },
+    { label: "Drill", value: formatStatValue(stats.drillPower, "fixed1") },
     { label: "DMG%", value: formatStatValue(stats.damageBonus, "percent") },
     { label: "SPD", value: formatStatValue(stats.strikeSpeed - 1, "percent") },
     { label: "HP", value: formatStatValue(stats.maxHp) },
