@@ -407,6 +407,7 @@ const state = {
   idleTime: 0,
   idleAutoCloseTriggered: false,
   idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
+  speedOfAutoClose: 1,
   autoClosePreview: null,
   autoClosePreviewReturnTimer: 0,
   autoClosePreviewFailed: false,
@@ -2046,6 +2047,7 @@ function setupField(seedOverride = null) {
   state.idleTime = 0;
   state.idleAutoCloseTriggered = false;
   state.idleAutoCloseDelay = IDLE_AUTO_CLOSE_DELAY;
+  state.speedOfAutoClose = 1;
   state.autoClosePreview = null;
   state.autoClosePreviewReturnTimer = 0;
   state.autoClosePreviewFailed = false;
@@ -3694,7 +3696,7 @@ function buildDebugPerkButtons() {
       { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "miningGoldBonusMultiplier", label: "miningGoldBonus", step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
-      { key: "idleAutoCloseDelay",   label: "autoCloseDelay (сек)",  step: 1,    fmt: v => v.toFixed(0) },
+      { key: "speedOfAutoClose",     label: "speedOfAutoClose",      step: 0.5,  fmt: v => v.toFixed(1) },
     ];
     statsRoot.innerHTML = "";
     for (const def of CORE_STATS) {
@@ -6606,7 +6608,7 @@ function updateDrill(dt) {
     } else {
       state.autoClosePreview = null;
     }
-    if (!state.idleAutoCloseTriggered && state.idleTime >= state.idleAutoCloseDelay) {
+    if (!state.idleAutoCloseTriggered && state.idleTime >= state.idleAutoCloseDelay / Math.max(0.1, state.speedOfAutoClose)) {
       state.idleAutoCloseTriggered = true;
       if (!tryAutoCloseContour()) {
         state.autoClosePreviewFailed = true;
