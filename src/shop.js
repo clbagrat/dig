@@ -508,6 +508,9 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
     if (good.effect.stat === "strikeSpeed") {
       return `+${Math.round(value * 100)}% скорость бура.`;
     }
+    if (good.effect.stat === "speedOfAutoClose") {
+      return `+${value} к скорости замыкания контура.`;
+    }
   }
   return good.desc || "";
 }

@@ -81,6 +81,21 @@ export const ALL_EQUIPMENT = [
 
 export const ALL_ITEMS = [
   {
+    id: "planning",
+    type: "item",
+    name: "Планирование",
+    icon: "🗒️",
+    desc: "+1 к скорости замыкания контура.",
+    category: "economy",
+    tags: ["economy"],
+    minRarity: 1,
+    baseCost: 30,
+    effect: {
+      stat: "speedOfAutoClose",
+      effectByRarity: [null, 1, 2, 3, 4],
+    },
+  },
+  {
     id: "machine_oil",
     type: "item",
     name: "Машинное масло",
