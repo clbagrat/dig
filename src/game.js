@@ -3642,10 +3642,10 @@ function isPointInsideRect(x, y, rect) {
 }
 
 function buildDebugPerkButtons() {
-  const goldRoot = document.getElementById("debugGoldPerks");
+  const tileRoot = document.getElementById("debugTilePerks");
   const instrRoot = document.getElementById("debugInstruments");
   const statsRoot = document.getElementById("debugCoreStats");
-  if (!goldRoot) {
+  if (!tileRoot) {
     return;
   }
 
@@ -3728,32 +3728,26 @@ function buildDebugPerkButtons() {
     }
   }
 
-  goldRoot.innerHTML = "";
-  for (let i = 1; i < GOLD_PERK_TYPES.length; i += 1) {
-    if (i === 21) {
-      continue;
-    }
-    if (!GOLD_PERK_TYPES[i]) {
-      continue;
-    }
-    const perk = GOLD_PERK_TYPES[i];
-    const key = `gold:${i}`;
+  tileRoot.innerHTML = "";
+  for (let i = 1; i < TILE_PERK_TYPES.length; i += 1) {
+    const perk = TILE_PERK_TYPES[i];
+    const key = `tile:${i}`;
     const isSelected = state.debugPerkSelection === key;
     const button = document.createElement("button");
     button.type = "button";
     button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
-    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon">${getGoldPerkIconMarkup(i, "debug-perk-menu__icon-svg")}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
+    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon" style="--perk-icon:${JSON.stringify(perk.color)}">${perk.icon}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
     button.addEventListener("click", () => {
       if (state.debugPerkSelection !== key) {
         state.debugPerkSelection = key;
         buildDebugPerkButtons();
         return;
       }
-      runFuelEvent(() => applyGoldPerk(i));
+      applyTilePerk(i, state.drill.x, state.drill.y, true);
       state.debugPerkSelection = "";
       syncDebugPerkOverlay();
     });
-    goldRoot.appendChild(button);
+    tileRoot.appendChild(button);
   }
 }
 
