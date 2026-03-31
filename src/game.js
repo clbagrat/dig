@@ -2862,9 +2862,11 @@ function getShopStatsSnapshot() {
   };
 }
 
-function applyItemEffect(effect, rarityMult) {
+function applyItemEffect(effect, rarityMult, rarity) {
   if (!effect || !effect.stat) return;
-  const value = effect.value * (rarityMult || 1);
+  const value = effect.effectByRarity
+    ? (effect.effectByRarity[rarity] ?? effect.effectByRarity[1] ?? 0)
+    : effect.value * (rarityMult || 1);
   state[effect.stat] = (state[effect.stat] || 0) + value;
   if (effect.stat === "visionRadius") state.visibilityDirty = true;
 }
@@ -3256,9 +3258,9 @@ function bindUi() {
   });
 
   document.addEventListener("shop:purchase-item", (e) => {
-    const { effect, cost, rarityMultiplier } = e.detail;
+    const { effect, cost, rarityMultiplier, rarity } = e.detail;
     state.gold = Math.max(0, state.gold - cost);
-    applyItemEffect(effect, rarityMultiplier);
+    applyItemEffect(effect, rarityMultiplier, rarity);
     renderShop(state.gold, getShopStatsSnapshot());
   });
 

@@ -271,6 +271,7 @@ function tryPurchase(offeringIdx) {
         effect: offering.good.effect,
         cost,
         rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
+        rarity: offering.rarity,
       },
     }));
     currentOfferings[offeringIdx] = null;

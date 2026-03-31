@@ -36,6 +36,7 @@ export const RARITY_COST_MULT = {
 export const CATEGORIES = [
   { id: "basic", name: "Базовое", icon: "D" },
   { id: "economy", name: "Экономика", icon: "●" },
+  { id: "maintenance", name: "Обслуживание", icon: "💧" },
 ];
 
 export const INITIAL_CATEGORIES = ["basic", "economy"];
@@ -66,5 +67,21 @@ export const ALL_EQUIPMENT = [
   },
 ];
 
-export const ALL_ITEMS = [];
+export const ALL_ITEMS = [
+  {
+    id: "machine_oil",
+    type: "item",
+    name: "Машинное масло",
+    icon: "💧",
+    desc: "+5% скорость бура.",
+    category: "maintenance",
+    tags: ["maintenance"],
+    minRarity: 1,
+    baseCost: 30,
+    effect: {
+      stat: "strikeSpeed",
+      effectByRarity: [null, 0.05, 0.08, 0.10, 0.13],
+    },
+  },
+];
 export const ALL_GOODS = [...ALL_EQUIPMENT, ...ALL_ITEMS];
