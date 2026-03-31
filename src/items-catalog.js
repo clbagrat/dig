@@ -85,7 +85,7 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Планирование",
     icon: "🗒️",
-    desc: "+1 к скорости замыкания контура.",
+    desc: "+1% скорость замыкания контура.",
     category: "economy",
     tags: ["economy"],
     minRarity: 1,

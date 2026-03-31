@@ -509,7 +509,7 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
       return `+${Math.round(value * 100)}% скорость бура.`;
     }
     if (good.effect.stat === "speedOfAutoClose") {
-      return `+${value} к скорости замыкания контура.`;
+      return `+${value}% скорость замыкания контура.`;
     }
   }
   return good.desc || "";
