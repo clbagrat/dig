@@ -3642,10 +3642,10 @@ function isPointInsideRect(x, y, rect) {
 }
 
 function buildDebugPerkButtons() {
-  const tileRoot = document.getElementById("debugTilePerks");
   const goldRoot = document.getElementById("debugGoldPerks");
   const instrRoot = document.getElementById("debugInstruments");
-  if (!tileRoot || !goldRoot) {
+  const statsRoot = document.getElementById("debugCoreStats");
+  if (!goldRoot) {
     return;
   }
 
@@ -3672,26 +3672,60 @@ function buildDebugPerkButtons() {
     }
   }
 
-  tileRoot.innerHTML = "";
-  for (let i = 1; i < TILE_PERK_TYPES.length; i += 1) {
-    const perk = TILE_PERK_TYPES[i];
-    const key = `tile:${i}`;
-    const isSelected = state.debugPerkSelection === key;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
-    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon" style="--perk-icon:${JSON.stringify(perk.color)}">${perk.icon}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
-    button.addEventListener("click", () => {
-      if (state.debugPerkSelection !== key) {
-        state.debugPerkSelection = key;
-        buildDebugPerkButtons();
-        return;
-      }
-      applyTilePerk(i, state.drill.x, state.drill.y, true);
-      state.debugPerkSelection = "";
-      syncDebugPerkOverlay();
-    });
-    tileRoot.appendChild(button);
+  // Core stats -/+ controls
+  if (statsRoot) {
+    const CORE_STATS = [
+      { key: "hp",                   label: "hp",                    step: 1,    fmt: v => Math.round(v) },
+      { key: "maxHp",                label: "maxHp",                 step: 1,    fmt: v => Math.round(v) },
+      { key: "fuel",                 label: "fuel",                  step: 50,   fmt: v => Math.round(v) },
+      { key: "maxFuel",              label: "maxFuel",               step: 50,   fmt: v => Math.round(v) },
+      { key: "fuelDrainRate",        label: "fuelDrainRate",         step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "heat",                 label: "heat",                  step: 10,   fmt: v => Math.round(v) },
+      { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
+      { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "strikeSpeed",          label: "strikeSpeed",           step: 0.1,  fmt: v => v.toFixed(2) },
+      { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
+      { key: "critChance",           label: "critChance",            step: 10,   fmt: v => Math.round(v) },
+      { key: "critMultiplier",       label: "critMultiplier",        step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "armor",                label: "armor",                 step: 1,    fmt: v => Math.round(v) },
+      { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
+      { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
+      { key: "concentration",        label: "concentration",         step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "miningGoldBonusMultiplier", label: "miningGoldBonus", step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+      { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
+    ];
+    statsRoot.innerHTML = "";
+    for (const def of CORE_STATS) {
+      const row = document.createElement("div");
+      row.className = "debug-stat-row";
+      const nameEl = document.createElement("span");
+      nameEl.className = "debug-stat-row__name";
+      nameEl.textContent = def.label;
+      const valueEl = document.createElement("span");
+      valueEl.className = "debug-stat-row__value";
+      valueEl.textContent = def.fmt(state[def.key] ?? 0);
+      const minus = document.createElement("button");
+      minus.type = "button";
+      minus.className = "debug-stat-row__btn";
+      minus.textContent = "−";
+      minus.addEventListener("click", () => {
+        state[def.key] = (state[def.key] ?? 0) - def.step;
+        if (def.key === "visionRadius") state.visibilityDirty = true;
+        valueEl.textContent = def.fmt(state[def.key]);
+      });
+      const plus = document.createElement("button");
+      plus.type = "button";
+      plus.className = "debug-stat-row__btn";
+      plus.textContent = "+";
+      plus.addEventListener("click", () => {
+        state[def.key] = (state[def.key] ?? 0) + def.step;
+        if (def.key === "visionRadius") state.visibilityDirty = true;
+        valueEl.textContent = def.fmt(state[def.key]);
+      });
+      row.append(nameEl, minus, valueEl, plus);
+      statsRoot.appendChild(row);
+    }
   }
 
   goldRoot.innerHTML = "";

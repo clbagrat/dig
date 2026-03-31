@@ -737,6 +737,51 @@ strong {
   font-size: 12px;
 }
 
+.debug-stat-list {
+  display: grid;
+  gap: 4px;
+}
+
+.debug-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(215, 159, 73, 0.1);
+}
+
+.debug-stat-row__name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.debug-stat-row__value {
+  min-width: 52px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.debug-stat-row__btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(215, 159, 73, 0.34);
+  border-radius: 8px;
+  background: rgba(215, 159, 73, 0.08);
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.debug-stat-row__btn:active {
+  background: rgba(215, 159, 73, 0.2);
+}
+
 .debug-generation {
   display: grid;
   gap: 10px;
