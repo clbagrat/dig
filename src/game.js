@@ -281,9 +281,6 @@ const state = {
   maxHp: START_HP,
   heat: 0,
   maxHeat: MAX_HEAT,
-  heatExplosionDamageBonus: 0,
-  heatExplosionRadiusBonus: 0,
-  heatDamageBonus: 0,
   luck: 0,
   critChance: 0,
   critMultiplier: 1.5,
@@ -379,9 +376,7 @@ const state = {
   strikeSpeed: 1,
   drillPower: 10,
   miningGoldBonusMultiplier: 0,
-  goldBonus: 0,
   fuelPickupBonus: 0,
-  perkFuelBonus: 0,
   overflowBomb: false,
   fuelEventDepth: 0,
   overflowTriggeredInEvent: false,
@@ -390,7 +385,6 @@ const state = {
   stunTimer: 0,
   stunDisplayDuration: 0,
   stunReduction: 0,
-  heatGainBonus: 0,
   radarCrystalModule: false,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
@@ -421,9 +415,6 @@ const state = {
   struckThisFrame: false,
   drillIdleFrame: false,
   heatCooldownTime: 0,
-  heatCoolingRewardLevel: 0,
-  heatCoolingRewardArmed: false,
-  heatCoolingPeak: 0,
   coolingRocketLevel: 0,
   coolingRocketCharge: 0,
   contourReturnFuelLevel: 0,
@@ -1741,7 +1732,7 @@ function getTankFuelMultiplier(level = state.tankBoostLevel) {
 }
 
 function getTankFuelDelta() {
-  return Math.round(60 * getTankFuelMultiplier()) - state.perkFuelBonus;
+  return Math.round(60 * getTankFuelMultiplier());
 }
 
 function getCenterDistanceRatio(x, y) {
@@ -1975,9 +1966,6 @@ function setupField(seedOverride = null) {
   state.maxHp = START_HP;
   state.heat = 0;
   state.maxHeat = MAX_HEAT;
-  state.heatExplosionDamageBonus = 0;
-  state.heatExplosionRadiusBonus = 0;
-  state.heatDamageBonus = 0;
   state.luck = 0;
   state.critChance = 0;
   state.critMultiplier = 1.5;
@@ -2027,9 +2015,7 @@ function setupField(seedOverride = null) {
   state.strikeSpeed = 1;
   state.drillPower = 10;
   state.miningGoldBonusMultiplier = 0;
-  state.goldBonus = 0;
   state.fuelPickupBonus = 0;
-  state.perkFuelBonus = 0;
   state.overflowBomb = false;
   state.fuelEventDepth = 0;
   state.overflowTriggeredInEvent = false;
@@ -2038,7 +2024,6 @@ function setupField(seedOverride = null) {
   state.stunTimer = 0;
   state.stunDisplayDuration = 0;
   state.stunReduction = 0;
-  state.heatGainBonus = 0;
   state.radarCrystalModule = false;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
@@ -2069,9 +2054,6 @@ function setupField(seedOverride = null) {
   state.struckThisFrame = false;
   state.drillIdleFrame = false;
   state.heatCooldownTime = 0;
-  state.heatCoolingRewardLevel = 0;
-  state.heatCoolingRewardArmed = false;
-  state.heatCoolingPeak = 0;
   state.coolingRocketLevel = 0;
   state.coolingRocketCharge = 0;
   state.contourReturnFuelLevel = 0;
@@ -2558,9 +2540,6 @@ function applyTilePerk(perkType, x, y, showToast = true) {
     default:
       break;
   }
-  if (state.perkFuelBonus > 0 && perkType !== 1) {
-    addFuel(state.perkFuelBonus, x, y);
-  }
   if (showToast) {
     showPerkToast(state.perkText);
   }
@@ -2595,8 +2574,6 @@ function applyGoldPerk(perkType) {
       state.perkText = "Саперный заряд";
       break;
     case 8:
-      state.perkFuelBonus += 50;
-      state.perkText = "Топливный контур";
       break;
     case 9:
       state.visionRadius = Math.min(9, state.visionRadius + 1);
@@ -2607,8 +2584,6 @@ function applyGoldPerk(perkType) {
       state.perkText = "Радарный модуль";
       break;
     case 11:
-      state.goldBonus += 2;
-      state.perkText = "Ломосбор";
       break;
     case 13:
       state.overflowBomb = true;
@@ -2644,10 +2619,6 @@ function applyGoldPerk(perkType) {
       state.perkText = "Шиповой форсаж";
       break;
     case 20:
-      state.heatExplosionDamageBonus += 1;
-      state.heatExplosionRadiusBonus += 0.5;
-      state.perkText = "Термозаряд";
-      break;
     case 21:
       break;
     case 22:
@@ -2655,16 +2626,10 @@ function applyGoldPerk(perkType) {
       state.perkText = "Теплоотвод";
       break;
     case 23:
-      state.heatDamageBonus += 0.2;
-      state.perkText = "Накал бура";
-      break;
     case 24:
-      state.heatCoolingRewardLevel += 1;
-      state.perkText = "Импульс остывания";
       break;
     case 25:
       state.stunReduction += 0.4;
-      state.heatGainBonus += 1;
       state.perkText = "Разгонные демпферы";
       break;
     case 26:
@@ -2689,9 +2654,6 @@ function applyGoldPerk(perkType) {
       break;
     default:
       break;
-  }
-  if (state.perkFuelBonus > 0) {
-    addFuel(state.perkFuelBonus, state.drill.x, state.drill.y);
   }
   showPerkToast(state.perkText);
 }
@@ -2725,11 +2687,8 @@ function applyShopPerk(effectId, rarityMult) {
       showPerkToast("Расширенный бак");
       break;
     case "fuel_circuit":
-      state.perkFuelBonus += Math.round(50 * m);
-      showPerkToast("Топливный контур");
       break;
     case "recirculator":
-      state.goldBonus += Math.round(2 * m);
       state.fuelPickupBonus += Math.round(2 * m);
       showPerkToast("Рециркулятор");
       break;
@@ -2795,22 +2754,12 @@ function applyShopPerk(effectId, rarityMult) {
       showPerkToast("Теплоотвод");
       break;
     case "heat_drill":
-      state.heatDamageBonus += 0.2 * m;
-      showPerkToast("Накал бура");
-      break;
     case "thermo_charge":
-      state.heatExplosionDamageBonus += 1 * m;
-      state.heatExplosionRadiusBonus += 0.5 * m;
-      showPerkToast("Термозаряд");
+    case "cooling_pulse":
       break;
     case "accel_dampers":
       state.stunReduction += 0.4 * m;
-      state.heatGainBonus += 1 * m;
       showPerkToast("Разгонные демпферы");
-      break;
-    case "cooling_pulse":
-      state.heatCoolingRewardLevel += 1;
-      showPerkToast("Импульс остывания");
       break;
     case "thermo_rockets":
       state.heatOverloadRocketLevel = Math.min(3, (state.heatOverloadRocketLevel || 0) + 1);
@@ -2831,8 +2780,6 @@ function applyShopPerk(effectId, rarityMult) {
       showPerkToast("Перелив адреналина");
       break;
     case "ore_collector":
-      state.goldBonus += Math.round(2 * m);
-      showPerkToast("Ломосбор");
       break;
     case "crystal_catalyst":
       state.crystalCatalystLevel = Math.min(3, (state.crystalCatalystLevel || 0) + 1);
@@ -2861,8 +2808,8 @@ function removeShopPerk(effectId, rarityMult) {
       state.remoteBombInterval = state.remoteBombLevel > 0 ? Math.max(15, 30 - (state.remoteBombLevel - 1) * 5) : 0;
       break;
     case "fuel_tank": state.maxFuel -= Math.round(60 * m); state.fuel = Math.min(state.fuel, state.maxFuel); break;
-    case "fuel_circuit": state.perkFuelBonus -= Math.round(50 * m); break;
-    case "recirculator": state.goldBonus -= Math.round(2 * m); state.fuelPickupBonus -= Math.round(2 * m); break;
+    case "fuel_circuit": break;
+    case "recirculator": state.fuelPickupBonus -= Math.round(2 * m); break;
     case "low_fuel_boost": state.lowFuelSpeedBonus -= 0.35 * m; break;
     case "overload": state.overflowBomb = false; state.fuelPickupBonus -= Math.round(50 * m); break;
     case "geo_lens": state.visionRadius = Math.max(VISION_RADIUS, state.visionRadius - Math.round(2 * m)); state.visibilityDirty = true; break;
@@ -2877,15 +2824,15 @@ function removeShopPerk(effectId, rarityMult) {
     case "contour_resonance": state.contourLengthDamageLevel = Math.max(0, (state.contourLengthDamageLevel || 0) - 1); break;
     case "contour_recovery": state.contourReturnFuelLevel = Math.max(0, (state.contourReturnFuelLevel || 0) - 1); break;
     case "heat_sink": state.maxHeat -= Math.round(20 * m); break;
-    case "heat_drill": state.heatDamageBonus -= 0.2 * m; break;
-    case "thermo_charge": state.heatExplosionDamageBonus -= 1 * m; state.heatExplosionRadiusBonus -= 0.5 * m; break;
-    case "accel_dampers": state.stunReduction -= 0.4 * m; state.heatGainBonus -= 1 * m; break;
-    case "cooling_pulse": state.heatCoolingRewardLevel = Math.max(0, state.heatCoolingRewardLevel - 1); break;
+    case "heat_drill": break;
+    case "thermo_charge": break;
+    case "accel_dampers": state.stunReduction -= 0.4 * m; break;
+    case "cooling_pulse": break;
     case "thermo_rockets": state.heatOverloadRocketLevel = Math.max(0, (state.heatOverloadRocketLevel || 0) - 1); break;
     case "cryo_rockets": state.coolingRocketLevel = Math.max(0, (state.coolingRocketLevel || 0) - 1); break;
     case "reinforced_hull": state.maxHp -= Math.round(1 * m); state.hp = Math.min(state.hp, state.maxHp); break;
     case "adrenaline": state.overhealOverdriveDuration = Math.max(0, (state.overhealOverdriveDuration || 0) - Math.round(2 * m)); if (state.overhealOverdriveDuration <= 0) state.overhealOverdrive = false; break;
-    case "ore_collector": state.goldBonus -= Math.round(2 * m); break;
+    case "ore_collector": break;
     case "crystal_catalyst": state.crystalCatalystLevel = Math.max(0, (state.crystalCatalystLevel || 0) - 1); break;
     case "basic_drill": break;
     case "lucky_pickaxe": break;
@@ -4419,16 +4366,6 @@ function update(dt) {
         triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
       }
     }
-    if (state.heat === 0 && state.heatCoolingRewardArmed) {
-      state.heatCoolingRewardArmed = false;
-      if (state.heatCoolingRewardLevel > 0 && state.heatCoolingPeak >= 30) {
-        state.signalMovesLeft = Math.max(state.signalMovesLeft, 5);
-        state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
-        refreshSignalDirection();
-        showPerkToast("Импульс остывания");
-      }
-      state.heatCoolingPeak = 0;
-    }
   } else {
     state.heatCooldownTime = 0;
   }
@@ -4752,12 +4689,8 @@ function activateOverhealDrillBoost() {
 }
 
 function triggerHeatOverload() {
-  const damageMultiplier = 1 + state.heatExplosionDamageBonus;
-  const radius = 1 + state.heatExplosionRadiusBonus;
   state.heat = 0;
-  state.heatCoolingRewardArmed = false;
-  state.heatCoolingPeak = 0;
-  explodeAt(state.drill.x, state.drill.y, getStrikeDamage() * damageMultiplier, radius, {
+  explodeAt(state.drill.x, state.drill.y, getStrikeDamage(), 1, {
     guaranteedBreak: false,
     cause: "explosion",
   });
@@ -4778,8 +4711,6 @@ function addHeatOnStrike(amount) {
   }
   state.heat = Math.min(state.maxHeat, state.heat + amount);
   state.struckThisFrame = true;
-  state.heatCoolingRewardArmed = state.heat > 0;
-  state.heatCoolingPeak = Math.max(state.heatCoolingPeak, state.heat);
   if (state.heat >= state.maxHeat) {
     triggerHeatOverload();
   }
@@ -4943,13 +4874,13 @@ function getGoldPerkNextLevel(perkType) {
     case 7:
       return state.remoteBombLevel + 1;
     case 8:
-      return Math.round(state.perkFuelBonus / 50) + 1;
+      return 1;
     case 9:
       return Math.max(1, state.visionRadius - VISION_RADIUS + 1);
     case 10:
       return 1;
     case 11:
-      return Math.round(state.goldBonus / 2) + 1;
+      return 1;
     case 13:
       return 1;
     case 14:
@@ -4965,15 +4896,12 @@ function getGoldPerkNextLevel(perkType) {
     case 19:
       return Math.min(3, state.spikeOverdriveLevel + 1);
     case 20:
-      return Math.round(state.heatExplosionDamageBonus) + 1;
     case 21:
-      return 0;
+    case 23:
+    case 24:
+      return 1;
     case 22:
       return Math.round((state.maxHeat - MAX_HEAT) / 20) + 1;
-    case 23:
-      return Math.round(state.heatDamageBonus / 0.2) + 1;
-    case 24:
-      return state.heatCoolingRewardLevel + 1;
     case 25:
       return Math.round(state.stunReduction / 0.4) + 1;
     case 26:
@@ -5006,13 +4934,13 @@ function getGoldPerkCurrentLevel(perkType) {
     case 7:
       return state.remoteBombLevel;
     case 8:
-      return Math.round(state.perkFuelBonus / 50);
+      return 0;
     case 9:
       return Math.max(0, state.visionRadius - VISION_RADIUS);
     case 10:
       return state.radarCrystalModule ? 1 : 0;
     case 11:
-      return Math.round(state.goldBonus / 2);
+      return 0;
     case 13:
       return state.overflowBomb ? 1 : 0;
     case 14:
@@ -5028,15 +4956,12 @@ function getGoldPerkCurrentLevel(perkType) {
     case 19:
       return state.spikeOverdriveLevel;
     case 20:
-      return Math.round(state.heatExplosionDamageBonus);
     case 21:
+    case 23:
+    case 24:
       return 0;
     case 22:
       return Math.max(0, Math.round((state.maxHeat - MAX_HEAT) / 20));
-    case 23:
-      return Math.round(state.heatDamageBonus / 0.2);
-    case 24:
-      return state.heatCoolingRewardLevel;
     case 25:
       return Math.round(state.stunReduction / 0.4);
     case 26:
@@ -5104,12 +5029,9 @@ function getGoldPerkPreview(perkType) {
       };
     }
     case 8: {
-      const currentTankDelta = 120 - state.perkFuelBonus;
-      const nextFuelBonus = state.perkFuelBonus + 50;
-      const nextTankDelta = 120 - nextFuelBonus;
       return {
-        effect: "Все перки дают топливо, Бак слабеет",
-        compare: `Бак ${formatSignedNumber(currentTankDelta)} → ${formatSignedNumber(nextTankDelta)}`,
+        effect: "Топливный контур (устарел)",
+        compare: "—",
       };
     }
     case 9: {
@@ -5127,8 +5049,8 @@ function getGoldPerkPreview(perkType) {
     }
     case 11: {
       return {
-        effect: "+2 gold за каждый блок",
-        compare: `${state.goldBonus} → ${state.goldBonus + 2}`,
+        effect: "Ломосбор (устарел)",
+        compare: "—",
       };
     }
     case 13: {
@@ -5191,8 +5113,8 @@ function getGoldPerkPreview(perkType) {
     }
     case 20: {
       return {
-        effect: "Усиляет взрыв от перегрева",
-        compare: `x${formatPerkNumber(1 + state.heatExplosionDamageBonus)} r${formatPerkNumber(1 + state.heatExplosionRadiusBonus)} → x${formatPerkNumber(2 + state.heatExplosionDamageBonus)} r${formatPerkNumber(1.5 + state.heatExplosionRadiusBonus)}`,
+        effect: "Термозаряд (устарел)",
+        compare: "—",
       };
     }
     case 21: {
@@ -5209,20 +5131,20 @@ function getGoldPerkPreview(perkType) {
     }
     case 23: {
       return {
-        effect: "Чем выше нагрев, тем выше урон",
-        compare: `${formatPerkPercent(state.heatDamageBonus)} → ${formatPerkPercent(state.heatDamageBonus + 0.2)}`,
+        effect: "Накал бура (устарел)",
+        compare: "—",
       };
     }
     case 24: {
       return {
-        effect: "После 30+ heat при остывании дает радар",
-        compare: state.heatCoolingRewardLevel > 0 ? "Уже: 5 сек" : "Выкл → 5 сек",
+        effect: "Импульс остывания (устарел)",
+        compare: "—",
       };
     }
     case 25: {
       return {
-        effect: "Меньше стан, но быстрее перегрев",
-        compare: `${HEAT_PER_STRIKE + state.heatGainBonus} → ${HEAT_PER_STRIKE + state.heatGainBonus + 1} heat`,
+        effect: "Меньше стан",
+        compare: `${Math.round(state.stunReduction / 0.4)} → ${Math.round(state.stunReduction / 0.4) + 1}`,
       };
     }
     case 26: {
@@ -5264,8 +5186,8 @@ function getGoldPerkPreview(perkType) {
     case 30: {
       const currentMultiplier = getTankFuelMultiplier();
       const nextMultiplier = getTankFuelMultiplier(Math.min(3, state.tankBoostLevel + 1));
-      const currentTank = Math.round(120 * currentMultiplier) - state.perkFuelBonus;
-      const nextTank = Math.round(120 * nextMultiplier) - state.perkFuelBonus;
+      const currentTank = Math.round(120 * currentMultiplier);
+      const nextTank = Math.round(120 * nextMultiplier);
       const currentDrain = getIdleFuelDrain();
       const nextBaseDrain = IDLE_FUEL_DRAIN + Math.floor(state.goldPerkLevel / 3);
       const nextDrain = nextBaseDrain + Math.max(1, nextBaseDrain * 0.1) * Math.min(3, state.tankBoostLevel + 1);
@@ -5317,12 +5239,11 @@ function syncPerkChoiceOverlay() {
 
 function getStrikeDamage() {
   const chargeBoost = state.loopChargeTimer > 0 ? 1 + state.loopChargeDamageBonus : 1;
-  const heatBoost = 1 + clamp(state.heat / Math.max(1, state.maxHeat), 0, 1) * state.heatDamageBonus;
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
   let damage =
-    BASE_DRILL_DAMAGE * chargeBoost * heatBoost * contourBoost +
+    BASE_DRILL_DAMAGE * chargeBoost * contourBoost +
     getBasicDrillDamageBonus() +
     getLuckyPickaxeDamageBonus();
   // Crit
@@ -6830,7 +6751,7 @@ function updateDrill(dt) {
     damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dx + dy, dirY: dy - dx });
   }
 
-  addHeatOnStrike((HEAT_PER_STRIKE + state.heatGainBonus) * Math.max(0, state.heatRate));
+  addHeatOnStrike(HEAT_PER_STRIKE * Math.max(0, state.heatRate));
 
   if (state.fuel <= 0 && state.health[targetIndex] > 0) {
     state.fuel = 0;
