@@ -497,6 +497,12 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
     const oreGain = getRarityTierValue([0, 1, 2, 3, 4], rarity);
     return `Урон ${flatDamage} (${damageScale}% dmg, ${luckScale}% luck). При ударе по золотой жиле увеличит ее ценность на ${oreGain}.`;
   }
+  if (good.effect?.effectByRarity) {
+    const value = good.effect.effectByRarity[rarity] ?? good.effect.effectByRarity[1] ?? 0;
+    if (good.effect.stat === "strikeSpeed") {
+      return `+${Math.round(value * 100)}% скорость бура.`;
+    }
+  }
   return good.desc || "";
 }
 
