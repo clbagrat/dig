@@ -2859,6 +2859,7 @@ function getShopStatsSnapshot() {
     fuelDrainRate: state.fuelDrainRate,
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier,
     fuelPickupBonus: state.fuelPickupBonus,
+    speedOfAutoClose: state.speedOfAutoClose,
   };
 }
 

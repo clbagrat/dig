@@ -541,6 +541,7 @@ function renderStats() {
     { label: "xCRIT", value: formatStatValue(stats.critMultiplier, "multiplier") },
     { label: "GOLD", value: formatStatValue(stats.miningGoldBonusMultiplier, "percent") },
     { label: "PICK", value: formatStatValue(stats.fuelPickupBonus) },
+    { label: "LOOP", value: formatStatValue(stats.speedOfAutoClose, "percent") },
   ];
 
   container.hidden = false;
