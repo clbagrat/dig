@@ -408,6 +408,7 @@ const state = {
   idleAutoCloseTriggered: false,
   idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
   speedOfAutoClose: 0,
+  damageBonus: 0,
   autoClosePreview: null,
   autoClosePreviewReturnTimer: 0,
   autoClosePreviewFailed: false,
@@ -2048,6 +2049,7 @@ function setupField(seedOverride = null) {
   state.idleAutoCloseTriggered = false;
   state.idleAutoCloseDelay = IDLE_AUTO_CLOSE_DELAY;
   state.speedOfAutoClose = 0;
+  state.damageBonus = 0;
   state.autoClosePreview = null;
   state.autoClosePreviewReturnTimer = 0;
   state.autoClosePreviewFailed = false;
@@ -2860,6 +2862,7 @@ function getShopStatsSnapshot() {
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier,
     fuelPickupBonus: state.fuelPickupBonus,
     speedOfAutoClose: state.speedOfAutoClose,
+    damageBonus: state.damageBonus,
   };
 }
 
@@ -3700,6 +3703,7 @@ function buildDebugPerkButtons() {
       { key: "miningGoldBonusMultiplier", label: "miningGoldBonus", step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
+      { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
     ];
     statsRoot.innerHTML = "";
     for (const def of CORE_STATS) {
@@ -5288,7 +5292,7 @@ function getStrikeDamage() {
   } else {
     state._lastStrikeWasCrit = false;
   }
-  return damage;
+  return damage * (1 + state.damageBonus / 100);
 }
 
 function getEquipmentTiers(effectId) {
@@ -6189,7 +6193,8 @@ function breakCell(x, y, index, options = {}) {
 
 function explodeAt(x, y, damage, radius = 2, options = {}) {
   spawnExplosionEffect(x, y, radius);
-  const breakDamage = options.guaranteedBreak === false ? damage : Math.max(damage, EXPLOSION_BREAK_DAMAGE);
+  const scaledDamage = damage * (1 + state.damageBonus / 100);
+  const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(radius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
     for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
