@@ -501,6 +501,12 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
     const damageScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
     return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}).`;
   }
+  if (good.id === "fragile_drill") {
+    const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
+    const damageScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
+    const speedBonus = getRarityTierValue([0, 10, 15, 20, 30], rarity);
+    return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}). +${speedBonus}% ${statShort("strikeSpeed")} пока есть броня.`;
+  }
   if (good.id === "lucky_pickaxe") {
     const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
     const damageScale = getRarityTierValue([0, 10, 20, 30, 40], rarity);

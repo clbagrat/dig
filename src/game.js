@@ -2792,6 +2792,9 @@ function applyShopPerk(effectId, rarityMult) {
     case "basic_drill":
       showPerkToast("Просто дрель");
       break;
+    case "fragile_drill":
+      showPerkToast("Хрупкий бур");
+      break;
     case "lucky_pickaxe":
       showPerkToast("Кирка счастливчика");
       break;
@@ -2839,6 +2842,7 @@ function removeShopPerk(effectId, rarityMult) {
     case "ore_collector": break;
     case "crystal_catalyst": state.crystalCatalystLevel = Math.max(0, (state.crystalCatalystLevel || 0) - 1); break;
     case "basic_drill": break;
+    case "fragile_drill": break;
     case "lucky_pickaxe": break;
     default: break;
   }
@@ -2847,7 +2851,7 @@ function removeShopPerk(effectId, rarityMult) {
 function getShopStatsSnapshot() {
   return {
     drillPower: state.drillPower,
-    strikeSpeed: state.strikeSpeed,
+    strikeSpeed: state.strikeSpeed + getFragileDrillSpeedBonus(),
     maxHp: state.maxHp,
     maxFuel: state.maxFuel,
     maxHeat: state.maxHeat,
@@ -5287,6 +5291,7 @@ function getStrikeDamage() {
   let damage =
     BASE_DRILL_DAMAGE * chargeBoost * contourBoost +
     getBasicDrillDamageBonus() +
+    getFragileDrillDamageBonus() +
     getLuckyPickaxeDamageBonus() +
     getThermoDrillDamageBonus();
   // Crit
@@ -5315,6 +5320,21 @@ function sumEquipmentTierValues(effectId, values) {
     total += values[tier] || 0;
   }
   return total;
+}
+
+function getFragileDrillDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("fragile_drill")) {
+    const flat = [0, 10, 15, 20, 25][tier] || 0;
+    const damageScale = [0, 0.10, 0.15, 0.20, 0.25][tier] || 0;
+    total += flat + state.drillPower * damageScale;
+  }
+  return total;
+}
+
+function getFragileDrillSpeedBonus() {
+  if (state.armor <= 0) return 0;
+  return sumEquipmentTierValues("fragile_drill", [0, 10, 15, 20, 30]);
 }
 
 function getBasicDrillDamageBonus() {
@@ -6668,7 +6688,7 @@ function updateDrill(dt) {
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
-  const actionRate = STRIKE_CYCLE_SPEED * (1 + state.strikeSpeed / 100) * lowFuelBoost * overdriveBoost;
+  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
   if (state.tunnelMask[targetIndex]) {
@@ -9840,7 +9860,7 @@ function renderHudCoreStats(x, y, width, title) {
   const ctx = state.ctx;
   const rows = [
     { perkType: 3, value: formatPerkNumber(state.drillPower) },
-    { perkType: 5, value: formatPerkPercent(state.strikeSpeed / 100) },
+    { perkType: 5, value: formatPerkPercent((state.strikeSpeed + getFragileDrillSpeedBonus()) / 100) },
   ];
   const rowHeight = 22;
 

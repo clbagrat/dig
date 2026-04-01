@@ -67,6 +67,17 @@ export const ALL_EQUIPMENT = [
     baseCost: 30,
   },
   {
+    id: "fragile_drill",
+    type: "equipment",
+    name: "Хрупкий бур",
+    icon: "🪟",
+    desc: "Урон 10 (10% dmg). +10% скорость пока есть броня.",
+    category: "basic",
+    tags: ["basic"],
+    minRarity: 1,
+    baseCost: 35,
+  },
+  {
     id: "lucky_pickaxe",
     type: "equipment",
     name: "Кирка счастливчика",
@@ -83,7 +94,7 @@ export const ALL_ITEMS = [
   {
     id: "heavy_drill",
     type: "item",
-    name: "Тяжёлый бур",
+    name: "Утяжелитель",
     icon: "⚒️",
     desc: "+3 drillPower. Скорость −10%.",
     category: "basic",
