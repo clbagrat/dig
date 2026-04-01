@@ -2867,12 +2867,16 @@ function getShopStatsSnapshot() {
 }
 
 function applyItemEffect(effect, rarityMult, rarity) {
-  if (!effect || !effect.stat) return;
-  const value = effect.effectByRarity
-    ? (effect.effectByRarity[rarity] ?? effect.effectByRarity[1] ?? 0)
-    : effect.value * (rarityMult || 1);
-  state[effect.stat] = (state[effect.stat] || 0) + value;
-  if (effect.stat === "visionRadius") state.visibilityDirty = true;
+  if (!effect) return;
+  const effects = Array.isArray(effect) ? effect : [effect];
+  for (const e of effects) {
+    if (!e.stat) continue;
+    const value = e.effectByRarity
+      ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
+      : e.value * (rarityMult || 1);
+    state[e.stat] = (state[e.stat] || 0) + value;
+    if (e.stat === "visionRadius") state.visibilityDirty = true;
+  }
 }
 
 async function openDebugMapWindow() {

@@ -81,6 +81,21 @@ export const ALL_EQUIPMENT = [
 
 export const ALL_ITEMS = [
   {
+    id: "heavy_drill",
+    type: "item",
+    name: "Тяжёлый бур",
+    icon: "⚒️",
+    desc: "+3 drillPower. Скорость −10%.",
+    category: "basic",
+    tags: ["basic"],
+    minRarity: 1,
+    baseCost: 35,
+    effect: [
+      { stat: "drillPower",   effectByRarity: [null, 3, 5, 8, 12] },
+      { stat: "strikeSpeed",  effectByRarity: [null, -0.10, -0.12, -0.15, -0.18] },
+    ],
+  },
+  {
     id: "planning",
     type: "item",
     name: "Планирование",
