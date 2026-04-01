@@ -81,7 +81,7 @@ export function renderShop(currentGold, stats = null) {
   }
   const goldEl = document.getElementById("shopGoldValue");
   if (goldEl) goldEl.textContent = Math.floor(currentGold);
-  renderStats();
+  renderStats(true);
   renderOfferings();
   renderSlots();
   renderRerollButton();
@@ -481,6 +481,11 @@ function getRarityTierValue(values, rarity) {
   return values[Math.max(0, Math.min(values.length - 1, rarity))] || 0;
 }
 
+function statShort(key) {
+  const def = STAT_DEFS.find((d) => d.key === key);
+  return def ? def.shortLabel : key;
+}
+
 function getGoodDescription(good, rarity = RARITY.COMMON) {
   if (!good) {
     return "";
@@ -489,29 +494,29 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
     const flat = getRarityTierValue([0, 0, 20, 25, 30], rarity);
     const drillScale = getRarityTierValue([0, 0, 15, 20, 25], rarity);
     const heatBonus = getRarityTierValue([0, 0, 1, 2, 3], rarity);
-    return `Урон ${flat} (+${drillScale}% dmg). +${heatBonus} урона за каждые 10 heat.`;
+    return `Урон ${flat} (+${drillScale}% ${statShort("damageBonus")}). +${heatBonus} урона за каждые 10 ${statShort("maxHeat")}.`;
   }
   if (good.id === "basic_drill") {
     const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
     const damageScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
-    return `Урон ${flatDamage} (${damageScale}% dmg).`;
+    return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}).`;
   }
   if (good.id === "lucky_pickaxe") {
     const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
     const damageScale = getRarityTierValue([0, 10, 20, 30, 40], rarity);
     const luckScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
     const oreGain = getRarityTierValue([0, 1, 2, 3, 4], rarity);
-    return `Урон ${flatDamage} (${damageScale}% dmg, ${luckScale}% luck). При ударе по золотой жиле увеличит ее ценность на ${oreGain}.`;
+    return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}, ${luckScale}% ${statShort("luck")}). При ударе по золотой жиле увеличит ее ценность на ${oreGain}.`;
   }
   if (good.id === "heavy_drill") {
     const dp = getRarityTierValue([0, 3, 5, 8, 12], rarity);
     const spd = getRarityTierValue([0, 10, 12, 15, 18], rarity);
-    return `+${dp} drillPower. Скорость −${spd}%.`;
+    return `+${dp} ${statShort("drillPower")}. Скорость −${spd}%.`;
   }
   if (good.effect?.effectByRarity) {
     const value = good.effect.effectByRarity[rarity] ?? good.effect.effectByRarity[1] ?? 0;
     if (good.effect.stat === "strikeSpeed") {
-      return `+${Math.round(value * 100)}% скорость бура.`;
+      return `+${Math.round(value)}% скорость бура.`;
     }
     if (good.effect.stat === "speedOfAutoClose") {
       return `+${value}% скорость замыкания контура.`;
@@ -520,7 +525,27 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
   return good.desc || "";
 }
 
-function renderStats() {
+const STAT_DEFS = [
+  { key: "drillPower",                 label: "Сила бура",                      shortLabel: "БУР",    format: "fixed1" },
+  { key: "damageBonus",                label: "Бонус к урону %",                shortLabel: "УРОН %", format: "percent" },
+  { key: "strikeSpeed",                label: "Скорость бурения %",             shortLabel: "СКОР %", format: "percent" },
+  { key: "maxHp",                      label: "Макс. жизни",                    shortLabel: "ЖЗН",    format: null },
+  { key: "maxFuel",                    label: "Макс. топливо",                  shortLabel: "ТОПЛ",   format: null },
+  { key: "maxHeat",                    label: "Макс. жар",                      shortLabel: "ЖАР",    format: null },
+  { key: "heatRate",                   label: "Скорость нагрева",               shortLabel: "ЖАР+",   format: "multiplier" },
+  { key: "effectDurationRate",         label: "Длительность эффектов",          shortLabel: "ЭФКТ",   format: "multiplier" },
+  { key: "concentration",              label: "Концентрация",                   shortLabel: "КОН",    format: "multiplier" },
+  { key: "fuelDrainRate",              label: "Расход топлива",                 shortLabel: "РАСХ",   format: "multiplier" },
+  { key: "visionRadius",               label: "Радиус обзора",                  shortLabel: "ОБЗ",    format: null },
+  { key: "luck",                       label: "Удача",                          shortLabel: "УДЧ",    format: null },
+  { key: "critChance",                 label: "Шанс критического урона",        shortLabel: "КРИТ",   format: "percent" },
+  { key: "critMultiplier",             label: "Множитель критического урона",   shortLabel: "хКРИТ",  format: "multiplier" },
+  { key: "miningGoldBonusMultiplier",  label: "Бонус к добыче золота",          shortLabel: "ЗОЛ",    format: "percent" },
+  { key: "fuelPickupBonus",            label: "Бонус к добыче топлива",         shortLabel: "ТОПЛ+",  format: null },
+  { key: "speedOfAutoClose",           label: "Скорость закрытия контура %",    shortLabel: "КОНТ%",  format: "percent" },
+];
+
+function renderStats(short = false) {
   const container = document.getElementById("shopStats");
   if (!container) return;
   const stats = currentStatsCache;
@@ -530,33 +555,57 @@ function renderStats() {
     return;
   }
 
-  const items = [
-    { label: "Drill", value: formatStatValue(stats.drillPower, "fixed1") },
-    { label: "DMG%", value: formatStatValue(stats.damageBonus, "percent") },
-    { label: "SPD", value: formatStatValue(stats.strikeSpeed - 1, "percent") },
-    { label: "HP", value: formatStatValue(stats.maxHp) },
-    { label: "FUEL", value: formatStatValue(stats.maxFuel) },
-    { label: "HEAT", value: formatStatValue(stats.maxHeat) },
-    { label: "H+", value: formatStatValue(stats.heatRate, "multiplier") },
-    { label: "DUR", value: formatStatValue(stats.effectDurationRate, "multiplier") },
-    { label: "CON", value: formatStatValue(stats.concentration, "multiplier") },
-    { label: "CONS", value: formatStatValue(stats.fuelDrainRate, "multiplier") },
-    { label: "VIS", value: formatStatValue(stats.visionRadius) },
-    { label: "LUCK", value: formatStatValue(stats.luck) },
-    { label: "CRIT", value: formatStatValue(stats.critChance, "percent") },
-    { label: "xCRIT", value: formatStatValue(stats.critMultiplier, "multiplier") },
-    { label: "GOLD", value: formatStatValue(stats.miningGoldBonusMultiplier, "percent") },
-    { label: "PICK", value: formatStatValue(stats.fuelPickupBonus) },
-    { label: "LOOP", value: formatStatValue(stats.speedOfAutoClose, "percent") },
-  ];
+  const items = STAT_DEFS.map((def) => ({
+    label: short ? def.shortLabel : def.label,
+    value: formatStatValue(stats[def.key], def.format),
+  }));
 
   container.hidden = false;
-  container.innerHTML = items.map((item) => `
-    <div class="shop-stats__item">
-      <span class="shop-stats__label">${item.label}</span>
-      <span class="shop-stats__value">${item.value}</span>
+  container.innerHTML = STAT_DEFS.map((def) => `
+    <div class="shop-stats__item" data-full-label="${def.label}">
+      <span class="shop-stats__label">${short ? def.shortLabel : def.label}</span>
+      <span class="shop-stats__value">${formatStatValue(stats[def.key], def.format)}</span>
     </div>
   `).join("");
+
+  container.querySelectorAll(".shop-stats__item").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showStatTooltip(el, el.dataset.fullLabel);
+    });
+  });
+}
+
+let _statTooltipEl = null;
+let _statTooltipHideHandler = null;
+
+function showStatTooltip(anchor, text) {
+  if (!_statTooltipEl) {
+    _statTooltipEl = document.createElement("div");
+    _statTooltipEl.className = "stat-tooltip";
+    document.body.appendChild(_statTooltipEl);
+  }
+
+  if (_statTooltipHideHandler) {
+    document.removeEventListener("click", _statTooltipHideHandler);
+    _statTooltipHideHandler = null;
+  }
+
+  _statTooltipEl.textContent = text;
+  _statTooltipEl.hidden = false;
+
+  const rect = anchor.getBoundingClientRect();
+  const ttW = _statTooltipEl.offsetWidth;
+  let left = rect.left + rect.width / 2 - ttW / 2;
+  left = Math.max(4, Math.min(left, window.innerWidth - ttW - 4));
+  _statTooltipEl.style.left = left + "px";
+  _statTooltipEl.style.top = (rect.top - _statTooltipEl.offsetHeight - 6) + "px";
+
+  _statTooltipHideHandler = () => {
+    _statTooltipEl.hidden = true;
+    _statTooltipHideHandler = null;
+  };
+  setTimeout(() => document.addEventListener("click", _statTooltipHideHandler, { once: true }), 0);
 }
 
 function renderOfferings() {

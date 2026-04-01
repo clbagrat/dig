@@ -373,7 +373,7 @@ const state = {
   crystalCollected: [0, 0, 0, 0, 0, 0],
   crystalProgress: 0,
   crystalStatusText: "",
-  strikeSpeed: 1,
+  strikeSpeed: 0,
   drillPower: 10,
   miningGoldBonusMultiplier: 0,
   fuelPickupBonus: 0,
@@ -2014,7 +2014,7 @@ function setupField(seedOverride = null) {
   state.signalPrevY = START_Y;
   state.signalDirX = 0;
   state.signalDirY = -1;
-  state.strikeSpeed = 1;
+  state.strikeSpeed = 0;
   state.drillPower = 10;
   state.miningGoldBonusMultiplier = 0;
   state.fuelPickupBonus = 0;
@@ -2530,7 +2530,7 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       break;
     }
     case 5:
-      state.strikeSpeed += 0.1;
+      state.strikeSpeed += 10;
       state.perkText = "Скорость";
       break;
     case 6:
@@ -2666,7 +2666,7 @@ function applyShopPerk(effectId, rarityMult) {
   const m = rarityMult || 1;
   switch (effectId) {
     case "drill_power":
-      state.strikeSpeed += 0.15 * m;
+      state.strikeSpeed += 15 * m;
       showPerkToast("Мощность бура");
       break;
     case "side_drills":
@@ -2721,7 +2721,7 @@ function applyShopPerk(effectId, rarityMult) {
       showPerkToast("Усилитель радара");
       break;
     case "speed":
-      state.strikeSpeed += 0.2 * m;
+      state.strikeSpeed += 20 * m;
       showPerkToast("Скорость бура");
       break;
     case "spike_boost":
@@ -2803,7 +2803,7 @@ function applyShopPerk(effectId, rarityMult) {
 function removeShopPerk(effectId, rarityMult) {
   const m = rarityMult || 1;
   switch (effectId) {
-    case "drill_power": state.strikeSpeed -= 0.15 * m; break;
+    case "drill_power": state.strikeSpeed -= 15 * m; break;
     case "side_drills": state.sideDrills = Math.max(0, state.sideDrills - 1); break;
     case "long_drill": state.longDrillPower -= 0.2 * m; break;
     case "diagonal_drills": state.diagonalDrillPower -= 0.2 * m; break;
@@ -2819,7 +2819,7 @@ function removeShopPerk(effectId, rarityMult) {
     case "geo_lens": state.visionRadius = Math.max(VISION_RADIUS, state.visionRadius - Math.round(2 * m)); state.visibilityDirty = true; break;
     case "radar_module": state.radarCrystalModule = false; break;
     case "radar_booster": state.radarBoosterLevel = Math.max(0, (state.radarBoosterLevel || 0) - 1); break;
-    case "speed": state.strikeSpeed -= 0.2 * m; break;
+    case "speed": state.strikeSpeed -= 20 * m; break;
     case "spike_boost": state.spikeOverdriveLevel = Math.max(0, (state.spikeOverdriveLevel || 0) - 1); break;
     case "tank_boost": state.tankBoostLevel = Math.max(0, (state.tankBoostLevel || 0) - 1); break;
     case "contour_charge": state.loopChargeLevel = Math.max(0, (state.loopChargeLevel || 0) - 1); state.loopChargeDuration = 2 + state.loopChargeLevel; break;
@@ -3695,7 +3695,7 @@ function buildDebugPerkButtons() {
       { key: "heat",                 label: "heat",                  step: 10,   fmt: v => Math.round(v) },
       { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
       { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
-      { key: "strikeSpeed",          label: "strikeSpeed",           step: 0.1,  fmt: v => v.toFixed(2) },
+      { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
       { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
       { key: "critChance",           label: "critChance",            step: 10,   fmt: v => Math.round(v) },
       { key: "critMultiplier",       label: "critMultiplier",        step: 0.1,  fmt: v => v.toFixed(1) },
@@ -4069,7 +4069,7 @@ function applyLevelReward(choiceId) {
       showPerkToast("+0.35 урона");
       return;
     case "speed_10":
-      state.strikeSpeed += 0.1;
+      state.strikeSpeed += 10;
       showPerkToast("+10% скорости");
       return;
     case "fuel_100":
@@ -4396,7 +4396,7 @@ function update(dt) {
   if (!state.struckThisFrame && state.drillIdleFrame) {
     state.heatCooldownTime += dt;
     const cooldownBoost = 1 + state.heatCooldownTime * state.heatCooldownTime * 0.65;
-    const speedCoolingBoost = 1 + Math.max(0, state.strikeSpeed - 1) * 0.7;
+    const speedCoolingBoost = 1 + Math.max(0, state.strikeSpeed / 100) * 0.7;
     const prevHeat = state.heat;
     state.heat = Math.max(0, state.heat - HEAT_COOL_RATE * cooldownBoost * speedCoolingBoost * dt);
     const cooledHeat = Math.max(0, prevHeat - state.heat);
@@ -6668,7 +6668,7 @@ function updateDrill(dt) {
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
-  const actionRate = STRIKE_CYCLE_SPEED * state.strikeSpeed * lowFuelBoost * overdriveBoost;
+  const actionRate = STRIKE_CYCLE_SPEED * (1 + state.strikeSpeed / 100) * lowFuelBoost * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
   if (state.tunnelMask[targetIndex]) {
@@ -9840,7 +9840,7 @@ function renderHudCoreStats(x, y, width, title) {
   const ctx = state.ctx;
   const rows = [
     { perkType: 3, value: formatPerkNumber(state.drillPower) },
-    { perkType: 5, value: formatPerkPercent(state.strikeSpeed - 1) },
+    { perkType: 5, value: formatPerkPercent(state.strikeSpeed / 100) },
   ];
   const rowHeight = 22;
 

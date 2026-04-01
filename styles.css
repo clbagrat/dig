@@ -1583,6 +1583,23 @@ strong {
   color: var(--accent);
 }
 
+.stat-tooltip {
+  position: fixed;
+  z-index: 9999;
+  padding: 4px 8px;
+  background: rgba(20, 10, 5, 0.92);
+  border: 1px solid rgba(215, 159, 73, 0.35);
+  border-radius: 6px;
+  font-size: 10px;
+  color: var(--accent);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.stat-tooltip[hidden] {
+  display: none;
+}
+
 /* ── Offerings grid ──────────────────────────────────────────── */
 
 .shop-offerings {

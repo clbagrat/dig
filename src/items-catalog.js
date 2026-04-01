@@ -92,7 +92,7 @@ export const ALL_ITEMS = [
     baseCost: 35,
     effect: [
       { stat: "drillPower",   effectByRarity: [null, 3, 5, 8, 12] },
-      { stat: "strikeSpeed",  effectByRarity: [null, -0.10, -0.12, -0.15, -0.18] },
+      { stat: "strikeSpeed",  effectByRarity: [null, -10, -12, -15, -18] },
     ],
   },
   {
@@ -122,7 +122,7 @@ export const ALL_ITEMS = [
     baseCost: 30,
     effect: {
       stat: "strikeSpeed",
-      effectByRarity: [null, 0.05, 0.08, 0.10, 0.13],
+      effectByRarity: [null, 5, 8, 10, 13],
     },
   },
 ];
