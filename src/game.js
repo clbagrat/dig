@@ -386,6 +386,7 @@ const state = {
   stunDisplayDuration: 0,
   stunReduction: 0,
   radarCrystalModule: false,
+  navigatorMode: false,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
   sideDrills: 0,
@@ -2027,6 +2028,7 @@ function setupField(seedOverride = null) {
   state.stunDisplayDuration = 0;
   state.stunReduction = 0;
   state.radarCrystalModule = false;
+  state.navigatorMode = false;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
   state.sideDrills = 0;
@@ -2878,7 +2880,9 @@ function applyItemEffect(effect, rarityMult, rarity) {
     const value = e.effectByRarity
       ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
       : e.value * (rarityMult || 1);
-    if (e.stat === "maxHp" && value < 0) {
+    if (e.stat === "navigatorMode") {
+      state.navigatorMode = true;
+    } else if (e.stat === "maxHp" && value < 0) {
       state.maxHp = Math.max(1, state.maxHp + value);
       state.hp = Math.min(state.hp, state.maxHp);
     } else {
@@ -8306,13 +8310,15 @@ function renderOneBeaconRadar(camera, beacon) {
   const dotX = midX + Math.cos(angle) * radius;
   const dotY = midY + Math.sin(angle) * radius;
 
-  // Nearest inactive beacon on a deeper level (b.y > beacon.y)
+  // Nearest inactive beacon: same depth if navigatorMode, otherwise deeper
   let nearestAngle = null;
   let nearestDotX = 0, nearestDotY = 0;
   {
     let bestDist = Infinity;
     for (const b of state.beacons) {
-      if (b === beacon || b.active || b.y <= beacon.y) continue;
+      if (b === beacon || b.active) continue;
+      const sameDepth = Math.abs(b.y - beacon.y) <= 3;
+      if (state.navigatorMode ? !sameDepth : b.y <= beacon.y) continue;
       const dx = (b.x + 0.5) - (beacon.x + 0.5);
       const dy = (b.y + 0.5) - (beacon.y + 0.5);
       const d = Math.hypot(dx, dy);

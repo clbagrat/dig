@@ -192,7 +192,8 @@ function rollOfferings(luck) {
     const candidates = pool.filter(g =>
       g.minRarity <= rarity &&
       unlockedCategories.has(g.category) &&
-      !usedIds.has(g.id)
+      !usedIds.has(g.id) &&
+      !(g.unique && getItemStacks(g.id) > 0)
     );
 
     if (candidates.length === 0) {
