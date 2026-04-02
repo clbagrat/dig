@@ -161,6 +161,7 @@ function createGridStateBuffers() {
     visibleMask: new Uint8Array(cellCount),
     visibleAlpha: new Float32Array(cellCount),
     visibleTargetAlpha: new Float32Array(cellCount),
+    weakSpotMask: new Uint8Array(cellCount),
   };
 }
 
@@ -395,6 +396,8 @@ const state = {
   sideDrills: 0,
   longDrillPower: 0,
   diagonalDrillPower: 0,
+  weakSpotChance: 0,
+  weakSpotMult: 2,
   loopChargeLevel: 0,
   loopChargeTimer: 0,
   loopChargeDuration: 0,
@@ -2040,6 +2043,9 @@ function setupField(seedOverride = null) {
   state.sideDrills = 0;
   state.longDrillPower = 0;
   state.diagonalDrillPower = 0;
+  state.weakSpotChance = 0;
+  state.weakSpotMult = 2;
+  state.weakSpotMask.fill(0);
   state.loopChargeLevel = 0;
   state.loopChargeTimer = 0;
   state.loopChargeDuration = 0;
@@ -6057,6 +6063,10 @@ function damageCell(x, y, damage, options = {}) {
   }
 
   const index = cellIndex(x, y);
+  if (options.byDrill && state.weakSpotMask[index]) {
+    damage *= state.weakSpotMult;
+    state.weakSpotMask[index] = 0;
+  }
   if (state.tunnelMask[index]) {
     return false;
   }
@@ -6814,6 +6824,7 @@ function updateDrill(dt) {
 
   state.drill.strikePhase = Math.PI * 0.5;
   state.drill.actionCooldown = actionInterval;
+  state.weakSpotMask.fill(0);
   const strikeDamage = getStrikeDamage();
   const hardness = state.hardness[targetIndex];
   damageCell(targetX, targetY, strikeDamage, {
@@ -6845,6 +6856,28 @@ function updateDrill(dt) {
     const diagonalDamage = strikeDamage * (0.15 + state.diagonalDrillPower);
     damageCell(targetX - dy, targetY + dx, diagonalDamage, { byDrill: true, dirX: dx - dy, dirY: dy + dx });
     damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dx + dy, dirY: dy - dx });
+  }
+
+  if (state.weakSpotChance > 0 && Math.random() < state.weakSpotChance) {
+    const weakCandidates = [];
+    const _wcAdd = (cx, cy) => {
+      if (cx < 1 || cy < 1 || cx >= GRID_W - 1 || cy >= GRID_H - 1) return;
+      const ci = cellIndex(cx, cy);
+      if (state.health[ci] > 0) weakCandidates.push(ci);
+    };
+    _wcAdd(targetX, targetY);
+    if (state.sideDrills > 0) {
+      _wcAdd(state.drill.x - dy, state.drill.y + dx);
+      _wcAdd(state.drill.x + dy, state.drill.y - dx);
+    }
+    if (state.longDrillPower > 0) _wcAdd(targetX + dx, targetY + dy);
+    if (state.diagonalDrillPower > 0) {
+      _wcAdd(targetX - dy, targetY + dx);
+      _wcAdd(targetX + dy, targetY - dx);
+    }
+    if (weakCandidates.length > 0) {
+      state.weakSpotMask[weakCandidates[Math.floor(Math.random() * weakCandidates.length)]] = 1;
+    }
   }
 
   addHeatOnStrike(HEAT_PER_STRIKE * Math.max(0, state.heatRate));
@@ -7816,6 +7849,25 @@ function render() {
         }
         ctx.fillStyle = "rgba(255, 231, 195, 0.2)";
         ctx.fillRect(sx + 6, sy + TILE_SIZE - 9, (TILE_SIZE - 12) * ratio, 4);
+      }
+
+      if (state.weakSpotMask[index]) {
+        const pulse = Math.sin((state.lastTs || 0) * 0.006) * 0.5 + 0.5;
+        ctx.globalAlpha = visibleAlpha * (0.55 + pulse * 0.45);
+        ctx.strokeStyle = "#00ffff";
+        ctx.lineWidth = 2;
+        const wcx = sx + TILE_SIZE * 0.5;
+        const wcy = sy + TILE_SIZE * 0.5;
+        const wr = 4 + pulse * 2;
+        ctx.beginPath();
+        ctx.arc(wcx, wcy, wr, 0, Math.PI * 2);
+        ctx.stroke();
+        const wa = 3 + pulse;
+        ctx.beginPath();
+        ctx.moveTo(wcx - wa, wcy - wa); ctx.lineTo(wcx + wa, wcy + wa);
+        ctx.moveTo(wcx + wa, wcy - wa); ctx.lineTo(wcx - wa, wcy + wa);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
       }
 
       renderSafeDoorTile(x, y, sx, sy);
