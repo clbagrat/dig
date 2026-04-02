@@ -388,6 +388,8 @@ const state = {
   radarCrystalModule: false,
   navigatorMode: false,
   artifactRadarMode: false,
+  goldRadarMode: false,
+  goldClustersCache: null,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
   sideDrills: 0,
@@ -2031,6 +2033,8 @@ function setupField(seedOverride = null) {
   state.radarCrystalModule = false;
   state.navigatorMode = false;
   state.artifactRadarMode = false;
+  state.goldRadarMode = false;
+  state.goldClustersCache = null;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
   state.sideDrills = 0;
@@ -2882,7 +2886,10 @@ function applyItemEffect(effect, rarityMult, rarity) {
     const value = e.effectByRarity
       ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
       : e.value * (rarityMult || 1);
-    if (e.stat === "artifactRadarMode") {
+    if (e.stat === "goldRadarMode") {
+      state.goldRadarMode = true;
+      state.goldClustersCache = null;
+    } else if (e.stat === "artifactRadarMode") {
       state.artifactRadarMode = true;
     } else if (e.stat === "navigatorMode") {
       state.navigatorMode = true;
@@ -6172,6 +6179,7 @@ function breakCell(x, y, index, options = {}) {
   state.hazardTriggeredMask[index] = 0;
   state.loopGoldMask[index] = 0;
   state.goldOreMask[index] = 0;
+  state.goldClustersCache = null;
   if (hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion") {
     triggerSpikeChain(x, y);
   }
@@ -8295,6 +8303,37 @@ function renderBeaconRadar(camera) {
   }
 }
 
+function buildGoldClusters() {
+  const visited = new Uint8Array(GRID_W * GRID_H);
+  const clusters = [];
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  for (let sy = 0; sy < GRID_H; sy++) {
+    for (let sx = 0; sx < GRID_W; sx++) {
+      const si = sy * GRID_W + sx;
+      if (!state.goldOreMask[si] || visited[si]) continue;
+      // BFS
+      const queue = [[sx, sy]];
+      visited[si] = 1;
+      let sumX = 0, sumY = 0, count = 0;
+      let head = 0;
+      while (head < queue.length) {
+        const [cx, cy] = queue[head++];
+        sumX += cx; sumY += cy; count++;
+        for (const [dx, dy] of dirs) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
+          const ni = ny * GRID_W + nx;
+          if (!state.goldOreMask[ni] || visited[ni]) continue;
+          visited[ni] = 1;
+          queue.push([nx, ny]);
+        }
+      }
+      if (count >= 5) clusters.push({ x: sumX / count, y: sumY / count, size: count });
+    }
+  }
+  return clusters;
+}
+
 function renderOneBeaconRadar(camera, beacon) {
   const visAlpha = Math.max(
     state.visibleAlpha[cellIndex(beacon.x, beacon.y)],
@@ -8361,6 +8400,27 @@ function renderOneBeaconRadar(camera, beacon) {
     if (artAngle !== null) {
       artDotX = midX + Math.cos(artAngle) * radius;
       artDotY = midY + Math.sin(artAngle) * radius;
+    }
+  }
+
+  // Gold probe indicator: nearest gold cluster (5+ blocks)
+  let goldAngle = null;
+  let goldDotX = 0, goldDotY = 0;
+  if (state.goldRadarMode) {
+    if (!state.goldClustersCache) state.goldClustersCache = buildGoldClusters();
+    let bestDist = Infinity;
+    for (const c of state.goldClustersCache) {
+      const dx = c.x - (beacon.x + 0.5);
+      const dy = c.y - (beacon.y + 0.5);
+      const d = Math.hypot(dx, dy);
+      if (d < bestDist) {
+        bestDist = d;
+        goldAngle = Math.atan2(dy / (d || 1), dx / (d || 1));
+      }
+    }
+    if (goldAngle !== null) {
+      goldDotX = midX + Math.cos(goldAngle) * radius;
+      goldDotY = midY + Math.sin(goldAngle) * radius;
     }
   }
 
@@ -8486,6 +8546,36 @@ function renderOneBeaconRadar(camera, beacon) {
     ctx.beginPath();
     ctx.arc(tgtDotX, tgtDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // --- Gold probe indicator (yellow) ---
+  if (goldAngle !== null) {
+    if (lineEase > 0) {
+      const gLineDotX = midX + Math.cos(goldAngle) * radius * lineEase;
+      const gLineDotY = midY + Math.sin(goldAngle) * radius * lineEase;
+      ctx.strokeStyle = `rgba(255, 210, 50, ${0.22 * lineEase})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(gLineDotX, gLineDotY);
+      ctx.stroke();
+    }
+    if (dotEase > 0) {
+      if (dotT < 0.8) {
+        ctx.fillStyle = `rgba(255, 230, 80, ${0.5 * (1 - dotT / 0.8)})`;
+        ctx.beginPath();
+        ctx.arc(goldDotX, goldDotY, 14 * dotEase, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = `rgba(255, 210, 50, ${(0.18 + pulse * 0.18) * dotEase})`;
+      ctx.beginPath();
+      ctx.arc(goldDotX, goldDotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255, 240, 120, ${dotEase})`;
+      ctx.beginPath();
+      ctx.arc(goldDotX, goldDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // --- Artifact compass indicator (purple) ---
