@@ -8306,13 +8306,13 @@ function renderOneBeaconRadar(camera, beacon) {
   const dotX = midX + Math.cos(angle) * radius;
   const dotY = midY + Math.sin(angle) * radius;
 
-  // Nearest inactive beacon direction
+  // Nearest inactive beacon on a deeper level (b.y > beacon.y)
   let nearestAngle = null;
   let nearestDotX = 0, nearestDotY = 0;
   {
     let bestDist = Infinity;
     for (const b of state.beacons) {
-      if (b === beacon || b.active) continue;
+      if (b === beacon || b.active || b.y <= beacon.y) continue;
       const dx = (b.x + 0.5) - (beacon.x + 0.5);
       const dy = (b.y + 0.5) - (beacon.y + 0.5);
       const d = Math.hypot(dx, dy);
