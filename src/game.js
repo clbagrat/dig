@@ -6856,10 +6856,8 @@ function updateDrill(dt) {
       if (state.health[ci] > 0) weakCandidates.push(ci);
     };
     _wcAdd(targetX, targetY);
-    if (state.sideDrills > 0) {
-      _wcAdd(state.drill.x - dy, state.drill.y + dx);
-      _wcAdd(state.drill.x + dy, state.drill.y - dx);
-    }
+    _wcAdd(state.drill.x - dy, state.drill.y + dx);
+    _wcAdd(state.drill.x + dy, state.drill.y - dx);
     if (state.longDrillPower > 0) _wcAdd(targetX + dx, targetY + dy);
     if (state.diagonalDrillPower > 0) {
       _wcAdd(targetX - dy, targetY + dx);
