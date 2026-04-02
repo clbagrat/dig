@@ -163,6 +163,18 @@ export const ALL_ITEMS = [
     effect: { stat: "artifactRadarMode", value: 1 },
   },
   {
+    id: "gold_fever",
+    type: "item",
+    name: "Золотая лихорадка",
+    icon: "🤑",
+    desc: "+10% к золоту с жил.",
+    category: "economy",
+    tags: ["economy"],
+    minRarity: 1,
+    baseCost: 35,
+    effect: { stat: "miningGoldBonusMultiplier", effectByRarity: [null, 0.1, 0.15, 0.2, 0.3] },
+  },
+  {
     id: "gold_probe",
     type: "item",
     name: "Золотой щуп",
