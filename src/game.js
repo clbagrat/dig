@@ -8382,14 +8382,24 @@ function renderOneBeaconRadar(camera, beacon) {
   ctx.arc(midX, midY, 2.4, 0, Math.PI * 2);
   ctx.fill();
 
-  // --- Phase 2: Direction line (40% - 70%) ---
+  // --- Phase 2 & 3: Single direction indicator ---
+  // Orange → nearest inactive beacon; Red → base (no beacons left)
+  const hasNextBeacon = nearestAngle !== null;
+  const tgtAngle = hasNextBeacon ? nearestAngle : angle;
+  const tgtDotX  = hasNextBeacon ? nearestDotX  : dotX;
+  const tgtDotY  = hasNextBeacon ? nearestDotY  : dotY;
+  const clrLine  = hasNextBeacon ? 'rgba(255, 180, 60,'  : 'rgba(255, 80,  80,';
+  const clrGlow  = hasNextBeacon ? 'rgba(255, 180, 60,'  : 'rgba(255, 90,  90,';
+  const clrCore  = hasNextBeacon ? 'rgba(255, 210, 100,' : 'rgba(255, 130, 130,';
+  const clrFlash = hasNextBeacon ? 'rgba(255, 200, 80,'  : 'rgba(255, 140, 140,';
+
   const lineT = animT < 0.4 ? 0 : Math.min(1, (animT - 0.4) / 0.3);
   const lineEase = 1 - Math.pow(1 - lineT, 3);
 
   if (lineEase > 0) {
-    const lineDotX = midX + Math.cos(angle) * radius * lineEase;
-    const lineDotY = midY + Math.sin(angle) * radius * lineEase;
-    ctx.strokeStyle = `rgba(160, 220, 255, ${0.22 * lineEase})`;
+    const lineDotX = midX + Math.cos(tgtAngle) * radius * lineEase;
+    const lineDotY = midY + Math.sin(tgtAngle) * radius * lineEase;
+    ctx.strokeStyle = `${clrLine} ${0.22 * lineEase})`;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(midX, midY);
@@ -8397,65 +8407,27 @@ function renderOneBeaconRadar(camera, beacon) {
     ctx.stroke();
   }
 
-  // --- Phase 3: Radar dot (70% - 100%) ---
   const dotT = animT < 0.7 ? 0 : Math.min(1, (animT - 0.7) / 0.3);
   const dotEase = 1 - Math.pow(1 - dotT, 3);
 
   if (dotEase > 0) {
-    // Flash on appear
     if (dotT < 0.8) {
       const flashAlpha = 0.6 * (1 - dotT / 0.8);
-      ctx.fillStyle = `rgba(200, 240, 255, ${flashAlpha})`;
+      ctx.fillStyle = `${clrFlash} ${flashAlpha})`;
       ctx.beginPath();
-      ctx.arc(dotX, dotY, 14 * dotEase, 0, Math.PI * 2);
+      ctx.arc(tgtDotX, tgtDotY, 14 * dotEase, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    ctx.fillStyle = `rgba(180, 230, 255, ${(0.18 + pulse * 0.18) * dotEase})`;
+    ctx.fillStyle = `${clrGlow} ${(0.18 + pulse * 0.18) * dotEase})`;
     ctx.beginPath();
-    ctx.arc(dotX, dotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
+    ctx.arc(tgtDotX, tgtDotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = `rgba(200, 240, 255, ${dotEase})`;
+    ctx.fillStyle = `${clrCore} ${dotEase})`;
     ctx.beginPath();
-    ctx.arc(dotX, dotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
+    ctx.arc(tgtDotX, tgtDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  // --- Nearest inactive beacon indicator (orange) ---
-  if (nearestAngle !== null) {
-    // Direction line (same timing as phase 2)
-    if (lineEase > 0) {
-      const nLineDotX = midX + Math.cos(nearestAngle) * radius * lineEase;
-      const nLineDotY = midY + Math.sin(nearestAngle) * radius * lineEase;
-      ctx.strokeStyle = `rgba(255, 180, 60, ${0.22 * lineEase})`;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(midX, midY);
-      ctx.lineTo(nLineDotX, nLineDotY);
-      ctx.stroke();
-    }
-
-    // Radar dot (same timing as phase 3)
-    if (dotEase > 0) {
-      if (dotT < 0.8) {
-        const flashAlpha = 0.5 * (1 - dotT / 0.8);
-        ctx.fillStyle = `rgba(255, 200, 80, ${flashAlpha})`;
-        ctx.beginPath();
-        ctx.arc(nearestDotX, nearestDotY, 14 * dotEase, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.fillStyle = `rgba(255, 180, 60, ${(0.18 + pulse * 0.18) * dotEase})`;
-      ctx.beginPath();
-      ctx.arc(nearestDotX, nearestDotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = `rgba(255, 210, 100, ${dotEase})`;
-      ctx.beginPath();
-      ctx.arc(nearestDotX, nearestDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
-      ctx.fill();
-    }
   }
 
   ctx.restore();
