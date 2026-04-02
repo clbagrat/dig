@@ -8314,20 +8314,25 @@ function renderOneBeaconRadar(camera, beacon) {
   const dotX = midX + Math.cos(angle) * radius;
   const dotY = midY + Math.sin(angle) * radius;
 
-  // Primary indicator: nearest inactive beacon deeper than current, or base
+  // Helper: find which depth level index a y coordinate belongs to
+  const beaconLevelIdx = DEPTH_LEVELS.findIndex(l => beacon.y >= l.startY && beacon.y <= l.endY);
+  const nextLevel = beaconLevelIdx >= 0 ? DEPTH_LEVELS[beaconLevelIdx + 1] : null;
+  const sameLevel = beaconLevelIdx >= 0 ? DEPTH_LEVELS[beaconLevelIdx] : null;
+
+  // Primary indicator: nearest inactive beacon in the NEXT depth level (blue), or base (red)
   let nearestAngle = null;
   let nearestDotX = 0, nearestDotY = 0;
-  {
+  if (nextLevel) {
     let bestDist = Infinity;
     for (const b of state.beacons) {
-      if (b === beacon || b.active || b.y <= beacon.y) continue;
+      if (b === beacon || b.active) continue;
+      if (b.y < nextLevel.startY || b.y > nextLevel.endY) continue;
       const dx = (b.x + 0.5) - (beacon.x + 0.5);
       const dy = (b.y + 0.5) - (beacon.y + 0.5);
       const d = Math.hypot(dx, dy);
       if (d < bestDist) {
         bestDist = d;
-        const len = d || 1;
-        nearestAngle = Math.atan2(dy / len, dx / len);
+        nearestAngle = Math.atan2(dy / (d || 1), dx / (d || 1));
       }
     }
     if (nearestAngle !== null) {
@@ -8359,20 +8364,20 @@ function renderOneBeaconRadar(camera, beacon) {
     }
   }
 
-  // Navigator bonus indicator: nearest inactive beacon on the same depth level
+  // Navigator bonus indicator: nearest inactive beacon in the SAME depth level (white)
   let navAngle = null;
   let navDotX = 0, navDotY = 0;
-  if (state.navigatorMode) {
+  if (state.navigatorMode && sameLevel) {
     let bestDist = Infinity;
     for (const b of state.beacons) {
-      if (b === beacon || b.active || Math.abs(b.y - beacon.y) > 3) continue;
+      if (b === beacon || b.active) continue;
+      if (b.y < sameLevel.startY || b.y > sameLevel.endY) continue;
       const dx = (b.x + 0.5) - (beacon.x + 0.5);
       const dy = (b.y + 0.5) - (beacon.y + 0.5);
       const d = Math.hypot(dx, dy);
       if (d < bestDist) {
         bestDist = d;
-        const len = d || 1;
-        navAngle = Math.atan2(dy / len, dx / len);
+        navAngle = Math.atan2(dy / (d || 1), dx / (d || 1));
       }
     }
     if (navAngle !== null) {
