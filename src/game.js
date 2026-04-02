@@ -8388,10 +8388,10 @@ function renderOneBeaconRadar(camera, beacon) {
   const tgtAngle = hasNextBeacon ? nearestAngle : angle;
   const tgtDotX  = hasNextBeacon ? nearestDotX  : dotX;
   const tgtDotY  = hasNextBeacon ? nearestDotY  : dotY;
-  const clrLine  = hasNextBeacon ? 'rgba(255, 180, 60,'  : 'rgba(255, 80,  80,';
-  const clrGlow  = hasNextBeacon ? 'rgba(255, 180, 60,'  : 'rgba(255, 90,  90,';
-  const clrCore  = hasNextBeacon ? 'rgba(255, 210, 100,' : 'rgba(255, 130, 130,';
-  const clrFlash = hasNextBeacon ? 'rgba(255, 200, 80,'  : 'rgba(255, 140, 140,';
+  const clrLine  = hasNextBeacon ? 'rgba(160, 220, 255,' : 'rgba(255, 80,  80,';
+  const clrGlow  = hasNextBeacon ? 'rgba(180, 230, 255,' : 'rgba(255, 90,  90,';
+  const clrCore  = hasNextBeacon ? 'rgba(200, 240, 255,' : 'rgba(255, 130, 130,';
+  const clrFlash = hasNextBeacon ? 'rgba(200, 240, 255,' : 'rgba(255, 140, 140,';
 
   const lineT = animT < 0.4 ? 0 : Math.min(1, (animT - 0.4) / 0.3);
   const lineEase = 1 - Math.pow(1 - lineT, 3);
