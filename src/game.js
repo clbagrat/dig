@@ -6814,7 +6814,6 @@ function updateDrill(dt) {
 
   state.drill.strikePhase = Math.PI * 0.5;
   state.drill.actionCooldown = actionInterval;
-  state.weakSpotMask.fill(0);
   const strikeDamage = getStrikeDamage();
   const hardness = state.hardness[targetIndex];
   damageCell(targetX, targetY, strikeDamage, {
@@ -6848,6 +6847,7 @@ function updateDrill(dt) {
     damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dx + dy, dirY: dy - dx });
   }
 
+  state.weakSpotMask.fill(0);
   if (state.weakSpotChance > 0 && Math.random() < state.weakSpotChance) {
     const weakCandidates = [];
     const _wcAdd = (cx, cy) => {
