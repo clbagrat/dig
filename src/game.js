@@ -2878,6 +2878,8 @@ function getShopStatsSnapshot() {
     fuelPickupBonus: state.fuelPickupBonus,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
+    weakSpotChance: state.weakSpotChance,
+    weakSpotMult: state.weakSpotMult,
   };
 }
 
