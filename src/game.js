@@ -161,7 +161,7 @@ function createGridStateBuffers() {
     visibleMask: new Uint8Array(cellCount),
     visibleAlpha: new Float32Array(cellCount),
     visibleTargetAlpha: new Float32Array(cellCount),
-    weakSpotMask: new Uint8Array(cellCount),
+    weakSpotMask: new Float32Array(cellCount),
   };
 }
 
@@ -6866,7 +6866,7 @@ function updateDrill(dt) {
       _wcAdd(targetX + dy, targetY - dx);
     }
     if (weakCandidates.length > 0) {
-      state.weakSpotMask[weakCandidates[Math.floor(Math.random() * weakCandidates.length)]] = 1;
+      state.weakSpotMask[weakCandidates[Math.floor(Math.random() * weakCandidates.length)]] = state.lastTs || 1;
     }
   }
 
@@ -7842,21 +7842,57 @@ function render() {
       }
 
       if (state.weakSpotMask[index]) {
-        const pulse = Math.sin((state.lastTs || 0) * 0.006) * 0.5 + 0.5;
-        ctx.globalAlpha = visibleAlpha * (0.55 + pulse * 0.45);
-        ctx.strokeStyle = "#00ffff";
-        ctx.lineWidth = 2;
+        const spawnTs = state.weakSpotMask[index];
+        const now = state.lastTs || 0;
+        const age = now - spawnTs;
+        const APPEAR_MS = 180;
+        const appearT = Math.min(1, age / APPEAR_MS);
+        const appearEase = 1 - Math.pow(1 - appearT, 3);
+
+        const pulse = Math.sin(now * 0.007) * 0.5 + 0.5;
         const wcx = sx + TILE_SIZE * 0.5;
         const wcy = sy + TILE_SIZE * 0.5;
-        const wr = 4 + pulse * 2;
+
+        // Shockwave ring on spawn
+        if (appearT < 1) {
+          const ringR = 6 + (1 - appearEase) * 10;
+          ctx.globalAlpha = visibleAlpha * (1 - appearT) * 0.6;
+          ctx.strokeStyle = "#ffe066";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(wcx, wcy, ringR, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Glow halo
+        const glowR = (10 + pulse * 3) * appearEase;
+        ctx.globalAlpha = visibleAlpha * 0.18 * appearEase;
+        ctx.fillStyle = "#ffd700";
         ctx.beginPath();
-        ctx.arc(wcx, wcy, wr, 0, Math.PI * 2);
-        ctx.stroke();
-        const wa = 3 + pulse;
+        ctx.arc(wcx, wcy, glowR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Diamond shape (rotated square)
+        const ds = (5 + pulse * 1.5) * appearEase;
+        ctx.globalAlpha = visibleAlpha * (0.7 + pulse * 0.3) * appearEase;
+        ctx.strokeStyle = "#ffe566";
+        ctx.lineWidth = 1.8;
         ctx.beginPath();
-        ctx.moveTo(wcx - wa, wcy - wa); ctx.lineTo(wcx + wa, wcy + wa);
-        ctx.moveTo(wcx + wa, wcy - wa); ctx.lineTo(wcx - wa, wcy + wa);
+        ctx.moveTo(wcx,      wcy - ds);
+        ctx.lineTo(wcx + ds, wcy);
+        ctx.lineTo(wcx,      wcy + ds);
+        ctx.lineTo(wcx - ds, wcy);
+        ctx.closePath();
         ctx.stroke();
+
+        // Inner bright core
+        const cr = (2.2 + pulse * 0.8) * appearEase;
+        ctx.globalAlpha = visibleAlpha * appearEase;
+        ctx.fillStyle = "#fff4a0";
+        ctx.beginPath();
+        ctx.arc(wcx, wcy, cr, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.globalAlpha = 1;
       }
 
