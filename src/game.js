@@ -6862,7 +6862,7 @@ function updateDrill(dt) {
   }
 
   state.weakSpotMask.fill(0);
-  if (state.weakSpotChance > 0 && Math.random() < state.weakSpotChance) {
+  if (state.weakSpotChance > 0 && state.health[targetIndex] > 0 && Math.random() < state.weakSpotChance) {
     const weakCandidates = [];
     const _wcAdd = (cx, cy) => {
       if (cx < 1 || cy < 1 || cx >= GRID_W - 1 || cy >= GRID_H - 1) return;
