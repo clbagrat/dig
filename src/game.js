@@ -8461,7 +8461,7 @@ function renderOneBeaconRadar(camera, beacon) {
     if (lineEase > 0) {
       const nLineDotX = midX + Math.cos(navAngle) * radius * lineEase;
       const nLineDotY = midY + Math.sin(navAngle) * radius * lineEase;
-      ctx.strokeStyle = `rgba(255, 180, 60, ${0.22 * lineEase})`;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.22 * lineEase})`;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(midX, midY);
@@ -8471,16 +8471,16 @@ function renderOneBeaconRadar(camera, beacon) {
 
     if (dotEase > 0) {
       if (dotT < 0.8) {
-        ctx.fillStyle = `rgba(255, 200, 80, ${0.5 * (1 - dotT / 0.8)})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.5 * (1 - dotT / 0.8)})`;
         ctx.beginPath();
         ctx.arc(navDotX, navDotY, 14 * dotEase, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = `rgba(255, 180, 60, ${(0.18 + pulse * 0.18) * dotEase})`;
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.18 + pulse * 0.18) * dotEase})`;
       ctx.beginPath();
       ctx.arc(navDotX, navDotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = `rgba(255, 210, 100, ${dotEase})`;
+      ctx.fillStyle = `rgba(255, 255, 255, ${dotEase})`;
       ctx.beginPath();
       ctx.arc(navDotX, navDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
       ctx.fill();
