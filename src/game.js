@@ -283,8 +283,7 @@ const state = {
   heat: 0,
   maxHeat: MAX_HEAT,
   luck: 0,
-  critChance: 0,
-  critMultiplier: 1.5,
+
   heatRate: 1,
   effectDurationRate: 1,
   concentration: 1,
@@ -1976,8 +1975,7 @@ function setupField(seedOverride = null) {
   state.heat = 0;
   state.maxHeat = MAX_HEAT;
   state.luck = 0;
-  state.critChance = 0;
-  state.critMultiplier = 1.5;
+
   state.heatRate = 1;
   state.effectDurationRate = 1;
   state.concentration = 1;
@@ -2871,8 +2869,7 @@ function getShopStatsSnapshot() {
     maxHeat: state.maxHeat,
     visionRadius: state.visionRadius,
     luck: state.luck,
-    critChance: state.critChance,
-    critMultiplier: state.critMultiplier,
+
     heatRate: state.heatRate,
     effectDurationRate: state.effectDurationRate,
     concentration: state.concentration,
@@ -3727,8 +3724,8 @@ function buildDebugPerkButtons() {
       { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
       { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
-      { key: "critChance",           label: "critChance",            step: 10,   fmt: v => Math.round(v) },
-      { key: "critMultiplier",       label: "critMultiplier",        step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "weakSpotChance",       label: "weakSpotChance",        step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+      { key: "weakSpotMult",         label: "weakSpotMult",          step: 0.5,  fmt: v => `x${v.toFixed(1)}` },
       { key: "armor",                label: "armor",                 step: 1,    fmt: v => Math.round(v) },
       { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
       { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
@@ -5320,13 +5317,6 @@ function getStrikeDamage() {
     getFragileDrillDamageBonus() +
     getLuckyPickaxeDamageBonus() +
     getThermoDrillDamageBonus();
-  // Crit
-  if (state.critChance > 0 && Math.random() * 100 < state.critChance) {
-    damage *= state.critMultiplier;
-    state._lastStrikeWasCrit = true;
-  } else {
-    state._lastStrikeWasCrit = false;
-  }
   return damage * (1 + state.damageBonus / 100);
 }
 
