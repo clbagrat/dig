@@ -514,6 +514,10 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
     const oreGain = getRarityTierValue([0, 1, 2, 3, 4], rarity);
     return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}, ${luckScale}% ${statShort("luck")}). При ударе по золотой жиле увеличит ее ценность на ${oreGain}.`;
   }
+  if (good.id === "afterburner") {
+    const spd = getRarityTierValue([0, 15, 22, 30, 40], rarity);
+    return `+${spd}% ${statShort("strikeSpeed")}. −1 ${statShort("maxHp")} (не ниже 1).`;
+  }
   if (good.id === "heavy_drill") {
     const dp = getRarityTierValue([0, 3, 5, 8, 12], rarity);
     const spd = getRarityTierValue([0, 10, 12, 15, 18], rarity);

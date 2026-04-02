@@ -2878,7 +2878,12 @@ function applyItemEffect(effect, rarityMult, rarity) {
     const value = e.effectByRarity
       ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
       : e.value * (rarityMult || 1);
-    state[e.stat] = (state[e.stat] || 0) + value;
+    if (e.stat === "maxHp" && value < 0) {
+      state.maxHp = Math.max(1, state.maxHp + value);
+      state.hp = Math.min(state.hp, state.maxHp);
+    } else {
+      state[e.stat] = (state[e.stat] || 0) + value;
+    }
     if (e.stat === "visionRadius") state.visibilityDirty = true;
   }
 }

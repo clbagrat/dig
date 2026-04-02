@@ -81,7 +81,35 @@ Most additions touch:
 Sometimes also:
 - `/root/dev/dig/src/shop.js`
 
-## Validation
+## Balance Validation
+
+Before confirming the spec, compare the new item's numbers against existing items with the same or similar stats.
+
+**Steps:**
+
+1. For each stat the new item affects, collect all existing items/equipment that affect the same stat.
+2. Build a comparison table per rarity tier (common → legendary):
+
+   | Предмет | C1 | C2 | C3 | C4 |
+   |---------|----|----|----|----|
+   | Существующий A | … | … | … | … |
+   | Существующий B | … | … | … | … |
+   | **Новый предмет** | … | … | … | … |
+
+3. Check the following rules. Flag any violation with `⚠️` and explain the issue:
+   - **Scaling consistency**: each rarity tier should be strictly stronger than the previous (no flat lines unless intentional).
+   - **Range fit**: new values should not exceed legendary-tier values of existing items for the same stat unless the item has a meaningful drawback.
+   - **Cost fit**: `baseCost` should be proportional to effect power relative to comparable items. A stronger item at the same rarity should cost more.
+   - **Drawback balance**: if the item has a negative effect, check that the positive effect is proportionally stronger than a pure-buff item of the same cost.
+   - **Legendary ceiling**: legendary-tier value should not be more than ~2–2.5× common-tier value for additive stats (multiplicative stats may scale differently, note it explicitly).
+
+4. After the table, write a short verdict:
+   - `✅ Баланс ок` — if all rules pass.
+   - `⚠️ Требует корректировки` — list each issue and suggest adjusted numbers.
+
+Present this balance report as part of the spec summary (step 3 of the Workflow). Wait for user confirmation before implementing.
+
+## Syntax Validation
 
 Always run after making changes:
 
