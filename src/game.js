@@ -387,6 +387,7 @@ const state = {
   stunReduction: 0,
   radarCrystalModule: false,
   navigatorMode: false,
+  artifactRadarMode: false,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
   sideDrills: 0,
@@ -2029,6 +2030,7 @@ function setupField(seedOverride = null) {
   state.stunReduction = 0;
   state.radarCrystalModule = false;
   state.navigatorMode = false;
+  state.artifactRadarMode = false;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
   state.sideDrills = 0;
@@ -2880,7 +2882,9 @@ function applyItemEffect(effect, rarityMult, rarity) {
     const value = e.effectByRarity
       ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
       : e.value * (rarityMult || 1);
-    if (e.stat === "navigatorMode") {
+    if (e.stat === "artifactRadarMode") {
+      state.artifactRadarMode = true;
+    } else if (e.stat === "navigatorMode") {
       state.navigatorMode = true;
     } else if (e.stat === "maxHp" && value < 0) {
       state.maxHp = Math.max(1, state.maxHp + value);
@@ -8332,6 +8336,29 @@ function renderOneBeaconRadar(camera, beacon) {
     }
   }
 
+  // Artifact compass indicator: nearest artifact on the map
+  let artAngle = null;
+  let artDotX = 0, artDotY = 0;
+  if (state.artifactRadarMode) {
+    let bestDist = Infinity;
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        if (!state.artifactMask[y * GRID_W + x]) continue;
+        const dx = (x + 0.5) - (beacon.x + 0.5);
+        const dy = (y + 0.5) - (beacon.y + 0.5);
+        const d = Math.hypot(dx, dy);
+        if (d < bestDist) {
+          bestDist = d;
+          artAngle = Math.atan2(dy / (d || 1), dx / (d || 1));
+        }
+      }
+    }
+    if (artAngle !== null) {
+      artDotX = midX + Math.cos(artAngle) * radius;
+      artDotY = midY + Math.sin(artAngle) * radius;
+    }
+  }
+
   // Navigator bonus indicator: nearest inactive beacon on the same depth level
   let navAngle = null;
   let navDotX = 0, navDotY = 0;
@@ -8454,6 +8481,36 @@ function renderOneBeaconRadar(camera, beacon) {
     ctx.beginPath();
     ctx.arc(tgtDotX, tgtDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // --- Artifact compass indicator (purple) ---
+  if (artAngle !== null) {
+    if (lineEase > 0) {
+      const aLineDotX = midX + Math.cos(artAngle) * radius * lineEase;
+      const aLineDotY = midY + Math.sin(artAngle) * radius * lineEase;
+      ctx.strokeStyle = `rgba(170, 80, 255, ${0.22 * lineEase})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(aLineDotX, aLineDotY);
+      ctx.stroke();
+    }
+    if (dotEase > 0) {
+      if (dotT < 0.8) {
+        ctx.fillStyle = `rgba(190, 100, 255, ${0.5 * (1 - dotT / 0.8)})`;
+        ctx.beginPath();
+        ctx.arc(artDotX, artDotY, 14 * dotEase, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = `rgba(170, 80, 255, ${(0.18 + pulse * 0.18) * dotEase})`;
+      ctx.beginPath();
+      ctx.arc(artDotX, artDotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(210, 150, 255, ${dotEase})`;
+      ctx.beginPath();
+      ctx.arc(artDotX, artDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // --- Navigator bonus: same-depth beacon indicator (orange) ---
