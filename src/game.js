@@ -72,6 +72,7 @@ const FUEL_DEPLETION_RECOVERY = 100;
 const IMPACT_EFFECT_DURATION = 0.22;
 const BREAK_EFFECT_DURATION = 0.42;
 const EXPLOSION_EFFECT_DURATION = 0.48;
+const WEAK_SPOT_HIT_DURATION = 0.52;
 const LOOP_FIELD_EFFECT_DURATION = 0.52;
 const CHAIN_EXPLOSION_DELAY = 0.14;
 const PERK_ZONE_CHARGE_DELAY = 1;
@@ -1010,6 +1011,16 @@ function spawnExplosionEffect(x, y, radius) {
     time: EXPLOSION_EFFECT_DURATION,
     duration: EXPLOSION_EFFECT_DURATION,
     seed: (x * 7219 + y * 3571 + Math.round(radius * 10)) % 1000,
+  });
+}
+
+function spawnWeakSpotHitEffect(x, y, dirX, dirY) {
+  state.effects.push({
+    kind: "weakSpotHit",
+    x, y, dirX, dirY,
+    time: WEAK_SPOT_HIT_DURATION,
+    duration: WEAK_SPOT_HIT_DURATION,
+    seed: (x * 73417 + y * 53923 + Math.round(dirX * 10 + dirY * 100)) % 1000,
   });
 }
 
@@ -6058,6 +6069,7 @@ function damageCell(x, y, damage, options = {}) {
   if (options.byDrill && state.weakSpotMask[index]) {
     damage *= state.weakSpotMult;
     state.weakSpotMask[index] = 0;
+    spawnWeakSpotHitEffect(x, y, options.dirX ?? 0, options.dirY ?? 1);
   }
   if (state.tunnelMask[index]) {
     return false;
@@ -7308,6 +7320,60 @@ function renderEffects(camera) {
         ctx.beginPath();
         ctx.arc(cx + Math.cos(angle) * puffReach, cy + Math.sin(angle) * puffReach, 5 + progress * 9 + puff, 0, Math.PI * 2);
         ctx.fill();
+      }
+    } else if (effect.kind === "weakSpotHit") {
+      const alpha = 1 - progress;
+      const easeOut = 1 - Math.pow(1 - progress, 2);
+
+      // Central flash
+      ctx.globalAlpha = (1 - progress * 2) > 0 ? (1 - progress * 2) : 0;
+      ctx.fillStyle = "#fff8c0";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8 + easeOut * 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gold glow ring
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4 + easeOut * 14, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Outer fading ring
+      ctx.globalAlpha = alpha * 0.25;
+      ctx.strokeStyle = "#ffe566";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8 + easeOut * 22, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Gold sparks flying outward
+      ctx.lineWidth = 1.8;
+      for (let spark = 0; spark < 8; spark++) {
+        const angle = ((effect.seed + spark * 79) % 628) / 100;
+        const speed = 8 + ((effect.seed + spark * 31) % 8);
+        const reach = speed * easeOut * 1.6;
+        const tailLen = speed * Math.max(0, easeOut - 0.15) * 1.6;
+        ctx.globalAlpha = alpha * (0.9 - spark * 0.05);
+        ctx.strokeStyle = spark % 2 === 0 ? "#ffe566" : "#ffd700";
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * Math.max(0, reach - tailLen),
+                   cy + Math.sin(angle) * Math.max(0, reach - tailLen));
+        ctx.lineTo(cx + Math.cos(angle) * reach, cy + Math.sin(angle) * reach);
+        ctx.stroke();
+      }
+
+      // Gold shards (square fragments)
+      for (let shard = 0; shard < 6; shard++) {
+        const angle = ((effect.seed + shard * 53) % 628) / 100;
+        const dist = (5 + ((effect.seed + shard * 17) % 6)) * easeOut * 1.8;
+        const size = 2.5 - progress * 1.5;
+        if (size <= 0) continue;
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.fillStyle = shard % 3 === 0 ? "#fff4a0" : "#ffc700";
+        ctx.fillRect(cx + Math.cos(angle) * dist - size * 0.5,
+                     cy + Math.sin(angle) * dist - size * 0.5, size, size);
       }
     } else if (effect.kind === "rocket") {
       const t = clamp(progress, 0, 1);
