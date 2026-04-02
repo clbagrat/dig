@@ -136,6 +136,31 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 /* ── Rarity colors ── */
 .r1 { color: var(--r1); } .r2 { color: var(--r2); } .r3 { color: var(--r3); } .r4 { color: var(--r4); }
 
+/* ── Todo cards ── */
+.todo-section { padding: 10px 10px 4px; }
+.todo-section-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 0 4px 6px; }
+.todo-card {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 14px; border-radius: var(--r);
+  background: var(--bg3); border: 1.5px solid var(--border);
+  margin-bottom: 6px;
+}
+.todo-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; padding-top: 1px; }
+.todo-info { flex: 1; min-width: 0; }
+.todo-name { font-weight: 700; font-size: 14px; }
+.todo-concept { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.todo-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.todo-stat { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(68,136,255,0.12); color: #4488ff; }
+.todo-cat  { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(215,159,73,0.1); color: var(--acc); }
+.todo-diff { font-size: 10px; padding: 1px 7px; border-radius: 8px; font-weight: 700; }
+.todo-diff.easy   { background: rgba(60,200,80,.12);  color: #3cc850; }
+.todo-diff.medium { background: rgba(215,159,73,.12); color: var(--acc); }
+.todo-diff.hard   { background: rgba(192,72,72,.12);  color: var(--danger); }
+.todo-progress { font-size: 11px; color: var(--muted); white-space: nowrap; margin-top: 2px; }
+.todo-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px; }
+.todo-header-stat { font-size: 12px; color: var(--muted); }
+.todo-header-stat b { color: var(--acc); }
+
 /* ── Toast ── */
 #toast {
   position: fixed; bottom: 24px; left: 50%; z-index: 200;
@@ -168,6 +193,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="tabs" id="tabs">
     <div class="tab active" data-tab="equipment">⛏ Части корпуса</div>
     <div class="tab" data-tab="items">✧ Предметы</div>
+    <div class="tab" data-tab="todo">📋 Роадмап</div>
   </div>
 </div>
 
@@ -203,6 +229,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 <script type="module">
 const { ALL_EQUIPMENT, ALL_ITEMS, CATEGORIES } = await import(`./src/items-catalog.js?t=${Date.now()}`);
+const { TODO_ITEMS } = await import(`./src/items-todo.js?t=${Date.now()}`);
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -219,7 +246,7 @@ const ALL_STATS = ['strikeSpeed','maxHeat','heatDamageBonus','maxFuel','fuelDrai
   'radarCrystalModule','loopChargeLevel','idleAutoCloseDelay','loopPerkLevel','heatExplosionRadiusBonus',
   'heatExplosionDamageBonus','maxHp','armor','goldBonus','luck','critChance','critMultiplier','heatRate'];
 
-function list() { return S[S.tab]; }
+function list() { return S.tab === 'todo' ? null : S[S.tab]; }
 function sel()  { return list().find(i => i.id === S.selId) ?? null; }
 function markDirty() { S.dirty = true; document.getElementById('unsaved').hidden = false; }
 function clearDirty() { S.dirty = false; document.getElementById('unsaved').hidden = true; }
@@ -542,19 +569,71 @@ async function saveFile() {
   }
 }
 
+// ── Todo ───────────────────────────────────────────────────────────────────
+const DIFFICULTY_LABELS = { easy: 'Просто', medium: 'Средне', hard: 'Сложно' };
+
+function renderTodo() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const catFilter = document.getElementById('filter-cat').value;
+
+  const existing = new Set([...ALL_EQUIPMENT, ...ALL_ITEMS].map(i => i.id));
+  const done = TODO_ITEMS.filter(i => existing.has(i.id));
+  const todo = TODO_ITEMS.filter(i => !existing.has(i.id));
+
+  function matchFilters(item) {
+    if (catFilter && item.category !== catFilter) return false;
+    if (search) {
+      const hay = `${item.name} ${item.concept} ${item.stats.join(' ')}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  }
+
+  const visibleTodo = todo.filter(matchFilters);
+  const visibleDone = done.filter(matchFilters);
+
+  const catName = id => CATEGORIES.find(c => c.id === id)?.name ?? id;
+
+  function card(item, isDone) {
+    const diffLabel = DIFFICULTY_LABELS[item.difficulty] ?? item.difficulty;
+    const statsHtml = item.stats.map(s => `<span class="todo-stat">${s}</span>`).join('');
+    return `
+      <div class="todo-card" style="${isDone ? 'opacity:.45' : ''}">
+        <div class="todo-icon">${item.icon}</div>
+        <div class="todo-info">
+          <div class="todo-name">${isDone ? '✓ ' : ''}${item.name}</div>
+          <div class="todo-concept">${item.concept}</div>
+          <div class="todo-meta">
+            <span class="todo-cat">${catName(item.category)}</span>
+            ${statsHtml}
+            <span class="todo-diff ${item.difficulty}">${diffLabel}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const total = TODO_ITEMS.length;
+  const doneCount = done.length;
+
+  document.getElementById('items-count').textContent = `${doneCount}/${total} готово`;
+  document.getElementById('items-list').innerHTML = `
+    <div class="todo-header">
+      <span class="todo-header-stat">Осталось: <b>${todo.length}</b> предметов</span>
+      <span class="todo-header-stat">Easy: <b>${todo.filter(i=>i.difficulty==='easy').length}</b> · Medium: <b>${todo.filter(i=>i.difficulty==='medium').length}</b> · Hard: <b>${todo.filter(i=>i.difficulty==='hard').length}</b></span>
+    </div>
+    ${visibleTodo.length ? `<div class="todo-section"><div class="todo-section-title">К реализации</div>${visibleTodo.map(i => card(i, false)).join('')}</div>` : ''}
+    ${visibleDone.length ? `<div class="todo-section"><div class="todo-section-title">Готово</div>${visibleDone.map(i => card(i, true)).join('')}</div>` : ''}
+  `;
+}
+
 // ── Tabs ───────────────────────────────────────────────────────────────────
 function switchTab(tab) {
   S.tab  = tab;
   S.selId = null;
   closeSheet();
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
-  renderList();
-}
-
-// ── Full render ────────────────────────────────────────────────────────────
-function render() {
-  populateCategoryFilter();
-  renderList();
+  if (tab === 'todo') renderTodo();
+  else renderList();
 }
 
 // ── Static bindings ────────────────────────────────────────────────────────
@@ -589,11 +668,15 @@ document.getElementById('tabs').addEventListener('click', e => {
 });
 
 ['search', 'filter-cat', 'filter-rarity'].forEach(id =>
-  document.getElementById(id).addEventListener('input', renderList)
+  document.getElementById(id).addEventListener('input', () => {
+    if (S.tab === 'todo') renderTodo();
+    else renderList();
+  })
 );
 
 // ── Boot ───────────────────────────────────────────────────────────────────
-render();
+populateCategoryFilter();
+renderList();
 </script>
 </body>
 </html>
