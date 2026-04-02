@@ -8305,6 +8305,28 @@ function renderOneBeaconRadar(camera, beacon) {
   const angle = Math.atan2(bdy / blen, bdx / blen);
   const dotX = midX + Math.cos(angle) * radius;
   const dotY = midY + Math.sin(angle) * radius;
+
+  // Nearest inactive beacon direction
+  let nearestAngle = null;
+  let nearestDotX = 0, nearestDotY = 0;
+  {
+    let bestDist = Infinity;
+    for (const b of state.beacons) {
+      if (b === beacon || b.active) continue;
+      const dx = (b.x + 0.5) - (beacon.x + 0.5);
+      const dy = (b.y + 0.5) - (beacon.y + 0.5);
+      const d = Math.hypot(dx, dy);
+      if (d < bestDist) {
+        bestDist = d;
+        const len = d || 1;
+        nearestAngle = Math.atan2(dy / len, dx / len);
+      }
+    }
+    if (nearestAngle !== null) {
+      nearestDotX = midX + Math.cos(nearestAngle) * radius;
+      nearestDotY = midY + Math.sin(nearestAngle) * radius;
+    }
+  }
   const pulse = 0.55 + (Math.sin((state.lastTs || 0) * 0.008) * 0.5 + 0.5) * 0.45;
 
   // Activation animation progress (0..1 over 2000ms)
@@ -8398,6 +8420,42 @@ function renderOneBeaconRadar(camera, beacon) {
     ctx.beginPath();
     ctx.arc(dotX, dotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // --- Nearest inactive beacon indicator (orange) ---
+  if (nearestAngle !== null) {
+    // Direction line (same timing as phase 2)
+    if (lineEase > 0) {
+      const nLineDotX = midX + Math.cos(nearestAngle) * radius * lineEase;
+      const nLineDotY = midY + Math.sin(nearestAngle) * radius * lineEase;
+      ctx.strokeStyle = `rgba(255, 180, 60, ${0.22 * lineEase})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(nLineDotX, nLineDotY);
+      ctx.stroke();
+    }
+
+    // Radar dot (same timing as phase 3)
+    if (dotEase > 0) {
+      if (dotT < 0.8) {
+        const flashAlpha = 0.5 * (1 - dotT / 0.8);
+        ctx.fillStyle = `rgba(255, 200, 80, ${flashAlpha})`;
+        ctx.beginPath();
+        ctx.arc(nearestDotX, nearestDotY, 14 * dotEase, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = `rgba(255, 180, 60, ${(0.18 + pulse * 0.18) * dotEase})`;
+      ctx.beginPath();
+      ctx.arc(nearestDotX, nearestDotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(255, 210, 100, ${dotEase})`;
+      ctx.beginPath();
+      ctx.arc(nearestDotX, nearestDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();
