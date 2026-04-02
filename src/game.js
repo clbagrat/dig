@@ -6867,6 +6867,7 @@ function updateDrill(dt) {
     const _wcAdd = (cx, cy) => {
       if (cx < 1 || cy < 1 || cx >= GRID_W - 1 || cy >= GRID_H - 1) return;
       const ci = cellIndex(cx, cy);
+      if (ci === targetIndex) return; // skip the block just hit (may be destroyed)
       if (state.health[ci] > 0) weakCandidates.push(ci);
     };
     _wcAdd(targetX, targetY);
