@@ -159,6 +159,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 50,
     unique: true,
+    maxRarity: 1,
     effect: { stat: "navigatorMode", value: 1 },
   },
   {

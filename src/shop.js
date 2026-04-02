@@ -225,7 +225,7 @@ function rollOfferings(luck) {
 
     const pick = candidates[Math.floor(Math.random() * candidates.length)];
     usedIds.add(pick.id);
-    currentOfferings[i] = { good: pick, rarity };
+    currentOfferings[i] = { good: pick, rarity: pick.maxRarity ? Math.min(rarity, pick.maxRarity) : rarity };
   }
 }
 
