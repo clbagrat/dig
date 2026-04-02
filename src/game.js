@@ -8310,15 +8310,13 @@ function renderOneBeaconRadar(camera, beacon) {
   const dotX = midX + Math.cos(angle) * radius;
   const dotY = midY + Math.sin(angle) * radius;
 
-  // Nearest inactive beacon: same depth if navigatorMode, otherwise deeper
+  // Primary indicator: nearest inactive beacon deeper than current, or base
   let nearestAngle = null;
   let nearestDotX = 0, nearestDotY = 0;
   {
     let bestDist = Infinity;
     for (const b of state.beacons) {
-      if (b === beacon || b.active) continue;
-      const sameDepth = Math.abs(b.y - beacon.y) <= 3;
-      if (state.navigatorMode ? !sameDepth : b.y <= beacon.y) continue;
+      if (b === beacon || b.active || b.y <= beacon.y) continue;
       const dx = (b.x + 0.5) - (beacon.x + 0.5);
       const dy = (b.y + 0.5) - (beacon.y + 0.5);
       const d = Math.hypot(dx, dy);
@@ -8331,6 +8329,28 @@ function renderOneBeaconRadar(camera, beacon) {
     if (nearestAngle !== null) {
       nearestDotX = midX + Math.cos(nearestAngle) * radius;
       nearestDotY = midY + Math.sin(nearestAngle) * radius;
+    }
+  }
+
+  // Navigator bonus indicator: nearest inactive beacon on the same depth level
+  let navAngle = null;
+  let navDotX = 0, navDotY = 0;
+  if (state.navigatorMode) {
+    let bestDist = Infinity;
+    for (const b of state.beacons) {
+      if (b === beacon || b.active || Math.abs(b.y - beacon.y) > 3) continue;
+      const dx = (b.x + 0.5) - (beacon.x + 0.5);
+      const dy = (b.y + 0.5) - (beacon.y + 0.5);
+      const d = Math.hypot(dx, dy);
+      if (d < bestDist) {
+        bestDist = d;
+        const len = d || 1;
+        navAngle = Math.atan2(dy / len, dx / len);
+      }
+    }
+    if (navAngle !== null) {
+      navDotX = midX + Math.cos(navAngle) * radius;
+      navDotY = midY + Math.sin(navAngle) * radius;
     }
   }
   const pulse = 0.55 + (Math.sin((state.lastTs || 0) * 0.008) * 0.5 + 0.5) * 0.45;
@@ -8434,6 +8454,37 @@ function renderOneBeaconRadar(camera, beacon) {
     ctx.beginPath();
     ctx.arc(tgtDotX, tgtDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // --- Navigator bonus: same-depth beacon indicator (orange) ---
+  if (navAngle !== null) {
+    if (lineEase > 0) {
+      const nLineDotX = midX + Math.cos(navAngle) * radius * lineEase;
+      const nLineDotY = midY + Math.sin(navAngle) * radius * lineEase;
+      ctx.strokeStyle = `rgba(255, 180, 60, ${0.22 * lineEase})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(nLineDotX, nLineDotY);
+      ctx.stroke();
+    }
+
+    if (dotEase > 0) {
+      if (dotT < 0.8) {
+        ctx.fillStyle = `rgba(255, 200, 80, ${0.5 * (1 - dotT / 0.8)})`;
+        ctx.beginPath();
+        ctx.arc(navDotX, navDotY, 14 * dotEase, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = `rgba(255, 180, 60, ${(0.18 + pulse * 0.18) * dotEase})`;
+      ctx.beginPath();
+      ctx.arc(navDotX, navDotY, (5.8 + pulse * 2.6) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255, 210, 100, ${dotEase})`;
+      ctx.beginPath();
+      ctx.arc(navDotX, navDotY, (3.2 + pulse * 1.2) * dotEase, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();
