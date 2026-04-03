@@ -429,6 +429,14 @@ const state = {
   contourReturnFuelLevel: 0,
   heatOverloadRocketLevel: 0,
   tankBoostLevel: 0,
+  levelUpFlash: 0,
+  levelUpPulse: 0,
+  levelUpModalDelay: 0,
+  drillPowerPerLevel: 0,
+  fuelPerLevel: 0,
+  strikeSpeedPerLevel: 0,
+  healPerLevel: 0,
+  goldBonusPerLevel: 0,
   perkToast: {
     text: "",
     time: 0,
@@ -1033,6 +1041,16 @@ function spawnGoldOreEffect(x, y, value) {
     time: 0.88,
     duration: 0.88,
     seed: (x * 73417 + y * 53923 + value * 131) % 1000,
+  });
+}
+
+function spawnLevelUpBurst(x, y) {
+  state.effects.push({
+    kind: "levelup",
+    x, y,
+    time: 0.9,
+    duration: 0.9,
+    seed: (x * 73417 + y * 53923) % 1000,
   });
 }
 
@@ -2086,6 +2104,14 @@ function setupField(seedOverride = null) {
   state.contourReturnFuelLevel = 0;
   state.heatOverloadRocketLevel = 0;
   state.tankBoostLevel = 0;
+  state.levelUpFlash = 0;
+  state.levelUpPulse = 0;
+  state.levelUpModalDelay = 0;
+  state.drillPowerPerLevel = 0;
+  state.fuelPerLevel = 0;
+  state.strikeSpeedPerLevel = 0;
+  state.healPerLevel = 0;
+  state.goldBonusPerLevel = 0;
   state.perkToast.text = "";
   state.perkToast.time = 0;
   state.fuelToast.value = 0;
@@ -4014,6 +4040,9 @@ function maybeOpenPendingLevelReward() {
   if (state.levelRewardQueue.length === 0 || state.levelUpModalOpen) {
     return;
   }
+  if (state.levelUpModalDelay > 0) {
+    return;
+  }
   if (
     state.beaconActivationAnim ||
     state.manualModalOpen ||
@@ -4096,6 +4125,24 @@ function restorePlayerFully() {
     healPlayer(missingHp, "Полное восстановление");
   }
   showPerkToast("Полное восстановление");
+}
+
+function applyLevelUpItemBonuses() {
+  if (state.drillPowerPerLevel > 0) {
+    state.drillPower += state.drillPowerPerLevel;
+  }
+  if (state.strikeSpeedPerLevel > 0) {
+    state.strikeSpeed += state.strikeSpeedPerLevel;
+  }
+  if (state.fuelPerLevel > 0) {
+    addFuel(state.fuelPerLevel, state.drill.x, state.drill.y);
+  }
+  if (state.healPerLevel > 0) {
+    healPlayer(state.healPerLevel, "Регенерация через опыт");
+  }
+  if (state.goldBonusPerLevel > 0) {
+    state.miningGoldBonusMultiplier += state.goldBonusPerLevel;
+  }
 }
 
 function applyLevelReward(choiceId) {
@@ -4461,6 +4508,14 @@ function update(dt) {
   state.goldToast.time = Math.max(0, state.goldToast.time - dt);
   state.depthTitle.time = Math.max(0, state.depthTitle.time - dt);
   state.damageFlash = Math.max(0, state.damageFlash - dt * 2.4);
+  state.levelUpFlash = Math.max(0, state.levelUpFlash - dt * 2.2);
+  state.levelUpPulse = Math.max(0, state.levelUpPulse - dt * 1.1);
+  if (state.levelUpModalDelay > 0) {
+    state.levelUpModalDelay = Math.max(0, state.levelUpModalDelay - dt);
+    if (state.levelUpModalDelay === 0) {
+      maybeOpenPendingLevelReward();
+    }
+  }
   if (state.pendingPerkChoice) {
     state.pendingPerkDelay = Math.max(0, state.pendingPerkDelay - dt);
     if (state.pendingPerkDelay === 0) {
@@ -5432,9 +5487,13 @@ function gainExperience(amount) {
     state.xpToNext = getXpNeededForLevel(state.level);
     state.levelRewardStep += 1;
     state.levelRewardQueue.push({ step: state.levelRewardStep, level: state.level });
+    applyLevelUpItemBonuses();
+    state.levelUpFlash = Math.min(1, (state.levelUpFlash || 0) + 0.55);
+    state.levelUpPulse = 0.9;
+    state.levelUpModalDelay = 0.9;
+    spawnLevelUpBurst(state.drill.x, state.drill.y);
     showPerkToast(`Уровень ${state.level}`);
   }
-  maybeOpenPendingLevelReward();
 }
 
 function pickupExperienceNearPlayer() {
@@ -7551,6 +7610,84 @@ function renderEffects(camera) {
         ctx.lineWidth = 3;
         ctx.stroke();
       }
+    } else if (effect.kind === "levelup") {
+      const t = progress;
+      const easeOut = 1 - (1 - t) * (1 - t);
+
+      // 1. Central flash — bright cyan burst that fades in first 28%
+      if (t < 0.28) {
+        const ft = t / 0.28;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 6 + ft * 30);
+        grad.addColorStop(0, `rgba(210, 248, 255, ${0.88 * (1 - ft)})`);
+        grad.addColorStop(0.5, `rgba(80, 220, 255, ${0.45 * (1 - ft)})`);
+        grad.addColorStop(1, "rgba(40, 180, 255, 0)");
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 6 + ft * 30, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 2. Primary expanding ring
+      if (t < 0.72) {
+        const rt = t / 0.72;
+        ctx.globalAlpha = 0.9 * (1 - rt);
+        ctx.strokeStyle = "#7de0ff";
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4 + rt * 42, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 3. Slower outer ring
+      if (t < 0.92) {
+        const rt = t / 0.92;
+        ctx.globalAlpha = 0.38 * (1 - rt);
+        ctx.strokeStyle = "#aaf0ff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 10 + rt * 60, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 4. Radial burst lines (first 48%)
+      if (t < 0.48) {
+        const st = t / 0.48;
+        ctx.globalAlpha = 1 - st;
+        ctx.strokeStyle = "#c0f4ff";
+        ctx.lineWidth = 1.6;
+        ctx.lineCap = "round";
+        for (let s = 0; s < 10; s += 1) {
+          const angle = ((effect.seed * 37 + s * 63) % 628) / 100;
+          const r1 = 7 + st * 3;
+          const r2 = 17 + st * 22;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
+          ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
+          ctx.stroke();
+        }
+      }
+
+      // 5. Flying XP-colored dots
+      for (let p = 0; p < 10; p += 1) {
+        const pseed = effect.seed + p * 113;
+        const angle = ((pseed * 79) % 628) / 100;
+        const speed = 20 + (pseed % 18);
+        const dpx = cx + Math.cos(angle) * speed * easeOut;
+        const dpy = cy + Math.sin(angle) * speed * easeOut;
+        const palpha = Math.max(0, 1 - t * 1.25);
+        const size = 1.8 + (pseed % 3) * 0.5;
+        ctx.globalAlpha = palpha;
+        ctx.fillStyle = "#5ae0ff";
+        ctx.beginPath();
+        ctx.arc(dpx, dpy, size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ddfbff";
+        ctx.beginPath();
+        ctx.arc(dpx, dpy, size * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     } else if (effect.kind === "wormDust") {
       const alpha = 1 - progress;
       // Dust cloud puff
@@ -8035,6 +8172,10 @@ function render() {
 
   if (state.damageFlash > 0) {
     ctx.fillStyle = `rgba(255, 64, 64, ${0.16 * state.damageFlash})`;
+    ctx.fillRect(0, 0, state.width, state.height);
+  }
+  if (state.levelUpFlash > 0) {
+    ctx.fillStyle = `rgba(80, 210, 255, ${0.10 * state.levelUpFlash})`;
     ctx.fillRect(0, 0, state.width, state.height);
   }
 
@@ -10186,10 +10327,19 @@ function drawHudXpBar(x, y, width, height, label, value, ratio) {
 
   ctx.save();
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#8fdfff";
-  ctx.font = `700 10px ${HUD_FONT}`;
+  const pulse = state.levelUpPulse || 0;
+  if (pulse > 0) {
+    const glowAlpha = pulse * 0.9;
+    ctx.shadowColor = `rgba(125, 224, 255, ${glowAlpha})`;
+    ctx.shadowBlur = 8 + pulse * 6;
+    ctx.fillStyle = `rgba(${Math.round(143 + 112 * pulse)}, ${Math.round(223 + 32 * pulse)}, 255, 1)`;
+  } else {
+    ctx.fillStyle = "#8fdfff";
+  }
+  ctx.font = `700 ${pulse > 0 ? Math.round(10 + pulse * 2) : 10}px ${HUD_FONT}`;
   ctx.textAlign = "left";
   ctx.fillText(label, x + 12, y + 16);
+  ctx.shadowBlur = 0;
 
   ctx.strokeStyle = "rgba(18, 12, 8, 0.78)";
   ctx.lineWidth = 3;

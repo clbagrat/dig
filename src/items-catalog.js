@@ -217,5 +217,83 @@ export const ALL_ITEMS = [
       effectByRarity: [null, 5, 8, 10, 13],
     },
   },
+  // ─── Level-up bonus items ──────────────────────────────────────────────────
+  // Each of these grants a bonus every time the player gains a level.
+  {
+    id: "learning_algorithm",
+    type: "item",
+    name: "Учебный алгоритм",
+    icon: "🧠",
+    desc: "При каждом уровне: +0.35 к силе удара бура.",
+    category: "basic",
+    tags: ["basic"],
+    minRarity: 1,
+    baseCost: 40,
+    effect: {
+      stat: "drillPowerPerLevel",
+      effectByRarity: [null, 0.35, 0.5, 0.7, 1.0],
+    },
+  },
+  {
+    id: "fuel_impulse",
+    type: "item",
+    name: "Топливный импульс",
+    icon: "⚗️",
+    desc: "При каждом уровне: +50 топлива.",
+    category: "maintenance",
+    tags: ["maintenance"],
+    minRarity: 1,
+    baseCost: 35,
+    effect: {
+      stat: "fuelPerLevel",
+      effectByRarity: [null, 50, 75, 100, 150],
+    },
+  },
+  {
+    id: "rapid_adaptation",
+    type: "item",
+    name: "Ускоренная адаптация",
+    icon: "🔩",
+    desc: "При каждом уровне: +2% скорости бура.",
+    category: "basic",
+    tags: ["basic"],
+    minRarity: 1,
+    baseCost: 35,
+    effect: {
+      stat: "strikeSpeedPerLevel",
+      effectByRarity: [null, 2, 3, 4, 6],
+    },
+  },
+  {
+    id: "experience_regen",
+    type: "item",
+    name: "Регенерация через опыт",
+    icon: "💉",
+    desc: "При каждом уровне: лечит +1 HP.",
+    category: "basic",
+    tags: ["basic"],
+    minRarity: 1,
+    baseCost: 50,
+    effect: {
+      stat: "healPerLevel",
+      effectByRarity: [null, 1, 1, 2, 3],
+    },
+  },
+  {
+    id: "golden_wisdom",
+    type: "item",
+    name: "Золотая мудрость",
+    icon: "💡",
+    desc: "При каждом уровне: +2% к золоту с жил.",
+    category: "economy",
+    tags: ["economy"],
+    minRarity: 1,
+    baseCost: 35,
+    effect: {
+      stat: "goldBonusPerLevel",
+      effectByRarity: [null, 0.02, 0.03, 0.04, 0.06],
+    },
+  },
 ];
+
 export const ALL_GOODS = [...ALL_EQUIPMENT, ...ALL_ITEMS];
