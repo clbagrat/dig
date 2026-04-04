@@ -462,6 +462,7 @@ const state = {
   idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
   speedOfAutoClose: 0,
   damageBonus: 0,
+  explosionDamageMultiplier: 1,
   bonusFindChance: 0,
   autoClosePreview: null,
   autoClosePreviewReturnTimer: 0,
@@ -3049,6 +3050,7 @@ function getShopStatsSnapshot() {
     fuelPickupBonus: state.fuelPickupBonus,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
+    explosionDamageMultiplier: state.explosionDamageMultiplier,
     weakSpotChance: state.weakSpotChance,
     weakSpotMult: state.weakSpotMult,
   };
@@ -4852,7 +4854,18 @@ function updateChainExplosions(dt) {
     }
 
     state.chainExplosions.splice(i, 1);
-    if (task.kind === "volatile") {
+    if (task.kind === "explosionCell") {
+      const tx = task.x;
+      const ty = task.y;
+      if (task.triggerGas && tx >= 1 && ty >= 1 && tx < GRID_W - 1 && ty < GRID_H - 1 && state.gasMask[cellIndex(tx, ty)]) {
+        scheduleChainExplosion({ kind: "gas", x: tx, y: ty });
+      }
+      damageCell(tx, ty, task.damage, {
+        ignoreHazardEffect: true,
+        allowHazardChain: true,
+        cause: "explosion",
+      });
+    } else if (task.kind === "volatile") {
       explodeAt(task.x, task.y, task.damage, task.radius, { cause: "explosion" });
     } else if (task.kind === "gas") {
       removeGasCell(task.x, task.y);
@@ -6652,29 +6665,26 @@ function breakCell(x, y, index, options = {}) {
   }
 }
 
+const EXPLOSION_WAVE_DELAY = 0.05;
+
 function explodeAt(x, y, damage, radius = 2, options = {}) {
   spawnExplosionEffect(x, y, radius);
-  const scaledDamage = damage * (1 + state.damageBonus / 100);
+  const scaledDamage = damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamageMultiplier || 0);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(radius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
     for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
-      if (Math.hypot(ox, oy) > radius) {
-        continue;
-      }
+      const dist = Math.hypot(ox, oy);
+      if (dist > radius) continue;
       const tx = x + ox;
       const ty = y + oy;
-      if (options.triggerGas !== false && tx >= 1 && ty >= 1 && tx < GRID_W - 1 && ty < GRID_H - 1 && state.gasMask[cellIndex(tx, ty)]) {
-        scheduleChainExplosion({
-          kind: "gas",
-          x: tx,
-          y: ty,
-        });
-      }
-      damageCell(tx, ty, breakDamage, {
-        ignoreHazardEffect: true,
-        allowHazardChain: true,
-        cause: "explosion",
+      const delay = Math.floor(dist) * EXPLOSION_WAVE_DELAY;
+      state.chainExplosions.push({
+        kind: "explosionCell",
+        x: tx, y: ty,
+        damage: breakDamage,
+        triggerGas: options.triggerGas !== false,
+        delay,
       });
     }
   }

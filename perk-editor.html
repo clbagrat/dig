@@ -97,13 +97,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .sheet-overlay.open { opacity: 1; pointer-events: auto; }
 .sheet {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 101;
-  background: var(--bg2); border-top: 1px solid var(--border); border-radius: 14px 14px 0 0;
+  position: fixed; inset: 0; z-index: 101;
+  background: var(--bg2); border-top: 1px solid var(--border);
   transform: translateY(100%); transition: transform .25s cubic-bezier(.32,0,.67,0);
-  max-height: 92vh; display: flex; flex-direction: column;
+  display: flex; flex-direction: column;
 }
 .sheet.open { transform: translateY(0); transition: transform .25s cubic-bezier(.33,1,.68,1); }
-.sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 2px; flex-shrink: 0; }
+.sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 2px; flex-shrink: 0; display: none; }
 .sheet-head { display: flex; align-items: center; gap: 8px; padding: 6px 14px 10px; flex-shrink: 0; }
 .sheet-head-title { flex: 1; font-weight: 700; font-size: 15px; }
 .sheet-close { width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg3); color: var(--muted); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -143,8 +143,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; align-items: flex-start; gap: 12px;
   padding: 10px 14px; border-radius: var(--r);
   background: var(--bg3); border: 1.5px solid var(--border);
-  margin-bottom: 6px;
+  margin-bottom: 6px; cursor: pointer; transition: all .15s; user-select: none;
 }
+.todo-card:active, .todo-card.sel { background: var(--bg4); border-color: var(--acc); }
 .todo-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; padding-top: 1px; }
 .todo-info { flex: 1; min-width: 0; }
 .todo-name { font-weight: 700; font-size: 14px; }
@@ -153,13 +154,89 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .todo-stat { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(68,136,255,0.12); color: #4488ff; }
 .todo-cat  { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(215,159,73,0.1); color: var(--acc); }
 .todo-diff { font-size: 10px; padding: 1px 7px; border-radius: 8px; font-weight: 700; }
-.todo-diff.easy   { background: rgba(60,200,80,.12);  color: #3cc850; }
-.todo-diff.medium { background: rgba(215,159,73,.12); color: var(--acc); }
-.todo-diff.hard   { background: rgba(192,72,72,.12);  color: var(--danger); }
 .todo-progress { font-size: 11px; color: var(--muted); white-space: nowrap; margin-top: 2px; }
 .todo-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px; }
 .todo-header-stat { font-size: 12px; color: var(--muted); }
 .todo-header-stat b { color: var(--acc); }
+
+/* ── Category panel ── */
+.cat-panel { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.cat-panel[hidden] { display: none !important; }
+.cat-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-chip { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 8px; background: var(--bg3); border: 1px solid var(--border); font-size: 12px; }
+.cat-chip button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+.cat-chip button:hover { color: var(--danger); }
+.cat-add-row { display: flex; gap: 6px; }
+.cat-add-row input { background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
+.cat-add-row input:focus { outline: none; border-color: var(--acc); }
+.cat-add-row .icon-in { width: 48px; text-align: center; }
+.cat-add-row .name-in { flex: 1; }
+.btn-cat-add { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg4); color: var(--acc); font-size: 13px; cursor: pointer; white-space: nowrap; }
+.btn-cat-toggle { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.btn-cat-toggle.active { border-color: var(--acc); color: var(--acc); }
+
+/* ── Stat guide ── */
+.guide-panel { background: var(--bg2); border-bottom: 1px solid var(--border); }
+.guide-panel summary {
+  list-style: none; cursor: pointer; padding: 10px 12px; color: var(--muted);
+  font-size: 12px; font-weight: 700; user-select: none;
+}
+.guide-panel summary::-webkit-details-marker { display: none; }
+.guide-panel[open] summary { color: var(--acc); }
+.guide-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px; padding: 0 12px 12px;
+}
+.guide-card {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px;
+}
+.guide-stat { font-size: 12px; font-weight: 700; color: var(--acc2); }
+.guide-name { font-size: 12px; color: var(--text); margin-top: 2px; }
+.guide-desc { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.guide-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.guide-count {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+}
+.guide-count.pos { color: #7edc8a; border-color: rgba(126,220,138,0.25); background: rgba(126,220,138,0.08); }
+.guide-count.neg { color: #ff8e7d; border-color: rgba(255,142,125,0.25); background: rgba(255,142,125,0.08); }
+.guide-dots { display: inline-flex; align-items: center; gap: 3px; min-height: 10px; }
+.guide-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.9; }
+
+/* ── Todo stat editor ── */
+.todo-stat-summary { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.todo-stat-chip {
+  font-size: 10px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+}
+.todo-stat-chip.pos { color: #7edc8a; border-color: rgba(126,220,138,0.25); background: rgba(126,220,138,0.08); }
+.todo-stat-chip.neg { color: #ff8e7d; border-color: rgba(255,142,125,0.25); background: rgba(255,142,125,0.08); }
+.todo-stat-list {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+.todo-stat-row {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+}
+.todo-stat-title { font-size: 12px; font-weight: 700; color: var(--acc2); }
+.todo-stat-key { font-size: 12px; color: var(--text); margin-top: 2px; }
+.todo-stat-desc { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+.todo-stat-controls { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.todo-stat-btn, .todo-stat-value {
+  min-width: 34px; height: 30px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg4); color: var(--text); font-size: 14px;
+}
+.todo-stat-btn { cursor: pointer; }
+.todo-stat-btn:hover { border-color: var(--acc); color: var(--acc); }
+.todo-stat-value {
+  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+}
+.todo-stat-value.pos { color: #7edc8a; }
+.todo-stat-value.neg { color: #ff8e7d; }
+.todo-stat-dots { display: inline-flex; align-items: center; gap: 3px; min-height: 10px; }
+.todo-stat-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.9; }
 
 /* ── Toast ── */
 #toast {
@@ -173,10 +250,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 /* ── Desktop ── */
 @media (min-width: 700px) {
-  .sheet { left: auto; right: 0; top: 0; bottom: 0; border-radius: 0; border-left: 1px solid var(--border); border-top: none; max-height: none; width: 340px; transform: translateX(100%); }
-  .sheet.open { transform: translateX(0); }
-  .sheet-handle { display: none; }
-  .sheet-overlay { display: none; }
+  .sheet-head { padding-top: 12px; }
 }
 </style>
 </head>
@@ -202,6 +276,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <select class="filter-select" id="filter-cat">
     <option value="">Все категории</option>
   </select>
+  <button class="btn-cat-toggle" id="btn-cat-toggle">⚙</button>
   <select class="filter-select" id="filter-rarity">
     <option value="">Все редкости</option>
     <option value="1">Обычный</option>
@@ -211,6 +286,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   </select>
   <span class="items-count" id="items-count"></span>
 </div>
+<div class="cat-panel" id="cat-panel" hidden>
+  <div class="cat-list" id="cat-list"></div>
+  <div class="cat-add-row">
+    <input class="icon-in" id="cat-icon" placeholder="🔧" maxlength="4">
+    <input class="name-in" id="cat-name" placeholder="Название категории">
+    <button class="btn-cat-add" id="btn-cat-add">Добавить</button>
+  </div>
+</div>
+<details class="guide-panel" id="stat-guide">
+  <summary>Памятка статов</summary>
+  <div class="guide-grid" id="guide-grid"></div>
+</details>
 
 <div id="items-list" class="items-list"></div>
 
@@ -235,19 +322,85 @@ const { TODO_ITEMS } = await import(`./src/items-todo.js?t=${Date.now()}`);
 const S = {
   equipment: JSON.parse(JSON.stringify(ALL_EQUIPMENT)),
   items:     JSON.parse(JSON.stringify(ALL_ITEMS)),
-  tab:       'equipment',  // 'equipment' | 'items'
+  todo:      JSON.parse(JSON.stringify(TODO_ITEMS)),
+  categories: JSON.parse(JSON.stringify(CATEGORIES)),
+  tab:       'equipment',  // 'equipment' | 'items' | 'todo'
   selId:     null,
   dirty:     false,
 };
 
 const RARITY_NAMES  = { 1: 'Обычный', 2: 'Необычный', 3: 'Редкий', 4: 'Легендарный' };
 const RARITY_COLORS = { 1: '#aaa', 2: '#4488ff', 3: '#aa44ff', 4: '#ff4444' };
-const ALL_STATS = ['strikeSpeed','maxHeat','heatDamageBonus','maxFuel','fuelDrainRate','visionRadius',
-  'radarCrystalModule','loopChargeLevel','idleAutoCloseDelay','loopPerkLevel','heatExplosionRadiusBonus',
-  'heatExplosionDamageBonus','maxHp','armor','goldBonus','luck','critChance','critMultiplier','heatRate'];
+const STAT_GUIDE = [
+  { id: 'drillPower', name: 'Сила бура', desc: 'Плоский бонус к базовому урону удара.' },
+  { id: 'strikeSpeed', name: 'Скорость бура', desc: 'Ускоряет цикл удара бура.' },
+  { id: 'damageBonus', name: 'Общий бонус урона', desc: 'Процентный множитель урона ударов и взрывов.' },
+  { id: 'explosionDamageMultiplier', name: 'Множитель урона взрывов', desc: 'Дополнительный множитель только для взрывов. 1 = базово, 2 = x2.' },
+  { id: 'miningGoldBonusMultiplier', name: 'Бонус золота', desc: 'Увеличивает золото, добытое из жил и других источников майнинга.' },
+  { id: 'goldBonusPerLevel', name: 'Золото за уровень', desc: 'При каждом новом уровне добавляет бонус к добыче золота.' },
+  { id: 'xpBonusMultiplier', name: 'Бонус опыта', desc: 'Увеличивает количество опыта с кристаллов и других pickup-источников.' },
+  { id: 'maxFuel', name: 'Макс. топливо', desc: 'Повышает верхний предел топлива.' },
+  { id: 'fuelDrainRate', name: 'Расход топлива', desc: 'Множитель расхода топлива. Меньше 1 = экономнее, больше 1 = прожорливее.' },
+  { id: 'fuelPickupBonus', name: 'Бонус топлива', desc: 'Плоский бонус к каждому получению топлива.' },
+  { id: 'fuelPerLevel', name: 'Топливо за уровень', desc: 'При каждом новом уровне выдаёт дополнительное топливо.' },
+  { id: 'maxHeat', name: 'Макс. нагрев', desc: 'Поднимает потолок heat до перегрева.' },
+  { id: 'heatRate', name: 'Скорость нагрева', desc: 'Множитель набора heat. Меньше 1 = медленнее греется.' },
+  { id: 'heatDamageBonus', name: 'Бонус урона от heat', desc: 'Усиливает урон, который масштабируется от текущего нагрева.' },
+  { id: 'heatExplosionDamageBonus', name: 'Бонус урона взрыва перегрева', desc: 'Спецстата для перегревных/heat-взрывов.' },
+  { id: 'heatExplosionRadiusBonus', name: 'Бонус радиуса взрыва перегрева', desc: 'Спецстата для радиуса heat-взрывов.' },
+  { id: 'maxHp', name: 'Макс. HP', desc: 'Повышает запас здоровья.' },
+  { id: 'armor', name: 'Броня', desc: 'Снижает входящий урон от опасностей.' },
+  { id: 'healPerLevel', name: 'Лечение за уровень', desc: 'При каждом уровне восстанавливает здоровье.' },
+  { id: 'visionRadius', name: 'Радиус обзора', desc: 'Увеличивает видимую область вокруг игрока.' },
+  { id: 'luck', name: 'Удача', desc: 'Влияет на шансы лучшего лута и других luck-зависимых роллов.' },
+  { id: 'weakSpotChance', name: 'Шанс бреши', desc: 'Шанс создать weak spot при ударе.' },
+  { id: 'weakSpotMult', name: 'Множитель weak spot', desc: 'Насколько сильнее урон по бреши.' },
+  { id: 'critChance', name: 'Шанс крита', desc: 'Редакторная стата под крит-механику предметов/идей.' },
+  { id: 'critMultiplier', name: 'Множитель крита', desc: 'Редакторная стата под силу критического удара.' },
+  { id: 'speedOfAutoClose', name: 'Скорость автозамыкания', desc: 'Ускоряет автоматическое дорисовывание контура.' },
+  { id: 'idleAutoCloseDelay', name: 'Задержка автозамыкания', desc: 'Сколько секунд бездействия до старта автозамыкания.' },
+  { id: 'loopChargeLevel', name: 'Уровень контурного заряда', desc: 'Усиливает баф после замкнутого контура.' },
+  { id: 'loopPerkLevel', name: 'Уровень контурного трофея', desc: 'Повышает шанс предмета внутри замкнутого контура.' },
+  { id: 'radarCrystalModule', name: 'Радар кристаллов', desc: 'Включает кольцевые подсказки на ближайшие кристаллы.' },
+  { id: 'artifactRadarMode', name: 'Радар артефакта', desc: 'Маяки показывают направление на ближайший артефакт.' },
+  { id: 'goldRadarMode', name: 'Радар золота', desc: 'Маяки показывают направление на крупное золотое скопление.' },
+  { id: 'navigatorMode', name: 'Навигатор маяков', desc: 'Маяки показывают ближайший неактивированный маяк на той же глубине.' },
+  { id: 'effectDurationRate', name: 'Длительность эффектов', desc: 'Множитель длительности временных бафов и состояний.' },
+  { id: 'concentration', name: 'Концентрация', desc: 'Влияет на длительность некоторых негативных состояний, например стана.' },
+  { id: 'bonusFindChance', name: 'Чутьё', desc: 'Шанс дополнительной находки/награды в системах, где это поддержано.' },
+  { id: 'drillPowerPerLevel', name: 'Сила бура за уровень', desc: 'При каждом новом уровне усиливает базовый урон бура.' },
+  { id: 'strikeSpeedPerLevel', name: 'Скорость бура за уровень', desc: 'При каждом новом уровне ускоряет бур.' },
+];
+const ALL_STATS = STAT_GUIDE.map(stat => stat.id);
+const STAT_GUIDE_MAP = new Map(STAT_GUIDE.map(stat => [stat.id, stat]));
+
+function normalizeTodoItem(item) {
+  const next = JSON.parse(JSON.stringify(item ?? {}));
+  const statWeights = {};
+  if (next && typeof next.statWeights === 'object' && next.statWeights) {
+    for (const [stat, value] of Object.entries(next.statWeights)) {
+      const numeric = Math.trunc(Number(value) || 0);
+      if (numeric !== 0) statWeights[stat] = numeric;
+    }
+  } else if (Array.isArray(next.stats)) {
+    for (const stat of next.stats) {
+      if (!stat) continue;
+      statWeights[stat] = (statWeights[stat] || 0) + 1;
+    }
+  }
+  next.concept = next.concept ?? '';
+  next.statWeights = statWeights;
+  delete next.stats;
+  return next;
+}
+
+S.todo = S.todo.map(normalizeTodoItem);
 
 function list() { return S.tab === 'todo' ? null : S[S.tab]; }
-function sel()  { return list().find(i => i.id === S.selId) ?? null; }
+function sel()  {
+  if (S.tab === 'todo') return S.todo.find(i => i.id === S.selId) ?? null;
+  return list().find(i => i.id === S.selId) ?? null;
+}
 function markDirty() { S.dirty = true; document.getElementById('unsaved').hidden = false; }
 function clearDirty() { S.dirty = false; document.getElementById('unsaved').hidden = true; }
 
@@ -277,8 +430,24 @@ function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function categories() {
+  return S.categories;
+}
+
 function categoryName(id) {
-  return CATEGORIES.find(c => c.id === id)?.name ?? id;
+  return categories().find(c => c.id === id)?.name ?? id;
+}
+
+function slugifyCategoryName(name) {
+  return String(name ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9а-яё]+/gi, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function isCategoryUsed(id) {
+  return [...S.equipment, ...S.items, ...S.todo].some(item => item.category === id);
 }
 
 // ── Filters ────────────────────────────────────────────────────────────────
@@ -308,7 +477,134 @@ function populateCategoryFilter() {
   const sel = document.getElementById('filter-cat');
   const cur = sel.value;
   sel.innerHTML = '<option value="">Все категории</option>' +
-    CATEGORIES.map(c => `<option value="${c.id}" ${c.id === cur ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
+    categories().map(c => `<option value="${c.id}" ${c.id === cur ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
+  if (cur && !categories().some(c => c.id === cur)) sel.value = '';
+}
+
+function renderStatGuide() {
+  const roadmapInfluence = getRoadmapInfluenceMap();
+  const dots = count => count > 0
+    ? `<span class="guide-dots">${Array.from({ length: count }, () => '<span class="guide-dot"></span>').join('')}</span>`
+    : '';
+  const container = document.getElementById('guide-grid');
+  container.innerHTML = STAT_GUIDE.map(stat => `
+    <div class="guide-card">
+      <div class="guide-stat">${esc(stat.id)}</div>
+      <div class="guide-name">${esc(stat.name)}</div>
+      <div class="guide-desc">${esc(stat.desc)}</div>
+      <div class="guide-meta">
+        ${(roadmapInfluence.get(stat.id)?.pos ?? 0) > 0 ? `<span class="guide-count pos">${dots(roadmapInfluence.get(stat.id)?.pos ?? 0)}</span>` : ''}
+        ${(roadmapInfluence.get(stat.id)?.neg ?? 0) > 0 ? `<span class="guide-count neg">${dots(roadmapInfluence.get(stat.id)?.neg ?? 0)}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function getTodoStatEntries(item) {
+  const weights = item?.statWeights ?? {};
+  return Object.entries(weights)
+    .map(([stat, value]) => [stat, Math.trunc(Number(value) || 0)])
+    .filter(([, value]) => value !== 0)
+    .sort((a, b) => {
+      const ai = ALL_STATS.indexOf(a[0]);
+      const bi = ALL_STATS.indexOf(b[0]);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    });
+}
+
+function getRoadmapInfluenceMap() {
+  const roadmapInfluence = new Map(STAT_GUIDE.map(stat => [stat.id, { pos: 0, neg: 0 }]));
+  for (const item of S.todo) {
+    for (const [stat, value] of getTodoStatEntries(item)) {
+      const bucket = roadmapInfluence.get(stat);
+      if (!bucket) continue;
+      if (value > 0) bucket.pos += 1;
+      if (value < 0) bucket.neg += 1;
+    }
+  }
+  return roadmapInfluence;
+}
+
+function formatAbstractDelta(value) {
+  const n = Math.trunc(Number(value) || 0);
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+function todoSearchText(item) {
+  const stats = getTodoStatEntries(item)
+    .map(([stat, value]) => `${stat} ${STAT_GUIDE_MAP.get(stat)?.name ?? ''} ${formatAbstractDelta(value)}`)
+    .join(' ');
+  return `${item.name ?? ''} ${item.concept ?? ''} ${stats}`.toLowerCase();
+}
+
+function renderCategoryPanel() {
+  const container = document.getElementById('cat-list');
+  container.innerHTML = categories().map(c => {
+    const used = isCategoryUsed(c.id);
+    const title = used ? 'Категория используется и не может быть удалена' : 'Удалить категорию';
+    const removeBtn = `<button type="button" class="cat-rm" data-cat-id="${esc(c.id)}" title="${title}" ${used ? 'disabled' : ''}>×</button>`;
+    return `<div class="cat-chip">${esc(c.icon)} ${esc(c.name)} <span style="color:var(--muted)">(${esc(c.id)})</span>${removeBtn}</div>`;
+  }).join('');
+
+  container.querySelectorAll('.cat-rm').forEach(btn =>
+    btn.addEventListener('click', () => removeCategory(btn.dataset.catId))
+  );
+}
+
+function refreshCategoriesUi() {
+  populateCategoryFilter();
+  renderCategoryPanel();
+  renderStatGuide();
+  if (S.tab === 'todo') {
+    renderTodo();
+    if (sel()) renderTodoSheetBody();
+  } else {
+    renderList();
+    if (sel()) renderSheetBody();
+  }
+}
+
+function addCategory() {
+  const iconInput = document.getElementById('cat-icon');
+  const nameInput = document.getElementById('cat-name');
+  const icon = iconInput.value.trim() || '✦';
+  const name = nameInput.value.trim();
+  if (!name) {
+    toast('Введите название категории');
+    nameInput.focus();
+    return;
+  }
+
+  const baseId = slugifyCategoryName(name);
+  if (!baseId) {
+    toast('Не удалось собрать id категории');
+    return;
+  }
+  let id = baseId;
+  let idx = 2;
+  while (categories().some(c => c.id === id)) {
+    id = `${baseId}_${idx++}`;
+  }
+
+  categories().push({ id, name, icon });
+  iconInput.value = '';
+  nameInput.value = '';
+  markDirty();
+  refreshCategoriesUi();
+  toast(`Категория "${name}" добавлена`);
+}
+
+function removeCategory(id) {
+  if (!id) return;
+  if (isCategoryUsed(id)) {
+    toast('Сначала уберите категорию с предметов роадмапа и каталога');
+    return;
+  }
+  const idx = categories().findIndex(c => c.id === id);
+  if (idx === -1) return;
+  categories().splice(idx, 1);
+  markDirty();
+  refreshCategoriesUi();
 }
 
 // ── Render list ────────────────────────────────────────────────────────────
@@ -358,7 +654,7 @@ function renderSheetBody() {
   document.getElementById('sheet-title').textContent = item.name || 'Предмет';
 
   const isEquip = item.type === 'equipment';
-  const catOpts = CATEGORIES.map(c =>
+  const catOpts = categories().map(c =>
     `<option value="${c.id}" ${c.id === item.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
   ).join('');
 
@@ -499,7 +795,7 @@ function addItem() {
     name:      'Новый',
     icon:      '✦',
     desc:      'Описание',
-    category:  'stats',
+    category:  categories()[0]?.id ?? 'basic',
     minRarity: 1,
     baseCost:  30,
   };
@@ -515,7 +811,16 @@ function addItem() {
 }
 
 function delItem() {
-  if (!S.selId || !confirm('Удалить предмет?')) return;
+  if (!S.selId || !confirm('Удалить?')) return;
+  if (S.tab === 'todo') {
+    const idx = S.todo.findIndex(i => i.id === S.selId);
+    if (idx !== -1) S.todo.splice(idx, 1);
+    S.selId = null;
+    markDirty();
+    closeSheet();
+    renderTodo();
+    return;
+  }
   const arr = list();
   const idx = arr.findIndex(i => i.id === S.selId);
   if (idx !== -1) arr.splice(idx, 1);
@@ -545,9 +850,67 @@ function serializeItem(item) {
 }
 
 function serialize() {
+  const categoriesText = categories()
+    .map(c => `  { id: ${JSON.stringify(c.id)}, name: ${JSON.stringify(c.name)}, icon: ${JSON.stringify(c.icon)} },`)
+    .join('\n');
   const eq = S.equipment.map(serializeItem).join('\n');
   const it = S.items.map(serializeItem).join('\n');
-  return `// ── Equipment (части корпуса) ───────────────────────────────────────────────────\n\nexport const ALL_EQUIPMENT = [\n${eq}\n];\n\n// ── Items (предметы) ────────────────────────────────────────────────────────────\n\nexport const ALL_ITEMS = [\n${it}\n];\n`;
+  return `export const RARITY = {
+  COMMON: 1,
+  UNCOMMON: 2,
+  RARE: 3,
+  LEGENDARY: 4,
+};
+
+export const RARITY_NAMES = {
+  1: "Обычный",
+  2: "Необычный",
+  3: "Редкий",
+  4: "Легендарный",
+};
+
+export const RARITY_COLORS = {
+  1: "#aaa",
+  2: "#4488ff",
+  3: "#aa44ff",
+  4: "#ff4444",
+};
+
+export const RARITY_EFFECT_MULT = {
+  1: 1,
+  2: 1.5,
+  3: 2,
+  4: 3,
+};
+
+export const RARITY_COST_MULT = {
+  1: 1,
+  2: 1.8,
+  3: 3,
+  4: 5,
+};
+
+export const CATEGORIES = [
+${categoriesText}
+];
+
+export const INITIAL_CATEGORIES = ["basic", "economy"];
+export const TAG_SYNERGIES = {};
+
+// ── Equipment (части корпуса) ───────────────────────────────────────────────────
+
+export const ALL_EQUIPMENT = [
+${eq}
+];
+
+// ── Items (предметы) ────────────────────────────────────────────────────────────
+
+export const ALL_ITEMS = [
+${it}
+];
+
+export const ALL_GOODS = [...ALL_EQUIPMENT, ...ALL_ITEMS];
+`;
 }
 
 // ── Save ───────────────────────────────────────────────────────────────────
@@ -570,65 +933,191 @@ async function saveFile() {
 }
 
 // ── Todo ───────────────────────────────────────────────────────────────────
-const DIFFICULTY_LABELS = { easy: 'Просто', medium: 'Средне', hard: 'Сложно' };
-
 function renderTodo() {
+  renderStatGuide();
   const search = document.getElementById('search').value.toLowerCase();
   const catFilter = document.getElementById('filter-cat').value;
 
-  const existing = new Set([...ALL_EQUIPMENT, ...ALL_ITEMS].map(i => i.id));
-  const done = TODO_ITEMS.filter(i => existing.has(i.id));
-  const todo = TODO_ITEMS.filter(i => !existing.has(i.id));
+  const existing = new Set([...S.equipment, ...S.items].map(i => i.id));
+  const done = S.todo.filter(i => existing.has(i.id));
+  const todo = S.todo.filter(i => !existing.has(i.id));
 
   function matchFilters(item) {
     if (catFilter && item.category !== catFilter) return false;
-    if (search) {
-      const hay = `${item.name} ${item.concept} ${item.stats.join(' ')}`.toLowerCase();
-      if (!hay.includes(search)) return false;
-    }
+    if (search && !todoSearchText(item).includes(search)) return false;
     return true;
   }
 
   const visibleTodo = todo.filter(matchFilters);
   const visibleDone = done.filter(matchFilters);
-
-  const catName = id => CATEGORIES.find(c => c.id === id)?.name ?? id;
+  const catName = id => categories().find(c => c.id === id)?.name ?? id;
 
   function card(item, isDone) {
-    const diffLabel = DIFFICULTY_LABELS[item.difficulty] ?? item.difficulty;
-    const statsHtml = item.stats.map(s => `<span class="todo-stat">${s}</span>`).join('');
+    const selClass = S.selId === item.id ? 'sel' : '';
+    const statsHtml = getTodoStatEntries(item).map(([stat, value]) => {
+      const cls = value > 0 ? 'pos' : 'neg';
+      const label = STAT_GUIDE_MAP.get(stat)?.name ?? stat;
+      return `<span class="todo-stat-chip ${cls}">${esc(label)} ${esc(formatAbstractDelta(value))}</span>`;
+    }).join('');
     return `
-      <div class="todo-card" style="${isDone ? 'opacity:.45' : ''}">
-        <div class="todo-icon">${item.icon}</div>
+      <div class="todo-card ${selClass}" data-todo-id="${esc(item.id)}" style="${isDone ? 'opacity:.45' : ''}">
+        <div class="todo-icon">${esc(item.icon || '✦')}</div>
         <div class="todo-info">
-          <div class="todo-name">${isDone ? '✓ ' : ''}${item.name}</div>
-          <div class="todo-concept">${item.concept}</div>
-          <div class="todo-meta">
-            <span class="todo-cat">${catName(item.category)}</span>
-            ${statsHtml}
-            <span class="todo-diff ${item.difficulty}">${diffLabel}</span>
-          </div>
+          <div class="todo-name">${esc(item.name || 'Новый')}</div>
+          <div class="todo-meta"><span class="todo-cat">${esc(catName(item.category))}</span></div>
+          ${item.concept ? `<div class="todo-concept" style="margin-top:4px">${esc(item.concept)}</div>` : ''}
+          ${statsHtml ? `<div class="todo-stat-summary">${statsHtml}</div>` : ''}
         </div>
       </div>`;
   }
 
-  const total = TODO_ITEMS.length;
-  const doneCount = done.length;
-
-  document.getElementById('items-count').textContent = `${doneCount}/${total} готово`;
-  document.getElementById('items-list').innerHTML = `
+  document.getElementById('items-count').textContent = `${done.length}/${S.todo.length} готово`;
+  const container = document.getElementById('items-list');
+  container.innerHTML = `
     <div class="todo-header">
       <span class="todo-header-stat">Осталось: <b>${todo.length}</b> предметов</span>
-      <span class="todo-header-stat">Easy: <b>${todo.filter(i=>i.difficulty==='easy').length}</b> · Medium: <b>${todo.filter(i=>i.difficulty==='medium').length}</b> · Hard: <b>${todo.filter(i=>i.difficulty==='hard').length}</b></span>
+      <button class="hdr-btn" id="btn-todo-export">📤 Экспорт JSON</button>
     </div>
     ${visibleTodo.length ? `<div class="todo-section"><div class="todo-section-title">К реализации</div>${visibleTodo.map(i => card(i, false)).join('')}</div>` : ''}
     ${visibleDone.length ? `<div class="todo-section"><div class="todo-section-title">Готово</div>${visibleDone.map(i => card(i, true)).join('')}</div>` : ''}
+    <div style="padding:10px">
+      <button class="btn-add-item" id="btn-add-todo">＋ Добавить в роадмап</button>
+    </div>
   `;
+
+  container.querySelectorAll('.todo-card').forEach(el =>
+    el.addEventListener('click', () => {
+      S.selId = el.dataset.todoId;
+      renderTodo();
+      renderTodoSheetBody();
+      openSheet();
+    })
+  );
+
+  document.getElementById('btn-add-todo').onclick = addTodoItem;
+  document.getElementById('btn-todo-export').onclick = exportTodoJson;
+}
+
+function exportTodoJson() {
+  const text = JSON.stringify(S.todo, null, 2);
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast('JSON скопирован!')).catch(() => copyFallback(text));
+  } else {
+    copyFallback(text);
+  }
+}
+
+function addTodoItem() {
+  const id = `todo_${Date.now()}`;
+  S.todo.push(normalizeTodoItem({
+    id,
+    icon: '✦',
+    name: 'Новый',
+    category: categories()[0]?.id ?? 'basic',
+    statWeights: {},
+    concept: '',
+  }));
+  S.selId = id;
+  markDirty();
+  renderTodo();
+  renderTodoSheetBody();
+  openSheet();
+}
+
+function renderTodoSheetBody() {
+  const item = sel();
+  if (!item) return;
+  document.getElementById('sheet-title').textContent = item.name || 'Элемент роадмапа';
+  const roadmapInfluence = getRoadmapInfluenceMap();
+  const guideDots = count => count > 0
+    ? `<span class="guide-dots">${Array.from({ length: count }, () => '<span class="guide-dot"></span>').join('')}</span>`
+    : '';
+
+  const catOpts = categories().map(c =>
+    `<option value="${c.id}" ${c.id === item.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
+  ).join('');
+  const statRows = STAT_GUIDE.map(stat => {
+    const value = Math.trunc(Number(item.statWeights?.[stat.id]) || 0);
+    const valueClass = value > 0 ? 'pos' : value < 0 ? 'neg' : '';
+    const dots = value !== 0
+      ? `<span class="todo-stat-dots">${Array.from({ length: Math.abs(value) }, () => '<span class="todo-stat-dot"></span>').join('')}</span>`
+      : '';
+    const popularity = roadmapInfluence.get(stat.id) ?? { pos: 0, neg: 0 };
+    return `
+      <div class="todo-stat-row">
+        <div class="todo-stat-title">${esc(stat.id)}</div>
+        <div class="todo-stat-key">${esc(stat.name)}</div>
+        <div class="todo-stat-desc">${esc(stat.desc)}</div>
+        <div class="guide-meta">
+          ${popularity.pos > 0 ? `<span class="guide-count pos">${guideDots(popularity.pos)}</span>` : ''}
+          ${popularity.neg > 0 ? `<span class="guide-count neg">${guideDots(popularity.neg)}</span>` : ''}
+        </div>
+        <div class="todo-stat-controls">
+          <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="-1">−</button>
+          <div class="todo-stat-value ${valueClass}">${dots}${dots ? '&nbsp;' : ''}${esc(formatAbstractDelta(value))}</div>
+          <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="1">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('sheet-body').innerHTML = `
+    <div class="field-row">
+      <div class="field" style="flex:0 0 auto">
+        <label>Иконка</label>
+        <input id="t-icon" class="icon-f" value="${esc(item.icon)}">
+      </div>
+      <div class="field">
+        <label>Название</label>
+        <input id="t-name" value="${esc(item.name)}">
+      </div>
+    </div>
+    <div class="field">
+      <label>id (технический)</label>
+      <input id="t-id" value="${esc(item.id)}">
+    </div>
+    <div class="field">
+      <label>Концепт (необязательно)</label>
+      <textarea id="t-concept" placeholder="Короткая идея или пояснение...">${esc(item.concept)}</textarea>
+    </div>
+    <div class="sep"></div>
+    <div class="field">
+      <label>Категория</label>
+      <select id="t-cat">${catOpts}</select>
+    </div>
+    <div class="field">
+      <label>Влияние на статы</label>
+      <div class="todo-stat-list">${statRows}</div>
+    </div>
+  `;
+
+  const live   = (id, fn) => document.getElementById(id)?.addEventListener('input',  e => { fn(e.target.value); markDirty(); });
+  const change = (id, fn) => document.getElementById(id)?.addEventListener('change', e => { fn(e.target.value); markDirty(); });
+
+  live('t-name',    v => { item.name = v; document.getElementById('sheet-title').textContent = v || 'Элемент роадмапа'; renderTodo(); });
+  live('t-icon',    v => { item.icon = v; renderTodo(); });
+  live('t-concept', v => { item.concept = v; renderTodo(); });
+  change('t-id',    v => { item.id = v; S.selId = v; renderTodo(); });
+  change('t-cat',   v => { item.category = v; renderTodo(); });
+  document.querySelectorAll('.todo-stat-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const stat = btn.dataset.stat;
+      const delta = Math.trunc(Number(btn.dataset.delta) || 0);
+      if (!stat || !delta) return;
+      if (!item.statWeights) item.statWeights = {};
+      const next = Math.trunc(Number(item.statWeights[stat]) || 0) + delta;
+      if (next === 0) delete item.statWeights[stat];
+      else item.statWeights[stat] = next;
+      markDirty();
+      renderTodo();
+      renderTodoSheetBody();
+    })
+  );
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
 function switchTab(tab) {
-  S.tab  = tab;
+  S.tab   = tab;
   S.selId = null;
   closeSheet();
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
@@ -661,6 +1150,19 @@ document.getElementById('btn-save').onclick     = saveFile;
 document.getElementById('overlay').onclick      = closeSheet;
 document.getElementById('sheet-close').onclick  = closeSheet;
 document.getElementById('sheet-del').onclick    = delItem;
+document.getElementById('btn-cat-toggle').onclick = () => {
+  const panel = document.getElementById('cat-panel');
+  const open = panel.hidden;
+  panel.hidden = !open;
+  document.getElementById('btn-cat-toggle').classList.toggle('active', open);
+  if (open) renderCategoryPanel();
+};
+document.getElementById('btn-cat-add').onclick = addCategory;
+['cat-icon', 'cat-name'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addCategory();
+  })
+);
 
 document.getElementById('tabs').addEventListener('click', e => {
   const tab = e.target.closest('[data-tab]');
@@ -676,6 +1178,8 @@ document.getElementById('tabs').addEventListener('click', e => {
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 populateCategoryFilter();
+renderCategoryPanel();
+renderStatGuide();
 renderList();
 </script>
 </body>
