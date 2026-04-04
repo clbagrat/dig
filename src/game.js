@@ -1,5 +1,5 @@
 import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState } from "./shop.js?v=41";
-import { CATEGORIES, TAG_SYNERGIES } from "./items-catalog.js?v=1";
+import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES } from "./items-catalog.js?v=1";
 import {
   generateMap,
   mulberry32 as _mulberry32,
@@ -9,6 +9,7 @@ import {
   START_Y,
   VISION_RADIUS,
   DEPTH_LEVELS,
+  TILE_PERK_WEIGHTS,
   getGenerationConfig,
   setGenerationConfig,
   resetGenerationConfig,
@@ -93,38 +94,65 @@ const XP_PICKUP_RADIUS = 1;
 const GENERATION_CONFIG_STORAGE_KEY = "dig:generation-config";
 const DEBUG_MODE = new URLSearchParams(location.search).has("debug-map");
 
-const LEVEL_REWARD_DEFS = {
-  1: [
-    { id: "gold_5", label: "+5% золота", description: "Больше золота из разрушаемых блоков" },
-    { id: "damage_0_5", label: "+0.35 урона", description: "Постоянный прирост силы бура" },
-    { id: "speed_10", label: "+10% скорости", description: "Бур делает новые удары быстрее" },
-  ],
-  2: [
-    { id: "gold_5", label: "+5% золота", description: "Еще больше золота из разрушаемых блоков" },
-    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
-  ],
-  3: [
-    { id: "damage_0_5", label: "+0.35 урона", description: "Еще сильнее увеличивает урон бура" },
-    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
-    { id: "hp_1", label: "+1 HP", description: "Повышает максимум HP и лечит на 1" },
-  ],
-  4: [
-    { id: "artifact", label: "Артефакт", description: "Артефакт сразу выдается в руки: отнеси его к маяку" },
-    { id: "full_restore", label: "Полное восстановление", description: "Полностью лечит и заполняет бак" },
-  ],
-  5: [
-    { id: "speed_10", label: "+10% скорости", description: "Бур делает новые удары быстрее" },
-    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
-    { id: "hp_1", label: "+1 HP", description: "Повышает максимум HP и лечит на 1" },
-  ],
-  6: [
-    { id: "gold_5", label: "+5% золота", description: "Еще больше золота из разрушаемых блоков" },
-    { id: "fuel_100", label: "+100 топлива", description: "Мгновенно пополняет бак" },
-    { id: "hp_1", label: "+1 HP", description: "Повышает максимум HP и лечит на 1" },
-  ],
-};
+// ─── Level reward pool ────────────────────────────────────────────────────────
+// Each entry: { stat, minRarity, values: [C, U, R, L], label, fmt }
+// fmt(value) → display string for the label
+const LEVEL_REWARD_POOL = [
+  { stat: "drillPower",                minRarity: 1, values: [0.3, 0.6, 1.0, 1.5],   label: "Сила бура",       fmt: v => `+${v}` },
+  { stat: "strikeSpeed",               minRarity: 1, values: [3, 6, 10, 15],          label: "Скорость бура",   fmt: v => `+${v}%` },
+  { stat: "damageBonus",               minRarity: 1, values: [0.03, 0.05, 0.08, 0.10], label: "Бонус урона",   fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "miningGoldBonusMultiplier", minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Золото",        fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "maxFuel",                   minRarity: 1, values: [10, 20, 30, 40],         label: "Макс. топливо", fmt: v => `+${v}` },
+  { stat: "weakSpotChance",            minRarity: 1, values: [0.03, 0.05, 0.07, 0.11], label: "Шанс бреши",   fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "weakSpotMult",              minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],    label: "Урон по бреши",  fmt: v => `+${v}` },
+  { stat: "luck",                      minRarity: 1, values: [3, 5, 7, 11],            label: "Удача",          fmt: v => `+${v}` },
+  { stat: "speedOfAutoClose",          minRarity: 1, values: [3, 6, 10, 15],           label: "Скорость контура", fmt: v => `+${v}%` },
+  { stat: "fuelPickupBonus",           minRarity: 2, values: [null, 5, 10, 15, 20],    label: "Бонус топлива",  fmt: v => `+${v}` },
+  { stat: "maxHeat",                   minRarity: 2, values: [null, 5, 10, 15],        label: "Макс. жар",      fmt: v => `+${v}` },
+  { stat: "maxHp",                     minRarity: 3, values: [null, null, 1, 2],       label: "Макс. HP",       fmt: v => `+${v}` },
+];
 
-const LEVEL_REWARD_REPEAT_PATTERN = [3, 5, 6];
+const RARITY_NAMES_RU = { 1: "Обычный", 2: "Необычный", 3: "Редкий", 4: "Легендарный" };
+
+function rollLevelRewardRarity(playerLevel) {
+  const t = Math.min(playerLevel / 12, 1);
+  const luck = state.luck || 0;
+  const luckBonus = 1 + luck * 0.01;
+  const legendary = Math.min(0.08, t * 0.08 * luckBonus);
+  const rare      = Math.min(0.25, t * 0.25 * luckBonus);
+  const uncommon  = Math.min(0.45, (0.10 + t * 0.35) * luckBonus);
+  const roll = Math.random();
+  if (roll < legendary) return 4;
+  if (roll < legendary + rare) return 3;
+  if (roll < legendary + rare + uncommon) return 2;
+  return 1;
+}
+
+function generateLevelRewardChoices(playerLevel) {
+  const choices = [];
+  const used = new Set();
+  let attempts = 0;
+  while (choices.length < 3 && attempts < 60) {
+    attempts++;
+    const rarity = rollLevelRewardRarity(playerLevel);
+    const pool = LEVEL_REWARD_POOL.filter(e => e.minRarity <= rarity && !used.has(e.stat));
+    if (pool.length === 0) continue;
+    const entry = pool[Math.floor(Math.random() * pool.length)];
+    const valueIndex = rarity - 1;
+    const value = entry.values[valueIndex];
+    if (value == null) continue;
+    used.add(entry.stat);
+    choices.push({
+      id: `${entry.stat}:${rarity}`,
+      stat: entry.stat,
+      value,
+      rarity,
+      label: `${entry.fmt(value)} ${entry.label}`,
+      description: RARITY_NAMES_RU[rarity],
+    });
+  }
+  return choices;
+}
 
 // Reusable buffers for visibility BFS — avoids per-frame allocations
 let _visFogDistance = new Int16Array(GRID_W * GRID_H);
@@ -207,6 +235,7 @@ const TILE_PERK_TYPES = [
   { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+10% к скорости нового удара" },
   { name: "HP+", icon: "H", color: "#73e58f", desc: "+1 к текущему здоровью" },
   { name: "Броня", icon: "A", color: "#b4d7ff", desc: "+1 брони против внешней опасности" },
+  { name: "Форсаж", icon: "⚡", color: "#ff4444", desc: "+3 сек форсажа бура" },
 ];
 
 const GOLD_PERK_TYPES = [
@@ -243,7 +272,6 @@ const GOLD_PERK_TYPES = [
   { name: "Усиленный бак", icon: "◌", desc: "Бак дает больше топлива, но растет расход в секунду" },
 ];
 
-const TILE_PERK_WEIGHTS = [0, 7, 0, 0, 4, 0, 2, 2];
 const CRYSTAL_TYPES = [
   null,
   { name: "Красный", color: "#ff4747", glow: "rgba(255,71,71,0.24)" },
@@ -2591,6 +2619,10 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       state.armor += 1;
       state.perkText = "Броня";
       break;
+    case 8:
+      activateDrillOverdrive(3, "");
+      state.perkText = "Форсаж";
+      break;
     default:
       break;
   }
@@ -4012,19 +4044,9 @@ function getCurrentLevelRewardEntry() {
   return state.levelRewardQueue[0] || null;
 }
 
-function getLevelRewardTemplateStep(step) {
-  if (LEVEL_REWARD_DEFS[step]) {
-    return step;
-  }
-  const cycleIndex = (step - 7) % LEVEL_REWARD_REPEAT_PATTERN.length;
-  return LEVEL_REWARD_REPEAT_PATTERN[(cycleIndex + LEVEL_REWARD_REPEAT_PATTERN.length) % LEVEL_REWARD_REPEAT_PATTERN.length];
-}
-
 function getLevelRewardChoices(entry = getCurrentLevelRewardEntry()) {
-  if (!entry) {
-    return [];
-  }
-  return LEVEL_REWARD_DEFS[getLevelRewardTemplateStep(entry.step)] || [];
+  if (!entry) return [];
+  return entry.choices || [];
 }
 
 function resolveLevelRewardQueue() {
@@ -4080,17 +4102,17 @@ function syncLevelUpModal() {
     return;
   }
   eyebrow.textContent = `Уровень ${entry.level}`;
-  title.textContent = entry.step === 4 ? "Выбор артефакта" : "Выберите награду";
-  text.textContent =
-    entry.step === 4
-      ? "Выберите: взять артефакт в руки и нести к маяку или полностью восстановиться."
-      : `Награда ${entry.step}: выберите один бонус.`;
-  choices.innerHTML = rewardChoices.map((choice) => `
-    <button class="level-up-modal__choice" type="button" data-level-reward-id="${choice.id}">
+  title.textContent = "Выберите награду";
+  text.textContent = "Выберите один бонус.";
+  choices.innerHTML = rewardChoices.map((choice) => {
+    const color = RARITY_COLORS[choice.rarity] || "#aaa";
+    const rarityName = RARITY_NAMES[choice.rarity] || "";
+    return `
+    <button class="level-up-modal__choice" type="button" data-level-reward-id="${choice.id}" style="border-color:${color}">
       <span class="level-up-modal__choice-label">${choice.label}</span>
-      <span class="level-up-modal__choice-text">${choice.description}</span>
-    </button>
-  `).join("");
+      <span class="level-up-modal__choice-text" style="color:${color}">${rarityName}</span>
+    </button>`;
+  }).join("");
   syncTouchZonesInteractivity();
 }
 
@@ -4147,52 +4169,27 @@ function applyLevelUpItemBonuses() {
 }
 
 function applyLevelReward(choiceId) {
-  switch (choiceId) {
-    case "gold_5":
-      state.miningGoldBonusMultiplier += 0.05;
-      showPerkToast("+5% золота из блоков");
-      return;
-    case "damage_0_5":
-      state.drillPower += 0.35;
-      showPerkToast("+0.35 урона");
-      return;
-    case "speed_10":
-      state.strikeSpeed += 10;
-      showPerkToast("+10% скорости");
-      return;
-    case "fuel_100":
-      addFuel(100, state.drill.x, state.drill.y);
-      showPerkToast("+100 топлива");
-      return;
-    case "hp_1":
-      state.maxHp += 1;
-      healPlayer(1, "Награда уровня");
-      showPerkToast("+1 HP");
-      return;
-    case "artifact":
-      grantLevelRewardArtifact();
-      return;
-    case "full_restore":
-      restorePlayerFully();
-      return;
-    case "heal_full":
-      healPlayer(Math.max(0, state.maxHp - state.hp), "Лечение");
-      showPerkToast("Полное лечение");
-      return;
-    default:
-      return;
+  const entry = getCurrentLevelRewardEntry();
+  const choice = (entry?.choices || []).find(c => c.id === choiceId);
+  if (!choice) return;
+  const { stat, value, label } = choice;
+  if (stat === "maxHp") {
+    state.maxHp += value;
+    healPlayer(value, "Награда уровня");
+  } else {
+    state[stat] = (state[stat] || 0) + value;
   }
+  if (stat === "visionRadius") state.visibilityDirty = true;
+  showPerkToast(label);
 }
 
 function claimLevelReward(choiceId) {
   const entry = getCurrentLevelRewardEntry();
   const rewardChoices = getLevelRewardChoices(entry);
-  if (!entry || !rewardChoices.some((choice) => choice.id === choiceId)) {
-    return;
-  }
+  if (!entry || !rewardChoices.some((c) => c.id === choiceId)) return;
+  applyLevelReward(choiceId);
   state.levelRewardQueue.shift();
   closeLevelUpModal();
-  applyLevelReward(choiceId);
   maybeOpenPendingLevelReward();
 }
 
@@ -5459,7 +5456,7 @@ function getLuckyPickaxeOreGain() {
 }
 
 function getXpNeededForLevel(level) {
-  return Math.round(40 * 1.5 ** Math.max(0, level - 1));
+  return Math.round(40 * 1.3 ** Math.max(0, level - 1));
 }
 
 function applyMiningGoldBonus(amount) {
@@ -5487,7 +5484,7 @@ function gainExperience(amount) {
     state.level += 1;
     state.xpToNext = getXpNeededForLevel(state.level);
     state.levelRewardStep += 1;
-    state.levelRewardQueue.push({ step: state.levelRewardStep, level: state.level });
+    state.levelRewardQueue.push({ step: state.levelRewardStep, level: state.level, choices: generateLevelRewardChoices(state.level) });
     applyLevelUpItemBonuses();
     state.levelUpFlash = Math.min(1, (state.levelUpFlash || 0) + 0.55);
     state.levelUpPulse = 0.9;

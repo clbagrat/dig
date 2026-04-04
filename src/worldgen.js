@@ -49,7 +49,7 @@ export const TILE_PERK_TYPES = [
   { name: "Броня", icon: "A", color: "#b4d7ff" },
 ];
 
-export const TILE_PERK_WEIGHTS = [0, 7, 0, 0, 4, 0, 2, 2];
+export const TILE_PERK_WEIGHTS = [0, 3, 0, 0, 4, 0, 2, 2, 4];
 
 export const CRYSTAL_TYPES = [
   null,
@@ -79,10 +79,10 @@ const DEFAULT_LEVEL_LAYOUT = [
   {
     id: 2,
     height: 26,
-    width: 52,
+    width: 26,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 2, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [2, 4, 17], thornVein: [2, 6, 23], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 10, 25], goldOre: [10, 4, 10], gasPocket: [1, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 8, maxCrystals: 52, hardnessBias: -0.8 },
+    rules: { beacons: 2, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [1, 4, 6], thornVein: [2, 4, 6], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 3, 6], goldOre: [5, 3, 5], gasPocket: [1, 4, 6], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 10, maxCrystals: 13, hardnessBias: -0.8 },
   },
   {
     id: 3,
