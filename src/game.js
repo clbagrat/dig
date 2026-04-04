@@ -190,6 +190,9 @@ function createGridStateBuffers() {
     loopGoldMask: new Float32Array(cellCount),
     droppedGoldMask: new Float32Array(cellCount),
     xpPickupMask: new Uint16Array(cellCount),
+    xpBonusPickupMask: new Uint16Array(cellCount),
+    goldPickupMask: new Float32Array(cellCount),
+    goldBonusPickupMask: new Float32Array(cellCount),
     visibleMask: new Uint8Array(cellCount),
     visibleAlpha: new Float32Array(cellCount),
     visibleTargetAlpha: new Float32Array(cellCount),
@@ -481,22 +484,9 @@ const state = {
   strikeSpeedPerLevel: 0,
   healPerLevel: 0,
   goldBonusPerLevel: 0,
-  perkToast: {
-    text: "",
-    time: 0,
-  },
-  fuelToast: {
-    value: 0,
-    time: 0,
-  },
-  hpToast: {
-    value: 0,
-    time: 0,
-  },
-  goldToast: {
-    value: 0,
-    time: 0,
-  },
+  activeToasts: [],
+  toastQueue: [],
+  toastQueueTimer: 0,
   depthTitle: {
     text: "",
     time: 0,
@@ -1076,6 +1066,16 @@ function spawnWeakSpotHitEffect(x, y, dirX, dirY) {
   });
 }
 
+function spawnXpPickupEffect(x, y, value) {
+  state.effects.push({
+    kind: "xpPickup",
+    x, y, value,
+    time: 0.88,
+    duration: 0.88,
+    seed: (x * 73417 + y * 53923 + value * 131) % 1000,
+  });
+}
+
 function spawnGoldOreEffect(x, y, value) {
   state.effects.push({
     kind: "goldOre",
@@ -1149,6 +1149,7 @@ function spawnExperienceParticles(tileX, tileY, totalValue) {
       delay: i * 0.03,
       duration: 0.24 + (seed % 6) * 0.02,
       seed,
+      showTotal: i === count - 1 ? totalValue : 0,
     });
   }
 }
@@ -2020,6 +2021,9 @@ function setupField(seedOverride = null) {
   state.loopGoldMask.fill(0);
   state.droppedGoldMask.fill(0);
   state.xpPickupMask.fill(0);
+  state.xpBonusPickupMask.fill(0);
+  state.goldPickupMask.fill(0);
+  state.goldBonusPickupMask.fill(0);
   state.hazardTriggeredMask.fill(0);
   state.metalMask.fill(0);
   state.goldOreMask.fill(0);
@@ -2182,16 +2186,11 @@ function setupField(seedOverride = null) {
   state.strikeSpeedPerLevel = 0;
   state.healPerLevel = 0;
   state.goldBonusPerLevel = 0;
-  state.perkToast.text = "";
-  state.perkToast.time = 0;
-  state.fuelToast.value = 0;
-  state.fuelToast.time = 0;
-  state.hpToast.value = 0;
-  state.hpToast.time = 0;
+  state.activeToasts.length = 0;
+  state.toastQueue.length = 0;
+  state.toastQueueTimer = 0;
   state.goldParticles.length = 0;
   state.xpParticles.length = 0;
-  state.goldToast.value = 0;
-  state.goldToast.time = 0;
   state.depthTitle.text = "";
   state.depthTitle.time = 0;
   state.damageFlash = 0;
@@ -2588,8 +2587,7 @@ function carveTunnel(x, y) {
   const droppedPickup = Math.floor(state.droppedGoldMask[index]);
   if (droppedPickup > 0) {
     state.droppedGoldMask[index] = 0;
-    state.unsafeGold += droppedPickup;
-    spawnGoldParticles(x, y, droppedPickup);
+    addToGoldPickupMask(x, y, droppedPickup);
   }
 
   if (perkType > 0) {
@@ -3102,19 +3100,30 @@ function showDebugToast(text) {
   el._t = setTimeout(() => { el.textContent = ""; }, 4000);
 }
 
+function applyToast(item) {
+  state.activeToasts.push({
+    text: item.text,
+    color: item.color,
+    time: 0.9,
+    wx: state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 + (Math.random() - 0.5) * TILE_SIZE * 1.6,
+    wy: state.drill.renderY * TILE_SIZE - 10 + state.activeToasts.length * 4,
+  });
+}
+
 function showPerkToast(text) {
-  state.perkToast.text = text;
-  state.perkToast.time = 1.2;
+  state.toastQueue.push({ text: `+ ${text}`, color: "#ffcf7a" });
 }
 
 function showFuelToast(value) {
-  state.fuelToast.value = value;
-  state.fuelToast.time = 0.9;
+  state.toastQueue.push({ text: `${value > 0 ? "+" : ""}${value} fuel`, color: value > 0 ? "#ffbf62" : "#ff8f8f" });
 }
 
 function showGoldToast(value) {
-  state.goldToast.value = value;
-  state.goldToast.time = 0.9;
+  state.toastQueue.push({ text: `+${value} ●`, color: "#f8e040" });
+}
+
+function showXpToast(value) {
+  state.toastQueue.push({ text: `+${value} ◆`, color: "#78d8ff" });
 }
 
 function runFuelEvent(callback) {
@@ -4638,6 +4647,7 @@ function update(dt) {
   }
 
   pickupExperienceNearPlayer();
+  pickupGoldNearPlayer();
 
   if (state.signalMovesLeft > 0) {
     state.signalMovesLeft = Math.max(0, state.signalMovesLeft - dt);
@@ -4709,10 +4719,16 @@ function update(dt) {
   if (state.loopChargeTimer === 0) {
     state.loopChargeDamageBonus = 0;
   }
-  state.perkToast.time = Math.max(0, state.perkToast.time - dt);
-  state.fuelToast.time = Math.max(0, state.fuelToast.time - dt);
-  state.hpToast.time = Math.max(0, state.hpToast.time - dt);
-  state.goldToast.time = Math.max(0, state.goldToast.time - dt);
+  for (let i = state.activeToasts.length - 1; i >= 0; i--) {
+    state.activeToasts[i].time -= dt;
+    if (state.activeToasts[i].time <= 0) state.activeToasts.splice(i, 1);
+  }
+  if (state.toastQueueTimer > 0) {
+    state.toastQueueTimer = Math.max(0, state.toastQueueTimer - dt);
+  } else if (state.toastQueue.length > 0) {
+    applyToast(state.toastQueue.shift());
+    state.toastQueueTimer = 0.08;
+  }
   state.depthTitle.time = Math.max(0, state.depthTitle.time - dt);
   state.damageFlash = Math.max(0, state.damageFlash - dt * 2.4);
   state.levelUpFlash = Math.max(0, state.levelUpFlash - dt * 2.2);
@@ -4762,7 +4778,6 @@ function updateGoldParticles(dt) {
     // Particle arrived — credit unsafe gold (unless already credited as deposit)
     if (!p.skipCredit) {
       state.unsafeGold += p.value;
-      if (p.isLast && !p.skipArrivalEffect) spawnGoldOreEffect(state.drill.x, state.drill.y, p.toastValue || p.value);
     } else if (p.destTileX !== undefined) {
       state.effects.push({
         kind: "depositArrival",
@@ -4784,7 +4799,13 @@ function updateExperienceParticles(dt) {
     if (particle.elapsed - particle.delay < particle.duration) {
       continue;
     }
-    gainExperience(particle.value);
+    if (particle.isGold || particle.isGoldBonus) {
+      state.unsafeGold += particle.value;
+      if (particle.showTotal) showGoldToast(particle.showTotal);
+    } else {
+      gainExperience(particle.value);
+      if (particle.showTotal) showXpToast(particle.showTotal);
+    }
     state.xpParticles.splice(i, 1);
   }
 }
@@ -5744,11 +5765,65 @@ function pickupExperienceNearPlayer() {
       }
       const index = cellIndex(tx, ty);
       const amount = state.xpPickupMask[index];
-      if (amount <= 0) {
+      if (amount > 0) {
+        state.xpPickupMask[index] = 0;
+        spawnExperienceParticles(tx, ty, amount);
+      }
+      const bonusAmount = state.xpBonusPickupMask[index];
+      if (bonusAmount <= 0) {
         continue;
       }
-      state.xpPickupMask[index] = 0;
-      spawnExperienceParticles(tx, ty, amount);
+      state.xpBonusPickupMask[index] = 0;
+      spawnExperienceParticles(tx, ty, bonusAmount);
+    }
+  }
+}
+
+function addToGoldPickupMask(x, y, amount) {
+  if (amount <= 0) return;
+  state.goldPickupMask[cellIndex(x, y)] += amount;
+}
+
+function addToGoldBonusPickupMask(x, y, amount) {
+  if (amount <= 0) return;
+  state.goldBonusPickupMask[cellIndex(x, y)] += amount;
+}
+
+function spawnGoldPickupParticle(tx, ty, amount, isBonus) {
+  const seed = (tx * 193 + ty * 389 + (isBonus ? 777 : 0)) % 1000;
+  state.xpParticles.push({
+    tileX: tx + 0.5,
+    tileY: ty + 0.5,
+    value: amount,
+    elapsed: 0,
+    delay: 0,
+    duration: 0.24 + (seed % 6) * 0.02,
+    seed,
+    isGold: true,
+    isGoldBonus: isBonus,
+    showTotal: amount,
+  });
+}
+
+function pickupGoldNearPlayer() {
+  const px = state.drill.x;
+  const py = state.drill.y;
+  for (let dy = -XP_PICKUP_RADIUS; dy <= XP_PICKUP_RADIUS; dy += 1) {
+    for (let dx = -XP_PICKUP_RADIUS; dx <= XP_PICKUP_RADIUS; dx += 1) {
+      const tx = px + dx;
+      const ty = py + dy;
+      if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
+      const index = cellIndex(tx, ty);
+      const amount = state.goldPickupMask[index];
+      if (amount > 0) {
+        state.goldPickupMask[index] = 0;
+        spawnGoldPickupParticle(tx, ty, amount, false);
+      }
+      const bonusAmount = state.goldBonusPickupMask[index];
+      if (bonusAmount > 0) {
+        state.goldBonusPickupMask[index] = 0;
+        spawnGoldPickupParticle(tx, ty, bonusAmount, true);
+      }
     }
   }
 }
@@ -5979,8 +6054,7 @@ function showHpToast(value) {
   if (value <= 0) {
     return;
   }
-  state.hpToast.value = value;
-  state.hpToast.time = 0.9;
+  state.toastQueue.push({ text: `-${value} HP`, color: "#ff8a8a" });
 }
 
 function consumeFuelEmergency() {
@@ -6459,33 +6533,32 @@ function breakCell(x, y, index, options = {}) {
   }
   const hazardType = state.hazardMask[index];
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
-  const goldGain =
-    hazardType === HAZARD_TYPES.SPIKE && options.cause === "explosion"
-      ? applyMiningGoldBonus(1)
-      : state.goldOreMask[index]
-        ? applyMiningGoldBonus(Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier))
-        : 0;
+  const baseGold = state.goldOreMask[index] ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier) : 0;
+  const totalGold = baseGold > 0 ? applyMiningGoldBonus(baseGold) : 0;
+  const bonusGold = totalGold - baseGold;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
-  if (state.goldOreMask[index]) {
-    spawnGoldParticles(x, y, goldGain);
+  if (baseGold > 0) {
+    addToGoldPickupMask(x, y, baseGold);
+    if (bonusGold > 0) addToGoldBonusPickupMask(x, y, bonusGold);
   }
   const embeddedGold = Math.floor(state.droppedGoldMask[index]);
   if (embeddedGold > 0) {
     state.droppedGoldMask[index] = 0;
-    spawnGoldParticles(x, y, embeddedGold);
+    addToGoldPickupMask(x, y, embeddedGold);
   }
   const microRes = state.microResourceMask[index];
   if (microRes > 0) {
     state.microResourceMask[index] = 0;
     state.microResourceRevealedMask[index] = 0;
     if (microRes === 1) {
-      const goldAmount = applyMiningGoldBonus(1);
-      state.unsafeGold += goldAmount;
-      spawnGoldParticles(x, y, goldAmount);
+      const microGoldTotal = applyMiningGoldBonus(1);
+      const microGoldBonus = microGoldTotal - 1;
+      addToGoldPickupMask(x, y, 1);
+      if (microGoldBonus > 0) addToGoldBonusPickupMask(x, y, microGoldBonus);
     } else if (microRes === 2) {
       addFuel(5, x, y);
     } else if (microRes === 3) {
-      gainExperience(1);
+      state.xpBonusPickupMask[cellIndex(x, y)] += 1;
     }
   }
   state.hardness[index] = 0;
@@ -6520,7 +6593,7 @@ function breakCell(x, y, index, options = {}) {
       nest.active = false;
       const reward = 150 + Math.floor(Math.random() * 101);
       // Flashy gold ore effect (burst + floating value text)
-      spawnGoldOreEffect(x, y, reward);
+      showGoldToast(reward);
       const scattered = scatterGoldAroundTile(x, y, reward);
       if (!scattered) {
         spawnGoldParticles(x, y, reward);
@@ -6649,7 +6722,7 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   const droppedPickup = Math.floor(state.droppedGoldMask[moveIndex]);
   if (droppedPickup > 0 && state.tunnelMask[moveIndex]) {
     state.droppedGoldMask[moveIndex] = 0;
-    spawnGoldParticles(toX, toY, droppedPickup);
+    addToGoldPickupMask(toX, toY, droppedPickup);
   }
   // Pick up perks/crystals on already-tunneled tiles (e.g. inside opened safe)
   const perkOnTile = state.perkMask[moveIndex];
@@ -7826,6 +7899,26 @@ function renderEffects(camera) {
       ctx.fillText(`+${effect.value} ●`, 0, 0);
       ctx.restore();
       ctx.globalAlpha = 1;
+    } else if (effect.kind === "xpPickup") {
+      const t = progress;
+      const easeOut = 1 - (1 - t) * (1 - t);
+      const textAlpha = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.25) / 0.75);
+      const scale = t < 0.12 ? 1.5 - (t / 0.12) * 0.5 : 1.0;
+      const lift = easeOut * 28;
+      ctx.globalAlpha = textAlpha;
+      ctx.save();
+      ctx.translate(cx, cy - 10 - lift);
+      ctx.scale(scale, scale);
+      ctx.font = `700 14px ${HUD_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "rgba(4, 16, 28, 0.95)";
+      ctx.fillStyle = "#78d8ff";
+      ctx.strokeText(`+${effect.value} ◆`, 0, 0);
+      ctx.fillText(`+${effect.value} ◆`, 0, 0);
+      ctx.restore();
+      ctx.globalAlpha = 1;
     } else if (effect.kind === "loopField") {
       const alpha = 1 - progress;
       ctx.globalAlpha = alpha;
@@ -8204,11 +8297,11 @@ function renderExperienceParticles(camera) {
     const size = 2.6 - t * 0.9;
 
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = "#7ee3ff";
+    ctx.fillStyle = particle.isGoldBonus ? "#ffe060" : particle.isGold ? "#c8920a" : "#7ee3ff";
     ctx.beginPath();
     ctx.arc(px, py, size, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#dbfbff";
+    ctx.fillStyle = particle.isGoldBonus ? "#fff7c0" : particle.isGold ? "#ffe060" : "#dbfbff";
     ctx.beginPath();
     ctx.arc(px, py, size * 0.45, 0, Math.PI * 2);
     ctx.fill();
@@ -8316,29 +8409,103 @@ function render() {
       if (state.tunnelMask[index]) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
         if (state.xpPickupMask[index] > 0) {
+          const jSeedX = (index * 1234567) >>> 0;
+          const jSeedY = (index * 7654321) >>> 0;
+          const jx = (((jSeedX & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const jy = (((jSeedY & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const cx = sx + TILE_SIZE * 0.5 + jx;
+          const cy = sy + TILE_SIZE * 0.5 + jy;
           const pulse = Math.sin((state.lastTs || 0) * 0.006 + x * 0.8 + y * 1.2) * 0.5 + 0.5;
           const amount = state.xpPickupMask[index];
           ctx.save();
           ctx.globalAlpha = visibleAlpha * (0.72 + pulse * 0.24);
           ctx.fillStyle = "#78d8ff";
           ctx.beginPath();
-          ctx.arc(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5, 3.2 + pulse * 0.55, 0, Math.PI * 2);
+          ctx.arc(cx, cy, 3.2 + pulse * 0.55, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = "#bff4ff";
           ctx.beginPath();
-          ctx.moveTo(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 - 4.4);
-          ctx.lineTo(sx + TILE_SIZE * 0.5 + 4.4, sy + TILE_SIZE * 0.5);
-          ctx.lineTo(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 + 4.4);
-          ctx.lineTo(sx + TILE_SIZE * 0.5 - 4.4, sy + TILE_SIZE * 0.5);
+          ctx.moveTo(cx, cy - 4.4);
+          ctx.lineTo(cx + 4.4, cy);
+          ctx.lineTo(cx, cy + 4.4);
+          ctx.lineTo(cx - 4.4, cy);
           ctx.closePath();
           ctx.fill();
-          if (amount > 1) {
-            ctx.fillStyle = "#133040";
-            ctx.font = `700 7px ${HUD_FONT}`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(String(amount), sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 + 0.5);
-          }
+          ctx.restore();
+          ctx.globalAlpha = visibleAlpha;
+        }
+        if (state.xpBonusPickupMask[index] > 0) {
+          const jSeedX = (index * 4567891) >>> 0;
+          const jSeedY = (index * 1987654) >>> 0;
+          const jx = (((jSeedX & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const jy = (((jSeedY & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const cx = sx + TILE_SIZE * 0.5 + jx;
+          const cy = sy + TILE_SIZE * 0.5 + jy;
+          const pulse = Math.sin((state.lastTs || 0) * 0.007 + x * 1.1 + y * 0.9) * 0.5 + 0.5;
+          ctx.save();
+          ctx.globalAlpha = visibleAlpha * (0.72 + pulse * 0.24);
+          ctx.fillStyle = "#78d8ff";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 3.2 + pulse * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#bff4ff";
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 4.4);
+          ctx.lineTo(cx + 4.4, cy);
+          ctx.lineTo(cx, cy + 4.4);
+          ctx.lineTo(cx - 4.4, cy);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+          ctx.globalAlpha = visibleAlpha;
+        }
+        if (state.goldPickupMask[index] > 0) {
+          const jSeedX = (index * 2345678) >>> 0;
+          const jSeedY = (index * 8765432) >>> 0;
+          const jx = (((jSeedX & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const jy = (((jSeedY & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const cx = sx + TILE_SIZE * 0.5 + jx;
+          const cy = sy + TILE_SIZE * 0.5 + jy;
+          const pulse = Math.sin((state.lastTs || 0) * 0.006 + x * 1.3 + y * 0.7) * 0.5 + 0.5;
+          const amount = Math.round(state.goldPickupMask[index]);
+          ctx.save();
+          ctx.globalAlpha = visibleAlpha * (0.72 + pulse * 0.24);
+          ctx.fillStyle = "#c8920a";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 3.2 + pulse * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ffe060";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 1.6 + pulse * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          ctx.globalAlpha = visibleAlpha;
+        }
+        if (state.goldBonusPickupMask[index] > 0) {
+          const jSeedX = (index * 3456789) >>> 0;
+          const jSeedY = (index * 9876543) >>> 0;
+          const jx = (((jSeedX & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const jy = (((jSeedY & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.25;
+          const cx = sx + TILE_SIZE * 0.5 + jx;
+          const cy = sy + TILE_SIZE * 0.5 + jy;
+          const pulse = Math.sin((state.lastTs || 0) * 0.008 + x * 0.9 + y * 1.4) * 0.5 + 0.5;
+          const amount = Math.round(state.goldBonusPickupMask[index]);
+          ctx.save();
+          ctx.globalAlpha = visibleAlpha * (0.78 + pulse * 0.22);
+          ctx.fillStyle = "#ffe060";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 3.2 + pulse * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#fff7c0";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 1.6 + pulse * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          // small star marker
+          ctx.fillStyle = "#c86400";
+          ctx.font = `600 5px ${HUD_FONT}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("★", cx + 3.5, cy - 3.5);
           ctx.restore();
           ctx.globalAlpha = visibleAlpha;
         }
@@ -8396,12 +8563,12 @@ function render() {
             ctx.arc(cx2 - 0.8, cy2 - 0.8, 1.2, 0, Math.PI * 2);
             ctx.fill();
           } else if (mType === 2) {
-            // fuel — small cyan drop
-            ctx.fillStyle = "#54d4f0";
+            // fuel — small black drop
+            ctx.fillStyle = "#1a1a1a";
             ctx.beginPath();
             ctx.arc(cx2, cy2 + 1, 2.8, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = "#b8f4ff";
+            ctx.fillStyle = "#444444";
             ctx.beginPath();
             ctx.moveTo(cx2, cy2 - 3.2);
             ctx.lineTo(cx2 + 2, cy2 + 0.5);
@@ -8581,10 +8748,7 @@ function render() {
   renderWorms(camera);
   renderDrill(camera);
   renderBaseProximityDot(camera);
-  renderFuelToast(camera);
-  renderHpToast(camera);
-  renderGoldToast(camera);
-  renderPerkToast(camera);
+  renderActiveToast(camera);
   if (!state.debugMapActive) {
     renderSignalStatus(camera);
     renderBeaconRadar(camera);
@@ -10337,114 +10501,46 @@ function renderLoopChargeStatus(camera) {
   ctx.restore();
 }
 
-function renderPerkToast(camera) {
-  if (state.perkToast.time <= 0 || !state.perkToast.text) {
-    return;
-  }
-
+function renderActiveToast(camera) {
+  if (state.activeToasts.length === 0) return;
   const ctx = state.ctx;
-  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const lift = (1.2 - state.perkToast.time) * 18;
-  const y = state.drill.renderY * TILE_SIZE - camera.y - 34 - lift;
-  const alpha = clamp(state.perkToast.time / 1.2, 0, 1);
-  const text = `+ ${state.perkToast.text}`;
-
   ctx.save();
-  ctx.globalAlpha = alpha;
   ctx.font = `700 14px ${HUD_FONT}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const width = Math.max(86, ctx.measureText(text).width + 22);
-  ctx.fillStyle = "rgba(36, 22, 13, 0.88)";
-  ctx.strokeStyle = "rgba(255, 207, 122, 0.42)";
-  ctx.lineWidth = 1.5;
-  drawRoundedRectPath(x - width * 0.5, y - 13, width, 26, 12);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#ffcf7a";
-  ctx.fillText(text, x, y + 1);
-  ctx.restore();
-}
-
-function renderFuelToast(camera) {
-  if (state.fuelToast.time <= 0 || state.fuelToast.value === 0) {
-    return;
+  ctx.lineWidth = 3.5;
+  for (let i = 0; i < state.activeToasts.length; i++) {
+    const toast = state.activeToasts[i];
+    const t = 1 - toast.time / 0.9;
+    const alpha = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.25) / 0.75);
+    const lift = (1 - (1 - t) * (1 - t)) * 28;
+    const x = toast.wx - camera.x;
+    const y = toast.wy - camera.y - lift;
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "rgba(8, 4, 2, 0.95)";
+    ctx.fillStyle = toast.color;
+    if (toast.text.endsWith(" ◆")) {
+      const prefix = toast.text.slice(0, -1); // "+N "
+      ctx.font = `700 14px ${HUD_FONT}`;
+      const prefixW = ctx.measureText(prefix).width;
+      ctx.font = `700 10px ${HUD_FONT}`;
+      const iconW = ctx.measureText("◆").width;
+      const totalW = prefixW + iconW;
+      const sx = x - totalW / 2;
+      ctx.textAlign = "left";
+      ctx.font = `700 14px ${HUD_FONT}`;
+      ctx.strokeText(prefix, sx, y);
+      ctx.fillText(prefix, sx, y);
+      ctx.font = `700 10px ${HUD_FONT}`;
+      ctx.strokeText("◆", sx + prefixW, y);
+      ctx.fillText("◆", sx + prefixW, y);
+      ctx.textAlign = "center";
+      ctx.font = `700 14px ${HUD_FONT}`;
+    } else {
+      ctx.strokeText(toast.text, x, y);
+      ctx.fillText(toast.text, x, y);
+    }
   }
-
-  const ctx = state.ctx;
-  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const lift = (0.9 - state.fuelToast.time) * 22;
-  const y = state.drill.renderY * TILE_SIZE - camera.y - 78 - lift;
-  const alpha = clamp(state.fuelToast.time / 0.9, 0, 1);
-  const text = `${state.fuelToast.value > 0 ? "+" : ""}${state.fuelToast.value} fuel`;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font = `700 13px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const width = Math.max(80, ctx.measureText(text).width + 18);
-  ctx.fillStyle = "rgba(41, 26, 12, 0.88)";
-  ctx.strokeStyle = state.fuelToast.value > 0 ? "rgba(255, 191, 98, 0.38)" : "rgba(255, 128, 128, 0.4)";
-  ctx.lineWidth = 1.5;
-  drawRoundedRectPath(x - width * 0.5, y - 12, width, 24, 11);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = state.fuelToast.value > 0 ? "#ffbf62" : "#ff8f8f";
-  ctx.fillText(text, x, y + 1);
-  ctx.restore();
-}
-
-function renderHpToast(camera) {
-  if (state.hpToast.time <= 0 || state.hpToast.value <= 0) {
-    return;
-  }
-
-  const ctx = state.ctx;
-  const sx = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const sy = state.drill.renderY * TILE_SIZE - camera.y;
-  const lift = (0.9 - state.hpToast.time) * 24;
-  const alpha = clamp(state.hpToast.time / 0.9, 0, 1);
-  const text = `-${state.hpToast.value} HP`;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = "#ff8a8a";
-  ctx.strokeStyle = "rgba(43, 12, 12, 0.72)";
-  ctx.lineWidth = 3;
-  ctx.font = `700 14px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  ctx.strokeText(text, sx, sy - 26 - lift);
-  ctx.fillText(text, sx, sy - 26 - lift);
-  ctx.restore();
-}
-
-function renderGoldToast(camera) {
-  if (state.goldToast.time <= 0 || state.goldToast.value <= 0) {
-    return;
-  }
-
-  const ctx = state.ctx;
-  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const lift = (0.9 - state.goldToast.time) * 22;
-  const y = state.drill.renderY * TILE_SIZE - camera.y - 56 - lift;
-  const alpha = clamp(state.goldToast.time / 0.9, 0, 1);
-  const text = `+${state.goldToast.value} золото`;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font = `700 13px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const width = Math.max(84, ctx.measureText(text).width + 18);
-  ctx.fillStyle = "rgba(41, 31, 12, 0.88)";
-  ctx.strokeStyle = "rgba(240, 223, 132, 0.38)";
-  ctx.lineWidth = 1.5;
-  drawRoundedRectPath(x - width * 0.5, y - 12, width, 24, 11);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#f0df84";
-  ctx.fillText(text, x, y + 1);
   ctx.restore();
 }
 
