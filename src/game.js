@@ -10065,7 +10065,7 @@ function renderOverdriveStatus(camera) {
 
   const ctx = state.ctx;
   const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.renderY * TILE_SIZE - camera.y + 20;
+  const y = state.drill.renderY * TILE_SIZE - camera.y - 12;
   const width = 64;
   const ratio = clamp(state.overhealDrillTimer / Math.max(1, state.overdriveDisplayDuration || state.overhealOverdriveDuration || 3), 0, 1);
 
