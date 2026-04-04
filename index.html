@@ -12,7 +12,10 @@
   <body>
     <div class="app-shell">
       <canvas id="game"></canvas>
-      <button id="manualOpen" class="manual-link" type="button" aria-label="Открыть руководство">?</button>
+      <div class="top-actions">
+        <button id="reloadGame" class="top-action-button top-action-button--text" type="button" aria-label="Перезагрузить игру">Перезагрузить</button>
+        <button id="manualOpen" class="top-action-button top-action-button--icon" type="button" aria-label="Открыть руководство">?</button>
+      </div>
       <div class="touch-zones">
         <div id="movePad" class="move-pad">
           <div id="moveStick" class="move-stick"></div>

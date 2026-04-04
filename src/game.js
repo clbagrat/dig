@@ -3357,6 +3357,7 @@ function bindUi() {
   const perkButtons = document.querySelectorAll("[data-perk-slot]");
   const rerollButton = document.getElementById("perkReroll");
   const shopOpenBtn = document.getElementById("shopOpen");
+  const reloadButton = document.getElementById("reloadGame");
   const manualOpen = document.getElementById("manualOpen");
   const manualClose = document.getElementById("manualClose");
   const manualOverlay = document.getElementById("manualModal");
@@ -3477,6 +3478,14 @@ function bindUi() {
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
       openShop(state.gold, null, state.luck, getShopStatsSnapshot());
+    });
+  }
+
+  if (reloadButton) {
+    reloadButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.location.reload();
     });
   }
 
@@ -8353,13 +8362,13 @@ function render() {
   ctx.clearRect(0, 0, state.width, state.height);
 
   const gradient = ctx.createLinearGradient(0, 0, 0, state.height);
-  gradient.addColorStop(0, "#3a2415");
-  gradient.addColorStop(0.45, "#24160f");
-  gradient.addColorStop(1, "#0b0706");
+  gradient.addColorStop(0, "#1a1613");
+  gradient.addColorStop(0.45, "#100d0b");
+  gradient.addColorStop(1, "#050403");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, state.width, state.height);
 
-  ctx.fillStyle = "rgba(224, 176, 96, 0.05)";
+  ctx.fillStyle = "rgba(255, 236, 204, 0.02)";
   ctx.beginPath();
   ctx.arc(state.width * 0.76, state.height * 0.1, 140, 0, Math.PI * 2);
   ctx.fill();
@@ -10686,11 +10695,11 @@ function renderHud() {
   drawHudXpBar(left, thirdRowTop, totalWidth, panelHeight, `LVL ${state.level}`, `${state.xp}/${state.xpToNext}`, xpRatio);
   const detailTop = thirdRowTop + panelHeight + 8;
 
-  const manualButton = document.getElementById("manualOpen");
-  if (manualButton) {
-    manualButton.style.top = `${detailTop - 1}px`;
-    manualButton.style.left = "auto";
-    manualButton.style.right = "14px";
+  const topActions = document.querySelector(".top-actions");
+  if (topActions) {
+    topActions.style.top = `${detailTop - 1}px`;
+    topActions.style.left = "auto";
+    topActions.style.right = "14px";
   }
 
   // Key indicator
