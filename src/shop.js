@@ -144,6 +144,18 @@ export function getEquippedParts() {
   return equippedParts.slice();
 }
 
+export function grantItem(good, rarity) {
+  purchasedItems.push({ id: good.id, rarity });
+  document.dispatchEvent(new CustomEvent("shop:purchase-item", {
+    detail: {
+      effect: good.effect,
+      cost: 0,
+      rarityMultiplier: RARITY_EFFECT_MULT[rarity],
+      rarity,
+    },
+  }));
+}
+
 // ── Rarity rolling ───────────────────────────────────────────────────────────────
 
 function lerp(a, b, t) { return a + (b - a) * t; }

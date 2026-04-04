@@ -1,5 +1,5 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState } from "./shop.js?v=41";
-import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES } from "./items-catalog.js?v=1";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem } from "./shop.js?v=41";
+import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, RARITY } from "./items-catalog.js?v=1";
 import {
   generateMap,
   mulberry32 as _mulberry32,
@@ -110,6 +110,7 @@ const LEVEL_REWARD_POOL = [
   { stat: "fuelPickupBonus",           minRarity: 2, values: [null, 5, 10, 15, 20],    label: "Бонус топлива",  fmt: v => `+${v}` },
   { stat: "maxHeat",                   minRarity: 2, values: [null, 5, 10, 15],        label: "Макс. жар",      fmt: v => `+${v}` },
   { stat: "maxHp",                     minRarity: 3, values: [null, null, 1, 2],       label: "Макс. HP",       fmt: v => `+${v}` },
+  { stat: "xpBonusMultiplier",         minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Опыт",           fmt: v => `+${Math.round(v*100)}%` },
 ];
 
 const RARITY_NAMES_RU = { 1: "Обычный", 2: "Необычный", 3: "Редкий", 4: "Легендарный" };
@@ -366,6 +367,15 @@ const state = {
   crystalRewardShuffleTick: 0,
   crystalRewardPreviewPerks: [0, 0],
   crystalRewardPerks: [0, 0],
+  crystalItemOfferOpen: false,
+  crystalItemOfferGood: null,
+  crystalItemOfferRarity: 1,
+  crystalItemOfferAnimTimer: 0,
+  crystalItemOfferRevealed: false,
+  crystalItemOfferShuffleTick: 0,
+  crystalItemOfferPreview: null,
+  crystalCompleteAnimDelay: 0,
+  crystalCompleteAnimRecipe: [],
   nextGoldPerkAt: GOLD_PERK_BASE_COST,
   goldPerkLevel: 0,
   perkChoices: [],
@@ -405,6 +415,7 @@ const state = {
   strikeSpeed: 0,
   drillPower: BASE_DRILL_DAMAGE,
   miningGoldBonusMultiplier: 0,
+  xpBonusMultiplier: 0,
   fuelPickupBonus: 0,
   overflowBomb: false,
   fuelEventDepth: 0,
@@ -2068,6 +2079,15 @@ function setupField(seedOverride = null) {
   state.crystalRewardShuffleTick = 0;
   state.crystalRewardPreviewPerks = [0, 0];
   state.crystalRewardPerks = [0, 0];
+  state.crystalItemOfferOpen = false;
+  state.crystalItemOfferGood = null;
+  state.crystalItemOfferRarity = 1;
+  state.crystalItemOfferAnimTimer = 0;
+  state.crystalItemOfferRevealed = false;
+  state.crystalItemOfferShuffleTick = 0;
+  state.crystalItemOfferPreview = null;
+  state.crystalCompleteAnimDelay = 0;
+  state.crystalCompleteAnimRecipe = [];
   state.nextGoldPerkAt = GOLD_PERK_BASE_COST;
   state.goldPerkLevel = 0;
   state.perkChoices = [];
@@ -2080,6 +2100,7 @@ function setupField(seedOverride = null) {
   state.strikeSpeed = 0;
   state.drillPower = BASE_DRILL_DAMAGE;
   state.miningGoldBonusMultiplier = 0;
+  state.xpBonusMultiplier = 0;
   state.fuelPickupBonus = 0;
   state.overflowBomb = false;
   state.fuelEventDepth = 0;
@@ -2397,14 +2418,59 @@ function awardBonusGoldPerkChoice() {
   syncPerkChoiceOverlay();
 }
 
-function grantCrystalRecipeReward(firstCrystalType, x, y) {
-  const firstPerkType = CRYSTAL_REWARD_TILE_PERKS[firstCrystalType] || 1;
-  const secondPerkType = getRandomTilePerkExcluding([firstPerkType]);
-  runFuelEvent(() => {
-    applyTilePerk(firstPerkType, x, y, false);
-    applyTilePerk(secondPerkType, x, y, false);
+function rollCrystalItemRarity() {
+  return rollLevelRewardRarity(state.level);
+}
+
+function pickCrystalRewardItem() {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const rarity = rollCrystalItemRarity();
+    const pool = ALL_GOODS.filter(g =>
+      g.type === "item" &&
+      (g.minRarity ?? 1) <= rarity &&
+      (!g.maxRarity || g.maxRarity >= rarity) &&
+      !(g.unique && getItemStacks(g.id) > 0)
+    );
+    if (pool.length === 0) continue;
+    const good = pool[Math.floor(Math.random() * pool.length)];
+    return { good, rarity };
+  }
+  return null;
+}
+
+function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y) {
+  const offer = pickCrystalRewardItem();
+  if (!offer) return;
+  // Store offer for deferred open
+  state.crystalItemOfferGood = offer.good;
+  state.crystalItemOfferRarity = offer.rarity;
+  state.crystalItemOfferRevealed = false;
+  state.crystalItemOfferShuffleTick = 0;
+  state.crystalItemOfferPreview = getRandomShuffleItem();
+  // Spawn crystal completion animation; modal opens after it finishes
+  const ANIM_DURATION = 1.1;
+  const recipe = Array.isArray(completedRecipe) && completedRecipe.length > 0
+    ? completedRecipe
+    : [firstCrystalType, firstCrystalType, firstCrystalType];
+  state.crystalCompleteAnimDelay = ANIM_DURATION;
+  state.effects.push({
+    kind: "crystalComplete",
+    x, y,
+    time: ANIM_DURATION,
+    duration: ANIM_DURATION,
+    recipe,
   });
-  openCrystalRewardModal(firstPerkType, secondPerkType);
+}
+
+function openCrystalItemOfferModal() {
+  state.crystalItemOfferOpen = true;
+  state.crystalItemOfferAnimTimer = 1.2;
+  syncCrystalItemOffer();
+}
+
+function getRandomShuffleItem() {
+  const pool = ALL_GOODS.filter(g => g.type === "item");
+  return pool[Math.floor(Math.random() * pool.length)] || null;
 }
 
 function applyCrystalCatalystBonus(x, y) {
@@ -2446,9 +2512,10 @@ function collectCrystalTile(x, y, index, crystalType) {
     showPerkToast(state.crystalStatusText);
     if (state.crystalProgress >= state.crystalRecipe.length) {
       const firstCrystalType = state.crystalRecipe[0];
+      const completedRecipe = [...state.crystalRecipe];
       showPerkToast("Кристаллы собраны");
       clearCrystalRecipe();
-      grantCrystalRecipeReward(firstCrystalType, x, y);
+      grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y);
     }
     return;
   }
@@ -3683,6 +3750,23 @@ function bindUi() {
     });
   }
 
+  const debugFinishRecipe = document.getElementById("debugFinishRecipe");
+  if (debugFinishRecipe) {
+    debugFinishRecipe.addEventListener("click", () => {
+      if (state.crystalRecipe && state.crystalRecipe.length > 0) {
+        const firstType = state.crystalRecipe[0];
+        const recipe = [...state.crystalRecipe];
+        clearCrystalRecipe();
+        grantCrystalRecipeReward(firstType, recipe, state.drill.x, state.drill.y);
+        showPerkToast("Рецепт выполнен!");
+      } else {
+        showPerkToast("Нет активного рецепта");
+      }
+      state.debugPerkMenuOpen = false;
+      syncDebugPerkOverlay();
+    });
+  }
+
   if (debugOverlay) {
     debugOverlay.addEventListener("click", (event) => {
       if (event.target !== debugOverlay) {
@@ -3894,13 +3978,78 @@ function regenerateCurrentSeed(reopenDebugMenu = false) {
   }
 }
 
+function syncCrystalItemOffer() {
+  const overlay = document.getElementById("crystalItemOffer");
+  if (!overlay) return;
+  if (!state.crystalItemOfferOpen || !state.crystalItemOfferGood) {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+    syncTouchZonesInteractivity();
+    return;
+  }
+  overlay.hidden = false;
+  overlay.removeAttribute("hidden");
+  overlay.style.cssText = [
+    "position:absolute", "inset:0", "z-index:9998", "display:flex",
+    "visibility:visible", "pointer-events:auto", "opacity:1",
+    "align-items:center", "justify-content:center", "padding:20px",
+    "background:rgba(7,4,3,0.78)", "backdrop-filter:blur(8px)",
+  ].join(";");
+
+  const revealed = state.crystalItemOfferRevealed;
+  const displayGood = revealed ? state.crystalItemOfferGood : (state.crystalItemOfferPreview || state.crystalItemOfferGood);
+  const rarity = state.crystalItemOfferRarity;
+  const color = revealed ? (RARITY_COLORS[rarity] || "#aaa") : "#6e5b48";
+  const rarityName = RARITY_NAMES[rarity] || "";
+
+  const panel = overlay.querySelector(".crystal-item-offer__panel") || overlay;
+
+  overlay.innerHTML = `
+    <div class="crystal-item-offer__panel">
+      <div class="crystal-item-offer__eyebrow">Рецепт собран</div>
+      <div class="crystal-item-offer__card ${revealed ? "crystal-item-offer__card--revealed" : "crystal-item-offer__card--shuffling"}" style="--offer-color:${color}">
+        <div class="crystal-item-offer__icon">${displayGood?.icon || "?"}</div>
+        <div class="crystal-item-offer__name">${revealed ? displayGood?.name : "???"}</div>
+        <div class="crystal-item-offer__rarity" style="color:${color}">${revealed ? rarityName : "·····"}</div>
+        <div class="crystal-item-offer__desc">${revealed ? (displayGood?.desc || "") : "Перемешивание..."}</div>
+      </div>
+      ${revealed ? `
+        <div class="crystal-item-offer__actions">
+          <button class="crystal-item-offer__btn crystal-item-offer__btn--accept" type="button" id="crystalItemAccept" style="border-color:${color}">Взять</button>
+          <button class="crystal-item-offer__btn crystal-item-offer__btn--decline" type="button" id="crystalItemDecline">Отказаться</button>
+        </div>
+      ` : ""}
+    </div>
+  `;
+
+  if (revealed) {
+    overlay.querySelector("#crystalItemAccept")?.addEventListener("click", () => acceptCrystalItemOffer());
+    overlay.querySelector("#crystalItemDecline")?.addEventListener("click", () => declineCrystalItemOffer());
+  }
+  syncTouchZonesInteractivity();
+}
+
+function acceptCrystalItemOffer() {
+  if (!state.crystalItemOfferGood) return;
+  grantItem(state.crystalItemOfferGood, state.crystalItemOfferRarity);
+  state.crystalItemOfferOpen = false;
+  state.crystalItemOfferGood = null;
+  syncCrystalItemOffer();
+}
+
+function declineCrystalItemOffer() {
+  state.crystalItemOfferOpen = false;
+  state.crystalItemOfferGood = null;
+  syncCrystalItemOffer();
+}
+
 function syncTouchZonesInteractivity() {
   const touchZones = document.querySelector(".touch-zones");
   if (!touchZones) {
     return;
   }
   touchZones.style.pointerEvents =
-    state.beaconActivationAnim || state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen ? "none" : "auto";
+    state.beaconActivationAnim || state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen || state.crystalItemOfferOpen ? "none" : "auto";
   syncMoveAim();
 }
 
@@ -4317,6 +4466,20 @@ function updateCrystalRewardModal(dt) {
   syncCrystalRewardOverlay();
 }
 
+function updateCrystalItemOffer(dt) {
+  if (!state.crystalItemOfferOpen || state.crystalItemOfferRevealed) return;
+  state.crystalItemOfferShuffleTick += dt;
+  while (state.crystalItemOfferShuffleTick >= 0.08) {
+    state.crystalItemOfferShuffleTick -= 0.08;
+    state.crystalItemOfferPreview = getRandomShuffleItem();
+  }
+  state.crystalItemOfferAnimTimer = Math.max(0, state.crystalItemOfferAnimTimer - dt);
+  if (state.crystalItemOfferAnimTimer === 0) {
+    state.crystalItemOfferRevealed = true;
+  }
+  syncCrystalItemOffer();
+}
+
 function showPadAt(x, y, pad, stick) {
   state.padCenterX = x;
   state.padCenterY = y;
@@ -4412,6 +4575,17 @@ function update(dt) {
   if (state.crystalRewardModalOpen) {
     updateCrystalRewardModal(dt);
     return;
+  }
+
+  if (state.crystalCompleteAnimDelay > 0) {
+    state.crystalCompleteAnimDelay = Math.max(0, state.crystalCompleteAnimDelay - dt);
+    if (state.crystalCompleteAnimDelay === 0) {
+      openCrystalItemOfferModal();
+    }
+  }
+
+  if (state.crystalItemOfferOpen && !state.crystalItemOfferRevealed) {
+    updateCrystalItemOffer(dt);
   }
 
   maybeOpenPendingLevelReward();
@@ -5471,7 +5645,9 @@ function spawnExperienceCrystal(x, y, amount = XP_PER_BLOCK) {
     return;
   }
   const index = cellIndex(x, y);
-  state.xpPickupMask[index] += amount;
+  state.xpPickupMask[index] += state.xpBonusMultiplier > 0
+    ? Math.max(1, Math.round(amount * (1 + state.xpBonusMultiplier)))
+    : amount;
 }
 
 function gainExperience(amount) {
@@ -7684,6 +7860,96 @@ function renderEffects(camera) {
         ctx.beginPath();
         ctx.arc(dpx, dpy, size * 0.5, 0, Math.PI * 2);
         ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    } else if (effect.kind === "crystalComplete") {
+      // Three crystals fill up sequentially above the player
+      const recipe = effect.recipe;
+      const count = Math.min(recipe.length, 3);
+      const spacing = 18;
+      const totalW = (count - 1) * spacing;
+      const baseX = cx - totalW * 0.5;
+      // Float upward as animation progresses
+      const lift = progress * 22;
+      const baseY = cy - 24 - lift;
+      const CR = 7; // crystal hexagon radius
+
+      for (let i = 0; i < count; i += 1) {
+        const crystalType = recipe[i];
+        const crystal = CRYSTAL_TYPES[crystalType];
+        if (!crystal) continue;
+
+        // Each crystal fills during its 1/count window, staggered by 0.18s
+        const fillStart = i * (0.28);
+        const fillEnd = fillStart + 0.42;
+        const fillT = Math.max(0, Math.min(1, (progress - fillStart) / (fillEnd - fillStart)));
+
+        const px = baseX + i * spacing;
+        const py = baseY;
+
+        // Draw hexagon path helper
+        const hexPath = () => {
+          ctx.beginPath();
+          for (let k = 0; k < 6; k += 1) {
+            const a = (k * Math.PI) / 3 - Math.PI / 6;
+            const hx = px + Math.cos(a) * CR;
+            const hy = py + Math.sin(a) * CR;
+            if (k === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+          }
+          ctx.closePath();
+        };
+
+        // Overall alpha — fade out near end
+        const alpha = progress > 0.82 ? Math.max(0, 1 - (progress - 0.82) / 0.18) : 1;
+
+        // Background (dark outline)
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.strokeStyle = "rgba(0,0,0,0.55)";
+        ctx.lineWidth = 3.5;
+        hexPath();
+        ctx.stroke();
+
+        // Empty shell
+        ctx.globalAlpha = alpha * 0.25;
+        ctx.fillStyle = crystal.color;
+        hexPath();
+        ctx.fill();
+
+        // Filled portion — clip vertically from bottom
+        if (fillT > 0) {
+          ctx.save();
+          hexPath();
+          ctx.clip();
+          const fillH = CR * 2 * fillT;
+          const fillY = py + CR - fillH;
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = crystal.color;
+          ctx.fillRect(px - CR - 1, fillY, CR * 2 + 2, fillH + 1);
+          ctx.restore();
+        }
+
+        // Outline
+        ctx.globalAlpha = alpha * (0.5 + fillT * 0.5);
+        ctx.strokeStyle = crystal.color;
+        ctx.lineWidth = 1.5;
+        hexPath();
+        ctx.stroke();
+
+        // Glow burst when crystal just completed filling
+        if (fillT >= 1) {
+          const burstAge = progress - fillEnd;
+          const burstT = Math.min(1, burstAge / 0.22);
+          if (burstT < 1) {
+            ctx.globalAlpha = alpha * (1 - burstT) * 0.7;
+            const grad = ctx.createRadialGradient(px, py, 0, px, py, CR + burstT * 14);
+            grad.addColorStop(0, crystal.color);
+            grad.addColorStop(1, "transparent");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(px, py, CR + burstT * 14, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
       }
       ctx.globalAlpha = 1;
     } else if (effect.kind === "wormDust") {
