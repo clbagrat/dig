@@ -111,6 +111,7 @@ const LEVEL_REWARD_POOL = [
   { stat: "maxHeat",                   minRarity: 2, values: [null, 5, 10, 15],        label: "Макс. жар",      fmt: v => `+${v}` },
   { stat: "maxHp",                     minRarity: 3, values: [null, null, 1, 2],       label: "Макс. HP",       fmt: v => `+${v}` },
   { stat: "xpBonusMultiplier",         minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Опыт",           fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "effectDurationRate",        minRarity: 2, values: [null, 0.10, 0.18, 0.28], label: "Длит. эффектов", fmt: v => `+${Math.round(v*100)}%` },
 ];
 
 const RARITY_NAMES_RU = { 1: "Обычный", 2: "Необычный", 3: "Редкий", 4: "Легендарный" };
@@ -3886,7 +3887,7 @@ function buildDebugPerkButtons() {
       { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
       { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
       { key: "concentration",        label: "concentration",         step: 0.1,  fmt: v => v.toFixed(1) },
-      { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
       { key: "miningGoldBonusMultiplier", label: "miningGoldBonus", step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
