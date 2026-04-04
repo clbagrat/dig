@@ -112,6 +112,7 @@ const LEVEL_REWARD_POOL = [
   { stat: "maxHp",                     minRarity: 3, values: [null, null, 1, 2],       label: "Макс. HP",       fmt: v => `+${v}` },
   { stat: "xpBonusMultiplier",         minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Опыт",           fmt: v => `+${Math.round(v*100)}%` },
   { stat: "effectDurationRate",        minRarity: 2, values: [null, 0.10, 0.18, 0.28], label: "Длит. эффектов", fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "bonusFindChance",           minRarity: 2, values: [null, 0.10, 0.20, 0.35], label: "Чутьё",          fmt: v => `+${Math.round(v*100)}%` },
 ];
 
 const RARITY_NAMES_RU = { 1: "Обычный", 2: "Необычный", 3: "Редкий", 4: "Легендарный" };
@@ -193,6 +194,8 @@ function createGridStateBuffers() {
     visibleAlpha: new Float32Array(cellCount),
     visibleTargetAlpha: new Float32Array(cellCount),
     weakSpotMask: new Float32Array(cellCount),
+    microResourceMask: new Uint8Array(cellCount),
+    microResourceRevealedMask: new Uint8Array(cellCount),
   };
 }
 
@@ -456,6 +459,7 @@ const state = {
   idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
   speedOfAutoClose: 0,
   damageBonus: 0,
+  bonusFindChance: 0,
   autoClosePreview: null,
   autoClosePreviewReturnTimer: 0,
   autoClosePreviewFailed: false,
@@ -1081,6 +1085,18 @@ function spawnGoldOreEffect(x, y, value) {
     time: 0.88,
     duration: 0.88,
     seed: (x * 73417 + y * 53923 + value * 131) % 1000,
+  });
+}
+
+function spawnMicroBonusRevealEffect(tileX, tileY, mType) {
+  state.effects.push({
+    kind: "microReveal",
+    x: tileX,
+    y: tileY,
+    mType,
+    time: 0.38,
+    duration: 0.38,
+    seed: (tileX * 73417 + tileY * 53923) % 1000,
   });
 }
 
@@ -2007,6 +2023,8 @@ function setupField(seedOverride = null) {
   state.hazardTriggeredMask.fill(0);
   state.metalMask.fill(0);
   state.goldOreMask.fill(0);
+  state.microResourceMask.fill(0);
+  state.microResourceRevealedMask.fill(0);
   state.visibleMask.fill(0);
   state.gasPocketMask.fill(0);
   state.steamPocketMask.fill(0);
@@ -2142,6 +2160,7 @@ function setupField(seedOverride = null) {
   state.idleAutoCloseDelay = IDLE_AUTO_CLOSE_DELAY;
   state.speedOfAutoClose = 0;
   state.damageBonus = 0;
+  state.bonusFindChance = 0;
   state.autoClosePreview = null;
   state.autoClosePreviewReturnTimer = 0;
   state.autoClosePreviewFailed = false;
@@ -2216,6 +2235,8 @@ function setupField(seedOverride = null) {
   state.beaconMask.set(map.beaconMask);
   state.artifactMask.set(map.artifactMask);
   state.tunnelMask.fill(0);
+  state.microResourceMask.fill(0);
+  state.microResourceRevealedMask.fill(0);
   for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     state.health[i] = BLOCK_TYPES[state.hardness[i]].hp;
     if (map.beaconMask[i] >= 1) {
@@ -2224,6 +2245,18 @@ function setupField(seedOverride = null) {
     }
     if (map.beaconMask[i] === 2) {
       state.tunnelMask[i] = 1;
+    }
+    // Seed micro-resources into solid blocks (~12% chance each)
+    if (state.hardness[i] > 0 && !state.goldOreMask[i] && !state.gasPocketMask[i] && !state.boulderPocketMask[i]) {
+      const roll = (i * 2654435761 + state.worldSeed * 1234567) & 0xffffffff;
+      const r = (roll >>> 0) % 100;
+      if (r < 4) {
+        state.microResourceMask[i] = 1; // gold
+      } else if (r < 8) {
+        state.microResourceMask[i] = 2; // fuel
+      } else if (r < 12) {
+        state.microResourceMask[i] = 3; // xp
+      }
     }
   }
   state.base.x = map.base.x;
@@ -3892,6 +3925,7 @@ function buildDebugPerkButtons() {
       { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
+      { key: "bonusFindChance",      label: "bonusFindChance",       step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
     ];
     statsRoot.innerHTML = "";
     for (const def of CORE_STATS) {
@@ -4843,11 +4877,38 @@ function rebuildVisibilityMask() {
   let fogHead = 0;
   let fogTail = 0;
 
+  const facingX = state.drill.facingX ?? 0;
+  const facingY = state.drill.facingY ?? 1;
+  const coneAngle = Math.atan2(facingY, facingX);
+  const CONE_SPREAD = 0.48;
+  const coneLengthSq = (state.visionRadius * 1.15) * (state.visionRadius * 1.15);
+
   for (let i = 0; i < state.visibleMask.length; i += 1) {
     if (!state.visibleMask[i]) continue;
     state.visibleTargetAlpha[i] = 1;
     _visFogDistance[i] = 0;
     _visFogQueue[fogTail++] = i;
+    // Reveal micro-resources only when the light cone hits them
+    if (state.microResourceMask[i] > 0 && !state.microResourceRevealedMask[i]) {
+      const tx = (i % GRID_W) - startX;
+      const ty = ((i / GRID_W) | 0) - startY;
+      const distSq = tx * tx + ty * ty;
+      if (distSq <= coneLengthSq) {
+        const tileAngle = Math.atan2(ty, tx);
+        let angleDiff = tileAngle - coneAngle;
+        // Normalize to [-π, π]
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        if (Math.abs(angleDiff) <= CONE_SPREAD) {
+          if (Math.random() < state.bonusFindChance) {
+            state.microResourceRevealedMask[i] = 1;
+            spawnMicroBonusRevealEffect(i % GRID_W, (i / GRID_W) | 0, state.microResourceMask[i]);
+          } else {
+            state.microResourceMask[i] = 0; // chance failed — bonus lost
+          }
+        }
+      }
+    }
   }
 
   while (fogHead < fogTail) {
@@ -6413,6 +6474,20 @@ function breakCell(x, y, index, options = {}) {
     state.droppedGoldMask[index] = 0;
     spawnGoldParticles(x, y, embeddedGold);
   }
+  const microRes = state.microResourceMask[index];
+  if (microRes > 0) {
+    state.microResourceMask[index] = 0;
+    state.microResourceRevealedMask[index] = 0;
+    if (microRes === 1) {
+      const goldAmount = applyMiningGoldBonus(1);
+      state.unsafeGold += goldAmount;
+      spawnGoldParticles(x, y, goldAmount);
+    } else if (microRes === 2) {
+      addFuel(5, x, y);
+    } else if (microRes === 3) {
+      gainExperience(1);
+    }
+  }
   state.hardness[index] = 0;
   state.health[index] = 0;
   state.blocksBroken += 1;
@@ -6952,8 +7027,11 @@ function updateDrill(dt) {
   const targetY = clamp(state.drill.y + dy, 1, GRID_H - 2);
   const targetIndex = cellIndex(targetX, targetY);
 
-  state.drill.facingX = dx;
-  state.drill.facingY = dy;
+  if (state.drill.facingX !== dx || state.drill.facingY !== dy) {
+    state.drill.facingX = dx;
+    state.drill.facingY = dy;
+    state.visibilityDirty = true;
+  }
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
@@ -7863,6 +7941,45 @@ function renderEffects(camera) {
         ctx.fill();
       }
       ctx.globalAlpha = 1;
+    } else if (effect.kind === "microReveal") {
+      const t = progress;
+      const colors = { 1: "#f5c842", 2: "#54d4f0", 3: "#78d8ff" };
+      const color = colors[effect.mType] || "#ffffff";
+      const ey = cy - TILE_SIZE * 0.18; // slightly above icon
+
+      // Flash core
+      if (t < 0.45) {
+        const ft = t / 0.45;
+        const grad = ctx.createRadialGradient(cx, ey, 0, cx, ey, 2 + ft * 9);
+        grad.addColorStop(0, `rgba(255,255,255,${0.9 * (1 - ft)})`);
+        grad.addColorStop(0.4, `${color}${Math.round((0.6 * (1 - ft)) * 255).toString(16).padStart(2, "0")}`);
+        grad.addColorStop(1, `${color}00`);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, ey, 2 + ft * 9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 4 short cross rays
+      if (t < 0.35) {
+        const st = t / 0.35;
+        ctx.globalAlpha = 1 - st;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.2;
+        ctx.lineCap = "round";
+        for (let s = 0; s < 4; s += 1) {
+          const angle = (s * Math.PI) / 2 + ((effect.seed % 31) / 31) * 0.5;
+          const r1 = 2 + st * 1.5;
+          const r2 = 5 + st * 7;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(angle) * r1, ey + Math.sin(angle) * r1);
+          ctx.lineTo(cx + Math.cos(angle) * r2, ey + Math.sin(angle) * r2);
+          ctx.stroke();
+        }
+      }
+
+      ctx.globalAlpha = 1;
     } else if (effect.kind === "crystalComplete") {
       // Three crystals fill up sequentially above the player
       const recipe = effect.recipe;
@@ -8256,6 +8373,53 @@ function render() {
             ctx.arc(fx, fy, r, 0, Math.PI * 2);
             ctx.fill();
           }
+          ctx.globalAlpha = visibleAlpha;
+        }
+        if (state.microResourceRevealedMask[index] && state.microResourceMask[index] > 0) {
+          const mType = state.microResourceMask[index];
+          const pulse = Math.sin((state.lastTs || 0) * 0.005 + x * 1.1 + y * 0.9) * 0.5 + 0.5;
+          const jSeed = (index * 2654435761) >>> 0;
+          const jx = (((jSeed & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.1;
+          const jy = ((((jSeed >> 8) & 0xff) / 255) * 2 - 1) * TILE_SIZE * 0.1;
+          const cx2 = sx + TILE_SIZE / 2 + jx;
+          const cy2 = sy + TILE_SIZE / 2 + jy;
+          ctx.save();
+          ctx.globalAlpha = visibleAlpha * (0.7 + pulse * 0.25);
+          if (mType === 1) {
+            // gold — small yellow circle
+            ctx.fillStyle = "#f5c842";
+            ctx.beginPath();
+            ctx.arc(cx2, cy2, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#fff7c0";
+            ctx.beginPath();
+            ctx.arc(cx2 - 0.8, cy2 - 0.8, 1.2, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (mType === 2) {
+            // fuel — small cyan drop
+            ctx.fillStyle = "#54d4f0";
+            ctx.beginPath();
+            ctx.arc(cx2, cy2 + 1, 2.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#b8f4ff";
+            ctx.beginPath();
+            ctx.moveTo(cx2, cy2 - 3.2);
+            ctx.lineTo(cx2 + 2, cy2 + 0.5);
+            ctx.lineTo(cx2 - 2, cy2 + 0.5);
+            ctx.closePath();
+            ctx.fill();
+          } else if (mType === 3) {
+            // xp — small cyan diamond
+            ctx.fillStyle = "#78d8ff";
+            ctx.beginPath();
+            ctx.moveTo(cx2, cy2 - 3.5);
+            ctx.lineTo(cx2 + 3.5, cy2);
+            ctx.lineTo(cx2, cy2 + 3.5);
+            ctx.lineTo(cx2 - 3.5, cy2);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.restore();
           ctx.globalAlpha = visibleAlpha;
         }
       }
