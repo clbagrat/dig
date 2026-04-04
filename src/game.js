@@ -487,6 +487,7 @@ const state = {
   activeToasts: [],
   toastQueue: [],
   toastQueueTimer: 0,
+  toastDebounceMap: {},
   depthTitle: {
     text: "",
     time: 0,
@@ -2189,6 +2190,7 @@ function setupField(seedOverride = null) {
   state.activeToasts.length = 0;
   state.toastQueue.length = 0;
   state.toastQueueTimer = 0;
+  state.toastDebounceMap = {};
   state.goldParticles.length = 0;
   state.xpParticles.length = 0;
   state.depthTitle.text = "";
@@ -3110,20 +3112,30 @@ function applyToast(item) {
   });
 }
 
+function debounceToast(key, value, color, fmt) {
+  if (state.toastDebounceMap[key]) {
+    state.toastDebounceMap[key].value += value;
+    state.toastDebounceMap[key].timer = 0.1;
+  } else {
+    state.toastDebounceMap[key] = { value, color, fmt, timer: 0.1 };
+  }
+}
+
 function showPerkToast(text) {
   state.toastQueue.push({ text: `+ ${text}`, color: "#ffcf7a" });
 }
 
 function showFuelToast(value) {
-  state.toastQueue.push({ text: `${value > 0 ? "+" : ""}${value} fuel`, color: value > 0 ? "#ffbf62" : "#ff8f8f" });
+  const key = value >= 0 ? "fuel_pos" : "fuel_neg";
+  debounceToast(key, value, value >= 0 ? "#ffbf62" : "#ff8f8f", v => `${v > 0 ? "+" : ""}${v} fuel`);
 }
 
 function showGoldToast(value) {
-  state.toastQueue.push({ text: `+${value} ●`, color: "#f8e040" });
+  debounceToast("gold", value, "#f8e040", v => `+${v} ●`);
 }
 
 function showXpToast(value) {
-  state.toastQueue.push({ text: `+${value} ◆`, color: "#78d8ff" });
+  debounceToast("xp", value, "#78d8ff", v => `+${v} ◆`);
 }
 
 function runFuelEvent(callback) {
@@ -4723,6 +4735,14 @@ function update(dt) {
     state.activeToasts[i].time -= dt;
     if (state.activeToasts[i].time <= 0) state.activeToasts.splice(i, 1);
   }
+  for (const key in state.toastDebounceMap) {
+    const entry = state.toastDebounceMap[key];
+    entry.timer -= dt;
+    if (entry.timer <= 0) {
+      state.toastQueue.push({ text: entry.fmt(entry.value), color: entry.color });
+      delete state.toastDebounceMap[key];
+    }
+  }
   if (state.toastQueueTimer > 0) {
     state.toastQueueTimer = Math.max(0, state.toastQueueTimer - dt);
   } else if (state.toastQueue.length > 0) {
@@ -6054,7 +6074,7 @@ function showHpToast(value) {
   if (value <= 0) {
     return;
   }
-  state.toastQueue.push({ text: `-${value} HP`, color: "#ff8a8a" });
+  debounceToast("hp", value, "#ff8a8a", v => `-${v} HP`);
 }
 
 function consumeFuelEmergency() {
