@@ -21,7 +21,7 @@ const MAX_FRAME_MS = 100;
 const START_FUEL = 350;
 const START_HP = 4;
 const MAX_HEAT = 100;
-const BASE_DRILL_DAMAGE = 10;
+const BASE_DRILL_DAMAGE = 20;
 const IDLE_FUEL_DRAIN = 0.8;
 const DRILL_FUEL_DRAIN = 8;
 const STRIKE_CYCLE_SPEED = 8;
@@ -375,7 +375,7 @@ const state = {
   crystalProgress: 0,
   crystalStatusText: "",
   strikeSpeed: 0,
-  drillPower: 10,
+  drillPower: BASE_DRILL_DAMAGE,
   miningGoldBonusMultiplier: 0,
   fuelPickupBonus: 0,
   overflowBomb: false,
@@ -1752,7 +1752,8 @@ function getGoldPerkCost(level) {
 function getIdleFuelDrain() {
   const baseDrain = IDLE_FUEL_DRAIN + Math.floor(state.goldPerkLevel / 3);
   const tankPenalty = state.tankBoostLevel > 0 ? Math.max(1, baseDrain * 0.1) * state.tankBoostLevel : 0;
-  return (baseDrain + tankPenalty) * Math.max(0, state.fuelDrainRate);
+  const stunPenalty = state.stunTimer > 0 ? 3 : 1;
+  return (baseDrain + tankPenalty) * Math.max(0, state.fuelDrainRate) * stunPenalty;
 }
 
 function getTankFuelMultiplier(level = state.tankBoostLevel) {
@@ -2049,7 +2050,7 @@ function setupField(seedOverride = null) {
   state.signalDirX = 0;
   state.signalDirY = -1;
   state.strikeSpeed = 0;
-  state.drillPower = 10;
+  state.drillPower = BASE_DRILL_DAMAGE;
   state.miningGoldBonusMultiplier = 0;
   state.fuelPickupBonus = 0;
   state.overflowBomb = false;

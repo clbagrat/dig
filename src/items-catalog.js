@@ -217,6 +217,21 @@ export const ALL_ITEMS = [
       effectByRarity: [null, 5, 8, 10, 13],
     },
   },
+  {
+    id: "geo_sight",
+    type: "item",
+    name: "Геологический прицел",
+    icon: "🔭",
+    desc: "+3% шанс бреши в породе.",
+    category: "basic",
+    tags: ["basic"],
+    minRarity: 1,
+    baseCost: 35,
+    effect: {
+      stat: "weakSpotChance",
+      effectByRarity: [null, 0.03, 0.05, 0.08, 0.10],
+    },
+  },
   // ─── Level-up bonus items ──────────────────────────────────────────────────
   // Each of these grants a bonus every time the player gains a level.
   {

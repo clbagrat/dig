@@ -52,7 +52,7 @@ export function openShop(currentGold, beaconY, luck = 0, stats = null) {
   currentGoldCache = currentGold;
   currentLuckCache = luck;
   currentStatsCache = stats;
-  shopLevel = beaconY != null ? getShopLevelFromY(beaconY) : 5;
+  shopLevel += 1;
   rerollCount = 0;
   selectedOfferingIdx = -1;
   replaceMode = false;
@@ -144,13 +144,6 @@ export function getEquippedParts() {
   return equippedParts.slice();
 }
 
-// ── Depth → shop level ───────────────────────────────────────────────────────────
-
-function getShopLevelFromY(beaconY) {
-  const ratio = (beaconY - START_Y) / (GRID_H - START_Y - 15);
-  return Math.min(11, Math.max(0, Math.floor(ratio * 12)));
-}
-
 // ── Rarity rolling ───────────────────────────────────────────────────────────────
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -232,16 +225,16 @@ function rollOfferings(luck) {
 // ── Cost calculation ─────────────────────────────────────────────────────────────
 
 function getOfferingCost(offering) {
-  return Math.max(1, Math.round(offering.good.baseCost * RARITY_COST_MULT[offering.rarity]));
+  const base = offering.good.baseCost * RARITY_COST_MULT[offering.rarity];
+  return Math.max(1, Math.floor(base + shopLevel + base * 0.1 * shopLevel));
 }
 
 function getRerollCost() {
   if (ALL_GOODS.length === 0) {
     return 0;
   }
-  const base = Math.max(3, Math.floor(shopLevel * 0.75)) + 1;
-  const increment = Math.max(1, Math.floor(shopLevel * 0.4));
-  return base + increment * rerollCount;
+  const increment = Math.max(1, Math.floor(0.40 * shopLevel));
+  return Math.floor(shopLevel * 0.75) + increment * (rerollCount + 1);
 }
 
 // ── Purchase logic ───────────────────────────────────────────────────────────────
@@ -469,6 +462,10 @@ function formatStatValue(value, mode = "number") {
     const rounded = Math.round(value * 100);
     return `${rounded > 0 ? "+" : ""}${rounded}%`;
   }
+  if (mode === "rawpercent") {
+    const rounded = Math.round(value);
+    return `${rounded > 0 ? "+" : ""}${rounded}%`;
+  }
   if (mode === "multiplier") {
     return `x${value.toFixed(2)}`;
   }
@@ -532,6 +529,9 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
     if (good.effect.stat === "speedOfAutoClose") {
       return `+${value}% скорость замыкания контура.`;
     }
+    if (good.effect.stat === "weakSpotChance") {
+      return `+${Math.round(value * 100)}% шанс бреши в породе.`;
+    }
   }
   return good.desc || "";
 }
@@ -539,7 +539,7 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
 const STAT_DEFS = [
   { key: "drillPower",                 label: "Сила бура",                      shortLabel: "БУР",    format: "fixed1" },
   { key: "damageBonus",                label: "Бонус к урону %",                shortLabel: "УРОН %", format: "percent" },
-  { key: "strikeSpeed",                label: "Скорость бурения %",             shortLabel: "СКОР %", format: "percent" },
+  { key: "strikeSpeed",                label: "Скорость бурения %",             shortLabel: "СКОР %", format: "rawpercent" },
   { key: "maxHp",                      label: "Макс. жизни",                    shortLabel: "ЖЗН",    format: null },
   { key: "maxFuel",                    label: "Макс. топливо",                  shortLabel: "ТОПЛ",   format: null },
   { key: "maxHeat",                    label: "Макс. жар",                      shortLabel: "ЖАР",    format: null },
@@ -553,7 +553,7 @@ const STAT_DEFS = [
   { key: "weakSpotMult",               label: "Урон по бреши",                  shortLabel: "хБрешь", format: "multiplier" },
   { key: "miningGoldBonusMultiplier",  label: "Бонус к добыче золота",          shortLabel: "ЗОЛ",    format: "percent" },
   { key: "fuelPickupBonus",            label: "Бонус к добыче топлива",         shortLabel: "ТОПЛ+",  format: null },
-  { key: "speedOfAutoClose",           label: "Скорость закрытия контура %",    shortLabel: "КОНТ%",  format: "percent" },
+  { key: "speedOfAutoClose",           label: "Скорость закрытия контура %",    shortLabel: "КОНТ%",  format: "rawpercent" },
 ];
 
 function renderStats(short = false) {
