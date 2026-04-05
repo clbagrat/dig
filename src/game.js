@@ -8687,7 +8687,7 @@ function render() {
         const now = state.lastTs || 0;
         const age = now - spawnTs;
         const APPEAR_MS = 180;
-        const appearT = Math.min(1, age / APPEAR_MS);
+        const appearT = Math.max(0, Math.min(1, age / APPEAR_MS));
         const appearEase = 1 - Math.pow(1 - appearT, 3);
 
         const pulse = Math.sin(now * 0.007) * 0.5 + 0.5;
