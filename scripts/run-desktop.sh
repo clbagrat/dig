@@ -63,7 +63,20 @@ fi
   echo "Project: $PROJECT_ROOT"
   echo "Node: $NODE_BIN"
   echo "Electron: $ELECTRON_BIN"
+  echo "Original LD_PRELOAD: ${LD_PRELOAD:-<unset>}"
   echo
 } >"$LOG_FILE"
 
-exec "$ELECTRON_BIN" "$PROJECT_ROOT" >>"$LOG_FILE" 2>&1
+# Steam/Game Mode injects overlay preload libraries that can break Electron on Deck.
+unset LD_PRELOAD
+unset LD_LIBRARY_PATH
+unset STEAM_COMPAT_DATA_PATH
+unset STEAM_COMPAT_CLIENT_INSTALL_PATH
+unset STEAM_RUNTIME
+unset PRESSURE_VESSEL_RUNTIME
+
+exec "$ELECTRON_BIN" \
+  --no-sandbox \
+  --disable-gpu \
+  --disable-gpu-compositing \
+  "$PROJECT_ROOT" >>"$LOG_FILE" 2>&1
