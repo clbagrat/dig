@@ -326,6 +326,8 @@ const state = {
   concentration: 1,
   fuelDrainRate: 1,
   armor: 0,
+  heatExplosionDamageBonus: 0,
+  heatExplosionRadiusBonus: 0,
   depth: 0,
   gold: 0,
   unsafeGold: 0,
@@ -445,6 +447,13 @@ const state = {
   diagonalDrillPower: 0,
   weakSpotChance: 0,
   weakSpotMult: 2,
+  weakSpotPierce: 0,
+  adrenalineLevel: 0,
+  firstStrikeLevel: 0,
+  firstStrikeTimer: 0,
+  weakSpotFuelGain: 0,
+  insuranceLevel: 0,
+  fuelConverterLevel: 0,
   loopChargeLevel: 0,
   loopChargeTimer: 0,
   loopChargeDuration: 0,
@@ -2076,6 +2085,8 @@ function setupField(seedOverride = null) {
   state.concentration = 1;
   state.fuelDrainRate = 1;
   state.armor = 0;
+  state.heatExplosionDamageBonus = 0;
+  state.heatExplosionRadiusBonus = 0;
   state.gold = 0;
   state.unsafeGold = 0;
   state.xp = 0;
@@ -2149,6 +2160,13 @@ function setupField(seedOverride = null) {
   state.diagonalDrillPower = 0;
   state.weakSpotChance = 0;
   state.weakSpotMult = 2;
+  state.weakSpotPierce = 0;
+  state.adrenalineLevel = 0;
+  state.firstStrikeLevel = 0;
+  state.firstStrikeTimer = 0;
+  state.weakSpotFuelGain = 0;
+  state.insuranceLevel = 0;
+  state.fuelConverterLevel = 0;
   state.weakSpotMask.fill(0);
   state.loopChargeLevel = 0;
   state.loopChargeTimer = 0;
@@ -4742,6 +4760,7 @@ function update(dt) {
     state.heatCooldownTime = 0;
   }
   state.loopChargeTimer = Math.max(0, state.loopChargeTimer - dt);
+  if (state.firstStrikeTimer > 0) state.firstStrikeTimer = Math.max(0, state.firstStrikeTimer - dt);
   if (state.loopChargeTimer === 0) {
     state.loopChargeDamageBonus = 0;
   }
@@ -5127,7 +5146,9 @@ function activateOverhealDrillBoost() {
 
 function triggerHeatOverload() {
   state.heat = 0;
-  explodeAt(state.drill.x, state.drill.y, getStrikeDamage(), 1, {
+  const overloadDamage = getStrikeDamage() * (1 + (state.heatExplosionDamageBonus || 0));
+  const overloadRadius = 1 + (state.heatExplosionRadiusBonus || 0);
+  explodeAt(state.drill.x, state.drill.y, overloadDamage, overloadRadius, {
     guaranteedBreak: false,
     cause: "explosion",
   });
@@ -5679,13 +5700,14 @@ function getStrikeDamage() {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
+  const firstStrikeBoost = (state.firstStrikeTimer > 0 && state.firstStrikeLevel > 0) ? 1 + state.firstStrikeLevel * 0.4 : 1;
   let damage =
     BASE_DRILL_DAMAGE * chargeBoost * contourBoost +
     getBasicDrillDamageBonus() +
     getFragileDrillDamageBonus() +
     getLuckyPickaxeDamageBonus() +
     getThermoDrillDamageBonus();
-  return damage * (1 + state.damageBonus / 100);
+  return damage * (1 + state.damageBonus / 100) * firstStrikeBoost;
 }
 
 function getEquipmentTiers(effectId) {
@@ -5719,6 +5741,11 @@ function getFragileDrillDamageBonus() {
 function getFragileDrillSpeedBonus() {
   if (state.armor <= 0) return 0;
   return sumEquipmentTierValues("fragile_drill", [0, 10, 15, 20, 30]);
+}
+
+function getAdrenalineSpeedBonus() {
+  if (!state.adrenalineLevel || state.hp > 1) return 0;
+  return state.adrenalineLevel * 30;
 }
 
 function getBasicDrillDamageBonus() {
@@ -5886,6 +5913,10 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   if (!options.preventOverflowTrigger && state.overflowBomb && overflow > 0 && !state.overflowTriggeredInEvent && !state.resolvingOverflowBomb) {
     state.overflowTriggeredInEvent = true;
     triggerOverflowSurge();
+  }
+  if (state.fuelConverterLevel > 0 && overflow > 0) {
+    const duration = getScaledEffectDuration(2 + state.fuelConverterLevel);
+    activateDrillOverdrive(duration, "Переработчик топлива");
   }
 }
 
@@ -6058,7 +6089,13 @@ function dropUnsafeGold() {
   if (state.unsafeGold <= 0) return;
   const total = Math.floor(state.unsafeGold);
   state.unsafeGold = 0;
-  const dropAmount = Math.ceil(total / 2); // half disappears, half drops
+  const saveRate = [0, 0.30, 0.50, 0.70, 0.90][Math.min(4, state.insuranceLevel || 0)];
+  if (saveRate > 0) {
+    const saved = Math.floor(total * saveRate);
+    state.gold += saved;
+    if (saved > 0) showPerkToast(`Страховка: +${saved} ●`);
+  }
+  const dropAmount = Math.ceil(total * (1 - saveRate) / 2);
   scatterGoldAroundTile(state.drill.x, state.drill.y, dropAmount);
 }
 
@@ -6484,6 +6521,14 @@ function damageCell(x, y, damage, options = {}) {
     damage *= state.weakSpotMult;
     state.weakSpotMask[index] = 0;
     spawnWeakSpotHitEffect(x, y, options.dirX ?? 0, options.dirY ?? 1);
+    if (state.weakSpotFuelGain > 0) {
+      addFuel(state.weakSpotFuelGain);
+    }
+    if (state.weakSpotPierce > 0) {
+      const px = x + (options.dirX ?? 0);
+      const py = y + (options.dirY ?? 1);
+      damageCell(px, py, damage, { ...options, byDrill: true });
+    }
   }
   if (state.tunnelMask[index]) {
     return false;
@@ -7150,7 +7195,7 @@ function updateDrill(dt) {
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
-  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
+  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
   if (state.tunnelMask[targetIndex]) {
@@ -7485,6 +7530,9 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     if (pathWithinBeaconArea) {
       beacon.active = true;
       beacon.activationAnimStart = state.lastTs || performance.now();
+      if (state.firstStrikeLevel > 0) {
+        state.firstStrikeTimer = getScaledEffectDuration(6 * state.firstStrikeLevel);
+      }
       // Deposit any remaining unsafe gold (most was deposited progressively)
       if (state.unsafeGold > 0) {
         state.gold += Math.floor(state.unsafeGold);
