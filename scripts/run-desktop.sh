@@ -40,7 +40,7 @@ find_node() {
 }
 
 NODE_BIN="$(find_node)"
-ELECTRON_CLI="${PROJECT_ROOT}/node_modules/electron/cli.js"
+ELECTRON_BIN="${PROJECT_ROOT}/node_modules/electron/dist/electron"
 
 if [[ ! -x "$NODE_BIN" ]]; then
   {
@@ -50,7 +50,7 @@ if [[ ! -x "$NODE_BIN" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$ELECTRON_CLI" ]]; then
+if [[ ! -x "$ELECTRON_BIN" ]]; then
   {
     echo "Electron is not installed in this project."
     echo "Run: npm install"
@@ -62,8 +62,8 @@ fi
   echo "Launching Hide and Dig Deck build"
   echo "Project: $PROJECT_ROOT"
   echo "Node: $NODE_BIN"
-  echo "Electron CLI: $ELECTRON_CLI"
+  echo "Electron: $ELECTRON_BIN"
   echo
 } >"$LOG_FILE"
 
-exec "$NODE_BIN" "$ELECTRON_CLI" "$PROJECT_ROOT" >>"$LOG_FILE" 2>&1
+exec "$ELECTRON_BIN" "$PROJECT_ROOT" >>"$LOG_FILE" 2>&1

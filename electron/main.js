@@ -1,6 +1,18 @@
 import { app, BrowserWindow, shell } from 'electron';
 
 const TARGET_URL = 'http://134.199.190.212:3000/';
+let mainWindow = null;
+
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('enable-logging');
+app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -8,6 +20,8 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 600,
+    show: false,
+    center: true,
     autoHideMenuBar: true,
     backgroundColor: '#111111',
     title: 'Hide and Dig Deck Test',
@@ -20,6 +34,17 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  win.once('ready-to-show', () => {
+    win.show();
+    win.focus();
+  });
+
+  win.on('closed', () => {
+    if (mainWindow === win) {
+      mainWindow = null;
+    }
   });
 
   win.loadURL(TARGET_URL).catch(() => {
@@ -61,14 +86,18 @@ function createWindow() {
       `)}`
     );
   });
+
+  return win;
 }
 
 app.whenReady().then(() => {
-  createWindow();
+  mainWindow = createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      mainWindow = createWindow();
+    } else {
+      BrowserWindow.getAllWindows()[0]?.focus();
     }
   });
 });
@@ -76,5 +105,14 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('second-instance', () => {
+  const existing = BrowserWindow.getAllWindows()[0];
+  if (existing) {
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
   }
 });
