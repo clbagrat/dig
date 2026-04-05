@@ -187,6 +187,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 8px; padding: 0 12px 12px;
 }
+.guide-group-title {
+  grid-column: 1 / -1;
+  font-size: 11px; font-weight: 700; color: var(--acc);
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 8px 2px 2px; border-bottom: 1px solid var(--border);
+}
 .guide-card {
   background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
   padding: 8px 10px;
@@ -206,6 +212,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .guide-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.9; }
 
 /* ── Todo stat editor ── */
+.todo-stat-group-title {
+  grid-column: 1 / -1;
+  font-size: 11px; font-weight: 700; color: var(--acc);
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 8px 2px 2px; border-bottom: 1px solid var(--border);
+}
 .todo-stat-summary { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 .todo-stat-chip {
   font-size: 10px; padding: 2px 7px; border-radius: 999px;
@@ -331,46 +343,85 @@ const S = {
 
 const RARITY_NAMES  = { 1: 'Обычный', 2: 'Необычный', 3: 'Редкий', 4: 'Легендарный' };
 const RARITY_COLORS = { 1: '#aaa', 2: '#4488ff', 3: '#aa44ff', 4: '#ff4444' };
-const STAT_GUIDE = [
-  { id: 'drillPower', name: 'Сила бура', desc: 'Плоский бонус к базовому урону удара.' },
-  { id: 'strikeSpeed', name: 'Скорость бура', desc: 'Ускоряет цикл удара бура.' },
-  { id: 'damageBonus', name: 'Общий бонус урона', desc: 'Процентный множитель урона ударов и взрывов.' },
-  { id: 'explosionDamageMultiplier', name: 'Множитель урона взрывов', desc: 'Дополнительный множитель только для взрывов. 1 = базово, 2 = x2.' },
-  { id: 'miningGoldBonusMultiplier', name: 'Бонус золота', desc: 'Увеличивает золото, добытое из жил и других источников майнинга.' },
-  { id: 'goldBonusPerLevel', name: 'Золото за уровень', desc: 'При каждом новом уровне добавляет бонус к добыче золота.' },
-  { id: 'xpBonusMultiplier', name: 'Бонус опыта', desc: 'Увеличивает количество опыта с кристаллов и других pickup-источников.' },
-  { id: 'maxFuel', name: 'Макс. топливо', desc: 'Повышает верхний предел топлива.' },
-  { id: 'fuelDrainRate', name: 'Расход топлива', desc: 'Множитель расхода топлива. Меньше 1 = экономнее, больше 1 = прожорливее.' },
-  { id: 'fuelPickupBonus', name: 'Бонус топлива', desc: 'Плоский бонус к каждому получению топлива.' },
-  { id: 'fuelPerLevel', name: 'Топливо за уровень', desc: 'При каждом новом уровне выдаёт дополнительное топливо.' },
-  { id: 'maxHeat', name: 'Макс. нагрев', desc: 'Поднимает потолок heat до перегрева.' },
-  { id: 'heatRate', name: 'Скорость нагрева', desc: 'Множитель набора heat. Меньше 1 = медленнее греется.' },
-  { id: 'heatDamageBonus', name: 'Бонус урона от heat', desc: 'Усиливает урон, который масштабируется от текущего нагрева.' },
-  { id: 'heatExplosionDamageBonus', name: 'Бонус урона взрыва перегрева', desc: 'Спецстата для перегревных/heat-взрывов.' },
-  { id: 'heatExplosionRadiusBonus', name: 'Бонус радиуса взрыва перегрева', desc: 'Спецстата для радиуса heat-взрывов.' },
-  { id: 'maxHp', name: 'Макс. HP', desc: 'Повышает запас здоровья.' },
-  { id: 'armor', name: 'Броня', desc: 'Снижает входящий урон от опасностей.' },
-  { id: 'healPerLevel', name: 'Лечение за уровень', desc: 'При каждом уровне восстанавливает здоровье.' },
-  { id: 'visionRadius', name: 'Радиус обзора', desc: 'Увеличивает видимую область вокруг игрока.' },
-  { id: 'luck', name: 'Удача', desc: 'Влияет на шансы лучшего лута и других luck-зависимых роллов.' },
-  { id: 'weakSpotChance', name: 'Шанс бреши', desc: 'Шанс создать weak spot при ударе.' },
-  { id: 'weakSpotMult', name: 'Множитель weak spot', desc: 'Насколько сильнее урон по бреши.' },
-  { id: 'critChance', name: 'Шанс крита', desc: 'Редакторная стата под крит-механику предметов/идей.' },
-  { id: 'critMultiplier', name: 'Множитель крита', desc: 'Редакторная стата под силу критического удара.' },
-  { id: 'speedOfAutoClose', name: 'Скорость автозамыкания', desc: 'Ускоряет автоматическое дорисовывание контура.' },
-  { id: 'idleAutoCloseDelay', name: 'Задержка автозамыкания', desc: 'Сколько секунд бездействия до старта автозамыкания.' },
-  { id: 'loopChargeLevel', name: 'Уровень контурного заряда', desc: 'Усиливает баф после замкнутого контура.' },
-  { id: 'loopPerkLevel', name: 'Уровень контурного трофея', desc: 'Повышает шанс предмета внутри замкнутого контура.' },
-  { id: 'radarCrystalModule', name: 'Радар кристаллов', desc: 'Включает кольцевые подсказки на ближайшие кристаллы.' },
-  { id: 'artifactRadarMode', name: 'Радар артефакта', desc: 'Маяки показывают направление на ближайший артефакт.' },
-  { id: 'goldRadarMode', name: 'Радар золота', desc: 'Маяки показывают направление на крупное золотое скопление.' },
-  { id: 'navigatorMode', name: 'Навигатор маяков', desc: 'Маяки показывают ближайший неактивированный маяк на той же глубине.' },
-  { id: 'effectDurationRate', name: 'Длительность эффектов', desc: 'Множитель длительности временных бафов и состояний.' },
-  { id: 'concentration', name: 'Концентрация', desc: 'Влияет на длительность некоторых негативных состояний, например стана.' },
-  { id: 'bonusFindChance', name: 'Чутьё', desc: 'Шанс дополнительной находки/награды в системах, где это поддержано.' },
-  { id: 'drillPowerPerLevel', name: 'Сила бура за уровень', desc: 'При каждом новом уровне усиливает базовый урон бура.' },
-  { id: 'strikeSpeedPerLevel', name: 'Скорость бура за уровень', desc: 'При каждом новом уровне ускоряет бур.' },
+const STAT_GROUPS = [
+  {
+    label: '⛏ Бурение',
+    stats: [
+      { id: 'drillPower',         name: 'Сила бура',               desc: 'Плоский бонус к базовому урону удара.' },
+      { id: 'strikeSpeed',        name: 'Скорость бура',           desc: 'Ускоряет цикл удара бура.' },
+      { id: 'damageBonus',        name: 'Общий бонус урона',       desc: 'Процентный множитель урона ударов и взрывов.' },
+      { id: 'explosionDamageMultiplier', name: 'Множитель урона взрывов', desc: 'Дополнительный множитель только для взрывов. 1 = базово, 2 = x2.' },
+      { id: 'drillPowerPerLevel', name: 'Сила бура за уровень',   desc: 'При каждом новом уровне усиливает базовый урон бура.' },
+      { id: 'strikeSpeedPerLevel',name: 'Скорость бура за уровень',desc: 'При каждом новом уровне ускоряет бур.' },
+    ],
+  },
+  {
+    label: '🌡️ Нагрев',
+    stats: [
+      { id: 'maxHeat',                   name: 'Макс. нагрев',                  desc: 'Поднимает потолок heat до перегрева.' },
+      { id: 'heatRate',                  name: 'Скорость нагрева',              desc: 'Множитель набора heat. Меньше 1 = медленнее греется.' },
+      { id: 'heatDamageBonus',           name: 'Бонус урона от heat',           desc: 'Усиливает урон, который масштабируется от текущего нагрева.' },
+      { id: 'heatExplosionDamageBonus',  name: 'Бонус урона взрыва перегрева',  desc: 'Спецстата для перегревных/heat-взрывов.' },
+      { id: 'heatExplosionRadiusBonus',  name: 'Бонус радиуса взрыва перегрева',desc: 'Спецстата для радиуса heat-взрывов.' },
+    ],
+  },
+  {
+    label: '⛽ Топливо',
+    stats: [
+      { id: 'maxFuel',        name: 'Макс. топливо',      desc: 'Повышает верхний предел топлива.' },
+      { id: 'fuelDrainRate',  name: 'Расход топлива',     desc: 'Множитель расхода топлива. Меньше 1 = экономнее, больше 1 = прожорливее.' },
+      { id: 'fuelPickupBonus',name: 'Бонус топлива',      desc: 'Плоский бонус к каждому получению топлива.' },
+      { id: 'fuelPerLevel',   name: 'Топливо за уровень', desc: 'При каждом новом уровне выдаёт дополнительное топливо.' },
+    ],
+  },
+  {
+    label: '❤️ Выживание',
+    stats: [
+      { id: 'maxHp',       name: 'Макс. HP',             desc: 'Повышает запас здоровья.' },
+      { id: 'armor',       name: 'Броня',                desc: 'Снижает входящий урон от опасностей.' },
+      { id: 'healPerLevel',name: 'Лечение за уровень',   desc: 'При каждом уровне восстанавливает здоровье.' },
+    ],
+  },
+  {
+    label: '🎯 Бреши / Крит',
+    stats: [
+      { id: 'weakSpotChance', name: 'Шанс бреши',        desc: 'Шанс создать weak spot при ударе.' },
+      { id: 'weakSpotMult',   name: 'Множитель weak spot',desc: 'Насколько сильнее урон по бреши.' },
+    ],
+  },
+  {
+    label: '⚡ Контур',
+    stats: [
+      { id: 'speedOfAutoClose',  name: 'Скорость автозамыкания', desc: 'Ускоряет автоматическое дорисовывание контура.' },
+      { id: 'idleAutoCloseDelay',name: 'Задержка автозамыкания', desc: 'Сколько секунд бездействия до старта автозамыкания.' },
+      { id: 'loopChargeLevel',   name: 'Уровень контурного заряда', desc: 'Усиливает баф после замкнутого контура.' },
+      { id: 'loopPerkLevel',     name: 'Уровень контурного трофея', desc: 'Повышает шанс предмета внутри замкнутого контура.' },
+      { id: 'effectDurationRate',name: 'Длительность эффектов',  desc: 'Множитель длительности временных бафов и состояний.' },
+      { id: 'concentration',     name: 'Концентрация',           desc: 'Влияет на длительность некоторых негативных состояний, например стана.' },
+    ],
+  },
+  {
+    label: '💰 Экономика',
+    stats: [
+      { id: 'miningGoldBonusMultiplier', name: 'Бонус золота',       desc: 'Увеличивает золото, добытое из жил и других источников майнинга.' },
+      { id: 'goldBonusPerLevel',         name: 'Золото за уровень',  desc: 'При каждом новом уровне добавляет бонус к добыче золота.' },
+      { id: 'xpBonusMultiplier',         name: 'Бонус опыта',        desc: 'Увеличивает количество опыта с кристаллов и других pickup-источников.' },
+      { id: 'bonusFindChance',           name: 'Чутьё',              desc: 'Шанс дополнительной находки/награды в системах, где это поддержано.' },
+    ],
+  },
+  {
+    label: '🔭 Разведка',
+    stats: [
+      { id: 'visionRadius',      name: 'Радиус обзора',     desc: 'Увеличивает видимую область вокруг игрока.' },
+      { id: 'luck',              name: 'Удача',             desc: 'Влияет на шансы лучшего лута и других luck-зависимых роллов.' },
+      { id: 'radarCrystalModule',name: 'Радар кристаллов', desc: 'Включает кольцевые подсказки на ближайшие кристаллы.' },
+      { id: 'artifactRadarMode', name: 'Радар артефакта',  desc: 'Маяки показывают направление на ближайший артефакт.' },
+      { id: 'goldRadarMode',     name: 'Радар золота',     desc: 'Маяки показывают направление на крупное золотое скопление.' },
+      { id: 'navigatorMode',     name: 'Навигатор маяков', desc: 'Маяки показывают ближайший неактивированный маяк на той же глубине.' },
+    ],
+  },
 ];
+const STAT_GUIDE = STAT_GROUPS.flatMap(g => g.stats);
 const ALL_STATS = STAT_GUIDE.map(stat => stat.id);
 const STAT_GUIDE_MAP = new Map(STAT_GUIDE.map(stat => [stat.id, stat]));
 
@@ -487,16 +538,19 @@ function renderStatGuide() {
     ? `<span class="guide-dots">${Array.from({ length: count }, () => '<span class="guide-dot"></span>').join('')}</span>`
     : '';
   const container = document.getElementById('guide-grid');
-  container.innerHTML = STAT_GUIDE.map(stat => `
-    <div class="guide-card">
-      <div class="guide-stat">${esc(stat.id)}</div>
-      <div class="guide-name">${esc(stat.name)}</div>
-      <div class="guide-desc">${esc(stat.desc)}</div>
-      <div class="guide-meta">
-        ${(roadmapInfluence.get(stat.id)?.pos ?? 0) > 0 ? `<span class="guide-count pos">${dots(roadmapInfluence.get(stat.id)?.pos ?? 0)}</span>` : ''}
-        ${(roadmapInfluence.get(stat.id)?.neg ?? 0) > 0 ? `<span class="guide-count neg">${dots(roadmapInfluence.get(stat.id)?.neg ?? 0)}</span>` : ''}
+  container.innerHTML = STAT_GROUPS.map(group => `
+    <div class="guide-group-title">${esc(group.label)}</div>
+    ${group.stats.map(stat => `
+      <div class="guide-card">
+        <div class="guide-stat">${esc(stat.id)}</div>
+        <div class="guide-name">${esc(stat.name)}</div>
+        <div class="guide-desc">${esc(stat.desc)}</div>
+        <div class="guide-meta">
+          ${(roadmapInfluence.get(stat.id)?.pos ?? 0) > 0 ? `<span class="guide-count pos">${dots(roadmapInfluence.get(stat.id)?.pos ?? 0)}</span>` : ''}
+          ${(roadmapInfluence.get(stat.id)?.neg ?? 0) > 0 ? `<span class="guide-count neg">${dots(roadmapInfluence.get(stat.id)?.neg ?? 0)}</span>` : ''}
+        </div>
       </div>
-    </div>
+    `).join('')}
   `).join('');
 }
 
@@ -1036,29 +1090,32 @@ function renderTodoSheetBody() {
   const catOpts = categories().map(c =>
     `<option value="${c.id}" ${c.id === item.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
   ).join('');
-  const statRows = STAT_GUIDE.map(stat => {
-    const value = Math.trunc(Number(item.statWeights?.[stat.id]) || 0);
-    const valueClass = value > 0 ? 'pos' : value < 0 ? 'neg' : '';
-    const dots = value !== 0
-      ? `<span class="todo-stat-dots">${Array.from({ length: Math.abs(value) }, () => '<span class="todo-stat-dot"></span>').join('')}</span>`
-      : '';
-    const popularity = roadmapInfluence.get(stat.id) ?? { pos: 0, neg: 0 };
-    return `
-      <div class="todo-stat-row">
-        <div class="todo-stat-title">${esc(stat.id)}</div>
-        <div class="todo-stat-key">${esc(stat.name)}</div>
-        <div class="todo-stat-desc">${esc(stat.desc)}</div>
-        <div class="guide-meta">
-          ${popularity.pos > 0 ? `<span class="guide-count pos">${guideDots(popularity.pos)}</span>` : ''}
-          ${popularity.neg > 0 ? `<span class="guide-count neg">${guideDots(popularity.neg)}</span>` : ''}
+  const statRows = STAT_GROUPS.map(group => {
+    const rows = group.stats.map(stat => {
+      const value = Math.trunc(Number(item.statWeights?.[stat.id]) || 0);
+      const valueClass = value > 0 ? 'pos' : value < 0 ? 'neg' : '';
+      const dots = value !== 0
+        ? `<span class="todo-stat-dots">${Array.from({ length: Math.abs(value) }, () => '<span class="todo-stat-dot"></span>').join('')}</span>`
+        : '';
+      const popularity = roadmapInfluence.get(stat.id) ?? { pos: 0, neg: 0 };
+      return `
+        <div class="todo-stat-row">
+          <div class="todo-stat-title">${esc(stat.id)}</div>
+          <div class="todo-stat-key">${esc(stat.name)}</div>
+          <div class="todo-stat-desc">${esc(stat.desc)}</div>
+          <div class="guide-meta">
+            ${popularity.pos > 0 ? `<span class="guide-count pos">${guideDots(popularity.pos)}</span>` : ''}
+            ${popularity.neg > 0 ? `<span class="guide-count neg">${guideDots(popularity.neg)}</span>` : ''}
+          </div>
+          <div class="todo-stat-controls">
+            <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="-1">−</button>
+            <div class="todo-stat-value ${valueClass}">${dots}${dots ? '&nbsp;' : ''}${esc(formatAbstractDelta(value))}</div>
+            <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="1">+</button>
+          </div>
         </div>
-        <div class="todo-stat-controls">
-          <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="-1">−</button>
-          <div class="todo-stat-value ${valueClass}">${dots}${dots ? '&nbsp;' : ''}${esc(formatAbstractDelta(value))}</div>
-          <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="1">+</button>
-        </div>
-      </div>
-    `;
+      `;
+    }).join('');
+    return `<div class="todo-stat-group-title">${esc(group.label)}</div>${rows}`;
   }).join('');
 
   document.getElementById('sheet-body').innerHTML = `
