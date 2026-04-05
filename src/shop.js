@@ -238,7 +238,9 @@ function rollOfferings(luck) {
 
 function getOfferingCost(offering) {
   const base = offering.good.baseCost * RARITY_COST_MULT[offering.rarity];
-  return Math.max(1, Math.floor(base + shopLevel + base * 0.1 * shopLevel));
+  const raw = Math.max(1, Math.floor(base + shopLevel + base * 0.1 * shopLevel));
+  const discount = Math.min(0.9, currentStatsCache?.shopPriceDiscount ?? 0);
+  return Math.max(1, Math.floor(raw * (1 - discount)));
 }
 
 function getRerollCost() {

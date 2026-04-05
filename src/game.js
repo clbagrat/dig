@@ -422,6 +422,7 @@ const state = {
   strikeSpeed: 0,
   drillPower: BASE_DRILL_DAMAGE,
   miningGoldBonusMultiplier: 0,
+  shopPriceDiscount: 0,
   xpBonusMultiplier: 0,
   fuelPickupBonus: 0,
   overflowBomb: false,
@@ -575,7 +576,7 @@ function fillRoundRect(ctx, x, y, width, height, radius) {
 }
 
 function buildRoundedRectPath(ctx, x, y, width, height, radius) {
-  const r = Math.min(radius, width * 0.5, height * 0.5);
+  const r = Math.max(0, Math.min(radius, width * 0.5, height * 0.5));
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + width, y, x + width, y + height, r);
@@ -2125,6 +2126,7 @@ function setupField(seedOverride = null) {
   state.strikeSpeed = 0;
   state.drillPower = BASE_DRILL_DAMAGE;
   state.miningGoldBonusMultiplier = 0;
+  state.shopPriceDiscount = 0;
   state.xpBonusMultiplier = 0;
   state.fuelPickupBonus = 0;
   state.overflowBomb = false;
@@ -3047,6 +3049,7 @@ function getShopStatsSnapshot() {
     concentration: state.concentration,
     fuelDrainRate: state.fuelDrainRate,
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier,
+    shopPriceDiscount: state.shopPriceDiscount,
     fuelPickupBonus: state.fuelPickupBonus,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,

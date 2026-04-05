@@ -309,6 +309,21 @@ export const ALL_ITEMS = [
       effectByRarity: [null, 0.02, 0.03, 0.04, 0.06],
     },
   },
+  {
+    id: "black_market",
+    type: "item",
+    name: "Чёрный рынок",
+    icon: "🏴",
+    desc: "−10% к стоимости предметов в магазине.",
+    category: "economy",
+    tags: ["economy"],
+    minRarity: 1,
+    baseCost: 45,
+    effect: {
+      stat: "shopPriceDiscount",
+      effectByRarity: [null, 0.10, 0.15, 0.20, 0.30],
+    },
+  },
 ];
 
 export const ALL_GOODS = [...ALL_EQUIPMENT, ...ALL_ITEMS];
