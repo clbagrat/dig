@@ -328,6 +328,20 @@ const state = {
   armor: 0,
   heatExplosionDamageBonus: 0,
   heatExplosionRadiusBonus: 0,
+  heatDamageBonus: 0,
+  heatEngineLevel: 0,
+  stunDetonatorLevel: 0,
+  stunReservoirLevel: 0,
+  stunAfterburnerLevel: 0,
+  breachMissileLevel: 0,
+  fuelRocketLevel: 0,
+  cryoRocketAccumulator: 0,
+  cryoRocketThreshold: 0,
+  beaconCatalystLevel: 0,
+  levelCatalystLevel: 0,
+  crystalRewardRerolls: 0,
+  crystalGoldGain: 0,
+  crystalXpGain: 0,
   depth: 0,
   gold: 0,
   unsafeGold: 0,
@@ -2087,6 +2101,20 @@ function setupField(seedOverride = null) {
   state.armor = 0;
   state.heatExplosionDamageBonus = 0;
   state.heatExplosionRadiusBonus = 0;
+  state.heatDamageBonus = 0;
+  state.heatEngineLevel = 0;
+  state.stunDetonatorLevel = 0;
+  state.stunReservoirLevel = 0;
+  state.stunAfterburnerLevel = 0;
+  state.breachMissileLevel = 0;
+  state.fuelRocketLevel = 0;
+  state.cryoRocketAccumulator = 0;
+  state.cryoRocketThreshold = 0;
+  state.beaconCatalystLevel = 0;
+  state.levelCatalystLevel = 0;
+  state.crystalRewardRerolls = 0;
+  state.crystalGoldGain = 0;
+  state.crystalXpGain = 0;
   state.gold = 0;
   state.unsafeGold = 0;
   state.xp = 0;
@@ -2479,19 +2507,24 @@ function rollCrystalItemRarity() {
 }
 
 function pickCrystalRewardItem() {
-  for (let attempt = 0; attempt < 40; attempt++) {
-    const rarity = rollCrystalItemRarity();
-    const pool = ALL_GOODS.filter(g =>
-      g.type === "item" &&
-      (g.minRarity ?? 1) <= rarity &&
-      (!g.maxRarity || g.maxRarity >= rarity) &&
-      !(g.unique && getItemStacks(g.id) > 0)
-    );
-    if (pool.length === 0) continue;
-    const good = pool[Math.floor(Math.random() * pool.length)];
-    return { good, rarity };
+  const picks = 1 + Math.max(0, state.crystalRewardRerolls || 0);
+  let best = null;
+  for (let pick = 0; pick < picks; pick++) {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const rarity = rollCrystalItemRarity();
+      const pool = ALL_GOODS.filter(g =>
+        g.type === "item" &&
+        (g.minRarity ?? 1) <= rarity &&
+        (!g.maxRarity || g.maxRarity >= rarity) &&
+        !(g.unique && getItemStacks(g.id) > 0)
+      );
+      if (pool.length === 0) continue;
+      const good = pool[Math.floor(Math.random() * pool.length)];
+      if (!best || rarity > best.rarity) best = { good, rarity };
+      break;
+    }
   }
-  return null;
+  return best;
 }
 
 function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y) {
@@ -2548,6 +2581,13 @@ function applyCrystalCatalystBonus(x, y) {
 function collectCrystalTile(x, y, index, crystalType) {
   state.crystalMask[index] = 0;
   runFuelEvent(() => applyCrystalCatalystBonus(x, y));
+  if (state.crystalGoldGain > 0) {
+    state.unsafeGold += state.crystalGoldGain;
+    showGoldToast(state.crystalGoldGain);
+  }
+  if (state.crystalXpGain > 0) {
+    gainExperience(state.crystalXpGain);
+  }
   if (state.crystalRecipe.length === 0) {
     startCrystalRecipe(crystalType);
     showPerkToast(state.crystalStatusText);
@@ -3092,6 +3132,8 @@ function applyItemEffect(effect, rarityMult, rarity) {
       state.artifactRadarMode = true;
     } else if (e.stat === "navigatorMode") {
       state.navigatorMode = true;
+    } else if (e.stat === "radarCrystalModule") {
+      state.radarCrystalModule = true;
     } else if (e.stat === "maxHp" && value < 0) {
       state.maxHp = Math.max(1, state.maxHp + value);
       state.hp = Math.min(state.hp, state.maxHp);
@@ -4737,9 +4779,14 @@ function update(dt) {
     state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 2.4);
     state.damageFlash = Math.min(1, state.damageFlash + 0.65);
   }
+  const prevStunTimer = state.stunTimer;
   state.stunTimer = Math.max(0, state.stunTimer - dt);
   if (state.stunTimer === 0) {
     state.stunDisplayDuration = 0;
+    if (prevStunTimer > 0 && state.stunAfterburnerLevel > 0) {
+      const afterDuration = getScaledEffectDuration(prevStunTimer * state.stunAfterburnerLevel * 2);
+      activateDrillOverdrive(afterDuration, "Форсаж после стана");
+    }
   }
   if (!state.struckThisFrame && state.drillIdleFrame) {
     state.heatCooldownTime += dt;
@@ -4753,6 +4800,13 @@ function update(dt) {
       const coolingRocketThreshold = getCoolingRocketThreshold();
       while (state.coolingRocketCharge >= coolingRocketThreshold) {
         state.coolingRocketCharge -= coolingRocketThreshold;
+        triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
+      }
+    }
+    if (state.cryoRocketThreshold > 0 && cooledHeat > 0) {
+      state.cryoRocketAccumulator += cooledHeat;
+      while (state.cryoRocketAccumulator >= state.cryoRocketThreshold) {
+        state.cryoRocketAccumulator -= state.cryoRocketThreshold;
         triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
       }
     }
@@ -5124,10 +5178,19 @@ function applyStun(duration, toastText = "") {
   }
   const concentration = Math.max(0.1, state.concentration || 1);
   const actualDuration = Math.max(0.5, duration / concentration - state.stunReduction);
+  const wasStunned = state.stunTimer > 0;
   state.stunTimer = Math.max(state.stunTimer, actualDuration);
   state.stunDisplayDuration = Math.max(state.stunDisplayDuration, actualDuration);
   if (toastText) {
     showPerkToast(toastText);
+  }
+  if (!wasStunned && actualDuration > 0) {
+    if (state.stunDetonatorLevel > 0) {
+      explodeAt(state.drill.x, state.drill.y, getStrikeDamage() * state.stunDetonatorLevel, 1.5, { cause: "explosion" });
+    }
+    if (state.stunReservoirLevel > 0) {
+      addFuel(state.stunReservoirLevel * 40, state.drill.x, state.drill.y);
+    }
   }
 }
 
@@ -5748,6 +5811,11 @@ function getAdrenalineSpeedBonus() {
   return state.adrenalineLevel * 30;
 }
 
+function getHeatEngineSpeedBonus() {
+  if (!state.heatEngineLevel || state.maxHeat <= 0) return 0;
+  return state.heatEngineLevel * 40 * (state.heat / state.maxHeat);
+}
+
 function getBasicDrillDamageBonus() {
   let total = 0;
   for (const tier of getEquipmentTiers("basic_drill")) {
@@ -5775,7 +5843,7 @@ function getThermoDrillDamageBonus() {
     const flat = [0, 0, 20, 25, 30][tier] || 0;
     const drillScale = [0, 0, 0.15, 0.20, 0.25][tier] || 0;
     const heatBonus = [0, 0, 1, 2, 3][tier] || 0;
-    total += flat + state.drillPower * drillScale + Math.floor(state.heat / 10) * heatBonus;
+    total += flat + state.drillPower * drillScale + Math.floor(state.heat / 10) * heatBonus * (1 + (state.heatDamageBonus || 0));
   }
   return total;
 }
@@ -5817,6 +5885,12 @@ function gainExperience(amount) {
     state.levelRewardStep += 1;
     state.levelRewardQueue.push({ step: state.levelRewardStep, level: state.level, choices: generateLevelRewardChoices(state.level) });
     applyLevelUpItemBonuses();
+    if (state.levelCatalystLevel > 0 && state.crystalRecipe.length > 0 && state.crystalProgress < state.crystalRecipe.length) {
+      const firstType = state.crystalRecipe[0];
+      const completedRecipe = [...state.crystalRecipe];
+      clearCrystalRecipe();
+      grantCrystalRecipeReward(firstType, completedRecipe, state.drill.x, state.drill.y);
+    }
     state.levelUpFlash = Math.min(1, (state.levelUpFlash || 0) + 0.55);
     state.levelUpPulse = 0.9;
     state.levelUpModalDelay = 0.9;
@@ -5917,6 +5991,9 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   if (state.fuelConverterLevel > 0 && overflow > 0) {
     const duration = getScaledEffectDuration(2 + state.fuelConverterLevel);
     activateDrillOverdrive(duration, "Переработчик топлива");
+  }
+  if (state.fuelRocketLevel > 0) {
+    triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
   }
 }
 
@@ -6523,6 +6600,9 @@ function damageCell(x, y, damage, options = {}) {
     spawnWeakSpotHitEffect(x, y, options.dirX ?? 0, options.dirY ?? 1);
     if (state.weakSpotFuelGain > 0) {
       addFuel(state.weakSpotFuelGain);
+    }
+    if (state.breachMissileLevel > 0) {
+      triggerRemoteBombSquare(x, y, 1 + Math.floor(Math.random() * 3));
     }
     if (state.weakSpotPierce > 0) {
       const px = x + (options.dirX ?? 0);
@@ -7195,7 +7275,7 @@ function updateDrill(dt) {
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
-  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
+  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus() + getHeatEngineSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
   if (state.tunnelMask[targetIndex]) {
@@ -7532,6 +7612,12 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       beacon.activationAnimStart = state.lastTs || performance.now();
       if (state.firstStrikeLevel > 0) {
         state.firstStrikeTimer = getScaledEffectDuration(6 * state.firstStrikeLevel);
+      }
+      if (state.beaconCatalystLevel > 0 && state.crystalRecipe.length > 0 && state.crystalProgress < state.crystalRecipe.length) {
+        const firstType = state.crystalRecipe[0];
+        const completedRecipe = [...state.crystalRecipe];
+        clearCrystalRecipe();
+        grantCrystalRecipeReward(firstType, completedRecipe, beacon.x, beacon.y);
       }
       // Deposit any remaining unsafe gold (most was deposited progressively)
       if (state.unsafeGold > 0) {
