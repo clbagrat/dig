@@ -4,6 +4,7 @@ import {
   RARITY, RARITY_NAMES, RARITY_COLORS, RARITY_EFFECT_MULT, RARITY_COST_MULT,
   TAG_SYNERGIES,
 } from "./items-catalog.js?v=1";
+import { DEPTH_LEVELS } from "./worldgen.js?v=1";
 
 // ── Constants ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ let purchasedItems = [];     // [{id, rarity}] — flat list, no limit
 let currentOfferings = [];   // [{good, rarity}] × OFFERINGS_COUNT
 let rerollCount = 0;
 let shopLevel = 0;
+let currentDepthLevel = 1;
 let currentGoldCache = 0;
 let currentLuckCache = 0;
 let currentStatsCache = null;
@@ -46,12 +48,13 @@ export function initShop(callbacks = {}) {
   bindEvents();
 }
 
-export function openShop(currentGold, beaconY, luck = 0, stats = null) {
+export function openShop(currentGold, depthLevel, luck = 0, stats = null) {
   const overlay = document.getElementById("shopModal");
   if (!overlay) return;
   currentGoldCache = currentGold;
   currentLuckCache = luck;
   currentStatsCache = stats;
+  currentDepthLevel = depthLevel ?? 1;
   shopLevel += 1;
   rerollCount = 0;
   selectedOfferingIdx = -1;
@@ -81,6 +84,8 @@ export function renderShop(currentGold, stats = null) {
   }
   const goldEl = document.getElementById("shopGoldValue");
   if (goldEl) goldEl.textContent = Math.floor(currentGold);
+  const titleEl = document.getElementById("shopTitle");
+  if (titleEl) titleEl.textContent = `Ур.${shopLevel} · Глубина ${currentDepthLevel}`;
   renderStats(true);
   renderOfferings();
   renderSlots();
@@ -135,6 +140,7 @@ export function resetShopState() {
   currentOfferings = [];
   rerollCount = 0;
   shopLevel = 0;
+  currentDepthLevel = 1;
   currentStatsCache = null;
   lockedSlots = new Set();
   prevTagCounts = {};
@@ -160,8 +166,8 @@ export function grantItem(good, rarity) {
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
-function rollRarity(level, luck) {
-  const t = Math.min(level / 9, 1);
+function rollRarity(depthLevel, luck) {
+  const t = Math.min((depthLevel - 1) / Math.max(1, DEPTH_LEVELS.length - 1), 1);
   const luckBonus = 1 + (luck || 0) * 0.01;
   const legendary = Math.min(0.08, lerp(0, 0.08, t) * luckBonus);
   const rare =      Math.min(0.25, lerp(0, 0.25, t) * luckBonus);
@@ -191,7 +197,7 @@ function rollOfferings(luck) {
   for (let i = 0; i < OFFERINGS_COUNT; i++) {
     if (currentOfferings[i]) continue; // locked slot, skip
     const isEquipment = Math.random() < EQUIPMENT_CHANCE;
-    const rarity = rollRarity(shopLevel, luck);
+    const rarity = rollRarity(currentDepthLevel, luck);
     const pool = isEquipment ? ALL_EQUIPMENT : ALL_ITEMS;
 
     const candidates = pool.filter(g =>
@@ -439,7 +445,7 @@ function buildDOM() {
     <div class="shop-stack">
       <div class="shop-panel">
         <div class="shop-head">
-          <span class="shop-head__title">Магазин</span>
+          <span class="shop-head__title" id="shopTitle">Магазин</span>
           <span class="shop-head__gold">
             <span class="shop-head__gold-icon"></span>
             <span id="shopGoldValue">0</span>
@@ -538,9 +544,8 @@ function getGoodDescription(good, rarity = RARITY.COMMON) {
     return `+${spd}% ${statShort("strikeSpeed")}. −1 ${statShort("maxHp")} (не ниже 1).`;
   }
   if (good.id === "heavy_drill") {
-    const dp = getRarityTierValue([0, 3, 5, 8, 12], rarity);
-    const spd = getRarityTierValue([0, 10, 12, 15, 18], rarity);
-    return `+${dp} ${statShort("drillPower")}. Скорость −${spd}%.`;
+    const dp = getRarityTierValue([0, 8, 10, 12, 15], rarity);
+    return `+${dp} ${statShort("drillPower")}. Скорость −10%.`;
   }
   if (good.effect?.effectByRarity) {
     const value = good.effect.effectByRarity[rarity] ?? good.effect.effectByRarity[1] ?? 0;

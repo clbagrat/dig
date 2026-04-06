@@ -6,6 +6,7 @@
 <title>Items Editor</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 :root {
   --bg:     #0f0b09;
   --bg2:    #1a1410;
@@ -19,6 +20,11 @@
   --danger: #c04848;
   --r:      8px;
   --r1: #aaa; --r2: #4488ff; --r3: #aa44ff; --r4: #ff4444;
+  /* aliases for shop.js CSS */
+  --accent: #d79f49;
+  --accent-strong: #8f4d1d;
+  --panel-border: rgba(215,159,73,0.28);
+  --shadow: rgba(0,0,0,0.34);
 }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; -webkit-tap-highlight-color: transparent; }
 
@@ -250,6 +256,136 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .todo-stat-dots { display: inline-flex; align-items: center; gap: 3px; min-height: 10px; }
 .todo-stat-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.9; }
 
+/* ══════════════════════════════════════════════
+   Shop CSS (extracted from styles.css)
+   ══════════════════════════════════════════════ */
+#shopModal { position: fixed !important; }
+.shop-modal {
+  position: fixed; inset: 0; z-index: 9998;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6,3,1,.75); backdrop-filter: blur(6px);
+  padding: 40px 24px;
+}
+.shop-modal[hidden] { display: none; }
+.shop-stack { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.shop-panel { width: 100%; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(215,159,73,.2); border-radius: 18px; background: rgba(14,7,3,.97); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+.shop-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid rgba(215,159,73,.14); background: rgba(20,10,5,.8); flex-shrink: 0; }
+.shop-head__title { flex: 1; font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.shop-head__gold { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid rgba(215,159,73,.25); border-radius: 8px; background: rgba(30,14,4,.6); font-size: 13px; font-weight: 700; color: var(--accent); }
+.shop-head__gold-icon { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #d79f49; border: 1.5px solid #f0c060; vertical-align: middle; margin-bottom: 1px; }
+.shop-reroll { padding: 5px 10px; border: 1px solid rgba(215,159,73,.3); border-radius: 8px; background: rgba(30,14,4,.5); color: var(--accent); font: inherit; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: transform .1s, opacity .1s; }
+.shop-reroll:active { transform: scale(.95); }
+.shop-reroll--poor { color: var(--muted); opacity: .45; border-color: rgba(215,159,73,.15); }
+.shop-close { width: 28px; height: 28px; border: 1px solid rgba(215,159,73,.2); border-radius: 8px; background: rgba(30,14,4,.5); color: var(--muted); font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.shop-close:active { transform: scale(.93); }
+.shop-stats { display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 0 2px; flex-shrink: 0; }
+.shop-stats[hidden] { display: none; }
+.shop-stats__item { display: inline-flex; align-items: baseline; gap: 4px; padding: 3px 6px; border: 1px solid rgba(215,159,73,.16); border-radius: 999px; background: rgba(20,10,5,.72); }
+.shop-stats__label { font-size: 8px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.shop-stats__value { font-size: 10px; font-weight: 700; color: var(--accent); }
+.stat-tooltip { position: fixed; z-index: 9999; padding: 4px 8px; background: rgba(20,10,5,.92); border: 1px solid rgba(215,159,73,.35); border-radius: 6px; font-size: 10px; color: var(--accent); white-space: nowrap; pointer-events: none; }
+.stat-tooltip[hidden] { display: none; }
+.shop-offerings { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 14px 12px; flex-shrink: 0; overflow-y: auto; }
+.shop-empty { grid-column: 1/-1; padding: 16px 14px; border: 1px solid rgba(215,159,73,.18); border-radius: 12px; background: rgba(22,11,5,.7); text-align: center; }
+.shop-empty__title { font-size: 13px; font-weight: 700; color: var(--text); }
+.shop-empty__text { margin-top: 6px; font-size: 11px; line-height: 1.4; color: var(--muted); }
+.shop-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px 8px; border: 1.5px solid rgba(215,159,73,.18); border-radius: 12px; background: rgba(22,11,5,.7); cursor: pointer; text-align: center; transition: border-color .12s, background .12s, transform .1s; position: relative; }
+.shop-card:active { transform: scale(.95); }
+.shop-card--sold { opacity: .25; cursor: default; pointer-events: none; }
+.shop-card__sold { font-size: 10px; color: var(--muted); padding: 18px 0; }
+.shop-card--rarity-1 { border-color: rgba(170,170,170,.35); }
+.shop-card--rarity-2 { border-color: rgba(68,136,255,.55); }
+.shop-card--rarity-3 { border-color: rgba(170,68,255,.55); }
+.shop-card--rarity-4 { border-color: rgba(255,68,68,.65); }
+.shop-card--selected { box-shadow: 0 0 0 2px rgba(215,159,73,.3), 0 0 14px rgba(215,159,73,.12); }
+.shop-card--selected.shop-card--rarity-2 { box-shadow: 0 0 0 2px rgba(68,136,255,.3), 0 0 14px rgba(68,136,255,.12); }
+.shop-card--selected.shop-card--rarity-3 { box-shadow: 0 0 0 2px rgba(170,68,255,.3), 0 0 14px rgba(170,68,255,.12); }
+.shop-card--selected.shop-card--rarity-4 { box-shadow: 0 0 0 2px rgba(255,68,68,.3), 0 0 14px rgba(255,68,68,.12); }
+.shop-card--merge { background: rgba(68,136,255,.08); }
+.shop-card--poor { opacity: .5; }
+.shop-card--locked { outline: 1px dashed rgba(215,159,73,.5); }
+.shop-card__type { font-size: 10px; opacity: .5; position: absolute; top: 4px; right: 6px; }
+.shop-card__icon { font-size: 20px; line-height: 1; height: 24px; display: flex; align-items: center; justify-content: center; }
+.shop-card__name { font-size: 9px; font-weight: 700; color: var(--text); letter-spacing: .02em; line-height: 1.2; min-height: 20px; display: flex; align-items: center; justify-content: center; }
+.shop-card__category { font-size: 7px; color: #888; letter-spacing: .03em; opacity: .75; }
+.shop-card__merge { font-size: 8px; font-weight: 700; color: #4488ff; letter-spacing: .03em; }
+.shop-card__cost { font-size: 10px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.shop-card__cost--poor { color: var(--muted); opacity: .55; }
+.shop-detail { flex-shrink: 0; border-top: 1px solid rgba(215,159,73,.18); background: rgba(18,9,4,.95); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.shop-detail[hidden] { display: none; }
+.shop-detail__row { display: flex; align-items: flex-start; gap: 12px; }
+.shop-detail__icon { font-size: 28px; line-height: 1; width: 36px; text-align: center; flex-shrink: 0; padding-top: 2px; }
+.shop-detail__info { flex: 1; min-width: 0; }
+.shop-detail__name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.shop-detail__desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.shop-detail__tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.shop-tag { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: rgba(215,159,73,.1); border: 1px solid rgba(215,159,73,.2); color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+.shop-detail__footer { display: flex; flex-direction: column; gap: 8px; }
+.shop-detail__actions { display: flex; gap: 8px; }
+.shop-detail__rarity { flex: 1; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.shop-detail__buy { flex: 1; padding: 8px 16px; border-radius: 10px; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: transform .1s, opacity .1s; }
+.shop-detail__buy--ok { background: rgba(215,159,73,.18); border-color: rgba(215,159,73,.5); color: var(--accent); }
+.shop-detail__buy--ok:active { transform: scale(.96); }
+.shop-detail__buy--merge { background: rgba(68,136,255,.15); border-color: rgba(68,136,255,.5); color: #4488ff; }
+.shop-detail__buy--merge:active { transform: scale(.96); }
+.shop-detail__buy--replace { background: rgba(255,170,68,.12); border-color: rgba(255,170,68,.35); color: #ffaa44; }
+.shop-detail__buy--poor { background: transparent; border-color: rgba(215,159,73,.2); color: var(--muted); opacity: .5; }
+.shop-detail__sell { flex-shrink: 0; padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,100,100,.35); background: rgba(255,100,100,.1); color: #ff8888; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.shop-detail__sell:active { transform: scale(.96); }
+.shop-detail__lock { flex-shrink: 0; padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(215,159,73,.3); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.shop-detail__lock--active { border-color: rgba(215,159,73,.6); color: var(--accent); background: rgba(215,159,73,.1); }
+.shop-detail__lock:active { transform: scale(.96); }
+.shop-slots { display: flex; gap: 6px; padding: 10px 14px 14px; border-top: 1px solid rgba(215,159,73,.12); flex-shrink: 0; }
+.shop-slot { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid rgba(215,159,73,.15); background: rgba(22,11,5,.5); display: flex; align-items: center; justify-content: center; position: relative; transition: border-color .12s, box-shadow .12s; cursor: pointer; }
+.shop-slot--empty { opacity: .35; }
+.shop-slot__empty { font-size: 16px; color: var(--muted); opacity: .4; }
+.shop-slot--filled { background: rgba(30,15,6,.8); }
+.shop-slot--rarity-1 { border-color: rgba(170,170,170,.35); }
+.shop-slot--rarity-2 { border-color: rgba(68,136,255,.5); }
+.shop-slot--rarity-3 { border-color: rgba(170,68,255,.5); }
+.shop-slot--rarity-4 { border-color: rgba(255,68,68,.6); }
+.shop-slot--replaceable { animation: slot-pulse .8s ease-in-out infinite; }
+.shop-slot--selected { outline: 2px solid rgba(68,170,255,.8); }
+.shop-slot--merge-target { animation: slot-merge-pulse .8s ease-in-out infinite; }
+.shop-slot__icon { font-size: 18px; line-height: 1; }
+.shop-slot__rarity { position: absolute; bottom: -2px; right: -2px; font-size: 8px; line-height: 1; }
+@keyframes slot-merge-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(68,255,170,0)} 50%{box-shadow:0 0 0 3px rgba(68,255,170,.5)} }
+@keyframes slot-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,170,68,0)} 50%{box-shadow:0 0 0 3px rgba(255,170,68,.3)} }
+
+/* ── Simulator ── */
+#sim-panel { padding: 16px 12px; display: flex; flex-direction: column; gap: 12px; }
+.sim-status {
+  display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px;
+  padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+}
+.sim-status b { color: var(--acc2); }
+.sim-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sim-row label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.sim-row input[type=number] {
+  width: 80px; background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px;
+}
+.sim-row input[type=number]:focus { outline: none; border-color: var(--acc); }
+.sim-btn {
+  padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text); font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.sim-btn:active { opacity: .75; }
+.sim-btn--primary { border-color: var(--acc); color: var(--acc); font-weight: 700; }
+.sim-btn--danger  { border-color: var(--danger); color: var(--danger); background: none; }
+.sim-artifact-panel {
+  padding: 12px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sim-artifact-title { font-size: 12px; color: var(--muted); font-weight: 600; }
+.sim-artifact-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.sim-artifact-choice {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg4); color: var(--text); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+}
+.sim-artifact-choice:active { border-color: var(--acc); color: var(--acc); }
+
 /* ── Toast ── */
 #toast {
   position: fixed; bottom: 24px; left: 50%; z-index: 200;
@@ -280,6 +416,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="tab active" data-tab="equipment">⛏ Части корпуса</div>
     <div class="tab" data-tab="items">✧ Предметы</div>
     <div class="tab" data-tab="todo">📋 Роадмап</div>
+    <div class="tab" data-tab="simulator">🏪 Симулятор</div>
   </div>
 </div>
 
@@ -313,6 +450,31 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 <div id="items-list" class="items-list"></div>
 
+<div id="sim-panel" hidden>
+  <div class="sim-status">
+    <span>Магазин <b id="sim-level-disp">0</b></span>
+    <span>🪙 <b id="sim-gold-disp">100</b></span>
+    <span>★ Удача <b id="sim-luck-disp">0</b></span>
+    <span>↓ Глубина <b id="sim-depth-disp">1</b></span>
+  </div>
+  <div class="sim-row">
+    <label>Золото: <input type="number" id="sim-gold-input" value="100" min="0"></label>
+    <button class="sim-btn" id="btn-sim-add-gold">+ Добавить</button>
+    <label>Удача: <input type="number" id="sim-luck-input" value="1" min="0"></label>
+    <button class="sim-btn" id="btn-sim-add-luck">+ Добавить</button>
+    <label>Глубина (1–8): <input type="number" id="sim-depth-input" value="1" min="1" max="8"></label>
+  </div>
+  <div class="sim-row">
+    <button class="sim-btn" id="btn-sim-artifact">Дать артефакт</button>
+    <button class="sim-btn sim-btn--primary" id="btn-sim-open">Открыть магазин (ур. <span id="sim-next-level">1</span>)</button>
+  </div>
+  <button class="sim-btn sim-btn--danger" id="btn-sim-reset">Сбросить симулятор</button>
+  <div id="sim-artifact-panel" class="sim-artifact-panel" hidden>
+    <div class="sim-artifact-title">Выбери категорию для разблокировки (+1 слот корпуса):</div>
+    <div id="sim-artifact-choices" class="sim-artifact-choices"></div>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="overlay"></div>
 <div class="sheet" id="sheet">
   <div class="sheet-handle"></div>
@@ -325,10 +487,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 </div>
 
 <div id="toast"></div>
+<div id="shopModal" class="shop-modal" hidden></div>
 
 <script type="module">
-const { ALL_EQUIPMENT, ALL_ITEMS, CATEGORIES } = await import(`./src/items-catalog.js?t=${Date.now()}`);
+const { ALL_EQUIPMENT, ALL_ITEMS, CATEGORIES, RARITY_EFFECT_MULT } = await import(`./src/items-catalog.js?t=${Date.now()}`);
 const { TODO_ITEMS } = await import(`./src/items-todo.js?t=${Date.now()}`);
+const {
+  initShop, openShop, renderShop: renderShopUI, resetShopState,
+  unlockCategory, addSlot, getLockedCategories,
+} = await import(`./src/shop.js?t=${Date.now()}`);
 
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
@@ -1189,7 +1356,17 @@ function switchTab(tab) {
   S.selId = null;
   closeSheet();
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
-  if (tab === 'todo') renderTodo();
+  const isSimulator = tab === 'simulator';
+  document.querySelector('.filters').hidden       = isSimulator;
+  document.getElementById('items-list').hidden    = isSimulator;
+  document.getElementById('sim-panel').hidden     = !isSimulator;
+  if (isSimulator) {
+    // Hide cat-panel and stat-guide when entering simulator
+    document.getElementById('cat-panel').hidden  = true;
+    document.getElementById('btn-cat-toggle').classList.remove('active');
+    document.getElementById('stat-guide').removeAttribute('open');
+    renderSimPanel();
+  } else if (tab === 'todo') renderTodo();
   else renderList();
 }
 
@@ -1240,9 +1417,144 @@ document.getElementById('tabs').addEventListener('click', e => {
 ['search', 'filter-cat', 'filter-rarity'].forEach(id =>
   document.getElementById(id).addEventListener('input', () => {
     if (S.tab === 'todo') renderTodo();
-    else renderList();
+    else if (S.tab !== 'simulator') renderList();
   })
 );
+
+// ── Simulator ──────────────────────────────────────────────────────────────
+const sim = { gold: 100, luck: 0, nextLevel: 1, depthLevel: 1, stats: {} };
+
+// Apply effect deltas to sim.stats.
+// oldRarity: if set, subtracts old rarity value first (for merges/replaces).
+// sign: +1 for add, -1 for remove (recycle).
+function simApplyEffects(effect, rarity, sign, oldRarity = 0) {
+  if (!effect) return;
+  const effects = Array.isArray(effect) ? effect : [effect];
+  for (const e of effects) {
+    if (!e?.stat) continue;
+    let newVal = 0, oldVal = 0;
+    if (e.effectByRarity) {
+      newVal = e.effectByRarity[rarity]    ?? 0;
+      oldVal = e.effectByRarity[oldRarity] ?? 0;
+    } else {
+      const v = e.value ?? 0;
+      newVal = v * (RARITY_EFFECT_MULT[rarity]    ?? 1);
+      oldVal = v * (RARITY_EFFECT_MULT[oldRarity] ?? 0);
+    }
+    sim.stats[e.stat] = (sim.stats[e.stat] ?? 0) + sign * (newVal - oldVal);
+  }
+}
+
+function renderSimPanel() {
+  document.getElementById('sim-gold-disp').textContent  = Math.floor(sim.gold);
+  document.getElementById('sim-luck-disp').textContent  = sim.luck;
+  document.getElementById('sim-level-disp').textContent = sim.nextLevel - 1;
+  document.getElementById('sim-next-level').textContent = sim.nextLevel;
+  document.getElementById('sim-depth-disp').textContent = sim.depthLevel;
+}
+
+function simGiveArtifact() {
+  const locked = getLockedCategories();
+  if (locked.length === 0) {
+    addSlot();
+    renderSimPanel();
+    toast('Все категории разблокированы — выдан дополнительный слот');
+    return;
+  }
+  if (locked.length === 1) {
+    unlockCategory(locked[0].id);
+    addSlot();
+    renderSimPanel();
+    toast(`Разблокировано: ${locked[0].icon} ${locked[0].name} (+1 слот)`);
+    return;
+  }
+  const shuffled = locked.slice().sort(() => Math.random() - 0.5);
+  const choices  = shuffled.slice(0, 2);
+  const panel    = document.getElementById('sim-artifact-panel');
+  const container = document.getElementById('sim-artifact-choices');
+  container.innerHTML = choices.map(c =>
+    `<button class="sim-artifact-choice" data-cat-id="${c.id}">${c.icon} ${c.name}</button>`
+  ).join('');
+  container.querySelectorAll('.sim-artifact-choice').forEach(btn =>
+    btn.addEventListener('click', () => {
+      unlockCategory(btn.dataset.catId);
+      addSlot();
+      panel.hidden = true;
+      renderSimPanel();
+      toast(`Разблокировано: ${btn.textContent.trim()} (+1 слот)`);
+    })
+  );
+  panel.hidden = false;
+}
+
+// Track gold + stats changes from shop events
+document.addEventListener('shop:purchase-item', e => {
+  sim.gold -= e.detail.cost;
+  simApplyEffects(e.detail.effect, e.detail.rarity, 1);
+  renderShopUI(sim.gold, sim.stats);
+  renderSimPanel();
+});
+document.addEventListener('shop:purchase-equipment', e => {
+  sim.gold -= e.detail.cost;
+  const equip = ALL_EQUIPMENT.find(eq => eq.id === e.detail.effectId);
+  if (equip?.effect) simApplyEffects(equip.effect, e.detail.rarity, 1, e.detail.oldRarity);
+  renderShopUI(sim.gold, sim.stats);
+  renderSimPanel();
+});
+document.addEventListener('shop:recycle', e => {
+  sim.gold += e.detail.refund;
+  const equip = ALL_EQUIPMENT.find(eq => eq.id === e.detail.effectId);
+  if (equip?.effect) simApplyEffects(equip.effect, e.detail.rarity, -1);
+  renderShopUI(sim.gold, sim.stats);
+  renderSimPanel();
+});
+document.addEventListener('shop:reroll', e => {
+  sim.gold -= e.detail.cost;
+  renderShopUI(sim.gold, sim.stats);
+  renderSimPanel();
+});
+document.addEventListener('shop:synergies-changed', e => {
+  for (const { bonuses } of (e.detail.removed ?? [])) {
+    for (const b of bonuses) sim.stats[b.stat] = (sim.stats[b.stat] ?? 0) - (b.value ?? 0);
+  }
+  for (const { bonuses } of (e.detail.added ?? [])) {
+    for (const b of bonuses) sim.stats[b.stat] = (sim.stats[b.stat] ?? 0) + (b.value ?? 0);
+  }
+  renderShopUI(sim.gold, sim.stats);
+});
+
+// Init shop module (builds DOM into #shopModal, binds events)
+initShop({ onClose: () => renderSimPanel() });
+
+document.getElementById('btn-sim-add-gold').addEventListener('click', () => {
+  const v = +document.getElementById('sim-gold-input').value || 0;
+  sim.gold = Math.max(0, sim.gold + v);
+  renderSimPanel();
+});
+document.getElementById('btn-sim-add-luck').addEventListener('click', () => {
+  const v = +document.getElementById('sim-luck-input').value || 0;
+  sim.luck = Math.max(0, sim.luck + v);
+  renderSimPanel();
+});
+document.getElementById('btn-sim-open').addEventListener('click', () => {
+  sim.depthLevel = Math.max(1, Math.min(8, +document.getElementById('sim-depth-input').value || 1));
+  openShop(sim.gold, sim.depthLevel, sim.luck, sim.stats);
+  sim.nextLevel++;
+  renderSimPanel();
+});
+document.getElementById('btn-sim-artifact').addEventListener('click', simGiveArtifact);
+document.getElementById('btn-sim-reset').addEventListener('click', () => {
+  resetShopState();
+  sim.gold = 100;
+  sim.luck = 0;
+  sim.nextLevel = 1;
+  sim.depthLevel = 1;
+  sim.stats = {};
+  document.getElementById('sim-depth-input').value = 1;
+  document.getElementById('sim-artifact-panel').hidden = true;
+  renderSimPanel();
+  toast('Симулятор сброшен');
+});
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 populateCategoryFilter();

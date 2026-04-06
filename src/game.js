@@ -4630,7 +4630,7 @@ function openNextArtifactChoice() {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
     playSound("shop_open");
-    openShop(state.gold, beacon ? beacon.y : null, state.luck, getShopStatsSnapshot());
+    openShop(state.gold, state.currentDepthLevel, state.luck, getShopStatsSnapshot());
     return;
   }
   const locked = getLockedCategories();
@@ -6683,6 +6683,7 @@ function updateWorms(dt) {
           renderX: path[0].x,
           renderY: path[0].y,
           moveTimer: 0,
+          telegraphTimer: 1.0,
           alive: true,
           damagedCells: new Set(),
           hitPlayer: false,
@@ -6700,6 +6701,7 @@ function updateWorms(dt) {
   for (let i = state.activeWorms.length - 1; i >= 0; i--) {
     const worm = state.activeWorms[i];
     worm.moveTimer += dt;
+    if (worm.telegraphTimer > 0) worm.telegraphTimer -= dt;
 
     // Smooth render position interpolation between current and next path tile
     const progress = Math.min(worm.moveTimer / wormMoveInterval, 1);
@@ -9195,6 +9197,7 @@ function render() {
   renderBoulders(camera);
   renderWorms(camera);
   renderDrill(camera);
+  renderWormTelegraph(camera);
   renderBaseProximityDot(camera);
   renderActiveToast(camera);
   if (!state.debugMapActive) {
@@ -9489,7 +9492,7 @@ function updateBeaconActivationAnim() {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
     playSound("shop_open");
-    openShop(state.gold, pa.beaconY ?? null, state.luck, getShopStatsSnapshot());
+    openShop(state.gold, pa.depthLevel ?? state.currentDepthLevel, state.luck, getShopStatsSnapshot());
   }
 }
 
@@ -10550,6 +10553,33 @@ function renderCog(cx, cy, radius, ctx) {
   ctx.beginPath();
   ctx.arc(cx, cy, radius * 0.38, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function renderWormTelegraph(camera) {
+  if (state.activeWorms.length === 0) return;
+  const ctx = state.ctx;
+  ctx.save();
+  for (const worm of state.activeWorms) {
+    if (worm.telegraphTimer <= 0 || worm.path.length < 2) continue;
+    const alpha = worm.telegraphTimer; // 1.0 → 0.0 over 1 second
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#ff3333";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    for (let i = 0; i < worm.path.length; i++) {
+      const pt = worm.path[i];
+      const px = pt.x * TILE_SIZE + TILE_SIZE / 2 - camera.x;
+      const py = pt.y * TILE_SIZE + TILE_SIZE / 2 - camera.y;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function renderWormSegment(ctx, cx, cy, radius, alpha, color, tileX, tileY) {
