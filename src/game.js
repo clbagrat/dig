@@ -1,5 +1,5 @@
 import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem } from "./shop.js?v=41";
-import { playSound, initSounds } from "./sounds.js?v=1";
+import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, RARITY } from "./items-catalog.js?v=1";
 import {
   generateMap,
@@ -534,6 +534,7 @@ const state = {
   toastQueue: [],
   toastQueueTimer: 0,
   toastDebounceMap: {},
+  debugAudioToastsEnabled: false,
   depthTitle: {
     text: "",
     time: 0,
@@ -1065,8 +1066,23 @@ function createSpriteAtlas() {
   };
 }
 
+function getImpactSoundId(x, y) {
+  const index = cellIndex(x, y);
+  if (state.hazardMask[index] === HAZARD_TYPES.SPIKE) {
+    return { id: "drill_strike_thorns", volume: 1 };
+  }
+  if (state.metalMask[index] || state.safeDoorMask[index] > 0) {
+    return { id: "drill_strike_metal", volume: 1 };
+  }
+  if (state.goldOreMask[index]) {
+    return { id: "drill_strike_ore", volume: 0.6 };
+  }
+  return { id: "drill_strike", volume: 0.6 };
+}
+
 function spawnImpactEffect(x, y, dirX, dirY, hardness) {
-  playSound("drill_strike", { pitch: 0.9 + Math.random() * 0.2 });
+  const impactSound = getImpactSoundId(x, y);
+  playSound(impactSound.id, { volume: impactSound.volume, pitch: 0.9 + Math.random() * 0.2 });
   state.effects.push({
     kind: "impact",
     x,
@@ -3199,17 +3215,35 @@ async function openDebugMapWindow() {
 }
 
 function showDebugToast(text) {
-  let el = document.getElementById("debugToast");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "debugToast";
-    el.style.cssText = "position:fixed;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#ff0;font:bold 13px monospace;padding:6px 12px;border-radius:6px;z-index:99999;pointer-events:none;white-space:nowrap;";
-    document.body.appendChild(el);
+  let host = document.getElementById("debugToastHost");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "debugToastHost";
+    host.style.cssText = "position:fixed;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:99999;pointer-events:none;";
+    document.body.appendChild(host);
   }
+  const el = document.createElement("div");
+  el.style.cssText = "max-width:min(90vw,720px);background:rgba(0,0,0,0.85);color:#ff0;font:bold 13px monospace;padding:6px 12px;border-radius:6px;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,0.28);";
   el.textContent = text;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => { el.textContent = ""; }, 4000);
+  host.appendChild(el);
+  while (host.childElementCount > 8) {
+    host.firstElementChild?.remove();
+  }
+  window.setTimeout(() => {
+    el.remove();
+    if (!host.childElementCount) host.remove();
+  }, 4000);
 }
+
+window.__digShowAudioToast = (id, opts = {}) => {
+  if (!state.debugAudioToastsEnabled) {
+    return;
+  }
+  const parts = [`[audio] ${id}`];
+  if (typeof opts.volume === "number") parts.push(`vol=${opts.volume.toFixed(2)}`);
+  if (typeof opts.pitch === "number") parts.push(`pitch=${opts.pitch.toFixed(2)}`);
+  showDebugToast(parts.join(" "));
+};
 
 function applyToast(item) {
   state.activeToasts.push({
@@ -3466,6 +3500,7 @@ function bindUi() {
   const rerollButton = document.getElementById("perkReroll");
   const shopOpenBtn = document.getElementById("shopOpen");
   const reloadButton = document.getElementById("reloadGame");
+  const soundToggle = document.getElementById("soundToggle");
   const manualOpen = document.getElementById("manualOpen");
   const manualClose = document.getElementById("manualClose");
   const manualOverlay = document.getElementById("manualModal");
@@ -3484,6 +3519,18 @@ function bindUi() {
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
   bindGenerationDebugControls();
+
+  const syncSoundToggle = () => {
+    if (!soundToggle) return;
+    const muted = isMuted();
+    const preload = getSoundPreloadProgress();
+    const loadingText = !muted && preload.total > 0 && preload.percent < 100 ? ` ${preload.percent}%` : "";
+    soundToggle.textContent = `${muted ? "🔇" : "🔊"}${loadingText}`;
+    soundToggle.setAttribute("aria-label", muted ? "Включить звук" : "Выключить звук");
+    soundToggle.classList.toggle("top-action-button--selected", !muted);
+  };
+
+  syncSoundToggle();
 
   const syncKeyboardAim = () => {
     const left = keysDown.has("arrowleft") || keysDown.has("a") || keysDown.has("ф");
@@ -3599,6 +3646,15 @@ function bindUi() {
     });
   }
 
+  if (soundToggle) {
+    soundToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setMuted(!isMuted());
+      syncSoundToggle();
+    });
+  }
+
   document.addEventListener("shop:purchase-equipment", (e) => {
     const { effectId, cost, rarityMultiplier, isMerge, oldRarityMultiplier } = e.detail;
     playSound(isMerge ? "equipment_merge" : "purchase");
@@ -3698,6 +3754,15 @@ function bindUi() {
       resetPad();
       state.debugPerkMenuOpen = false;
       state.debugPerkSelection = "";
+      syncDebugPerkOverlay();
+    });
+  }
+
+  const debugToggleAudioToasts = document.getElementById("debugToggleAudioToasts");
+  if (debugToggleAudioToasts) {
+    debugToggleAudioToasts.addEventListener("click", () => {
+      state.debugAudioToastsEnabled = !state.debugAudioToastsEnabled;
+      showPerkToast(`Audio toasts ${state.debugAudioToastsEnabled ? "ON" : "OFF"}`);
       syncDebugPerkOverlay();
     });
   }
@@ -4012,6 +4077,7 @@ function bindUi() {
   syncDebugPerkOverlay();
   syncCrystalRewardOverlay();
   syncLevelUpModal();
+  state.syncSoundToggleButton = syncSoundToggle;
 }
 
 function isPointInsideRect(x, y, rect) {
@@ -4269,7 +4335,12 @@ function syncDebugPerkOverlay() {
     return;
   }
   const seedDisplay = document.getElementById("debugSeedDisplay");
+  const debugToggleAudioToasts = document.getElementById("debugToggleAudioToasts");
   if (seedDisplay) seedDisplay.textContent = `Seed: ${state.worldSeed}`;
+  if (debugToggleAudioToasts) {
+    debugToggleAudioToasts.textContent = `🔊 Audio Toasts: ${state.debugAudioToastsEnabled ? "ON" : "OFF"}`;
+    debugToggleAudioToasts.classList.toggle("debug-perk-menu__button--selected", state.debugAudioToastsEnabled);
+  }
 
   if (state.debugPerkMenuOpen) {
     overlay.hidden = false;
@@ -4983,9 +5054,11 @@ function updateExperienceParticles(dt) {
       continue;
     }
     if (particle.isGold || particle.isGoldBonus) {
+      playSound("gold_pickup", { volume: particle.isGoldBonus ? 0.8 : 0.7 });
       state.unsafeGold += particle.value;
       if (particle.showTotal) showGoldToast(particle.showTotal);
     } else {
+      playSound("xp_pickup", { volume: 0.6, pitch: 0.95 + Math.random() * 0.1 });
       gainExperience(particle.value);
       if (particle.showTotal) showXpToast(particle.showTotal);
     }
@@ -11063,7 +11136,11 @@ function renderHud() {
   ctx.font = `700 10px ${HUD_FONT}`;
   ctx.textAlign = "right";
   ctx.textBaseline = "top";
-  ctx.fillText(`FPS ${Math.round(state.fps || 0)}`, state.width - 14, detailTop + 52);
+  const fpsText = `FPS ${Math.round(state.fps || 0)}`;
+  const fpsX = state.width - 14;
+  const fpsY = detailTop + 52;
+  ctx.fillText(fpsText, fpsX, fpsY);
+  state.syncSoundToggleButton?.();
 
   // FPS sparkline graph
   const history = state.fpsHistory;

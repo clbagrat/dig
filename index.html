@@ -13,7 +13,8 @@
     <div class="app-shell">
       <canvas id="game"></canvas>
       <div class="top-actions">
-        <button id="reloadGame" class="top-action-button top-action-button--text" type="button" aria-label="Перезагрузить игру">Перезагрузить</button>
+        <button id="soundToggle" class="top-action-button top-action-button--status" type="button" aria-label="Включить звук">🔇</button>
+        <button id="reloadGame" class="top-action-button top-action-button--icon" type="button" aria-label="Перезагрузить игру">↻</button>
         <button id="manualOpen" class="top-action-button top-action-button--icon" type="button" aria-label="Открыть руководство">?</button>
       </div>
       <div class="touch-zones">
@@ -85,6 +86,7 @@
           <div class="debug-perk-menu__section">
             <div class="debug-perk-menu__label">Быстрые действия</div>
             <div class="debug-perk-menu__grid">
+              <button id="debugToggleAudioToasts" type="button" class="debug-perk-menu__button">🔊 Audio Toasts: OFF</button>
               <button id="debugGiveArtifact" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">🔮 Дать артефакт</button>
               <button id="debugGiveKey" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">🔑 Дать ключ</button>
               <button id="debugTeleportBeacon" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">📡 К ближ. маяку</button>

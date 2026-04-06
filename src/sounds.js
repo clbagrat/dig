@@ -4,16 +4,26 @@
 let audioCtx = null;
 /** @type {Map<string, AudioBuffer>} */
 const bufferCache = new Map();
-/** @type {Set<string>} */
-const failedIds = new Set();
-let muted = false;
+/** @type {Map<string, number>} */
+const failedIds = new Map();
+/** @type {Map<string, string>} */
+const resolvedExtById = new Map();
+const preloadIds = [];
+let muted = true;
 let masterVolume = 1.0;
+let preloadStarted = false;
+let preloadFinished = false;
+const FAILED_RETRY_MS = 2500;
+const SOUND_EXTENSIONS = ["ogg", "wav"];
 
 // ── Sound catalog ───────────────────────────────────────────────────────────────
 
 export const SFX = {
   // 1. Бурение и добыча
   drill_strike:    { id: "drill_strike",    cat: "mining",      desc: "Удар бура по породе", full: "Короткий металлический удар бура о породу. Звучит при каждом цикле бурения. Должен быть коротким и не раздражать при частом повторении. Вариативность через pitch shift." },
+  drill_strike_metal: { id: "drill_strike_metal", cat: "mining", desc: "Удар бура по металлу", full: "Жёсткий звонкий удар по металлической жиле или запертой металлической двери. Более высокий и твёрдый, чем обычный drill_strike." },
+  drill_strike_ore: { id: "drill_strike_ore", cat: "mining", desc: "Удар бура по золотой жиле", full: "Удар бура по тайлу с золотом. Каменный удар с лёгким металлическим и ценным призвуком, но без полного звука разрушения руды." },
+  drill_strike_thorns: { id: "drill_strike_thorns", cat: "mining", desc: "Удар бура по шипам", full: "Короткий резкий лязг по шипастому тайлу. Должен звучать опаснее и колючее обычного удара по камню." },
   block_break:     { id: "block_break",     cat: "mining",      desc: "Разрушение каменного блока", full: "Хруст/разрушение каменного блока. Звучит при полном разрушении ячейки. Ощущение рассыпающейся породы." },
   block_break_ore: { id: "block_break_ore", cat: "mining",      desc: "Разрушение рудного/золотого блока", full: "Разрушение рудного/золотого блока. Более звонкий и «ценный» звук, чем обычный block_break. Лёгкий металлический отзвук." },
   weak_spot_hit:   { id: "weak_spot_hit",   cat: "mining",      desc: "Попадание по слабому месту", full: "Попадание по слабому месту блока. Усиленный, сочный удар с ощущением критического попадания. Короткий высокочастотный акцент." },
@@ -97,6 +107,8 @@ export const SFX = {
   crystal_catalyst:{ id: "crystal_catalyst",cat: "special",     desc: "Кристаллический катализатор", full: "Кристаллический катализатор. Магический резонанс — вибрирующий кристальный тон." },
 };
 
+preloadIds.push(...Object.keys(SFX));
+
 // ── Audio Context ───────────────────────────────────────────────────────────────
 
 function ensureContext() {
@@ -109,24 +121,62 @@ function ensureContext() {
   return audioCtx;
 }
 
-async function decodeBuffer(id) {
+async function decodeBuffer(id, { ignoreRetryWindow = false } = {}) {
   if (bufferCache.has(id)) return bufferCache.get(id);
-  if (failedIds.has(id)) return null;
+  const lastFailedAt = failedIds.get(id);
+  if (!ignoreRetryWindow && lastFailedAt && Date.now() - lastFailedAt < FAILED_RETRY_MS) return null;
   try {
-    const resp = await fetch(`/res/${id}.ogg`);
-    if (!resp.ok) {
-      failedIds.add(id);
-      return null;
+    const extensions = resolvedExtById.has(id)
+      ? [resolvedExtById.get(id), ...SOUND_EXTENSIONS.filter((ext) => ext !== resolvedExtById.get(id))]
+      : SOUND_EXTENSIONS;
+
+    for (const ext of extensions) {
+      const resp = await fetch(`/res/${id}.${ext}`);
+      if (!resp.ok) {
+        continue;
+      }
+      const raw = await resp.arrayBuffer();
+      const ctx = ensureContext();
+      const buf = await ctx.decodeAudioData(raw);
+      failedIds.delete(id);
+      resolvedExtById.set(id, ext);
+      bufferCache.set(id, buf);
+      return buf;
     }
-    const raw = await resp.arrayBuffer();
-    const ctx = ensureContext();
-    const buf = await ctx.decodeAudioData(raw);
-    bufferCache.set(id, buf);
-    return buf;
+
+    failedIds.set(id, Date.now());
+    return null;
   } catch {
-    failedIds.add(id);
+    failedIds.set(id, Date.now());
     return null;
   }
+}
+
+function waitForPreloadSlot() {
+  return new Promise((resolve) => {
+    const run = () => resolve();
+    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(run, { timeout: 180 });
+    } else {
+      window.setTimeout(run, 0);
+    }
+  });
+}
+
+async function preloadAllSounds() {
+  if (preloadStarted) return;
+  preloadStarted = true;
+
+  for (const id of preloadIds) {
+    const lastFailedAt = failedIds.get(id);
+    if (bufferCache.has(id) || (lastFailedAt && Date.now() - lastFailedAt < FAILED_RETRY_MS)) {
+      continue;
+    }
+    await waitForPreloadSlot();
+    await decodeBuffer(id);
+  }
+
+  preloadFinished = true;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────────
@@ -142,8 +192,15 @@ export function playSound(id, opts = {}) {
   if (muted) return;
   const vol = (opts.volume ?? 1) * masterVolume;
   const rate = opts.pitch ?? 1;
+  if (typeof window !== "undefined" && typeof window.__digShowAudioToast === "function") {
+    try {
+      window.__digShowAudioToast(id, { volume: vol, pitch: rate });
+    } catch {
+      // Debug toast must never break audio playback
+    }
+  }
 
-  decodeBuffer(id).then((buf) => {
+  decodeBuffer(id, { ignoreRetryWindow: true }).then((buf) => {
     if (!buf) return;
     const ctx = ensureContext();
     const src = ctx.createBufferSource();
@@ -160,15 +217,32 @@ export function playSound(id, opts = {}) {
 export function invalidateSound(id) {
   bufferCache.delete(id);
   failedIds.delete(id);
+  resolvedExtById.delete(id);
+  preloadFinished = false;
+  if (preloadStarted) {
+    waitForPreloadSlot().then(() => decodeBuffer(id)).catch(() => {});
+  }
 }
 
 export function setMuted(v) { muted = !!v; }
 export function isMuted() { return muted; }
 export function setMasterVolume(v) { masterVolume = Math.max(0, Math.min(1, v)); }
+export function getSoundPreloadProgress() {
+  const total = preloadIds.length;
+  const ready = bufferCache.size + failedIds.size;
+  const percent = total > 0 ? Math.round((Math.min(total, ready) / total) * 100) : 100;
+  return {
+    active: preloadStarted && !preloadFinished,
+    ready: Math.min(total, ready),
+    total,
+    percent,
+  };
+}
 
 export function initSounds() {
   const unlock = () => {
     ensureContext();
+    preloadAllSounds().catch(() => {});
     document.removeEventListener("pointerdown", unlock);
     document.removeEventListener("keydown", unlock);
   };

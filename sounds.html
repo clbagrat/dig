@@ -6,65 +6,115 @@
   <title>Dig — Sound Manager</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      color-scheme: dark;
+      --bg: #1a1a2e;
+      --panel: rgba(20, 22, 40, 0.88);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e0;
+      --text-dim: #9b9bb0;
+      --accent: #e8c547;
+      --accent-soft: rgba(232, 197, 71, 0.14);
+      --card: rgba(38, 38, 64, 0.86);
+      --card-hover: rgba(52, 52, 88, 0.95);
+    }
     body {
       font-family: 'Baskerville', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
-      padding: 24px;
+      background:
+        radial-gradient(circle at top, rgba(232, 197, 71, 0.08), transparent 28%),
+        linear-gradient(180deg, #1e2038 0%, var(--bg) 45%, #12131e 100%);
+      color: var(--text);
+      padding: 20px;
       min-height: 100vh;
     }
+    .page {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+    }
+    .hero {
+      padding: 20px 22px;
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(10px);
+      margin-bottom: 18px;
+    }
     h1 {
-      color: #e8c547;
+      color: var(--accent);
       margin-bottom: 8px;
-      font-size: 28px;
+      font-size: clamp(28px, 6vw, 44px);
+      line-height: 0.95;
     }
     .subtitle {
-      color: #888;
-      margin-bottom: 24px;
-      font-size: 14px;
+      color: var(--text-dim);
+      margin-bottom: 18px;
+      font-size: 15px;
+      line-height: 1.45;
+      max-width: 70ch;
     }
     .stats {
-      color: #aaa;
-      margin-bottom: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #c8c8d6;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      margin-bottom: 16px;
       font-size: 14px;
     }
-    .stats span { color: #e8c547; font-weight: bold; }
+    .stats span { color: var(--accent); font-weight: bold; }
     .category {
       margin-bottom: 28px;
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(17, 18, 31, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
     .category-title {
-      font-size: 18px;
-      color: #e8c547;
-      border-bottom: 1px solid #333;
-      padding-bottom: 6px;
-      margin-bottom: 12px;
+      color: var(--accent);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px;
+      margin-bottom: 14px;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.12em;
       font-size: 14px;
+    }
+    .sound-grid {
+      display: grid;
+      gap: 12px;
     }
     .sound-row {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
-      padding: 8px 12px;
-      border-radius: 6px;
-      transition: background 0.15s;
+      padding: 14px;
+      border-radius: 14px;
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: background 0.15s, border-color 0.15s, transform 0.15s;
     }
     .sound-row:hover {
-      background: #262640;
+      background: var(--card-hover);
+      border-color: rgba(232, 197, 71, 0.24);
+      transform: translateY(-1px);
     }
     .sound-id {
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 13px;
       color: #7ec8e3;
-      min-width: 160px;
+      min-width: 180px;
       flex-shrink: 0;
+      word-break: break-word;
     }
     .sound-desc {
       flex: 1;
-      font-size: 14px;
-      color: #bbb;
+      font-size: 15px;
+      color: #ddd;
       min-width: 0;
+      margin-bottom: 4px;
     }
     .sound-meta {
       flex: 1;
@@ -72,33 +122,40 @@
     }
     .sound-full {
       margin-top: 2px;
-      font-size: 12px;
-      line-height: 1.35;
-      color: #8e8e8e;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #9d9db0;
     }
     .sound-status {
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       flex-shrink: 0;
+      margin-top: 5px;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.03);
     }
     .sound-status.loaded { background: #4caf50; }
     .sound-status.missing { background: #555; }
     .sound-actions {
       display: flex;
-      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
       flex-shrink: 0;
+      width: 210px;
     }
     button {
       font-family: inherit;
-      font-size: 12px;
-      padding: 4px 10px;
+      font-size: 13px;
+      min-height: 42px;
+      padding: 9px 14px;
       border: 1px solid #444;
-      border-radius: 4px;
+      border-radius: 10px;
       background: #2a2a4a;
       color: #ddd;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
+      touch-action: manipulation;
     }
     button:hover {
       background: #3a3a5a;
@@ -122,47 +179,127 @@
     button.delete-btn:hover {
       background: #5a3a3a;
     }
+    .picker-btn {
+      background: var(--accent-soft);
+      border-color: rgba(232, 197, 71, 0.35);
+      color: #f6e7a9;
+    }
+    .picker-btn:hover {
+      background: rgba(232, 197, 71, 0.22);
+      border-color: rgba(232, 197, 71, 0.55);
+    }
     input[type="file"] {
       display: none;
     }
     .drop-zone {
       border: 2px dashed #444;
-      border-radius: 8px;
-      padding: 24px;
+      border-radius: 18px;
+      padding: 22px;
       text-align: center;
-      color: #666;
+      color: #9393a5;
       margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.03);
       transition: border-color 0.2s, color 0.2s;
     }
     .drop-zone.dragover {
-      border-color: #e8c547;
-      color: #e8c547;
+      border-color: var(--accent);
+      color: var(--accent);
     }
-    .category-names {
-      mining: "Бурение и добыча",
-      pickup: "Ресурсы и подбор",
-      explosion: "Взрывы",
-      damage: "Урон и здоровье",
-      heat: "Нагрев",
-      hazard: "Опасности",
-      navigation: "Навигация",
-      progression: "Прогрессия",
-      shop: "Магазин",
-      ui: "UI",
-      special: "Специальные",
+    .drop-zone__title {
+      color: #f2f2f5;
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+    .drop-zone__hint {
+      font-size: 14px;
+      line-height: 1.45;
+      max-width: 58ch;
+      margin: 0 auto;
+    }
+    .drop-zone__actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .mobile-note {
+      display: block;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #b9b9c8;
+    }
+    @media (max-width: 860px) {
+      body {
+        padding: 14px;
+      }
+      .hero {
+        padding: 16px;
+      }
+      .sound-row {
+        flex-wrap: wrap;
+      }
+      .sound-id {
+        min-width: 0;
+        width: calc(100% - 28px);
+      }
+      .sound-meta {
+        width: 100%;
+      }
+      .sound-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+    }
+    @media (max-width: 560px) {
+      body {
+        padding:
+          max(12px, env(safe-area-inset-top))
+          12px
+          max(20px, env(safe-area-inset-bottom))
+          12px;
+      }
+      .category {
+        padding: 14px;
+      }
+      .sound-row {
+        padding: 12px;
+      }
+      .sound-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      button {
+        width: 100%;
+        min-height: 46px;
+        padding: 10px 12px;
+      }
+      .drop-zone {
+        padding: 18px 14px;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>Sound Manager</h1>
-  <div class="subtitle">Загрузи .ogg файлы для каждого звукового эффекта. Они сохраняются в /res/ и сразу доступны в игре.</div>
-  <div class="stats">Загружено: <span id="loadedCount">0</span> / <span id="totalCount">0</span></div>
+  <div class="page">
+    <section class="hero">
+      <h1>Sound Manager</h1>
+      <div class="subtitle">Загрузи `.ogg` или `.wav` для каждого звукового эффекта. Они сохраняются в `/res/` и сразу доступны в игре.</div>
+      <div class="stats">Загружено: <span id="loadedCount">0</span> / <span id="totalCount">0</span></div>
 
-  <div id="dropZone" class="drop-zone">
-    Перетащи .ogg файлы сюда. Имя файла должно совпадать с ID звука (например drill_strike.ogg)
+      <div id="dropZone" class="drop-zone">
+        <div class="drop-zone__title">Имя файла должно совпадать с ID звука</div>
+        <div class="drop-zone__hint">На десктопе можно перетащить файлы сюда. На телефоне или планшете используй кнопку выбора файлов.</div>
+        <div class="drop-zone__actions">
+          <button id="pickFilesBtn" class="picker-btn" type="button">Выбрать .ogg / .wav</button>
+        </div>
+        <span class="mobile-note">Например: `drill_strike.ogg` или `drill_strike.wav`</span>
+        <input id="bulkFileInput" type="file" accept=".ogg,.wav,audio/ogg,audio/wav,audio/x-wav" multiple />
+      </div>
+    </section>
+
+    <div id="soundList"></div>
   </div>
-
-  <div id="soundList"></div>
 
   <script type="module">
     import { SFX } from "./src/sounds.js?v=1";
@@ -197,8 +334,14 @@
     }
 
     async function uploadSound(id, file) {
+      const extMatch = file.name.toLowerCase().match(/\.(ogg|wav)$/);
+      const ext = extMatch?.[1] || "ogg";
       const buf = await file.arrayBuffer();
-      await fetch(`/api/sounds/${id}`, { method: "POST", body: buf });
+      await fetch(`/api/sounds/${id}`, {
+        method: "POST",
+        headers: { "X-Sound-Ext": ext },
+        body: buf,
+      });
       loadedSet.add(id);
       updateUI();
     }
@@ -211,9 +354,18 @@
 
     async function playPreview(id) {
       const ctx = ensureAudio();
-      const resp = await fetch(`/res/${id}.ogg`);
-      if (!resp.ok) return;
-      const buf = await ctx.decodeAudioData(await resp.arrayBuffer());
+      let buf = null;
+      for (const ext of ["ogg", "wav"]) {
+        const resp = await fetch(`/res/${id}.${ext}`);
+        if (!resp.ok) continue;
+        try {
+          buf = await ctx.decodeAudioData(await resp.arrayBuffer());
+          break;
+        } catch {
+          // Try next extension
+        }
+      }
+      if (!buf) return;
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(ctx.destination);
@@ -234,7 +386,11 @@
       for (const [cat, items] of Object.entries(categories)) {
         const section = document.createElement("div");
         section.className = "category";
-        section.innerHTML = `<div class="category-title">${CAT_NAMES[cat] || cat}</div>`;
+        section.innerHTML = `
+          <div class="category-title">${CAT_NAMES[cat] || cat}</div>
+          <div class="sound-grid"></div>
+        `;
+        const grid = section.querySelector(".sound-grid");
 
         for (const item of items) {
           const row = document.createElement("div");
@@ -251,10 +407,10 @@
               <button class="play-btn" data-play="${item.id}" ${!loadedSet.has(item.id) ? 'disabled' : ''}>Play</button>
               <button class="upload-btn" data-upload="${item.id}">Upload</button>
               <button class="delete-btn" data-delete="${item.id}" ${!loadedSet.has(item.id) ? 'disabled' : ''}>Del</button>
-              <input type="file" accept=".ogg" data-file="${item.id}" />
+              <input type="file" accept=".ogg,.wav,audio/ogg,audio/wav,audio/x-wav" data-file="${item.id}" />
             </div>
           `;
-          section.appendChild(row);
+          grid.appendChild(row);
         }
         container.appendChild(section);
       }
@@ -303,18 +459,33 @@
 
     // Drag & drop
     const dropZone = document.getElementById("dropZone");
+    const bulkFileInput = document.getElementById("bulkFileInput");
+    const pickFilesBtn = document.getElementById("pickFilesBtn");
+
+    async function uploadFiles(files) {
+      const allIds = new Set(Object.keys(SFX));
+      for (const file of files) {
+        const id = file.name.replace(/\.(ogg|wav)$/i, "");
+        if (allIds.has(id)) {
+          await uploadSound(id, file);
+        }
+      }
+    }
+
+    pickFilesBtn.addEventListener("click", () => bulkFileInput.click());
+    bulkFileInput.addEventListener("change", async (e) => {
+      if (e.target.files?.length) {
+        await uploadFiles(e.target.files);
+        e.target.value = "";
+      }
+    });
+
     dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
     dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
     dropZone.addEventListener("drop", async (e) => {
       e.preventDefault();
       dropZone.classList.remove("dragover");
-      const allIds = new Set(Object.keys(SFX));
-      for (const file of e.dataTransfer.files) {
-        const id = file.name.replace(/\.ogg$/i, "");
-        if (allIds.has(id)) {
-          await uploadSound(id, file);
-        }
-      }
+      await uploadFiles(e.dataTransfer.files);
     });
 
     // Init

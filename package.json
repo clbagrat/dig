@@ -3,7 +3,7 @@
   "main": "electron/main.js",
   "scripts": {
     "desktop": "electron .",
-    "serve": "node scripts/sound-server.js"
+    "serve": "PORT=3001 node scripts/sound-server.js"
   },
   "dependencies": {
     "sharp": "^0.34.5"

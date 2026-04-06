@@ -96,6 +96,13 @@ body {
   font-size: 14px;
 }
 
+.top-action-button--status {
+  min-width: 62px;
+  padding: 0 10px;
+  font-size: 13px;
+  gap: 4px;
+}
+
 .top-action-button::before {
   content: "";
   position: absolute;

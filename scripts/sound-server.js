@@ -3,12 +3,12 @@
  * Dev server for Dig — serves static files + handles sound file uploads.
  *
  * Usage: node scripts/sound-server.js
- * Then open: http://localhost:8000/
+ * Then open: http://localhost:3001/
  *
  * API:
  *   GET  /api/sounds       — list uploaded sound IDs
- *   POST /api/sounds/:id   — upload .ogg (raw body → res/:id.ogg)
- *   DELETE /api/sounds/:id — remove res/:id.ogg
+ *   POST /api/sounds/:id   — upload .ogg/.wav (raw body → res/:id.<ext>)
+ *   DELETE /api/sounds/:id — remove res/:id.ogg / res/:id.wav
  */
 
 import fs from "fs";
@@ -19,7 +19,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const RES_DIR = path.join(ROOT, "res");
-const PORT = 8000;
+const PORT = Number(process.env.PORT || 3001);
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -27,6 +27,7 @@ const MIME = {
   ".js":   "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".ogg":  "audio/ogg",
+  ".wav":  "audio/wav",
   ".png":  "image/png",
   ".jpg":  "image/jpeg",
   ".svg":  "image/svg+xml",
@@ -38,6 +39,18 @@ const MIME = {
 // Ensure res/ exists
 if (!fs.existsSync(RES_DIR)) {
   fs.mkdirSync(RES_DIR);
+}
+
+function getSoundPath(id, ext) {
+  return path.join(RES_DIR, `${id}.${ext}`);
+}
+
+function listSoundIds() {
+  return [...new Set(
+    fs.readdirSync(RES_DIR)
+      .filter((f) => /\.(ogg|wav)$/i.test(f))
+      .map((f) => f.replace(/\.(ogg|wav)$/i, ""))
+  )];
 }
 
 function readBody(req) {
@@ -78,9 +91,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── API: list sounds ──────────────────────────────────────────────────
   if (pathname === "/api/sounds" && req.method === "GET") {
-    const files = fs.readdirSync(RES_DIR)
-      .filter((f) => f.endsWith(".ogg"))
-      .map((f) => f.replace(/\.ogg$/, ""));
+    const files = listSoundIds();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(files));
     return;
@@ -90,19 +101,29 @@ const server = http.createServer(async (req, res) => {
   const uploadMatch = pathname.match(/^\/api\/sounds\/([a-z0-9_]+)$/);
   if (uploadMatch && req.method === "POST") {
     const id = uploadMatch[1];
+    const extHeader = String(req.headers["x-sound-ext"] || "").toLowerCase();
+    const ext = extHeader === "wav" ? "wav" : "ogg";
     const body = await readBody(req);
-    fs.writeFileSync(path.join(RES_DIR, `${id}.ogg`), body);
+    for (const otherExt of ["ogg", "wav"]) {
+      const existingPath = getSoundPath(id, otherExt);
+      if (otherExt !== ext && fs.existsSync(existingPath)) {
+        fs.unlinkSync(existingPath);
+      }
+    }
+    fs.writeFileSync(getSoundPath(id, ext), body);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, id }));
+    res.end(JSON.stringify({ ok: true, id, ext }));
     return;
   }
 
   // ── API: delete sound ─────────────────────────────────────────────────
   if (uploadMatch && req.method === "DELETE") {
     const id = uploadMatch[1];
-    const filePath = path.join(RES_DIR, `${id}.ogg`);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    for (const ext of ["ogg", "wav"]) {
+      const filePath = getSoundPath(id, ext);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, id }));
