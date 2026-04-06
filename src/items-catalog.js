@@ -46,7 +46,7 @@ export const CATEGORIES = [
   { id: "алхимия", name: "Алхимия", icon: "⚗️" },
 ];
 
-export const INITIAL_CATEGORIES = ["basic", "economy"];
+export const INITIAL_CATEGORIES = ["basic"];
 export const TAG_SYNERGIES = {};
 
 export const ALL_EQUIPMENT = [
@@ -336,15 +336,14 @@ export const ALL_ITEMS = [
     name: "Предохранительный клапан",
     type: "item",
     icon: "🎚️",
-    desc: "−20% скорость нагрева. −10 макс. нагрев. −30% урон от тепла.",
+    desc: "−20% скорость нагрева. −10 макс. нагрев.",
     category: "heat",
     tags: ["heat"],
     minRarity: 1,
     baseCost: 35,
     effect: [
-      { stat: "heatRate",        effectByRarity: [null, -0.20, -0.28, -0.38, -0.50] },
-      { stat: "maxHeat",         effectByRarity: [null, -10,   -15,   -20,   -30  ] },
-      { stat: "heatDamageBonus", effectByRarity: [null, -0.30, -0.40, -0.55, -0.70] },
+      { stat: "heatRate", effectByRarity: [null, -0.20, -0.28, -0.38, -0.50] },
+      { stat: "maxHeat",  effectByRarity: [null, -10,   -15,   -20,   -30  ] },
     ],
   },
 
@@ -813,6 +812,61 @@ export const ALL_ITEMS = [
       { stat: "effectDurationRate", effectByRarity: [null, null, 0.10, 0.18, 0.28] },
     ],
   },
+  {
+    id: "loop_extender",
+    type: "item",
+    name: "Удлинитель контура",
+    icon: "📏",
+    desc: "Увеличивает максимальную длину контура.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    baseCost: 35,
+    effect: { stat: "maxLoopLength", effectByRarity: [null, 3, 5, 8, 12] },
+  },
+  {
+    id: "loop_pressure",
+    type: "item",
+    name: "Контурное давление",
+    icon: "🔩",
+    desc: "Каждая клетка контура даёт +1% к урону бурения.",
+    category: "контур",
+    tags: ["контур", "урон"],
+    minRarity: 2,
+    baseCost: 55,
+    effect: [
+      { stat: "loopLengthDamageBonus", effectByRarity: [null, null, 1, 2, 3] },
+    ],
+  },
+  {
+    id: "loop_conduit",
+    type: "item",
+    name: "Топливный контур",
+    icon: "🌊",
+    desc: "Каждая клетка контура даёт +0.5 топлива при поднятии.",
+    category: "контур",
+    tags: ["контур", "топливо"],
+    minRarity: 1,
+    baseCost: 40,
+    effect: [
+      { stat: "loopLengthFuelBonus", effectByRarity: [null, 0.5, 0.8, 1.2, 2.0] },
+    ],
+  },
+  {
+    id: "loop_spawner",
+    type: "item",
+    name: "Контурный трюфель",
+    icon: "🍄",
+    desc: "Замкнутый контур с шансом спавнит бонус внутри. Максимальная длина контура −3.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 2,
+    baseCost: 50,
+    effect: [
+      { stat: "loopSpawnBonusChance", effectByRarity: [null, null, 0.30, 0.50, 0.75] },
+      { stat: "maxLoopLength",        effectByRarity: [null, null, -3,   -3,   -3   ] },
+    ],
+  },
   // ── Алхимия ───────────────────────────────────────────────────────────────────
   {
     id: "beacon_catalyst",
@@ -959,8 +1013,8 @@ export const ALL_ITEMS = [
     minRarity: 2,
     baseCost: 50,
     effect: [
-      { stat: "cryoRocketThreshold", effectByRarity: [null, null, 20, 15, 10] },
-      { stat: "heatRate",            effectByRarity: [null, null, -0.15, -0.20, -0.28] },
+      { stat: "cryoRocketCount", effectByRarity: [null, null, 1, 1, 1] },
+      { stat: "heatRate",        effectByRarity: [null, null, -0.15, -0.20, -0.28] },
     ],
   },
   {

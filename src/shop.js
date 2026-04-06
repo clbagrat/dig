@@ -682,11 +682,15 @@ function renderOfferings() {
 
     const typeLabel = isEquip ? "⛏" : "✧";
     const mergeLabel = isMerge ? `<div class="shop-card__merge">⬆ Объединить</div>` : "";
+    const catId = offering.good.category;
+    const catDef = catId ? CATEGORIES.find(c => c.id === catId) : null;
+    const catLabel = catDef ? `<div class="shop-card__category">${catDef.icon} ${catDef.name}</div>` : "";
 
     card.innerHTML = `
       <div class="shop-card__type">${typeLabel}</div>
       <div class="shop-card__icon">${offering.good.icon}</div>
       <div class="shop-card__name">${offering.good.name}</div>
+      ${catLabel}
       ${mergeLabel}
       <div class="shop-card__cost${canAfford ? "" : " shop-card__cost--poor"}">${cost} ●</div>
     `;

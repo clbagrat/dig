@@ -1745,6 +1745,13 @@ strong {
   justify-content: center;
 }
 
+.shop-card__category {
+  font-size: 7px;
+  color: var(--text-dim, #888);
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+}
+
 .shop-card__merge {
   font-size: 8px;
   font-weight: 700;

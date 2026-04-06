@@ -63,6 +63,19 @@ const STEAM_LIFETIME = 3;
 const STEAM_DAMAGE = 1;
 const STEAM_RANGE = 99;
 const EXPLOSION_BREAK_DAMAGE = 9999;
+const ROCKET_ARMED_DURATION = 2.0;
+const BREACH_MISSILE_DAMAGE = 35;
+const BREACH_MISSILE_RADIUS = 1.2;
+const FUEL_ROCKET_DAMAGE = 45;
+const FUEL_ROCKET_RADIUS = 1.5;
+const CRYO_ROCKET_DAMAGE = 28;
+const CRYO_ROCKET_RADIUS = 1.0;
+const COOLING_ROCKET_DAMAGE = 30;
+const COOLING_ROCKET_RADIUS = 1.0;
+const OVERLOAD_ROCKET_DAMAGE = 55;
+const OVERLOAD_ROCKET_RADIUS = 1.5;
+const REMOTE_BOMB_DAMAGE = 40;
+const REMOTE_BOMB_RADIUS = 1.0;
 const OVERFLOW_OVERDRIVE_DURATION = 3;
 const OVERFLOW_STUN_DURATION = 3;
 const HEAT_PER_STRIKE = 3;
@@ -337,6 +350,7 @@ const state = {
   fuelRocketLevel: 0,
   cryoRocketAccumulator: 0,
   cryoRocketThreshold: 0,
+  cryoRocketCount: 0,
   beaconCatalystLevel: 0,
   levelCatalystLevel: 0,
   crystalRewardRerolls: 0,
@@ -473,6 +487,9 @@ const state = {
   loopChargeDuration: 0,
   loopChargeDamageBonus: 0,
   contourLengthDamageLevel: 0,
+  loopLengthDamageBonus: 0,
+  loopLengthFuelBonus: 0,
+  loopSpawnBonusChance: 0,
   loopPerkLevel: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
@@ -498,7 +515,10 @@ const state = {
   heatCooldownTime: 0,
   coolingRocketLevel: 0,
   coolingRocketCharge: 0,
+  pathTailFade: 0,
+  pathTailGhost: null,
   contourReturnFuelLevel: 0,
+  maxLoopLength: 12,
   heatOverloadRocketLevel: 0,
   tankBoostLevel: 0,
   levelUpFlash: 0,
@@ -2110,6 +2130,7 @@ function setupField(seedOverride = null) {
   state.fuelRocketLevel = 0;
   state.cryoRocketAccumulator = 0;
   state.cryoRocketThreshold = 0;
+  state.cryoRocketCount = 0;
   state.beaconCatalystLevel = 0;
   state.levelCatalystLevel = 0;
   state.crystalRewardRerolls = 0;
@@ -2201,6 +2222,9 @@ function setupField(seedOverride = null) {
   state.loopChargeDuration = 0;
   state.loopChargeDamageBonus = 0;
   state.contourLengthDamageLevel = 0;
+  state.loopLengthDamageBonus = 0;
+  state.loopLengthFuelBonus = 0;
+  state.loopSpawnBonusChance = 0;
   state.loopPerkLevel = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
@@ -2225,7 +2249,10 @@ function setupField(seedOverride = null) {
   state.heatCooldownTime = 0;
   state.coolingRocketLevel = 0;
   state.coolingRocketCharge = 0;
+  state.pathTailFade = 0;
+  state.pathTailGhost = null;
   state.contourReturnFuelLevel = 0;
+  state.maxLoopLength = 12;
   state.heatOverloadRocketLevel = 0;
   state.tankBoostLevel = 0;
   state.levelUpFlash = 0;
@@ -2763,9 +2790,9 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       const targetY = clamp(y + state.drill.facingY * 2, 1, GRID_H - 2);
       spawnRocketEffect(x, y, targetX, targetY, {
         kind: "radiusBomb",
-        damage: BASE_DRILL_DAMAGE,
+        damage: BASE_DRILL_DAMAGE * 10,
         radius: 2,
-      });
+      }, { instant: true });
       state.perkText = "Бомба";
       break;
     }
@@ -4800,14 +4827,18 @@ function update(dt) {
       const coolingRocketThreshold = getCoolingRocketThreshold();
       while (state.coolingRocketCharge >= coolingRocketThreshold) {
         state.coolingRocketCharge -= coolingRocketThreshold;
-        triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
+        for (let ri = 0; ri < state.coolingRocketLevel; ri += 1) {
+          fireRocket(state.drill.x, state.drill.y, COOLING_ROCKET_DAMAGE, COOLING_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
+        }
       }
     }
-    if (state.cryoRocketThreshold > 0 && cooledHeat > 0) {
+    if (state.cryoRocketCount > 0 && cooledHeat > 0) {
       state.cryoRocketAccumulator += cooledHeat;
-      while (state.cryoRocketAccumulator >= state.cryoRocketThreshold) {
-        state.cryoRocketAccumulator -= state.cryoRocketThreshold;
-        triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
+      while (state.cryoRocketAccumulator >= 20) {
+        state.cryoRocketAccumulator -= 20;
+        for (let ri = 0; ri < state.cryoRocketCount; ri += 1) {
+          fireRocket(state.drill.x, state.drill.y, CRYO_ROCKET_DAMAGE, CRYO_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
+        }
       }
     }
   } else {
@@ -4815,6 +4846,10 @@ function update(dt) {
   }
   state.loopChargeTimer = Math.max(0, state.loopChargeTimer - dt);
   if (state.firstStrikeTimer > 0) state.firstStrikeTimer = Math.max(0, state.firstStrikeTimer - dt);
+  if (state.pathTailFade > 0) {
+    state.pathTailFade = Math.max(0, state.pathTailFade - dt * 8);
+    if (state.pathTailFade === 0) state.pathTailGhost = null;
+  }
   if (state.loopChargeTimer === 0) {
     state.loopChargeDamageBonus = 0;
   }
@@ -4869,9 +4904,22 @@ function updateEffects(dt) {
     effect.time -= dt;
     if (effect.time <= 0) {
       if (effect.kind === "rocket") {
-        detonateRocketEffect(effect);
+        if (effect.phase === "flying") {
+          if (effect.instant) {
+            detonateRocketEffect(effect);
+            state.effects.splice(i, 1);
+            continue;
+          }
+          effect.phase = "armed";
+          effect.time = ROCKET_ARMED_DURATION;
+          effect.duration = ROCKET_ARMED_DURATION;
+        } else {
+          detonateRocketEffect(effect);
+          state.effects.splice(i, 1);
+        }
+      } else {
+        state.effects.splice(i, 1);
       }
-      state.effects.splice(i, 1);
     }
   }
 }
@@ -5216,7 +5264,7 @@ function triggerHeatOverload() {
     cause: "explosion",
   });
   for (let i = 0; i < state.heatOverloadRocketLevel; i += 1) {
-    triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
+    fireRocket(state.drill.x, state.drill.y, OVERLOAD_ROCKET_DAMAGE, OVERLOAD_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
   }
   applyStun(HEAT_STUN_DURATION, "Перегрев");
   state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 2.8);
@@ -5762,7 +5810,7 @@ function getStrikeDamage() {
   const chargeBoost = state.loopChargeTimer > 0 ? 1 + state.loopChargeDamageBonus : 1;
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
-  const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
+  const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01) + contourLength * (state.loopLengthDamageBonus || 0) * 0.01;
   const firstStrikeBoost = (state.firstStrikeTimer > 0 && state.firstStrikeLevel > 0) ? 1 + state.firstStrikeLevel * 0.4 : 1;
   let damage =
     BASE_DRILL_DAMAGE * chargeBoost * contourBoost +
@@ -5979,7 +6027,8 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
     return;
   }
 
-  const totalGain = amount + state.fuelPickupBonus;
+  const loopFuelBonus = (state.loopLengthFuelBonus || 0) > 0 ? Math.floor(state.pathTiles.length * state.loopLengthFuelBonus) : 0;
+  const totalGain = amount + state.fuelPickupBonus + loopFuelBonus;
   showFuelToast(totalGain);
   const overflow = state.fuel + totalGain - state.maxFuel;
   state.fuel = Math.min(state.maxFuel, state.fuel + totalGain);
@@ -5992,8 +6041,8 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
     const duration = getScaledEffectDuration(2 + state.fuelConverterLevel);
     activateDrillOverdrive(duration, "Переработчик топлива");
   }
-  if (state.fuelRocketLevel > 0) {
-    triggerRemoteBombSquare(state.drill.x, state.drill.y, 1 + Math.floor(Math.random() * 3));
+  for (let ri = 0; ri < state.fuelRocketLevel; ri += 1) {
+    fireRocket(state.drill.x, state.drill.y, FUEL_ROCKET_DAMAGE, FUEL_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
   }
 }
 
@@ -6601,8 +6650,8 @@ function damageCell(x, y, damage, options = {}) {
     if (state.weakSpotFuelGain > 0) {
       addFuel(state.weakSpotFuelGain);
     }
-    if (state.breachMissileLevel > 0) {
-      triggerRemoteBombSquare(x, y, 1 + Math.floor(Math.random() * 3));
+    for (let ri = 0; ri < state.breachMissileLevel; ri += 1) {
+      fireRocket(x, y, BREACH_MISSILE_DAMAGE, BREACH_MISSILE_RADIUS, 1 + Math.floor(Math.random() * 3));
     }
     if (state.weakSpotPierce > 0) {
       const px = x + (options.dirX ?? 0);
@@ -6827,15 +6876,18 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
   }
 }
 
-function spawnRocketEffect(fromX, fromY, targetX, targetY, payload) {
+function spawnRocketEffect(fromX, fromY, targetX, targetY, payload, { instant = false } = {}) {
   const dx = targetX - fromX;
   const dy = targetY - fromY;
   const distance = Math.hypot(dx, dy);
-  const duration = 0.18 + distance * 0.07;
+  const travelDuration = 0.18 + distance * 0.07;
   state.effects.push({
     kind: "rocket",
-    time: duration,
-    duration,
+    phase: "flying",
+    instant,
+    time: travelDuration,
+    duration: travelDuration,
+    travelDuration,
     fromX,
     fromY,
     targetX,
@@ -6852,13 +6904,18 @@ function detonateRocketEffect(effect) {
   }
 
   if (effect.payload.kind === "radiusBomb") {
+    const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
+    if (distToPlayer <= effect.payload.radius) {
+      const scaledDamage = effect.payload.damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamageMultiplier || 1);
+      addHeatOnStrike(Math.round(scaledDamage * 0.3));
+    }
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
       guaranteedBreak: true,
     });
   }
 }
 
-function triggerRemoteBombSquare(originX, originY, distance) {
+function fireRocket(originX, originY, baseDamage, baseRadius, distance) {
   const directions = [
     { x: 1, y: 0 },
     { x: -1, y: 0 },
@@ -6872,13 +6929,22 @@ function triggerRemoteBombSquare(originX, originY, distance) {
   const dir = directions[Math.floor(Math.random() * directions.length)];
   const centerX = clamp(originX + dir.x * distance, 1, GRID_W - 2);
   const centerY = clamp(originY + dir.y * distance, 1, GRID_H - 2);
-  const damage = EXPLOSION_BREAK_DAMAGE;
-
   spawnRocketEffect(originX, originY, centerX, centerY, {
     kind: "radiusBomb",
-    damage,
-    radius: 1,
+    damage: baseDamage,
+    radius: baseRadius,
   });
+}
+
+function triggerRemoteBombSquare(originX, originY, distance) {
+  const directions = [
+    { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+    { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 },
+  ];
+  const dir = directions[Math.floor(Math.random() * directions.length)];
+  const centerX = clamp(originX + dir.x * distance, 1, GRID_W - 2);
+  const centerY = clamp(originY + dir.y * distance, 1, GRID_H - 2);
+  explodeAt(centerX, centerY, REMOTE_BOMB_DAMAGE, REMOTE_BOMB_RADIUS, { guaranteedBreak: true });
 }
 
 function recordPlayerMove(fromX, fromY, toX, toY) {
@@ -7148,7 +7214,7 @@ function tryAutoCloseContour() {
         cause: "explosion",
       });
     }
-    extendPath(x, y);
+    extendPath(x, y, true);
     if (state.pathTiles.length === 1 && state.pathTiles[0].x === x && state.pathTiles[0].y === y) {
       state.pathTiles[0] = { x: heroX, y: heroY };
       rebuildPathIndex();
@@ -7496,7 +7562,7 @@ function tryBeaconContourDeposit(x, y) {
   }
 }
 
-function extendPath(x, y) {
+function extendPath(x, y, ignoreMaxLength = false) {
   const tail = state.pathTiles[state.pathTiles.length - 1];
   if (tail && tail.x === x && tail.y === y) {
     return;
@@ -7524,6 +7590,11 @@ function extendPath(x, y) {
 
   state.depth = Math.max(state.depth, Math.abs(y - START_Y));
   state.pathTiles.push({ x, y });
+  if (!ignoreMaxLength && state.pathTiles.length > state.maxLoopLength) {
+    state.pathTailGhost = state.pathTiles[0];
+    state.pathTiles.shift();
+    state.pathTailFade = 1;
+  }
   rebuildPathIndex();
   tryBeaconContourDeposit(x, y);
 }
@@ -7673,7 +7744,7 @@ function getLoopPerkBlockHardness(x, y) {
 }
 
 function maybeSpawnLoopPerk(interiorCells) {
-  const chance = getLoopPerkChance(interiorCells.length);
+  const chance = Math.min(1, getLoopPerkChance(interiorCells.length) + (state.loopSpawnBonusChance || 0));
   if (chance <= 0 || state.worldRandom() >= chance) {
     return;
   }
@@ -7937,45 +8008,91 @@ function renderEffects(camera) {
                      cy + Math.sin(angle) * dist - size * 0.5, size, size);
       }
     } else if (effect.kind === "rocket") {
-      const t = clamp(progress, 0, 1);
-      const startX = effect.fromX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-      const startY = effect.fromY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
-      const endX = effect.targetX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-      const endY = effect.targetY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
-      const midX = startX + (endX - startX) * t;
-      const midY = startY + (endY - startY) * t - Math.sin(t * Math.PI) * effect.arcHeight;
-      const tailX = startX + (endX - startX) * Math.max(0, t - 0.08);
-      const tailY = startY + (endY - startY) * Math.max(0, t - 0.08) - Math.sin(Math.max(0, t - 0.08) * Math.PI) * effect.arcHeight;
+      if (effect.phase === "flying") {
+        const t = clamp(1 - effect.time / effect.travelDuration, 0, 1);
+        const startX = effect.fromX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+        const startY = effect.fromY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+        const endX = effect.targetX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+        const endY = effect.targetY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+        const midX = startX + (endX - startX) * t;
+        const midY = startY + (endY - startY) * t - Math.sin(t * Math.PI) * effect.arcHeight;
+        const tailT = Math.max(0, t - 0.08);
+        const tailX = startX + (endX - startX) * tailT;
+        const tailY = startY + (endY - startY) * tailT - Math.sin(tailT * Math.PI) * effect.arcHeight;
 
-      ctx.strokeStyle = "rgba(255, 213, 155, 0.8)";
-      ctx.lineWidth = 2.6;
-      ctx.beginPath();
-      ctx.moveTo(tailX, tailY);
-      ctx.lineTo(midX, midY);
-      ctx.stroke();
+        ctx.strokeStyle = "rgba(255, 213, 155, 0.8)";
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(midX, midY);
+        ctx.stroke();
 
-      const gradient = ctx.createRadialGradient(midX - 1, midY - 1, 1, midX, midY, 8);
-      gradient.addColorStop(0, "rgba(255,248,224,0.95)");
-      gradient.addColorStop(0.45, "rgba(255,172,92,0.85)");
-      gradient.addColorStop(1, "rgba(255,120,32,0)");
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(midX, midY, 8, 0, Math.PI * 2);
-      ctx.fill();
+        const gradient = ctx.createRadialGradient(midX - 1, midY - 1, 1, midX, midY, 8);
+        gradient.addColorStop(0, "rgba(255,248,224,0.95)");
+        gradient.addColorStop(0.45, "rgba(255,172,92,0.85)");
+        gradient.addColorStop(1, "rgba(255,120,32,0)");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(midX, midY, 8, 0, Math.PI * 2);
+        ctx.fill();
 
-      ctx.fillStyle = "#ffd59b";
-      ctx.beginPath();
-      ctx.arc(midX, midY, 2.4, 0, Math.PI * 2);
-      ctx.fill();
+        ctx.fillStyle = "#ffd59b";
+        ctx.beginPath();
+        ctx.arc(midX, midY, 2.4, 0, Math.PI * 2);
+        ctx.fill();
 
-      ctx.strokeStyle = "rgba(255, 238, 196, 0.65)";
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(midX - 3, midY);
-      ctx.lineTo(midX + 3, midY);
-      ctx.moveTo(midX, midY - 3);
-      ctx.lineTo(midX, midY + 3);
-      ctx.stroke();
+        ctx.strokeStyle = "rgba(255, 238, 196, 0.65)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(midX - 3, midY);
+        ctx.lineTo(midX + 3, midY);
+        ctx.moveTo(midX, midY - 3);
+        ctx.lineTo(midX, midY + 3);
+        ctx.stroke();
+      } else {
+        // Armed phase: perk-zone style highlight
+        const pulse = 0.5 + 0.5 * Math.sin((state.lastTs || 0) * 0.018);
+        const radius = effect.payload?.radius ?? 1;
+        const maxOffset = Math.ceil(radius);
+        const zoneColor = "#ff5a14";
+        const inBlast = (ox, oy) => Math.hypot(ox, oy) <= radius;
+
+        ctx.save();
+        ctx.shadowColor = zoneColor;
+        ctx.shadowBlur = 8 + pulse * 8;
+
+        for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
+          for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
+            if (!inBlast(ox, oy)) continue;
+            const sx = (effect.targetX + ox) * TILE_SIZE - camera.x;
+            const sy = (effect.targetY + oy) * TILE_SIZE - camera.y;
+
+            // Fill
+            ctx.fillStyle = `${zoneColor}${Math.round((0x18 + pulse * 0x28)).toString(16).padStart(2, "0")}`;
+            ctx.fillRect(sx + 5, sy + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+
+            // Border only on outer edges
+            ctx.strokeStyle = `${zoneColor}cc`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            if (!inBlast(ox, oy - 1)) { ctx.moveTo(sx + 4, sy + 4);           ctx.lineTo(sx + TILE_SIZE - 4, sy + 4); }
+            if (!inBlast(ox + 1, oy)) { ctx.moveTo(sx + TILE_SIZE - 4, sy + 4); ctx.lineTo(sx + TILE_SIZE - 4, sy + TILE_SIZE - 4); }
+            if (!inBlast(ox, oy + 1)) { ctx.moveTo(sx + 4, sy + TILE_SIZE - 4); ctx.lineTo(sx + TILE_SIZE - 4, sy + TILE_SIZE - 4); }
+            if (!inBlast(ox - 1, oy)) { ctx.moveTo(sx + 4, sy + 4);           ctx.lineTo(sx + 4, sy + TILE_SIZE - 4); }
+            ctx.stroke();
+          }
+        }
+
+        // Pulsing center dot
+        const cx = effect.targetX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+        const cy = effect.targetY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+        ctx.fillStyle = `rgba(255, 220, 80, ${0.8 + 0.2 * pulse})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3 + 1.5 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
     } else if (effect.kind === "damageNumber") {
       const alpha = 1 - progress;
       const driftX = (((effect.seed % 7) - 3) / 3) * 6 * progress;
@@ -9103,6 +9220,28 @@ function renderPath(camera) {
   }
   ctx.lineWidth = 8;
   ctx.lineCap = "round";
+
+  // Ghost tail: the ejected tile fading out
+  const ghost = state.pathTailGhost;
+  const tailFade = state.pathTailFade;
+  if (ghost && tailFade > 0 && renderPathLength >= 1) {
+    const t1 = state.pathTiles[0];
+    const p0x = ghost.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+    const p0y = ghost.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+    const p1x = t1.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+    const p1y = t1.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+    ctx.strokeStyle = `rgba(108, 62, 31, ${0.65 * tailFade})`;
+    ctx.beginPath();
+    ctx.moveTo(p0x, p0y);
+    ctx.lineTo(p1x, p1y);
+    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(219, 171, 99, ${0.52 * tailFade})`;
+    ctx.stroke();
+    ctx.lineWidth = 8;
+  }
+
+  // Main path
   ctx.strokeStyle = "rgba(108, 62, 31, 0.65)";
   ctx.beginPath();
   for (let i = 0; i < renderPathLength; i += 1) {
@@ -9123,19 +9262,6 @@ function renderPath(camera) {
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(219, 171, 99, 0.52)";
   ctx.stroke();
-
-  ctx.fillStyle = "rgba(247, 220, 172, 0.45)";
-  for (let i = 0; i < renderPathLength; i += 3) {
-    const tile = state.pathTiles[i];
-    ctx.beginPath();
-    ctx.arc(tile.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x, tile.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  if (liveTail && renderPathLength > 0) {
-    ctx.beginPath();
-    ctx.arc(liveTail.x, liveTail.y, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
 
   renderAutoClosePreview(camera);
 }
