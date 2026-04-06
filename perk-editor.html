@@ -569,10 +569,20 @@ function getTodoStatEntries(item) {
 
 function getRoadmapInfluenceMap() {
   const roadmapInfluence = new Map(STAT_GUIDE.map(stat => [stat.id, { pos: 0, neg: 0 }]));
-  for (const item of S.todo) {
-    for (const [stat, value] of getTodoStatEntries(item)) {
-      const bucket = roadmapInfluence.get(stat);
+  const allReal = [...S.equipment, ...S.items];
+  for (const item of allReal) {
+    if (!item.effect) continue;
+    const effects = Array.isArray(item.effect) ? item.effect : [item.effect];
+    for (const e of effects) {
+      if (!e.stat) continue;
+      const bucket = roadmapInfluence.get(e.stat);
       if (!bucket) continue;
+      let value = 0;
+      if (e.effectByRarity) {
+        value = e.effectByRarity.find(v => v != null && v !== 0) ?? 0;
+      } else if (typeof e.value === 'number') {
+        value = e.value;
+      }
       if (value > 0) bucket.pos += 1;
       if (value < 0) bucket.neg += 1;
     }
