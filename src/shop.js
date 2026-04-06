@@ -296,8 +296,10 @@ function tryPurchase(offeringIdx) {
       detail: {
         effectId: offering.good.id,
         cost,
+        rarity: offering.rarity,
         rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
         isMerge: false,
+        oldRarity: 0,
         oldRarityMultiplier: 0,
       },
     }));
@@ -321,8 +323,10 @@ function tryPurchase(offeringIdx) {
       detail: {
         effectId: offering.good.id,
         cost,
+        rarity: newRarity,
         rarityMultiplier: RARITY_EFFECT_MULT[newRarity],
         isMerge: true,
+        oldRarity,
         oldRarityMultiplier: RARITY_EFFECT_MULT[oldRarity],
       },
     }));
@@ -353,6 +357,7 @@ function doReplace(slotIdx) {
   document.dispatchEvent(new CustomEvent("shop:recycle", {
     detail: {
       effectId: old.id,
+      rarity: old.rarity,
       rarityMultiplier: RARITY_EFFECT_MULT[old.rarity],
       refund,
     },
@@ -365,8 +370,10 @@ function doReplace(slotIdx) {
     detail: {
       effectId: offering.good.id,
       cost,
+      rarity: offering.rarity,
       rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
       isMerge: false,
+      oldRarity: 0,
       oldRarityMultiplier: 0,
     },
   }));
@@ -1020,6 +1027,7 @@ function doSellSlot(slotIdx) {
   document.dispatchEvent(new CustomEvent("shop:recycle", {
     detail: {
       effectId: part.id,
+      rarity: part.rarity,
       rarityMultiplier: RARITY_EFFECT_MULT[part.rarity],
       refund,
     },
@@ -1046,8 +1054,10 @@ function doSlotMerge(slotIdxA, slotIdxB) {
     detail: {
       effectId: a.id,
       cost: 0,
+      rarity: newRarity,
       rarityMultiplier: RARITY_EFFECT_MULT[newRarity],
       isMerge: true,
+      oldRarity,
       oldRarityMultiplier: RARITY_EFFECT_MULT[oldRarity],
     },
   }));

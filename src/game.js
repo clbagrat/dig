@@ -64,7 +64,7 @@ const STEAM_LIFETIME = 3;
 const STEAM_DAMAGE = 1;
 const STEAM_RANGE = 99;
 const EXPLOSION_BREAK_DAMAGE = 9999;
-const ROCKET_ARMED_DURATION = 2.0;
+const ROCKET_ARMED_DURATION = 1.0;
 const BREACH_MISSILE_DAMAGE = 35;
 const BREACH_MISSILE_RADIUS = 1.2;
 const FUEL_ROCKET_DAMAGE = 45;
@@ -99,7 +99,7 @@ const TILE_SWAP_ANIMATION_DURATION = 0.18;
 const WORM_ACTIVATION_RADIUS = 10;
 const WORM_ATTACK_INTERVAL = 10;
 const WORM_SPEED = 4;
-const WORM_DAMAGE = 3;
+const WORM_DAMAGE = 2;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
@@ -2966,7 +2966,7 @@ function applyGoldPerk(perkType) {
   showPerkToast(state.perkText);
 }
 
-function applyShopPerk(effectId, rarityMult) {
+function applyShopPerk(effectId, rarityMult, rarity) {
   const m = rarityMult || 1;
   switch (effectId) {
     case "drill_power":
@@ -3102,12 +3102,15 @@ function applyShopPerk(effectId, rarityMult) {
     case "lucky_pickaxe":
       showPerkToast("Кирка счастливчика");
       break;
-    default:
+    default: {
+      const good = ALL_GOODS.find(g => g.id === effectId);
+      if (good?.effect) applyItemEffect(good.effect, rarityMult, rarity);
       break;
+    }
   }
 }
 
-function removeShopPerk(effectId, rarityMult) {
+function removeShopPerk(effectId, rarityMult, rarity) {
   const m = rarityMult || 1;
   switch (effectId) {
     case "drill_power": state.strikeSpeed -= 15 * m; break;
@@ -3148,7 +3151,11 @@ function removeShopPerk(effectId, rarityMult) {
     case "basic_drill": break;
     case "fragile_drill": break;
     case "lucky_pickaxe": break;
-    default: break;
+    default: {
+      const good = ALL_GOODS.find(g => g.id === effectId);
+      if (good?.effect) reverseItemEffect(good.effect, rarityMult, rarity);
+      break;
+    }
   }
 }
 
@@ -3199,6 +3206,24 @@ function applyItemEffect(effect, rarityMult, rarity) {
       state.hp = Math.min(state.hp, state.maxHp);
     } else {
       state[e.stat] = (state[e.stat] || 0) + value;
+    }
+    if (e.stat === "visionRadius") state.visibilityDirty = true;
+  }
+}
+
+function reverseItemEffect(effect, rarityMult, rarity) {
+  if (!effect) return;
+  const effects = Array.isArray(effect) ? effect : [effect];
+  for (const e of effects) {
+    if (!e.stat) continue;
+    const value = e.effectByRarity
+      ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
+      : e.value * (rarityMult || 1);
+    if (e.stat === "maxHp" && value < 0) {
+      state.maxHp = Math.max(1, state.maxHp - value);
+      state.hp = Math.min(state.hp, state.maxHp);
+    } else {
+      state[e.stat] = (state[e.stat] || 0) - value;
     }
     if (e.stat === "visionRadius") state.visibilityDirty = true;
   }
@@ -3656,11 +3681,11 @@ function bindUi() {
   }
 
   document.addEventListener("shop:purchase-equipment", (e) => {
-    const { effectId, cost, rarityMultiplier, isMerge, oldRarityMultiplier } = e.detail;
+    const { effectId, cost, rarity, rarityMultiplier, isMerge, oldRarity, oldRarityMultiplier } = e.detail;
     playSound(isMerge ? "equipment_merge" : "purchase");
     state.gold = Math.max(0, state.gold - cost);
-    if (isMerge) removeShopPerk(effectId, oldRarityMultiplier);
-    applyShopPerk(effectId, rarityMultiplier);
+    if (isMerge) removeShopPerk(effectId, oldRarityMultiplier, oldRarity);
+    applyShopPerk(effectId, rarityMultiplier, rarity);
     renderShop(state.gold, getShopStatsSnapshot());
   });
 
@@ -3673,9 +3698,9 @@ function bindUi() {
   });
 
   document.addEventListener("shop:recycle", (e) => {
-    const { effectId, rarityMultiplier, refund } = e.detail;
+    const { effectId, rarity, rarityMultiplier, refund } = e.detail;
     playSound("recycle");
-    removeShopPerk(effectId, rarityMultiplier);
+    removeShopPerk(effectId, rarityMultiplier, rarity);
     state.gold += refund;
     renderShop(state.gold, getShopStatsSnapshot());
   });
@@ -6667,7 +6692,6 @@ function updateWorms(dt) {
       }
     } else {
       nest.active = false;
-      nest.cooldown = 0;
     }
   }
 
@@ -7034,7 +7058,7 @@ function detonateRocketEffect(effect) {
       addHeatOnStrike(Math.round(scaledDamage * 0.3));
     }
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
-      guaranteedBreak: true,
+      guaranteedBreak: false,
     });
   }
 }
@@ -11074,10 +11098,41 @@ function renderHud() {
   }
   ctx.restore();
 
-  drawHudBar(left, secondRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
+  const xpRatio = clamp(state.xp / Math.max(1, state.xpToNext), 0, 1);
+  const xpBarWidth = (totalWidth - gap) / 2;
+  drawHudXpBar(left, secondRowTop, xpBarWidth, panelHeight, `LVL ${state.level}`, `${state.xp}/${state.xpToNext}`, xpRatio);
+
+  // Depth + beacons info panel
+  const infoX = left + xpBarWidth + gap;
+  const infoW = totalWidth - xpBarWidth - gap;
+  const curDepth = DEPTH_LEVELS.find(l => l.level === state.currentDepthLevel);
+  const levelBeacons = curDepth
+    ? state.beacons.filter(b => b.y >= curDepth.startY && b.y <= curDepth.endY)
+    : [];
+  const beaconsTotal = levelBeacons.length;
+  const beaconsActive = levelBeacons.filter(b => b.active).length;
+  drawHudPanel(infoX, secondRowTop, infoW, panelHeight);
+  {
+    const ctx = state.ctx;
+    ctx.save();
+    ctx.textBaseline = "middle";
+    const midY = secondRowTop + panelHeight * 0.5;
+    ctx.font = `700 10px ${HUD_FONT}`;
+    ctx.fillStyle = "#c8a96e";
+    ctx.textAlign = "left";
+    ctx.fillText(`ГЛУБИНА ${state.currentDepthLevel}`, infoX + 12, midY);
+    ctx.textAlign = "right";
+    const beaconDone = beaconsTotal > 0 && beaconsActive === beaconsTotal;
+    ctx.fillStyle = beaconDone ? "#7de87d" : "#e5f8ff";
+    ctx.fillText(`${beaconsActive}/${beaconsTotal} 📡`, infoX + infoW - 10, midY);
+    ctx.restore();
+  }
+
+  const thirdRowTop = secondRowTop + panelHeight + 8;
+  drawHudBar(left, thirdRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
   drawHudBar(
     left + panelWidth + gap,
-    secondRowTop,
+    thirdRowTop,
     panelWidth,
     panelHeight,
     "HEAT",
@@ -11085,10 +11140,6 @@ function renderHud() {
     heatRatio,
     ["#ffb36d", "#ff4c3f"],
   );
-
-  const thirdRowTop = secondRowTop + panelHeight + 8;
-  const xpRatio = clamp(state.xp / Math.max(1, state.xpToNext), 0, 1);
-  drawHudXpBar(left, thirdRowTop, totalWidth, panelHeight, `LVL ${state.level}`, `${state.xp}/${state.xpToNext}`, xpRatio);
   const detailTop = thirdRowTop + panelHeight + 8;
 
   const topActions = document.querySelector(".top-actions");
@@ -11216,7 +11267,7 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   const ctx = state.ctx;
   const trackX = x + 72;
   const trackY = y + 12;
-  const trackWidth = Math.max(44, width - 106);
+  const trackWidth = Math.max(44, width - 82);
   const trackHeight = 10;
 
   drawHudPanel(x, y, width, height);
@@ -11282,9 +11333,9 @@ function renderHudInfoColumn(x, y, width, rows, title) {
 
 function drawHudXpBar(x, y, width, height, label, value, ratio) {
   const ctx = state.ctx;
-  const trackX = x + 86;
+  const trackX = x + 72;
   const trackY = y + 12;
-  const trackWidth = Math.max(96, width - 126);
+  const trackWidth = Math.max(44, width - 82);
   const trackHeight = 10;
 
   drawHudPanel(x, y, width, height);
@@ -11302,16 +11353,12 @@ function drawHudXpBar(x, y, width, height, label, value, ratio) {
   }
   ctx.font = `700 ${pulse > 0 ? Math.round(10 + pulse * 2) : 10}px ${HUD_FONT}`;
   ctx.textAlign = "left";
-  ctx.fillText(label, x + 12, y + 16);
+  ctx.fillText(label, x + 10, y + 13);
   ctx.shadowBlur = 0;
 
-  ctx.strokeStyle = "rgba(18, 12, 8, 0.78)";
-  ctx.lineWidth = 3;
-  ctx.font = `700 11px ${HUD_FONT}`;
-  ctx.textAlign = "right";
-  ctx.strokeText(value, x + width - 12, y + 16);
   ctx.fillStyle = "#e5f8ff";
-  ctx.fillText(value, x + width - 12, y + 16);
+  ctx.font = `700 11px ${HUD_FONT}`;
+  ctx.fillText(value, x + 10, y + 27);
 
   ctx.fillStyle = "rgba(180, 238, 255, 0.1)";
   drawRoundedRectPath(trackX, trackY, trackWidth, trackHeight, trackHeight * 0.5);
