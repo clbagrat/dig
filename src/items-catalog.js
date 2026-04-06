@@ -102,14 +102,14 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Утяжелитель",
     icon: "⚒️",
-    desc: "+3 drillPower. Скорость −10%.",
+    desc: "+8 drillPower. Скорость −10%.",
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
     baseCost: 35,
     effect: [
-      { stat: "drillPower",   effectByRarity: [null, 3, 5, 8, 12] },
-      { stat: "strikeSpeed",  effectByRarity: [null, -10, -12, -15, -18] },
+      { stat: "drillPower",   effectByRarity: [null, 8, 10, 12, 15] },
+      { stat: "strikeSpeed",  effectByRarity: [null, -10, -10, -10, -10] },
     ],
   },
   {
