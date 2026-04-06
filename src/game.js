@@ -1,4 +1,5 @@
 import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem } from "./shop.js?v=41";
+import { playSound, initSounds } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, RARITY } from "./items-catalog.js?v=1";
 import {
   generateMap,
@@ -1065,6 +1066,7 @@ function createSpriteAtlas() {
 }
 
 function spawnImpactEffect(x, y, dirX, dirY, hardness) {
+  playSound("drill_strike", { pitch: 0.9 + Math.random() * 0.2 });
   state.effects.push({
     kind: "impact",
     x,
@@ -1078,6 +1080,7 @@ function spawnImpactEffect(x, y, dirX, dirY, hardness) {
 }
 
 function spawnBreakEffect(x, y, hardness, cause = "break") {
+  playSound("block_break", { pitch: 0.85 + Math.random() * 0.3 });
   state.effects.push({
     kind: "break",
     x,
@@ -1091,6 +1094,7 @@ function spawnBreakEffect(x, y, hardness, cause = "break") {
 }
 
 function spawnExplosionEffect(x, y, radius) {
+  playSound("explosion");
   state.effects.push({
     kind: "explosion",
     x,
@@ -1103,6 +1107,7 @@ function spawnExplosionEffect(x, y, radius) {
 }
 
 function spawnWeakSpotHitEffect(x, y, dirX, dirY) {
+  playSound("weak_spot_hit");
   state.effects.push({
     kind: "weakSpotHit",
     x, y, dirX, dirY,
@@ -1113,6 +1118,7 @@ function spawnWeakSpotHitEffect(x, y, dirX, dirY) {
 }
 
 function spawnXpPickupEffect(x, y, value) {
+  playSound("xp_pickup", { volume: 0.6, pitch: 0.95 + Math.random() * 0.1 });
   state.effects.push({
     kind: "xpPickup",
     x, y, value,
@@ -1123,6 +1129,7 @@ function spawnXpPickupEffect(x, y, value) {
 }
 
 function spawnGoldOreEffect(x, y, value) {
+  playSound("gold_pickup", { volume: 0.7 });
   state.effects.push({
     kind: "goldOre",
     x,
@@ -1135,6 +1142,7 @@ function spawnGoldOreEffect(x, y, value) {
 }
 
 function spawnMicroBonusRevealEffect(tileX, tileY, mType) {
+  playSound("micro_bonus", { volume: 0.4 });
   state.effects.push({
     kind: "microReveal",
     x: tileX,
@@ -1147,6 +1155,7 @@ function spawnMicroBonusRevealEffect(tileX, tileY, mType) {
 }
 
 function spawnLevelUpBurst(x, y) {
+  playSound("level_up");
   state.effects.push({
     kind: "levelup",
     x, y,
@@ -1948,6 +1957,7 @@ function revealGasPocket(x, y) {
     timer: GAS_SPREAD_INTERVAL,
     spreadsDone: 0,
   });
+  playSound("gas_release");
   applyGasContactDamage();
 }
 
@@ -2054,6 +2064,7 @@ function revealSteamPocket(x, y, dirX, dirY) {
     cells: released.slice(),
   };
   state.steamJets.push(jet);
+  playSound("steam_burst");
 }
 
 function setupField(seedOverride = null) {
@@ -2468,6 +2479,7 @@ function showDepthTitle(level) {
   if (!Number.isFinite(level) || level <= 0) {
     return;
   }
+  playSound("depth_announce");
   state.depthTitle.text = `Глубина ${level}`;
   state.depthTitle.time = 1.8;
 }
@@ -2593,7 +2605,7 @@ function applyCrystalCatalystBonus(x, y) {
   if (state.crystalCatalystLevel <= 0) {
     return;
   }
-
+  playSound("crystal_catalyst", { volume: 0.6 });
   state.unsafeGold += 30;
   showGoldToast(30);
 
@@ -2616,6 +2628,7 @@ function collectCrystalTile(x, y, index, crystalType) {
     gainExperience(state.crystalXpGain);
   }
   if (state.crystalRecipe.length === 0) {
+    playSound("crystal_pickup");
     startCrystalRecipe(crystalType);
     showPerkToast(state.crystalStatusText);
     return;
@@ -2629,6 +2642,7 @@ function collectCrystalTile(x, y, index, crystalType) {
   }
 
   if (recipeCount > 0 && state.crystalCollected[crystalType] < recipeCount) {
+    playSound("crystal_pickup");
     state.crystalCollected[crystalType] += 1;
     state.crystalProgress += 1;
     state.crystalStatusText = `${CRYSTAL_TYPES[crystalType].name}: ${state.crystalProgress}/${state.crystalRecipe.length}`;
@@ -2637,12 +2651,14 @@ function collectCrystalTile(x, y, index, crystalType) {
       const firstCrystalType = state.crystalRecipe[0];
       const completedRecipe = [...state.crystalRecipe];
       showPerkToast("Кристаллы собраны");
+      playSound("recipe_complete");
       clearCrystalRecipe();
       grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y);
     }
     return;
   }
 
+  playSound("crystal_wrong");
   applyStun(1, "Неверный кристалл");
 }
 
@@ -2695,6 +2711,7 @@ function carveTunnel(x, y) {
 }
 
 function collectPerkTile(x, y, index, perkType) {
+  playSound("perk_pickup");
   state.perkMask[index] = 0;
   runFuelEvent(() => applyTilePerk(perkType, x, y));
   state.outOfFuel = false;
@@ -3416,12 +3433,13 @@ function bindFatalErrorHandlers() {
 function init() {
   bindFatalErrorHandlers();
   try {
+    initSounds();
     loadStoredGenerationConfig();
     state.ctx = state.canvas.getContext("2d");
     state.sprites = createSpriteAtlas();
     resize();
     setupField();
-    initShop({ onClose: () => { state.shopModalOpen = false; syncTouchZonesInteractivity(); } });
+    initShop({ onClose: () => { playSound("shop_close"); state.shopModalOpen = false; syncTouchZonesInteractivity(); } });
     bindUi();
     requestAnimationFrame(frame);
   } catch (error) {
@@ -3550,6 +3568,7 @@ function bindUi() {
 
   for (let i = 0; i < perkButtons.length; i += 1) {
     perkButtons[i].addEventListener("click", () => {
+      playSound("perk_choose");
       chooseGoldPerk(i);
     });
   }
@@ -3567,6 +3586,7 @@ function bindUi() {
       resetPad();
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
+      playSound("shop_open");
       openShop(state.gold, null, state.luck, getShopStatsSnapshot());
     });
   }
@@ -3581,6 +3601,7 @@ function bindUi() {
 
   document.addEventListener("shop:purchase-equipment", (e) => {
     const { effectId, cost, rarityMultiplier, isMerge, oldRarityMultiplier } = e.detail;
+    playSound(isMerge ? "equipment_merge" : "purchase");
     state.gold = Math.max(0, state.gold - cost);
     if (isMerge) removeShopPerk(effectId, oldRarityMultiplier);
     applyShopPerk(effectId, rarityMultiplier);
@@ -3589,6 +3610,7 @@ function bindUi() {
 
   document.addEventListener("shop:purchase-item", (e) => {
     const { effect, cost, rarityMultiplier, rarity } = e.detail;
+    playSound("purchase");
     state.gold = Math.max(0, state.gold - cost);
     applyItemEffect(effect, rarityMultiplier, rarity);
     renderShop(state.gold, getShopStatsSnapshot());
@@ -3596,6 +3618,7 @@ function bindUi() {
 
   document.addEventListener("shop:recycle", (e) => {
     const { effectId, rarityMultiplier, refund } = e.detail;
+    playSound("recycle");
     removeShopPerk(effectId, rarityMultiplier);
     state.gold += refund;
     renderShop(state.gold, getShopStatsSnapshot());
@@ -3603,12 +3626,14 @@ function bindUi() {
 
   document.addEventListener("shop:reroll", (e) => {
     const { cost } = e.detail;
+    playSound("reroll");
     state.gold = Math.max(0, state.gold - cost);
     renderShop(state.gold, getShopStatsSnapshot());
   });
 
   document.addEventListener("shop:synergies-changed", (e) => {
     const { removed, added } = e.detail;
+    if (added.length > 0) playSound("synergy_found");
     for (const tier of removed) {
       for (const bonus of tier.bonuses) {
         if (typeof bonus.value === "number") {
@@ -3878,6 +3903,7 @@ function bindUi() {
       syncDebugPerkOverlay();
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
+      playSound("shop_open");
       openShop(state.gold, null, state.luck, getShopStatsSnapshot());
     });
   }
@@ -4493,6 +4519,7 @@ function claimLevelReward(choiceId) {
   const entry = getCurrentLevelRewardEntry();
   const rewardChoices = getLevelRewardChoices(entry);
   if (!entry || !rewardChoices.some((c) => c.id === choiceId)) return;
+  playSound("reward_choose");
   applyLevelReward(choiceId);
   state.levelRewardQueue.shift();
   closeLevelUpModal();
@@ -4506,6 +4533,7 @@ function openNextArtifactChoice() {
     const beacon = state.artifactChoicePendingBeacon;
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
+    playSound("shop_open");
     openShop(state.gold, beacon ? beacon.y : null, state.luck, getShopStatsSnapshot());
     return;
   }
@@ -5196,6 +5224,7 @@ function checkGoldPerkUnlock() {
   }
   state.pendingPerkChoice = true;
   state.pendingPerkDelay = GOLD_PERK_POPUP_DELAY;
+  playSound("gold_perk_unlock");
   state.goldPerkLevel += 1;
   state.nextGoldPerkAt += getGoldPerkCost(state.goldPerkLevel);
 }
@@ -5212,6 +5241,7 @@ function activateDrillOverdrive(duration, toastText = "") {
   if (actualDuration <= 0) {
     return 0;
   }
+  playSound("drill_overdrive");
   state.overhealDrillTimer = Math.max(state.overhealDrillTimer, actualDuration);
   state.overdriveDisplayDuration = Math.max(state.overdriveDisplayDuration, actualDuration);
   if (toastText) {
@@ -5224,6 +5254,7 @@ function applyStun(duration, toastText = "") {
   if (duration <= 0) {
     return;
   }
+  playSound("stun");
   const concentration = Math.max(0.1, state.concentration || 1);
   const actualDuration = Math.max(0.5, duration / concentration - state.stunReduction);
   const wasStunned = state.stunTimer > 0;
@@ -5243,6 +5274,7 @@ function applyStun(duration, toastText = "") {
 }
 
 function triggerOverflowSurge() {
+  playSound("overflow_surge");
   state.resolvingOverflowBomb = true;
   try {
     state.overflowOverdriveTimer = activateDrillOverdrive(OVERFLOW_OVERDRIVE_DURATION, "Перегрузка");
@@ -5252,10 +5284,12 @@ function triggerOverflowSurge() {
 }
 
 function activateOverhealDrillBoost() {
+  playSound("overheal_boost");
   activateDrillOverdrive(state.overhealOverdriveDuration || 4, "Перелив адреналина");
 }
 
 function triggerHeatOverload() {
+  playSound("heat_overload");
   state.heat = 0;
   const overloadDamage = getStrikeDamage() * (1 + (state.heatExplosionDamageBonus || 0));
   const overloadRadius = 1 + (state.heatExplosionRadiusBonus || 0);
@@ -5278,8 +5312,12 @@ function addHeatOnStrike(amount) {
   if (state.overhealDrillTimer > 0) {
     return;
   }
+  const wasBelowWarning = state.heat < state.maxHeat * 0.8;
   state.heat = Math.min(state.maxHeat, state.heat + amount);
   state.struckThisFrame = true;
+  if (wasBelowWarning && state.heat >= state.maxHeat * 0.8) {
+    playSound("heat_warning");
+  }
   if (state.heat >= state.maxHeat) {
     triggerHeatOverload();
   }
@@ -5290,6 +5328,7 @@ function healPlayer(amount, sourceText = "") {
     return 0;
   }
 
+  playSound("player_heal");
   const missingHp = Math.max(0, state.maxHp - state.hp);
   const actualHeal = Math.min(amount, missingHp);
   const overheal = Math.max(0, amount - actualHeal);
@@ -6027,6 +6066,7 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
     return;
   }
 
+  playSound("fuel_pickup", { volume: 0.7 });
   const loopFuelBonus = (state.loopLengthFuelBonus || 0) > 0 ? Math.floor(state.pathTiles.length * state.loopLengthFuelBonus) : 0;
   const totalGain = amount + state.fuelPickupBonus + loopFuelBonus;
   showFuelToast(totalGain);
@@ -6048,6 +6088,7 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
 
 function dropArtifactOnDamage() {
   if (state.artifactCount <= 0) return;
+  playSound("artifact_drop");
   state.artifactCount--;
   const dx = state.drill.facingX;
   const dy = state.drill.facingY;
@@ -6105,6 +6146,7 @@ function dropKeyOnDamage() {
 function openSafeDoor(safeIdx, doorX, doorY) {
   const safe = state.safes[safeIdx];
   if (!safe || safe.opened) return;
+  playSound("safe_door_open");
   safe.opened = true;
   state.heldKeyForSafe = -1;
   state.keyBumpTime = 0;
@@ -6247,6 +6289,7 @@ function applyHazardDamage(amount, options = {}) {
   }
 
   state.hp = Math.max(0, state.hp - damageLeft);
+  playSound("player_hit");
   state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
   state.damageFlash = Math.min(1, state.damageFlash + 0.8);
   showHpToast(damageLeft);
@@ -6254,6 +6297,7 @@ function applyHazardDamage(amount, options = {}) {
   dropArtifactOnDamage();
   dropKeyOnDamage();
   if (state.hp <= 0) {
+    playSound("player_death");
     state.dead = true;
   }
 }
@@ -6276,6 +6320,7 @@ function consumeFuelEmergency() {
 
   state.fuel = 0;
   state.outOfFuel = false;
+  playSound("fuel_emergency");
   applyHazardDamage(FUEL_DEPLETION_HP_COST, { affectsArmor: false });
   if (!state.dead) {
     state.fuel = Math.min(state.maxFuel, state.fuel + FUEL_DEPLETION_RECOVERY);
@@ -6402,6 +6447,7 @@ function startBoulderRoll(x, y, dirX, dirY) {
     moveTimer: BOULDER_MOVE_INTERVAL,
     brokenBlocks: 0,
   });
+  playSound("boulder_roll");
 }
 
 function updateBoulders(dt) {
@@ -6544,6 +6590,7 @@ function updateWorms(dt) {
           hitPlayer: false,
           trail: [],
         });
+        playSound("worm_spawn");
       }
     } else {
       nest.active = false;
@@ -6606,6 +6653,7 @@ function updateWorms(dt) {
       // Player collision
       if (!worm.hitPlayer && worm.tileX === drillX && worm.tileY === drillY) {
         worm.hitPlayer = true;
+        playSound("worm_attack");
         applyHazardDamage(WORM_DAMAGE);
       }
     }
@@ -6721,6 +6769,7 @@ function damageCell(x, y, damage, options = {}) {
 }
 
 function triggerSpikeChain(x, y) {
+  playSound("spike_trigger");
   for (let oy = -1; oy <= 1; oy += 1) {
     for (let ox = -1; ox <= 1; ox += 1) {
       if (ox === 0 && oy === 0) {
@@ -6757,6 +6806,7 @@ function breakCell(x, y, index, options = {}) {
   const bonusGold = totalGold - baseGold;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   if (baseGold > 0) {
+    playSound("block_break_ore");
     addToGoldPickupMask(x, y, baseGold);
     if (bonusGold > 0) addToGoldBonusPickupMask(x, y, bonusGold);
   }
@@ -6877,6 +6927,7 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
 }
 
 function spawnRocketEffect(fromX, fromY, targetX, targetY, payload, { instant = false } = {}) {
+  playSound("rocket_launch");
   const dx = targetX - fromX;
   const dy = targetY - fromY;
   const distance = Math.hypot(dx, dy);
@@ -6902,7 +6953,7 @@ function detonateRocketEffect(effect) {
   if (!effect?.payload) {
     return;
   }
-
+  playSound("rocket_detonate");
   if (effect.payload.kind === "radiusBomb") {
     const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
     if (distToPlayer <= effect.payload.radius) {
@@ -6937,6 +6988,7 @@ function fireRocket(originX, originY, baseDamage, baseRadius, distance) {
 }
 
 function triggerRemoteBombSquare(originX, originY, distance) {
+  playSound("remote_bomb");
   const directions = [
     { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
     { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 },
@@ -6970,6 +7022,7 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   if (state.artifactMask[moveIndex] > 0) {
     state.artifactMask[moveIndex] = 0;
     state.artifactCount++;
+    playSound("artifact_pickup");
     showPerkToast("Артефакт подобран!");
   }
   // Pick up key by walking over it
@@ -6979,6 +7032,7 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
     state.heldKeyForSafe = safeIdx;
     state.keyBumpTime = 0;
     state.keyBumpDir = null;
+    playSound("key_pickup");
     showPerkToast("Ключ подобран! Неси к замку");
     triggerPickupRadar("key", toX, toY);
   }
@@ -7520,6 +7574,7 @@ function consumeSignalMove(fromX, fromY, toX, toY) {
 function updateDiscovery() {
   if (!state.baseFound && state.tunnelMask[cellIndex(state.base.x, state.base.y)]) {
     state.baseFound = true;
+    playSound("base_found");
   }
 }
 
@@ -7604,6 +7659,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   if (loopPath.length < 3) {
     return false;
   }
+  playSound("contour_close");
 
   const polygon = [];
   for (let i = 0; i < loopPath.length; i += 1) {
@@ -7680,6 +7736,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     if (beacon.active) continue;
     if (pathWithinBeaconArea) {
       beacon.active = true;
+      playSound("beacon_activate");
       beacon.activationAnimStart = state.lastTs || performance.now();
       if (state.firstStrikeLevel > 0) {
         state.firstStrikeTimer = getScaledEffectDuration(6 * state.firstStrikeLevel);
@@ -7803,6 +7860,7 @@ function isPointInPolygon(px, py, polygon) {
 }
 
 function spawnLoopFieldEffect(loopPath, affectedCells) {
+  playSound("loop_field");
   const sampleLimit = 84;
   const sampledCells = [];
   const sampleStep = Math.max(1, Math.floor(affectedCells.length / sampleLimit));
@@ -9333,6 +9391,7 @@ function updateBeaconActivationAnim() {
   } else {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
+    playSound("shop_open");
     openShop(state.gold, pa.beaconY ?? null, state.luck, getShopStatsSnapshot());
   }
 }
@@ -9842,6 +9901,7 @@ function triggerPickupRadar(kind, fromX, fromY) {
     }
   }
   if (bestDist === Infinity) return;
+  playSound("radar_pickup");
   state.pickupRadarTimer = 1.0;
   state.pickupRadarKind = kind;
   state.pickupRadarTargetX = bestX;

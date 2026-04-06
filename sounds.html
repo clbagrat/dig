@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dig — Sound Manager</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Baskerville', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    h1 {
+      color: #e8c547;
+      margin-bottom: 8px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #888;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .stats {
+      color: #aaa;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .stats span { color: #e8c547; font-weight: bold; }
+    .category {
+      margin-bottom: 28px;
+    }
+    .category-title {
+      font-size: 18px;
+      color: #e8c547;
+      border-bottom: 1px solid #333;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 14px;
+    }
+    .sound-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .sound-row:hover {
+      background: #262640;
+    }
+    .sound-id {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      color: #7ec8e3;
+      min-width: 160px;
+      flex-shrink: 0;
+    }
+    .sound-desc {
+      flex: 1;
+      font-size: 14px;
+      color: #bbb;
+      min-width: 0;
+    }
+    .sound-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .sound-full {
+      margin-top: 2px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: #8e8e8e;
+    }
+    .sound-status {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .sound-status.loaded { background: #4caf50; }
+    .sound-status.missing { background: #555; }
+    .sound-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    button {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 10px;
+      border: 1px solid #444;
+      border-radius: 4px;
+      background: #2a2a4a;
+      color: #ddd;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover {
+      background: #3a3a5a;
+      border-color: #666;
+    }
+    button:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+    button.upload-btn {
+      background: #2a4a2a;
+      border-color: #4a6a4a;
+    }
+    button.upload-btn:hover {
+      background: #3a5a3a;
+    }
+    button.delete-btn {
+      background: #4a2a2a;
+      border-color: #6a4a4a;
+    }
+    button.delete-btn:hover {
+      background: #5a3a3a;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    .drop-zone {
+      border: 2px dashed #444;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      color: #666;
+      margin-bottom: 24px;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .drop-zone.dragover {
+      border-color: #e8c547;
+      color: #e8c547;
+    }
+    .category-names {
+      mining: "Бурение и добыча",
+      pickup: "Ресурсы и подбор",
+      explosion: "Взрывы",
+      damage: "Урон и здоровье",
+      heat: "Нагрев",
+      hazard: "Опасности",
+      navigation: "Навигация",
+      progression: "Прогрессия",
+      shop: "Магазин",
+      ui: "UI",
+      special: "Специальные",
+    }
+  </style>
+</head>
+<body>
+  <h1>Sound Manager</h1>
+  <div class="subtitle">Загрузи .ogg файлы для каждого звукового эффекта. Они сохраняются в /res/ и сразу доступны в игре.</div>
+  <div class="stats">Загружено: <span id="loadedCount">0</span> / <span id="totalCount">0</span></div>
+
+  <div id="dropZone" class="drop-zone">
+    Перетащи .ogg файлы сюда. Имя файла должно совпадать с ID звука (например drill_strike.ogg)
+  </div>
+
+  <div id="soundList"></div>
+
+  <script type="module">
+    import { SFX } from "./src/sounds.js?v=1";
+
+    const CAT_NAMES = {
+      mining: "Бурение и добыча",
+      pickup: "Ресурсы и подбор",
+      explosion: "Взрывы",
+      damage: "Урон и здоровье",
+      heat: "Нагрев",
+      hazard: "Опасности",
+      navigation: "Навигация",
+      progression: "Прогрессия",
+      shop: "Магазин",
+      ui: "UI",
+      special: "Специальные",
+    };
+
+    let audioCtx = null;
+    let loadedSet = new Set();
+
+    function ensureAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
+    }
+
+    async function fetchLoadedSounds() {
+      const resp = await fetch("/api/sounds");
+      const ids = await resp.json();
+      loadedSet = new Set(ids);
+    }
+
+    async function uploadSound(id, file) {
+      const buf = await file.arrayBuffer();
+      await fetch(`/api/sounds/${id}`, { method: "POST", body: buf });
+      loadedSet.add(id);
+      updateUI();
+    }
+
+    async function deleteSound(id) {
+      await fetch(`/api/sounds/${id}`, { method: "DELETE" });
+      loadedSet.delete(id);
+      updateUI();
+    }
+
+    async function playPreview(id) {
+      const ctx = ensureAudio();
+      const resp = await fetch(`/res/${id}.ogg`);
+      if (!resp.ok) return;
+      const buf = await ctx.decodeAudioData(await resp.arrayBuffer());
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+    }
+
+    function buildUI() {
+      const container = document.getElementById("soundList");
+      const entries = Object.values(SFX);
+      const categories = {};
+      for (const entry of entries) {
+        if (!categories[entry.cat]) categories[entry.cat] = [];
+        categories[entry.cat].push(entry);
+      }
+
+      document.getElementById("totalCount").textContent = entries.length;
+
+      for (const [cat, items] of Object.entries(categories)) {
+        const section = document.createElement("div");
+        section.className = "category";
+        section.innerHTML = `<div class="category-title">${CAT_NAMES[cat] || cat}</div>`;
+
+        for (const item of items) {
+          const row = document.createElement("div");
+          row.className = "sound-row";
+          row.dataset.id = item.id;
+          row.innerHTML = `
+            <div class="sound-status ${loadedSet.has(item.id) ? 'loaded' : 'missing'}" data-status="${item.id}"></div>
+            <div class="sound-id">${item.id}</div>
+            <div class="sound-meta">
+              <div class="sound-desc">${item.desc}</div>
+              <div class="sound-full">${item.full}</div>
+            </div>
+            <div class="sound-actions">
+              <button class="play-btn" data-play="${item.id}" ${!loadedSet.has(item.id) ? 'disabled' : ''}>Play</button>
+              <button class="upload-btn" data-upload="${item.id}">Upload</button>
+              <button class="delete-btn" data-delete="${item.id}" ${!loadedSet.has(item.id) ? 'disabled' : ''}>Del</button>
+              <input type="file" accept=".ogg" data-file="${item.id}" />
+            </div>
+          `;
+          section.appendChild(row);
+        }
+        container.appendChild(section);
+      }
+
+      // Bind events
+      container.addEventListener("click", (e) => {
+        const playId = e.target.dataset?.play;
+        if (playId) { playPreview(playId); return; }
+
+        const uploadId = e.target.dataset?.upload;
+        if (uploadId) {
+          const input = container.querySelector(`input[data-file="${uploadId}"]`);
+          input?.click();
+          return;
+        }
+
+        const deleteId = e.target.dataset?.delete;
+        if (deleteId) { deleteSound(deleteId); return; }
+      });
+
+      container.addEventListener("change", (e) => {
+        const fileId = e.target.dataset?.file;
+        if (fileId && e.target.files[0]) {
+          uploadSound(fileId, e.target.files[0]);
+          e.target.value = "";
+        }
+      });
+    }
+
+    function updateUI() {
+      const count = loadedSet.size;
+      document.getElementById("loadedCount").textContent = count;
+
+      for (const entry of Object.values(SFX)) {
+        const has = loadedSet.has(entry.id);
+        const status = document.querySelector(`[data-status="${entry.id}"]`);
+        if (status) {
+          status.className = `sound-status ${has ? 'loaded' : 'missing'}`;
+        }
+        const playBtn = document.querySelector(`[data-play="${entry.id}"]`);
+        if (playBtn) playBtn.disabled = !has;
+        const delBtn = document.querySelector(`[data-delete="${entry.id}"]`);
+        if (delBtn) delBtn.disabled = !has;
+      }
+    }
+
+    // Drag & drop
+    const dropZone = document.getElementById("dropZone");
+    dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      const allIds = new Set(Object.keys(SFX));
+      for (const file of e.dataTransfer.files) {
+        const id = file.name.replace(/\.ogg$/i, "");
+        if (allIds.has(id)) {
+          await uploadSound(id, file);
+        }
+      }
+    });
+
+    // Init
+    await fetchLoadedSounds();
+    buildUI();
+    updateUI();
+  </script>
+</body>
+</html>

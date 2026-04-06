@@ -2,7 +2,8 @@
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
-    "desktop": "electron ."
+    "desktop": "electron .",
+    "serve": "node scripts/sound-server.js"
   },
   "dependencies": {
     "sharp": "^0.34.5"
