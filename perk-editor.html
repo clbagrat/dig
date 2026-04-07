@@ -453,19 +453,21 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <div id="sim-panel" hidden>
   <div class="sim-status">
     <span>Магазин <b id="sim-level-disp">0</b></span>
-    <span>🪙 <b id="sim-gold-disp">100</b></span>
+    <span>🪙 <b id="sim-gold-disp">0</b></span>
     <span>★ Удача <b id="sim-luck-disp">0</b></span>
     <span>↓ Глубина <b id="sim-depth-disp">1</b></span>
   </div>
   <div class="sim-row">
-    <label>Золото: <input type="number" id="sim-gold-input" value="100" min="0"></label>
-    <button class="sim-btn" id="btn-sim-add-gold">+ Добавить</button>
-    <label>Удача: <input type="number" id="sim-luck-input" value="1" min="0"></label>
-    <button class="sim-btn" id="btn-sim-add-luck">+ Добавить</button>
-    <label>Глубина (1–8): <input type="number" id="sim-depth-input" value="1" min="1" max="8"></label>
+    <span style="font-size:12px;color:var(--muted)">🪙</span>
+    <button class="sim-btn" data-gold="5">+5</button>
+    <button class="sim-btn" data-gold="10">+10</button>
+    <button class="sim-btn" data-gold="20">+20</button>
+    <button class="sim-btn" data-gold="50">+50</button>
   </div>
   <div class="sim-row">
-    <button class="sim-btn" id="btn-sim-artifact">Дать артефакт</button>
+    <button class="sim-btn" id="btn-sim-add-luck">+1 удача</button>
+    <button class="sim-btn" id="btn-sim-add-depth">+1 глубина</button>
+    <button class="sim-btn" id="btn-sim-artifact">Артефакт</button>
     <button class="sim-btn sim-btn--primary" id="btn-sim-open">Открыть магазин (ур. <span id="sim-next-level">1</span>)</button>
   </div>
   <button class="sim-btn sim-btn--danger" id="btn-sim-reset">Сбросить симулятор</button>
@@ -1422,7 +1424,7 @@ document.getElementById('tabs').addEventListener('click', e => {
 );
 
 // ── Simulator ──────────────────────────────────────────────────────────────
-const sim = { gold: 100, luck: 0, nextLevel: 1, depthLevel: 1, stats: {} };
+const sim = { gold: 0, luck: 0, nextLevel: 1, depthLevel: 1, stats: {} };
 
 // Apply effect deltas to sim.stats.
 // oldRarity: if set, subtracts old rarity value first (for merges/replaces).
@@ -1526,18 +1528,21 @@ document.addEventListener('shop:synergies-changed', e => {
 // Init shop module (builds DOM into #shopModal, binds events)
 initShop({ onClose: () => renderSimPanel() });
 
-document.getElementById('btn-sim-add-gold').addEventListener('click', () => {
-  const v = +document.getElementById('sim-gold-input').value || 0;
-  sim.gold = Math.max(0, sim.gold + v);
+document.querySelectorAll('[data-gold]').forEach(btn =>
+  btn.addEventListener('click', () => {
+    sim.gold += +btn.dataset.gold;
+    renderSimPanel();
+  })
+);
+document.getElementById('btn-sim-add-luck').addEventListener('click', () => {
+  sim.luck += 1;
   renderSimPanel();
 });
-document.getElementById('btn-sim-add-luck').addEventListener('click', () => {
-  const v = +document.getElementById('sim-luck-input').value || 0;
-  sim.luck = Math.max(0, sim.luck + v);
+document.getElementById('btn-sim-add-depth').addEventListener('click', () => {
+  sim.depthLevel = Math.min(8, sim.depthLevel + 1);
   renderSimPanel();
 });
 document.getElementById('btn-sim-open').addEventListener('click', () => {
-  sim.depthLevel = Math.max(1, Math.min(8, +document.getElementById('sim-depth-input').value || 1));
   openShop(sim.gold, sim.depthLevel, sim.luck, sim.stats);
   sim.nextLevel++;
   renderSimPanel();
@@ -1545,12 +1550,11 @@ document.getElementById('btn-sim-open').addEventListener('click', () => {
 document.getElementById('btn-sim-artifact').addEventListener('click', simGiveArtifact);
 document.getElementById('btn-sim-reset').addEventListener('click', () => {
   resetShopState();
-  sim.gold = 100;
+  sim.gold = 0;
   sim.luck = 0;
   sim.nextLevel = 1;
   sim.depthLevel = 1;
   sim.stats = {};
-  document.getElementById('sim-depth-input').value = 1;
   document.getElementById('sim-artifact-panel').hidden = true;
   renderSimPanel();
   toast('Симулятор сброшен');
