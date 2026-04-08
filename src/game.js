@@ -48,6 +48,7 @@ const BEACON_WIRE_BREAK_WAVE_DELAY_MS = 70;
 const BEACON_WIRE_POST_SHOP_DELAY_MS = 350;
 const BEACON_WIRE_FLARE_MS = 650;
 const BEACON_WIRE_RECOVER_MS = 1400;
+const FULL_FREEDOM_WIRE_HIDE_MS = 900;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -418,6 +419,7 @@ const state = {
   crystalItemOfferRevealed: false,
   crystalItemOfferShuffleTick: 0,
   crystalItemOfferPreview: null,
+  crystalItemOfferTitle: "Рецепт собран",
   crystalCompleteAnimDelay: 0,
   crystalCompleteAnimRecipe: [],
   nextGoldPerkAt: GOLD_PERK_BASE_COST,
@@ -2225,6 +2227,7 @@ function setupField(seedOverride = null) {
   state.crystalItemOfferRevealed = false;
   state.crystalItemOfferShuffleTick = 0;
   state.crystalItemOfferPreview = null;
+  state.crystalItemOfferTitle = "Рецепт собран";
   state.crystalCompleteAnimDelay = 0;
   state.crystalCompleteAnimRecipe = [];
   state.nextGoldPerkAt = GOLD_PERK_BASE_COST;
@@ -2392,7 +2395,20 @@ function setupField(seedOverride = null) {
   state.base.x = map.base.x;
   state.base.y = map.base.y;
   for (const b of map.beacons) {
-    state.beacons.push({ x: b.x, y: b.y, active: false, wireActivationStart: null, wireDamageTriggered: false, wiresFreedToastShown: false, wireTrackedCells: [] });
+    state.beacons.push({
+      x: b.x,
+      y: b.y,
+      active: false,
+      wireActivationStart: null,
+      wireDamageTriggered: false,
+      wiresFreedToastShown: false,
+      wireTrackedCells: [],
+      rewardContourReady: false,
+      rewardClaimed: false,
+      rewardRecipe: null,
+      rewardRevealStart: 0,
+      rewardGranted: false,
+    });
   }
   state.beaconWires = map.beaconWires;
   state.perkMask.set(map.perkMask);
@@ -2572,6 +2588,33 @@ function startCrystalRecipe(firstCrystalType) {
   state.crystalStatusText = `${CRYSTAL_TYPES[firstCrystalType].name}: 1/${state.crystalRecipe.length}`;
 }
 
+function buildBeaconBonusRecipe(beacon) {
+  const level = getDepthLevelForCell(beacon.x, beacon.y);
+  if (!level) {
+    const fallbackType = chooseCrystalType(state.worldRandom);
+    return [fallbackType, fallbackType, fallbackType];
+  }
+  const available = [];
+  for (let y = level.startY; y <= level.endY; y += 1) {
+    for (let x = level.xMin; x <= level.xMax; x += 1) {
+      const crystalType = state.crystalMask[cellIndex(x, y)];
+      if (crystalType > 0) {
+        available.push(crystalType);
+      }
+    }
+  }
+  if (available.length <= 0) {
+    const fallbackType = chooseCrystalType(state.worldRandom);
+    return [fallbackType, fallbackType, fallbackType];
+  }
+  const recipe = [];
+  for (let i = 0; i < CRYSTAL_RECIPE_LENGTH; i += 1) {
+    const pickIndex = Math.floor(state.worldRandom() * available.length);
+    recipe.push(available[pickIndex] || available[0]);
+  }
+  return recipe;
+}
+
 function awardBonusGoldPerkChoice() {
   if (state.isChoosingPerk || state.pendingPerkChoice) {
     state.bonusPerkChoices += 1;
@@ -2609,26 +2652,33 @@ function pickCrystalRewardItem() {
   return best;
 }
 
-function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y) {
+function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y, options = {}) {
   const offer = pickCrystalRewardItem();
   if (!offer) return;
+  const showRecipeAnimation = options.showRecipeAnimation !== false;
+  const delaySeconds = Number.isFinite(options.delaySeconds)
+    ? Math.max(0, options.delaySeconds)
+    : 1.1;
   // Store offer for deferred open
   state.crystalItemOfferGood = offer.good;
   state.crystalItemOfferRarity = offer.rarity;
   state.crystalItemOfferRevealed = false;
   state.crystalItemOfferShuffleTick = 0;
   state.crystalItemOfferPreview = getRandomShuffleItem();
+  state.crystalItemOfferTitle = options.title || "Рецепт собран";
+  state.crystalCompleteAnimDelay = delaySeconds;
+  if (!showRecipeAnimation) {
+    return;
+  }
   // Spawn crystal completion animation; modal opens after it finishes
-  const ANIM_DURATION = 1.1;
   const recipe = Array.isArray(completedRecipe) && completedRecipe.length > 0
     ? completedRecipe
     : [firstCrystalType, firstCrystalType, firstCrystalType];
-  state.crystalCompleteAnimDelay = ANIM_DURATION;
   state.effects.push({
     kind: "crystalComplete",
     x, y,
-    time: ANIM_DURATION,
-    duration: ANIM_DURATION,
+    time: delaySeconds,
+    duration: delaySeconds,
     recipe,
   });
 }
@@ -4314,7 +4364,7 @@ function syncCrystalItemOffer() {
 
   overlay.innerHTML = `
     <div class="crystal-item-offer__panel">
-      <div class="crystal-item-offer__eyebrow">Рецепт собран</div>
+      <div class="crystal-item-offer__eyebrow">${state.crystalItemOfferTitle || "Рецепт собран"}</div>
       <div class="crystal-item-offer__card ${revealed ? "crystal-item-offer__card--revealed" : "crystal-item-offer__card--shuffling"}" style="--offer-color:${color}">
         <div class="crystal-item-offer__icon">${displayGood?.icon || "?"}</div>
         <div class="crystal-item-offer__name">${revealed ? displayGood?.name : "???"}</div>
@@ -4342,12 +4392,14 @@ function acceptCrystalItemOffer() {
   grantItem(state.crystalItemOfferGood, state.crystalItemOfferRarity);
   state.crystalItemOfferOpen = false;
   state.crystalItemOfferGood = null;
+  state.crystalItemOfferTitle = "Рецепт собран";
   syncCrystalItemOffer();
 }
 
 function declineCrystalItemOffer() {
   state.crystalItemOfferOpen = false;
   state.crystalItemOfferGood = null;
+  state.crystalItemOfferTitle = "Рецепт собран";
   syncCrystalItemOffer();
 }
 
@@ -4968,7 +5020,26 @@ function update(dt) {
     if (!beacon.active || !beacon.wireDamageTriggered || beacon.wiresFreedToastShown === true) continue;
     if (!areBeaconWiresFreed(beacon)) continue;
     beacon.wiresFreedToastShown = true;
+    beacon.rewardContourReady = true;
+    beacon.rewardRecipe = buildBeaconBonusRecipe(beacon);
     showPerkToast("Провода освобождены");
+    showPerkToast("Замкни контур ещё раз");
+  }
+  for (const beacon of state.beacons) {
+    if (!beacon.rewardClaimed || beacon.rewardGranted || beacon.rewardRevealStart <= 0) continue;
+    if ((state.lastTs || 0) - beacon.rewardRevealStart < FULL_FREEDOM_WIRE_HIDE_MS) continue;
+    const rewardRecipe = Array.isArray(beacon.rewardRecipe) && beacon.rewardRecipe.length > 0
+      ? beacon.rewardRecipe
+      : buildBeaconBonusRecipe(beacon);
+    beacon.rewardRecipe = rewardRecipe;
+    beacon.rewardGranted = true;
+    playSound("recipe_complete");
+    grantCrystalRecipeReward(rewardRecipe[0], rewardRecipe, beacon.x, beacon.y, {
+      title: "Полная свобода",
+      showRecipeAnimation: false,
+      delaySeconds: 0,
+    });
+    openCrystalItemOfferModal();
   }
   updateBeaconActivationAnim();
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
@@ -7928,7 +7999,22 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         cell.y >= beacon.y - 1 &&
         cell.y <= beacon.y + 2,
     );
-    if (beacon.active) continue;
+    if (!pathWithinBeaconArea) continue;
+    if (beacon.active) {
+      if (!beacon.rewardContourReady || beacon.rewardClaimed) {
+        continue;
+      }
+      const rewardRecipe = Array.isArray(beacon.rewardRecipe) && beacon.rewardRecipe.length > 0
+        ? beacon.rewardRecipe
+        : buildBeaconBonusRecipe(beacon);
+      beacon.rewardContourReady = false;
+      beacon.rewardClaimed = true;
+      beacon.rewardRecipe = rewardRecipe;
+      beacon.rewardRevealStart = state.lastTs || performance.now();
+      beacon.rewardGranted = false;
+      showPerkToast("Полная свобода");
+      continue;
+    }
     if (pathWithinBeaconArea) {
       beacon.active = true;
       playSound("beacon_activate");
@@ -9747,6 +9833,14 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
     }
     return { outerColor, coreColor };
   };
+  const getWireVisibility = (beacon) => {
+    if (!beacon.rewardClaimed || beacon.rewardRevealStart <= 0) {
+      return 1;
+    }
+    const elapsed = (state.lastTs || 0) - beacon.rewardRevealStart;
+    const hideT = clamp(elapsed / FULL_FREEDOM_WIRE_HIDE_MS, 0, 1);
+    return 1 - hideT * hideT * (3 - 2 * hideT);
+  };
   const wireIntersectsViewport = (beacon, pts) => {
     let minX = beacon.x + 1;
     let maxX = beacon.x + 1;
@@ -9785,7 +9879,9 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
       const pts = wire.points;
       if (pts.length === 0 || !wireIntersectsViewport(beacon, pts)) continue;
       const { outerColor, coreColor } = getWireColors(beacon);
-      ctx.globalAlpha = 1;
+      const wireAlpha = getWireVisibility(beacon);
+      if (wireAlpha <= 0.01) continue;
+      ctx.globalAlpha = wireAlpha;
       ctx.strokeStyle = outerColor;
       ctx.lineWidth = 6;
       traceWirePath(beacon, pts);
@@ -9842,6 +9938,8 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
     if (pts.length === 0) continue;
     const { x: bx, y: by } = beacon;
     const { outerColor, coreColor } = getWireColors(beacon);
+    const wireVisibility = getWireVisibility(beacon);
+    if (wireVisibility <= 0.01) continue;
 
     const sPx = (bx + 1) * TILE_SIZE - camera.x;
     const sPy = (by + 1) * TILE_SIZE - camera.y;
@@ -9907,7 +10005,7 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
           const tailDistance = traveledTiles - pieceMidDistance;
           const tailT = clamp(tailDistance / tailFadeTiles, 0, 1);
           const tailAlpha = tailT * tailT * (3 - 2 * tailT);
-          const pieceAlpha = tailAlpha * s.alpha * reveal;
+          const pieceAlpha = tailAlpha * s.alpha * reveal * wireVisibility;
           if (pieceAlpha > 0.01) {
             ctx.globalAlpha = pieceAlpha;
             ctx.beginPath();
@@ -10021,8 +10119,8 @@ function renderOneBeacon(camera, beacon) {
   ctx.closePath();
   ctx.fill();
 
-  // Placeholder contour hint (only when not yet activated)
-  if (!active) {
+  // Contour hint for initial activation and post-wire bonus reward.
+  if (!active || (beacon.rewardContourReady && !beacon.rewardClaimed)) {
     const ringPath = [
       { x: bx - 1, y: by - 1 },
       { x: bx,     y: by - 1 },
@@ -10052,10 +10150,14 @@ function renderOneBeacon(camera, beacon) {
     }
     ctx.closePath();
     ctx.lineWidth = 8;
-    ctx.strokeStyle = "rgba(60, 42, 22, 0.32)";
+    ctx.strokeStyle = beacon.rewardContourReady
+      ? "rgba(60, 82, 120, 0.34)"
+      : "rgba(60, 42, 22, 0.32)";
     ctx.stroke();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(219, 171, 99, 0.25)";
+    ctx.strokeStyle = beacon.rewardContourReady
+      ? "rgba(180, 226, 255, 0.42)"
+      : "rgba(219, 171, 99, 0.25)";
     ctx.stroke();
 
     ctx.restore();

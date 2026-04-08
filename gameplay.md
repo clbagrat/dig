@@ -247,6 +247,8 @@ Activation:
 - on activation: full fuel restore and `+1 HP` heal trigger during the animation
 - a `2000 ms` radar animation plays (ring → line → dot), followed by a `500 ms` pause
 - after the animation the shop (or artifact choice) opens
+- when all beacon wires are fully freed, the contour hint appears around that beacon again
+- closing the contour around that already-active beacon a second time triggers `Full Freedom`: beacon wires fully fade out, then the beacon grants a bonus item reward
 - active beacons still accept contour-gold deposits
 
 Gameplay role:
