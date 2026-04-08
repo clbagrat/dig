@@ -139,7 +139,7 @@ Gold is spent in the beacon shop:
 
 ## Experience And Levels
 
-Every destroyed block drops `1` experience crystal on the tile where that block stood.
+Every destroyed block drops `10 XP` on the tile where that block stood.
 
 Pickup rules:
 - experience stays on the map until collected
@@ -148,7 +148,7 @@ Pickup rules:
 
 Current level flow:
 - the run starts at level `1`
-- level requirement grows non-linearly: `round(40 * 1.5^(level-1))`
+- level requirement grows non-linearly: `round(400 * 1.3^(level-1))`
 - each level up opens a reward choice modal when a reward tier is assigned
 - reward tiers currently work like this:
   - first reward: `+5% gold from mined blocks` or `+0.35 damage` or `+10% speed`

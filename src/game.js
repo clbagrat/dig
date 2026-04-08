@@ -110,7 +110,8 @@ const WORM_DAMAGE = 2;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
-const XP_PER_BLOCK = 1;
+const XP_INFLATION = 10;
+const XP_PER_BLOCK = 1 * XP_INFLATION;
 const XP_PICKUP_RADIUS = 1;
 const GENERATION_CONFIG_STORAGE_KEY = "dig:generation-config";
 const DEBUG_MODE = new URLSearchParams(location.search).has("debug-map");
@@ -367,9 +368,11 @@ const state = {
   depth: 0,
   gold: 0,
   unsafeGold: 0,
+  goldBonusRemainder: 0,
   xp: 0,
+  xpBonusRemainder: 0,
   level: 1,
-  xpToNext: 12,
+  xpToNext: 40 * XP_INFLATION,
   levelRewardStep: 0,
   levelRewardQueue: [],
   levelUpModalOpen: false,
@@ -2208,7 +2211,9 @@ function setupField(seedOverride = null) {
   state.crystalXpGain = 0;
   state.gold = 0;
   state.unsafeGold = 0;
+  state.goldBonusRemainder = 0;
   state.xp = 0;
+  state.xpBonusRemainder = 0;
   state.level = 1;
   state.xpToNext = getXpNeededForLevel(state.level);
   state.levelRewardStep = 0;
@@ -2892,7 +2897,7 @@ function collectCrystalTile(x, y, index, crystalType) {
     showGoldToast(state.crystalGoldGain);
   }
   if (state.crystalXpGain > 0) {
-    gainExperience(state.crystalXpGain);
+    gainExperience(scaleExperienceGain(state.crystalXpGain));
   }
   if (state.crystalRecipe.length === 0) {
     playSound("crystal_pickup");
@@ -4430,6 +4435,7 @@ function buildDebugPerkButtons() {
       { key: "concentration",        label: "concentration",         step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
       { key: "miningGoldBonusMultiplier", label: "miningGoldBonus", step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+      { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
@@ -6415,14 +6421,18 @@ function getLuckyPickaxeOreGain() {
 }
 
 function getXpNeededForLevel(level) {
-  return Math.round(40 * 1.3 ** Math.max(0, level - 1));
+  return Math.round(40 * XP_INFLATION * 1.3 ** Math.max(0, level - 1));
 }
 
 function applyMiningGoldBonus(amount) {
   if (amount <= 0) {
     return 0;
   }
-  return Math.max(1, Math.floor(amount * (1 + state.miningGoldBonusMultiplier)));
+  const multiplier = Math.max(0, 1 + (state.miningGoldBonusMultiplier || 0));
+  const total = amount * multiplier + (state.goldBonusRemainder || 0);
+  const whole = Math.max(1, Math.floor(total + 1e-9));
+  state.goldBonusRemainder = Math.max(0, total - whole);
+  return whole;
 }
 
 function spawnExperienceCrystal(x, y, amount = XP_PER_BLOCK) {
@@ -6430,9 +6440,18 @@ function spawnExperienceCrystal(x, y, amount = XP_PER_BLOCK) {
     return;
   }
   const index = cellIndex(x, y);
-  state.xpPickupMask[index] += state.xpBonusMultiplier > 0
-    ? Math.max(1, Math.round(amount * (1 + state.xpBonusMultiplier)))
-    : amount;
+  state.xpPickupMask[index] += amount;
+}
+
+function scaleExperienceGain(amount) {
+  if (amount <= 0) {
+    return 0;
+  }
+  const multiplier = Math.max(0, 1 + (state.xpBonusMultiplier || 0));
+  const total = amount * multiplier + (state.xpBonusRemainder || 0);
+  const whole = Math.max(0, Math.floor(total + 1e-9));
+  state.xpBonusRemainder = Math.max(0, total - whole);
+  return whole;
 }
 
 function gainExperience(amount) {
@@ -6475,14 +6494,14 @@ function pickupExperienceNearPlayer() {
       const amount = state.xpPickupMask[index];
       if (amount > 0) {
         state.xpPickupMask[index] = 0;
-        spawnExperienceParticles(tx, ty, amount);
+        spawnExperienceParticles(tx, ty, scaleExperienceGain(amount));
       }
       const bonusAmount = state.xpBonusPickupMask[index];
       if (bonusAmount <= 0) {
         continue;
       }
       state.xpBonusPickupMask[index] = 0;
-      spawnExperienceParticles(tx, ty, bonusAmount);
+      spawnExperienceParticles(tx, ty, scaleExperienceGain(bonusAmount));
     }
   }
 }
@@ -7308,7 +7327,7 @@ function breakCell(x, y, index, options = {}) {
     } else if (microRes === 2) {
       addFuel(5, x, y);
     } else if (microRes === 3) {
-      state.xpBonusPickupMask[cellIndex(x, y)] += 1;
+      state.xpBonusPickupMask[cellIndex(x, y)] += XP_PER_BLOCK;
     }
   }
   state.hardness[index] = 0;
