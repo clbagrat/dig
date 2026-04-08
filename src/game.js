@@ -45,6 +45,9 @@ const IDLE_AUTO_CLOSE_PREVIEW_RETURN_DURATION = 0.24;
 const BEACON_ACTIVATION_MS = 2000;
 const BEACON_WIRE_BREAK_TELEGRAPH_MS = 700;
 const BEACON_WIRE_BREAK_WAVE_DELAY_MS = 70;
+const BEACON_WIRE_POST_SHOP_DELAY_MS = 350;
+const BEACON_WIRE_FLARE_MS = 650;
+const BEACON_WIRE_RECOVER_MS = 1400;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -444,6 +447,8 @@ const state = {
   beacons: [],
   beaconWires: [],
   beaconWireBreaks: [],
+  pendingBeaconWireActivation: null,
+  pendingBeaconWireActivationAt: 0,
   signalMovesLeft: 0,
   signalMovesMax: 0,
   signalPrevX: START_X,
@@ -2143,6 +2148,8 @@ function setupField(seedOverride = null) {
   state.beacons.length = 0;
   state.beaconWires = [];
   state.beaconWireBreaks.length = 0;
+  state.pendingBeaconWireActivation = null;
+  state.pendingBeaconWireActivationAt = 0;
   state.perkZones.length = 0;
   state.gasClouds.length = 0;
   state.steamJets.length = 0;
@@ -2385,7 +2392,7 @@ function setupField(seedOverride = null) {
   state.base.x = map.base.x;
   state.base.y = map.base.y;
   for (const b of map.beacons) {
-    state.beacons.push({ x: b.x, y: b.y, active: false });
+    state.beacons.push({ x: b.x, y: b.y, active: false, wireActivationStart: null, wireDamageTriggered: false });
   }
   state.beaconWires = map.beaconWires;
   state.perkMask.set(map.perkMask);
@@ -3518,7 +3525,14 @@ function init() {
     state.sprites = createSpriteAtlas();
     resize();
     setupField();
-    initShop({ onClose: () => { playSound("shop_close"); state.shopModalOpen = false; syncTouchZonesInteractivity(); } });
+    initShop({ onClose: () => {
+      playSound("shop_close");
+      state.shopModalOpen = false;
+      syncTouchZonesInteractivity();
+      if (state.pendingBeaconWireActivation) {
+        state.pendingBeaconWireActivationAt = (state.lastTs || performance.now()) + BEACON_WIRE_POST_SHOP_DELAY_MS;
+      }
+    } });
     bindUi();
     requestAnimationFrame(frame);
   } catch (error) {
@@ -4938,6 +4952,18 @@ function update(dt) {
   updateDiscovery();
   updateCamera(dt);
   updateCameraShake(dt);
+  if (state.pendingBeaconWireActivation && state.pendingBeaconWireActivationAt > 0 && (state.lastTs || 0) >= state.pendingBeaconWireActivationAt) {
+    state.pendingBeaconWireActivation.wireActivationStart = state.lastTs || performance.now();
+    state.pendingBeaconWireActivation.wireDamageTriggered = false;
+    state.pendingBeaconWireActivation = null;
+    state.pendingBeaconWireActivationAt = 0;
+  }
+  for (const beacon of state.beacons) {
+    if (!beacon.wireActivationStart || beacon.wireDamageTriggered) continue;
+    if ((state.lastTs || 0) - beacon.wireActivationStart < BEACON_WIRE_FLARE_MS) continue;
+    activateBeaconWires(beacon);
+    beacon.wireDamageTriggered = true;
+  }
   updateBeaconActivationAnim();
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
   if (state.overhealDrillTimer === 0) {
@@ -7901,7 +7927,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       beacon.active = true;
       playSound("beacon_activate");
       beacon.activationAnimStart = state.lastTs || performance.now();
-      activateBeaconWires(beacon);
+      state.pendingBeaconWireActivation = beacon;
       if (state.firstStrikeLevel > 0) {
         state.firstStrikeTimer = getScaledEffectDuration(6 * state.firstStrikeLevel);
       }
@@ -9701,14 +9727,31 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
     const pts = wire.points;
     if (pts.length === 0) continue;
     const { x: bx, y: by } = beacon;
-    const activationT = !beacon.active
-      ? 0
-      : beacon.activationAnimStart
-        ? clamp(((state.lastTs || 0) - beacon.activationAnimStart) / BEACON_ACTIVATION_MS, 0, 1)
-        : 1;
-    const colorT = activationT * activationT * activationT;
-    const outerColor = mixRgba([60, 42, 22, 0.32], [50, 110, 170, 0.40], colorT);
-    const coreColor = mixRgba([219, 171, 99, 0.28], [120, 190, 230, 0.65], colorT);
+    const inactiveOuter = [60, 42, 22, 0.32];
+    const inactiveCore = [219, 171, 99, 0.28];
+    const calmOuter = [50, 110, 170, 0.40];
+    const calmCore = [120, 190, 230, 0.65];
+    const flareOuter = [105, 220, 255, 0.82];
+    const flareCore = [215, 247, 255, 0.96];
+    let outerColor = mixRgba(inactiveOuter, inactiveOuter, 0);
+    let coreColor = mixRgba(inactiveCore, inactiveCore, 0);
+    if (beacon.active && beacon.wireActivationStart) {
+      const elapsed = (state.lastTs || 0) - beacon.wireActivationStart;
+      if (elapsed < BEACON_WIRE_FLARE_MS) {
+        const flareT = clamp(elapsed / BEACON_WIRE_FLARE_MS, 0, 1);
+        const flareEase = 1 - Math.pow(1 - flareT, 3);
+        outerColor = mixRgba(inactiveOuter, flareOuter, flareEase);
+        coreColor = mixRgba(inactiveCore, flareCore, flareEase);
+      } else {
+        const recoverT = clamp((elapsed - BEACON_WIRE_FLARE_MS) / BEACON_WIRE_RECOVER_MS, 0, 1);
+        const recoverEase = recoverT * recoverT * (3 - 2 * recoverT);
+        outerColor = mixRgba(flareOuter, calmOuter, recoverEase);
+        coreColor = mixRgba(flareCore, calmCore, recoverEase);
+      }
+    } else if (beacon.active) {
+      outerColor = mixRgba(inactiveOuter, inactiveOuter, 0);
+      coreColor = mixRgba(inactiveCore, inactiveCore, 0);
+    }
 
     const sPx = (bx + 1) * TILE_SIZE - camera.x;
     const sPy = (by + 1) * TILE_SIZE - camera.y;

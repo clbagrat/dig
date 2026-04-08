@@ -1505,11 +1505,11 @@ function generateBeaconWires(beacons, metalMask, random) {
     const beacon = beacons[bi];
     const cx = beacon.x + 1;
     const cy = beacon.y + 1;
-    // 5 wires evenly spaced (72° apart) with a random base rotation and small per-wire jitter.
+    // 4 wires evenly spaced (90° apart) with a random base rotation and small per-wire jitter.
     // This guarantees no two wires start close together while still looking organic.
     const baseOffset = random() * Math.PI * 2;
-    for (let wi = 0; wi < 5; wi++) {
-      let angle = baseOffset + wi * (Math.PI * 2 / 5) + (random() - 0.5) * 0.5;
+    for (let wi = 0; wi < 4; wi++) {
+      let angle = baseOffset + wi * (Math.PI * 2 / 4) + (random() - 0.5) * 0.5;
       const steps = 8 + Math.floor(random() * 7); // 8-14
       const points = [];
       const bendBias = (random() - 0.5) * 0.24;
