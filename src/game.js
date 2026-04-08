@@ -9719,6 +9719,85 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
   const ctx = state.ctx;
   const lerp = (a, b, t) => a + (b - a) * t;
   const mixRgba = (from, to, t) => `rgba(${lerp(from[0], to[0], t)}, ${lerp(from[1], to[1], t)}, ${lerp(from[2], to[2], t)}, ${lerp(from[3], to[3], t)})`;
+  const getWireColors = (beacon) => {
+    const inactiveOuter = [60, 42, 22, 0.32];
+    const inactiveCore = [219, 171, 99, 0.28];
+    const calmOuter = [50, 110, 170, 0.40];
+    const calmCore = [120, 190, 230, 0.65];
+    const flareOuter = [105, 220, 255, 0.82];
+    const flareCore = [215, 247, 255, 0.96];
+    let outerColor = mixRgba(inactiveOuter, inactiveOuter, 0);
+    let coreColor = mixRgba(inactiveCore, inactiveCore, 0);
+    if (beacon.active && beacon.wireActivationStart) {
+      const elapsed = (state.lastTs || 0) - beacon.wireActivationStart;
+      if (elapsed < BEACON_WIRE_FLARE_MS) {
+        const flareT = clamp(elapsed / BEACON_WIRE_FLARE_MS, 0, 1);
+        const flareEase = 1 - Math.pow(1 - flareT, 3);
+        outerColor = mixRgba(inactiveOuter, flareOuter, flareEase);
+        coreColor = mixRgba(inactiveCore, flareCore, flareEase);
+      } else {
+        const recoverT = clamp((elapsed - BEACON_WIRE_FLARE_MS) / BEACON_WIRE_RECOVER_MS, 0, 1);
+        const recoverEase = recoverT * recoverT * (3 - 2 * recoverT);
+        outerColor = mixRgba(flareOuter, calmOuter, recoverEase);
+        coreColor = mixRgba(flareCore, calmCore, recoverEase);
+      }
+    } else if (beacon.active) {
+      outerColor = mixRgba(inactiveOuter, inactiveOuter, 0);
+      coreColor = mixRgba(inactiveCore, inactiveCore, 0);
+    }
+    return { outerColor, coreColor };
+  };
+  const wireIntersectsViewport = (beacon, pts) => {
+    let minX = beacon.x + 1;
+    let maxX = beacon.x + 1;
+    let minY = beacon.y + 1;
+    let maxY = beacon.y + 1;
+    for (let i = 0; i < pts.length; i += 1) {
+      minX = Math.min(minX, pts[i].x);
+      maxX = Math.max(maxX, pts[i].x);
+      minY = Math.min(minY, pts[i].y);
+      maxY = Math.max(maxY, pts[i].y);
+    }
+    return !(maxX < startX - 1 || minX > endX + 1 || maxY < startY - 1 || minY > endY + 1);
+  };
+  const traceWirePath = (beacon, pts) => {
+    const startPx = (beacon.x + 1) * TILE_SIZE - camera.x;
+    const startPy = (beacon.y + 1) * TILE_SIZE - camera.y;
+    ctx.beginPath();
+    ctx.moveTo(startPx, startPy);
+    for (let i = 0; i < pts.length; i += 1) {
+      const cur = pts[i];
+      const next = i + 1 < pts.length ? pts[i + 1] : null;
+      const controlX = cur.x * TILE_SIZE - camera.x;
+      const controlY = cur.y * TILE_SIZE - camera.y;
+      const endX = next ? ((cur.x + next.x) * 0.5) * TILE_SIZE - camera.x : controlX;
+      const endY = next ? ((cur.y + next.y) * 0.5) * TILE_SIZE - camera.y : controlY;
+      ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+    }
+  };
+  if (state.debugMapActive) {
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const wire of state.beaconWires) {
+      const beacon = state.beacons[wire.beaconIndex];
+      if (!beacon) continue;
+      const pts = wire.points;
+      if (pts.length === 0 || !wireIntersectsViewport(beacon, pts)) continue;
+      const { outerColor, coreColor } = getWireColors(beacon);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = outerColor;
+      ctx.lineWidth = 6;
+      traceWirePath(beacon, pts);
+      ctx.stroke();
+      ctx.strokeStyle = coreColor;
+      ctx.lineWidth = 2;
+      traceWirePath(beacon, pts);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
   const sampleVisibilityAlpha = (worldX, worldY) => {
     const baseX = Math.floor(worldX);
     const baseY = Math.floor(worldY);
@@ -9762,31 +9841,7 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
     const pts = wire.points;
     if (pts.length === 0) continue;
     const { x: bx, y: by } = beacon;
-    const inactiveOuter = [60, 42, 22, 0.32];
-    const inactiveCore = [219, 171, 99, 0.28];
-    const calmOuter = [50, 110, 170, 0.40];
-    const calmCore = [120, 190, 230, 0.65];
-    const flareOuter = [105, 220, 255, 0.82];
-    const flareCore = [215, 247, 255, 0.96];
-    let outerColor = mixRgba(inactiveOuter, inactiveOuter, 0);
-    let coreColor = mixRgba(inactiveCore, inactiveCore, 0);
-    if (beacon.active && beacon.wireActivationStart) {
-      const elapsed = (state.lastTs || 0) - beacon.wireActivationStart;
-      if (elapsed < BEACON_WIRE_FLARE_MS) {
-        const flareT = clamp(elapsed / BEACON_WIRE_FLARE_MS, 0, 1);
-        const flareEase = 1 - Math.pow(1 - flareT, 3);
-        outerColor = mixRgba(inactiveOuter, flareOuter, flareEase);
-        coreColor = mixRgba(inactiveCore, flareCore, flareEase);
-      } else {
-        const recoverT = clamp((elapsed - BEACON_WIRE_FLARE_MS) / BEACON_WIRE_RECOVER_MS, 0, 1);
-        const recoverEase = recoverT * recoverT * (3 - 2 * recoverT);
-        outerColor = mixRgba(flareOuter, calmOuter, recoverEase);
-        coreColor = mixRgba(flareCore, calmCore, recoverEase);
-      }
-    } else if (beacon.active) {
-      outerColor = mixRgba(inactiveOuter, inactiveOuter, 0);
-      coreColor = mixRgba(inactiveCore, inactiveCore, 0);
-    }
+    const { outerColor, coreColor } = getWireColors(beacon);
 
     const sPx = (bx + 1) * TILE_SIZE - camera.x;
     const sPy = (by + 1) * TILE_SIZE - camera.y;
