@@ -9506,7 +9506,14 @@ function render() {
       if (!state.tunnelMask[index] && !state.metalMask[index] && !state.gasPocketMask[index] && !state.steamPocketMask[index] && !state.boulderPocketMask[index]) {
         const hazardType = state.hazardMask[index];
         if (hazardType) {
-          drawTileSprite(state.sprites.hazards[hazardType], sx, sy);
+          if (hazardType === HAZARD_TYPES.SPIKE && state.hazardTriggeredMask[index]) {
+            ctx.save();
+            ctx.globalAlpha *= 0.28;
+            drawTileSprite(state.sprites.hazards[hazardType], sx, sy);
+            ctx.restore();
+          } else {
+            drawTileSprite(state.sprites.hazards[hazardType], sx, sy);
+          }
         }
       }
 
