@@ -247,6 +247,10 @@ Activation:
 - on activation: full fuel restore and `+1 HP` heal trigger during the animation
 - a `2000 ms` radar animation plays (ring → line → dot), followed by a `500 ms` pause
 - after the animation the shop (or artifact choice) opens
+- some beacons can generate as hidden: their `2×2` core is buried under ordinary breakable blocks until activation
+- hidden beacons do not get the normal 1-tile open ring; that area is filled with ordinary excavatable blocks as well
+- the beacon is rendered under those blocks and gets revealed as the core is excavated; on activation it becomes a normal beacon core
+- once a hidden core is fully excavated, it immediately solidifies into a normal non-walkable beacon core; if the player stands on it, the drill is pushed to the nearest free tile and the current contour is cleared
 - when all beacon wires are fully freed, the contour hint appears around that beacon again
 - closing the contour around that already-active beacon a second time triggers `Full Freedom`: beacon wires fully fade out, then the beacon grants a bonus item reward
 - if beacon wires were already fully freed before the first activation, the beacon still opens the normal shop first; `Full Freedom` triggers only after the shop flow is closed

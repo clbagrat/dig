@@ -1319,6 +1319,7 @@ function clearStoredGenerationConfig() {
 const GENERATION_QUICK_FIELDS = [
   { label: "Height", source: "height", min: 8, step: 1 },
   { label: "Width", source: "width", min: 6, max: GRID_W - 2, step: 1 },
+  { label: "Hidden Beacons", source: "rules.hiddenBeacons", min: 0, step: 1 },
   { label: "Perk Zone Count", source: "rules.perkZones", min: 0, step: 1 },
   { label: "Safe Count", source: "rules.safes", min: 0, step: 1 },
   { label: "Worm Nest Count", source: "rules.wormNests", min: 0, step: 1 },
@@ -1480,13 +1481,14 @@ function renderGenerationQuickEditor() {
       card.open = true;
     }
     const beacons = Number(level?.rules?.beacons) || 0;
+    const hidden = Number(level?.rules?.hiddenBeacons) || 0;
     const upper = Number(level?.rules?.upperBeacons) || 0;
     const lower = Number(level?.rules?.lowerBeacons) || 0;
     card.innerHTML = `
       <summary class="debug-generation__level-summary">
         <div class="debug-generation__level-header">
           <div class="debug-generation__level-title">Level ${i + 1}</div>
-      <div class="debug-generation__level-meta">Beacon split: upper ${upper}, lower ${lower}, flexible ${Math.max(0, beacons - upper - lower)}</div>
+      <div class="debug-generation__level-meta">Beacon split: hidden ${hidden}, upper ${upper}, lower ${lower}, flexible ${Math.max(0, beacons - upper - lower)}</div>
         </div>
       </summary>
       <div class="debug-generation__level-body">
@@ -1509,6 +1511,19 @@ function renderGenerationQuickEditor() {
                 min="0"
                 step="1"
                 value="${beacons}"
+              >
+            </label>
+            <label class="debug-generation__field">
+              <span class="debug-generation__field-label">Hidden Beacons</span>
+              <input
+                class="debug-generation__field-input"
+                type="number"
+                inputmode="numeric"
+                data-level-index="${i}"
+                data-source="rules.hiddenBeacons"
+                min="0"
+                step="1"
+                value="${hidden}"
               >
             </label>
             <label class="debug-generation__field">
@@ -2372,7 +2387,7 @@ function setupField(seedOverride = null) {
   state.microResourceRevealedMask.fill(0);
   for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     state.health[i] = BLOCK_TYPES[state.hardness[i]].hp;
-    if (map.beaconMask[i] >= 1) {
+    if (map.beaconMask[i] === 1 || map.beaconMask[i] === 2) {
       state.hardness[i] = 0;
       state.health[i] = 0;
     }
@@ -2398,6 +2413,7 @@ function setupField(seedOverride = null) {
     state.beacons.push({
       x: b.x,
       y: b.y,
+      hidden: !!b.hidden,
       active: false,
       wireActivationStart: null,
       wireDamageTriggered: false,
@@ -2614,6 +2630,148 @@ function buildBeaconBonusRecipe(beacon) {
     recipe.push(available[pickIndex] || available[0]);
   }
   return recipe;
+}
+
+function isHiddenBeaconCore(index) {
+  return state.beaconMask[index] === 3;
+}
+
+function isWalkableTileIndex(index) {
+  return state.tunnelMask[index] && state.beaconMask[index] !== 1;
+}
+
+function revealHiddenBeacon(beacon) {
+  if (!beacon?.hidden) {
+    return;
+  }
+  finalizeHiddenBeaconExcavation(beacon);
+}
+
+function isBeaconFullyExcavated(beacon) {
+  for (let dy = 0; dy < 2; dy += 1) {
+    for (let dx = 0; dx < 2; dx += 1) {
+      const index = cellIndex(beacon.x + dx, beacon.y + dy);
+      if (!state.tunnelMask[index]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function isInsideBeaconCore(beacon, x, y) {
+  return x >= beacon.x && x <= beacon.x + 1 && y >= beacon.y && y <= beacon.y + 1;
+}
+
+function findNearestWalkableTileOutsideBeacon(beacon, fromX, fromY) {
+  const visited = new Uint8Array(GRID_W * GRID_H);
+  const queue = [{ x: fromX, y: fromY }];
+  visited[cellIndex(fromX, fromY)] = 1;
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (
+      !isInsideBeaconCore(beacon, current.x, current.y) &&
+      isWalkableTileIndex(cellIndex(current.x, current.y))
+    ) {
+      return current;
+    }
+    for (let i = 0; i < CARDINAL_DIRS.length; i += 1) {
+      const nx = current.x + CARDINAL_DIRS[i].x;
+      const ny = current.y + CARDINAL_DIRS[i].y;
+      if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
+        continue;
+      }
+      const index = cellIndex(nx, ny);
+      if (visited[index]) {
+        continue;
+      }
+      visited[index] = 1;
+      queue.push({ x: nx, y: ny });
+    }
+  }
+  return null;
+}
+
+function clearHiddenBeaconRing(beacon) {
+  for (let dy = -1; dy <= 2; dy += 1) {
+    for (let dx = -1; dx <= 2; dx += 1) {
+      if (dx >= 0 && dx < 2 && dy >= 0 && dy < 2) {
+        continue;
+      }
+      const x = beacon.x + dx;
+      const y = beacon.y + dy;
+      if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) {
+        continue;
+      }
+      const index = cellIndex(x, y);
+      if (state.metalMask[index] || state.safeDoorMask[index] > 0 || state.beaconMask[index] > 0) {
+        continue;
+      }
+      if (state.hardness[index] > 0) {
+        breakCell(x, y, index, { cause: "explosion" });
+      }
+    }
+  }
+}
+
+function finalizeHiddenBeaconExcavation(beacon) {
+  if (!beacon?.hidden || !isBeaconFullyExcavated(beacon)) {
+    return false;
+  }
+  beacon.hidden = false;
+  for (let dy = 0; dy < 2; dy += 1) {
+    for (let dx = 0; dx < 2; dx += 1) {
+      const index = cellIndex(beacon.x + dx, beacon.y + dy);
+      state.beaconMask[index] = 1;
+    }
+  }
+  clearHiddenBeaconRing(beacon);
+  state.pathTiles.length = 0;
+  rebuildPathIndex();
+  if (isInsideBeaconCore(beacon, state.drill.x, state.drill.y)) {
+    const fallback = findNearestWalkableTileOutsideBeacon(beacon, state.drill.x, state.drill.y);
+    if (fallback) {
+      state.drill.x = fallback.x;
+      state.drill.y = fallback.y;
+      state.drill.renderX = fallback.x;
+      state.drill.renderY = fallback.y;
+      refreshSignalDirection();
+      state.visibilityDirty = true;
+    }
+  }
+  showPerkToast("Маяк раскопан");
+  return true;
+}
+
+function renderHiddenBeaconReveal(camera) {
+  const ctx = state.ctx;
+  for (const beacon of state.beacons) {
+    if (!beacon.hidden || beacon.active) {
+      continue;
+    }
+    let hasRevealedCell = false;
+    ctx.save();
+    ctx.beginPath();
+    for (let dy = 0; dy < 2; dy += 1) {
+      for (let dx = 0; dx < 2; dx += 1) {
+        const tx = beacon.x + dx;
+        const ty = beacon.y + dy;
+        const index = cellIndex(tx, ty);
+        if (!state.tunnelMask[index]) {
+          continue;
+        }
+        hasRevealedCell = true;
+        ctx.rect(tx * TILE_SIZE - camera.x, ty * TILE_SIZE - camera.y, TILE_SIZE, TILE_SIZE);
+      }
+    }
+    if (!hasRevealedCell) {
+      ctx.restore();
+      continue;
+    }
+    ctx.clip();
+    renderOneBeacon(camera, beacon, { suppressContourHint: true });
+    ctx.restore();
+  }
 }
 
 function beginFullFreedom(beacon, announce = true) {
@@ -7014,7 +7172,7 @@ function damageCell(x, y, damage, options = {}) {
     }
     return false;
   }
-  if (state.beaconMask[index]) {
+  if (state.beaconMask[index] && !isHiddenBeaconCore(index)) {
     return false;
   }
   if (!state.hardness[index]) {
@@ -7144,6 +7302,16 @@ function breakCell(x, y, index, options = {}) {
   }
 
   carveTunnel(x, y);
+  for (const beacon of state.beacons) {
+    if (!beacon.hidden) {
+      continue;
+    }
+    if (!isInsideBeaconCore(beacon, x, y)) {
+      continue;
+    }
+    finalizeHiddenBeaconExcavation(beacon);
+    break;
+  }
   spawnExperienceCrystal(x, y);
 
   // Check if a worm nest was destroyed
@@ -7344,22 +7512,22 @@ function moveDrillFreely(dx, dy, dt) {
   if (dx > 0) {
     nextY = currentCellY;
     const rightCell = currentCellX + 1 < GRID_W ? cellIndex(currentCellX + 1, currentCellY) : -1;
-    const maxX = rightCell !== -1 && state.tunnelMask[rightCell] ? state.drill.renderX + maxDistance : Math.min(currentCellX + 0.5, state.drill.renderX + maxDistance);
+    const maxX = rightCell !== -1 && isWalkableTileIndex(rightCell) ? state.drill.renderX + maxDistance : Math.min(currentCellX + 0.5, state.drill.renderX + maxDistance);
     nextX = maxX;
   } else if (dx < 0) {
     nextY = currentCellY;
     const leftCell = currentCellX - 1 >= 0 ? cellIndex(currentCellX - 1, currentCellY) : -1;
-    const minX = leftCell !== -1 && state.tunnelMask[leftCell] ? state.drill.renderX - maxDistance : Math.max(currentCellX - 0.5, state.drill.renderX - maxDistance);
+    const minX = leftCell !== -1 && isWalkableTileIndex(leftCell) ? state.drill.renderX - maxDistance : Math.max(currentCellX - 0.5, state.drill.renderX - maxDistance);
     nextX = minX;
   } else if (dy > 0) {
     nextX = currentCellX;
     const downCell = currentCellY + 1 < GRID_H ? cellIndex(currentCellX, currentCellY + 1) : -1;
-    const maxY = downCell !== -1 && state.tunnelMask[downCell] ? state.drill.renderY + maxDistance : Math.min(currentCellY + 0.5, state.drill.renderY + maxDistance);
+    const maxY = downCell !== -1 && isWalkableTileIndex(downCell) ? state.drill.renderY + maxDistance : Math.min(currentCellY + 0.5, state.drill.renderY + maxDistance);
     nextY = maxY;
   } else if (dy < 0) {
     nextX = currentCellX;
     const upCell = currentCellY - 1 >= 0 ? cellIndex(currentCellX, currentCellY - 1) : -1;
-    const minY = upCell !== -1 && state.tunnelMask[upCell] ? state.drill.renderY - maxDistance : Math.max(currentCellY - 0.5, state.drill.renderY - maxDistance);
+    const minY = upCell !== -1 && isWalkableTileIndex(upCell) ? state.drill.renderY - maxDistance : Math.max(currentCellY - 0.5, state.drill.renderY - maxDistance);
     nextY = minY;
   }
 
@@ -7689,7 +7857,7 @@ function updateDrill(dt) {
   const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus() + getHeatEngineSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
-  if (state.tunnelMask[targetIndex]) {
+  if (isWalkableTileIndex(targetIndex)) {
     if (state.drill.moveResumeTimer > 0) {
       state.drill.strikePhase += dt * actionRate;
       state.drill.progress = 0;
@@ -7736,7 +7904,7 @@ function updateDrill(dt) {
       for (const c of candidates) {
         if (c.x < 0 || c.x >= GRID_W || c.y < 0 || c.y >= GRID_H) continue;
         const ci = cellIndex(c.x, c.y);
-        if (!state.tunnelMask[ci]) continue;
+        if (!isWalkableTileIndex(ci)) continue;
         if (c.x === state.drill.x && c.y === state.drill.y) continue;
         state.keyMask[ci] = state.heldKeyForSafe + 1;
         dropped = true;
@@ -7873,6 +8041,7 @@ function tryBeaconContourDeposit(x, y) {
   if (state.unsafeGold <= 0) return;
   for (const beacon of state.beacons) {
     if (beacon.active) continue;
+    if (beacon.hidden && !isBeaconFullyExcavated(beacon)) continue;
     if (x < beacon.x - 1 || x > beacon.x + 2 || y < beacon.y - 1 || y > beacon.y + 2) continue;
     // Count tiles in beacon 4×4 area not yet covered by contour.
     // The current tile was just added to the path, so add 1 back to get
@@ -8025,6 +8194,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         cell.y <= beacon.y + 2,
     );
     if (!pathWithinBeaconArea) continue;
+    if (beacon.hidden && !isBeaconFullyExcavated(beacon)) continue;
     if (beacon.active) {
       if (!beacon.rewardContourReady || beacon.rewardClaimed) {
         continue;
@@ -8033,6 +8203,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       continue;
     }
     if (pathWithinBeaconArea) {
+      revealHiddenBeacon(beacon);
       beacon.active = true;
       playSound("beacon_activate");
       beacon.activationAnimStart = state.lastTs || performance.now();
@@ -9049,6 +9220,8 @@ function render() {
         ctx.globalAlpha = 0.16;
         if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
+        } else if (state.beaconMask[index] === 3) {
+          drawTileSprite(state.sprites.blocks[1]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
         } else if (state.gasPocketMask[index]) {
           drawTileSprite(state.sprites.gasPocket, sx, sy);
         } else if (state.steamPocketMask[index]) {
@@ -9070,6 +9243,8 @@ function render() {
         ctx.globalAlpha = (1 - visibleAlpha) * 0.16;
         if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
+        } else if (state.beaconMask[index] === 3) {
+          drawTileSprite(state.sprites.blocks[1]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
         } else if (state.gasPocketMask[index]) {
           drawTileSprite(state.sprites.gasPocket, sx, sy);
         } else if (state.steamPocketMask[index]) {
@@ -9192,6 +9367,8 @@ function render() {
         }
       } else if (state.beaconMask[index] === 1) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
+      } else if (state.beaconMask[index] === 3) {
+        drawTileSprite(state.sprites.blocks[1]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
       } else if (state.metalMask[index]) {
         drawTileSprite(state.sprites.metal, sx, sy);
       } else if (state.gasPocketMask[index]) {
@@ -9393,6 +9570,7 @@ function render() {
     }
   }
 
+  renderHiddenBeaconReveal(camera);
   renderBeaconWires(camera, startX, endX, startY, endY);
 
   // Artifact, key & worm nest overlay pass — drawn after all tiles so waves aren't clipped
@@ -10045,11 +10223,12 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
 
 function renderBeacon(camera) {
   for (const beacon of state.beacons) {
+    if (beacon.hidden && !beacon.active) continue;
     renderOneBeacon(camera, beacon);
   }
 }
 
-function renderOneBeacon(camera, beacon) {
+function renderOneBeacon(camera, beacon, options = {}) {
   const ctx = state.ctx;
   const bx = beacon.x;
   const by = beacon.y;
@@ -10067,7 +10246,6 @@ function renderOneBeacon(camera, beacon) {
   const t = state.lastTs || 0;
   const pulse = Math.sin(t * 0.008) * 0.5 + 0.5;
   const active = beacon.active;
-
   ctx.save();
   ctx.globalAlpha = visAlpha;
 
@@ -10107,12 +10285,12 @@ function renderOneBeacon(camera, beacon) {
 
   // Crystal body — hexagon shape (tall diamond with shoulders)
   ctx.beginPath();
-  ctx.moveTo(midX,      midY - 22); // tip
-  ctx.lineTo(midX + 10, midY - 8);  // upper right
-  ctx.lineTo(midX + 10, midY + 6);  // lower right
-  ctx.lineTo(midX,      midY + 18); // bottom tip
-  ctx.lineTo(midX - 10, midY + 6);  // lower left
-  ctx.lineTo(midX - 10, midY - 8);  // upper left
+  ctx.moveTo(midX,      midY - 22);
+  ctx.lineTo(midX + 10, midY - 8);
+  ctx.lineTo(midX + 10, midY + 6);
+  ctx.lineTo(midX,      midY + 18);
+  ctx.lineTo(midX - 10, midY + 6);
+  ctx.lineTo(midX - 10, midY - 8);
   ctx.closePath();
   ctx.fillStyle = active ? `rgba(60, 130, 190, ${0.55 + pulse * 0.15})` : "rgba(80, 70, 55, 0.55)";
   ctx.fill();
@@ -10140,7 +10318,7 @@ function renderOneBeacon(camera, beacon) {
   ctx.fill();
 
   // Contour hint for initial activation and post-wire bonus reward.
-  if (!active || (beacon.rewardContourReady && !beacon.rewardClaimed)) {
+  if ((!active || (beacon.rewardContourReady && !beacon.rewardClaimed)) && !options.suppressContourHint) {
     const ringPath = [
       { x: bx - 1, y: by - 1 },
       { x: bx,     y: by - 1 },
