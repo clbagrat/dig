@@ -1499,6 +1499,43 @@ function validateLevelRequirements(map) {
   }
 }
 
+function generateBeaconWires(beacons, metalMask, random) {
+  const wires = [];
+  for (let bi = 0; bi < beacons.length; bi++) {
+    const beacon = beacons[bi];
+    const cx = beacon.x + 1;
+    const cy = beacon.y + 1;
+    // 5 wires evenly spaced (72° apart) with a random base rotation and small per-wire jitter.
+    // This guarantees no two wires start close together while still looking organic.
+    const baseOffset = random() * Math.PI * 2;
+    for (let wi = 0; wi < 5; wi++) {
+      let angle = baseOffset + wi * (Math.PI * 2 / 5) + (random() - 0.5) * 0.5;
+      const steps = 8 + Math.floor(random() * 7); // 8-14
+      const points = [];
+      const bendBias = (random() - 0.5) * 0.24;
+      const swayPhase = random() * Math.PI * 2;
+      const swayStrength = 0.12 + random() * 0.08;
+      let px = cx + Math.cos(angle) * 1.5;
+      let py = cy + Math.sin(angle) * 1.5;
+      for (let s = 0; s < steps; s++) {
+        const sway = Math.sin(s * 0.9 + swayPhase) * swayStrength;
+        angle += bendBias + sway + (random() - 0.5) * 1.7;
+        px += Math.cos(angle);
+        py += Math.sin(angle);
+        const tx = Math.round(px);
+        const ty = Math.round(py);
+        if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) break;
+        if (metalMask[ty * GRID_W + tx]) break;
+        points.push({ x: px, y: py });
+      }
+      if (points.length >= 2) {
+        wires.push({ beaconIndex: bi, points });
+      }
+    }
+  }
+  return wires;
+}
+
 // ── Main export ─────────────────────────────────────────────────────────────
 
 /**
@@ -1592,6 +1629,7 @@ export function generateMap(seed) {
   for (let i = 0; i < GRID_W * GRID_H; i += 1) {
     if (beaconMask[i] >= 1) hardness[i] = 0;
   }
+  const beaconWires = generateBeaconWires(beacons, metalMask, random);
 
   placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketMask, boulderPocketMask, perkZoneMask, perkMask, crystalMask, hazardMask, safes, base, random);
   placePerkTiles(perkMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
@@ -1616,6 +1654,7 @@ export function generateMap(seed) {
     boulderPocketMask,
     beaconMask,
     beacons,
+    beaconWires,
     perkMask,
     crystalMask,
     perkZones,

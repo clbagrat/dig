@@ -439,6 +439,7 @@ const state = {
   wormNests: [],
   activeWorms: [],
   beacons: [],
+  beaconWires: [],
   signalMovesLeft: 0,
   signalMovesMax: 0,
   signalPrevX: START_X,
@@ -2124,6 +2125,7 @@ function setupField(seedOverride = null) {
   state.keyBumpTime = 0;
   state.keyBumpDir = null;
   state.beacons.length = 0;
+  state.beaconWires = [];
   state.perkZones.length = 0;
   state.gasClouds.length = 0;
   state.steamJets.length = 0;
@@ -2368,6 +2370,7 @@ function setupField(seedOverride = null) {
   for (const b of map.beacons) {
     state.beacons.push({ x: b.x, y: b.y, active: false });
   }
+  state.beaconWires = map.beaconWires;
   state.perkMask.set(map.perkMask);
   state.crystalMask.set(map.crystalMask);
   for (const zone of map.perkZones) {
@@ -7837,6 +7840,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       beacon.active = true;
       playSound("beacon_activate");
       beacon.activationAnimStart = state.lastTs || performance.now();
+      activateBeaconWires(beacon);
       if (state.firstStrikeLevel > 0) {
         state.firstStrikeTimer = getScaledEffectDuration(6 * state.firstStrikeLevel);
       }
@@ -9162,6 +9166,8 @@ function render() {
     }
   }
 
+  renderBeaconWires(camera, startX, endX, startY, endY);
+
   // Artifact, key & worm nest overlay pass — drawn after all tiles so waves aren't clipped
   for (let y = startY; y < endY; y += 1) {
     for (let x = startX; x < endX; x += 1) {
@@ -9494,6 +9500,155 @@ function updateBeaconActivationAnim() {
     playSound("shop_open");
     openShop(state.gold, pa.depthLevel ?? state.currentDepthLevel, state.luck, getShopStatsSnapshot());
   }
+}
+
+function activateBeaconWires(beacon) {
+  const beaconIndex = state.beacons.indexOf(beacon);
+  for (const wire of state.beaconWires) {
+    if (wire.beaconIndex !== beaconIndex) continue;
+    for (const p of wire.points) {
+      const tx = Math.round(p.x);
+      const ty = Math.round(p.y);
+      if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) continue;
+      const idx = cellIndex(tx, ty);
+      if (state.hardness[idx] > 0 && !state.metalMask[idx]) {
+        breakCell(tx, ty, idx, { cause: "explosion" });
+      }
+    }
+  }
+}
+
+function renderBeaconWires(camera, startX, endX, startY, endY) {
+  if (state.beaconWires.length === 0) return;
+  const ctx = state.ctx;
+  const sampleVisibilityAlpha = (worldX, worldY) => {
+    const baseX = Math.floor(worldX);
+    const baseY = Math.floor(worldY);
+    const fracX = worldX - baseX;
+    const fracY = worldY - baseY;
+    let total = 0;
+
+    for (let oy = 0; oy <= 1; oy += 1) {
+      const ty = clamp(baseY + oy, 0, GRID_H - 1);
+      const wy = oy === 0 ? 1 - fracY : fracY;
+      for (let ox = 0; ox <= 1; ox += 1) {
+        const tx = clamp(baseX + ox, 0, GRID_W - 1);
+        const wx = ox === 0 ? 1 - fracX : fracX;
+        total += state.visibleAlpha[cellIndex(tx, ty)] * wx * wy;
+      }
+    }
+
+    return clamp(total, 0, 1);
+  };
+
+  // Build clip from visible tunnel tiles so wires can't bleed over blocks
+  ctx.save();
+  ctx.beginPath();
+  for (let ty = startY; ty < endY; ty++) {
+    for (let tx = startX; tx < endX; tx++) {
+      const idx = cellIndex(tx, ty);
+      if (state.hardness[idx] === 0 && state.visibleAlpha[idx] > 0.001) {
+        ctx.rect(tx * TILE_SIZE - camera.x, ty * TILE_SIZE - camera.y, TILE_SIZE, TILE_SIZE);
+      }
+    }
+  }
+  ctx.clip();
+  ctx.lineCap = "butt";
+  ctx.lineJoin = "round";
+
+  const tailFadeTiles = 3;
+
+  for (const wire of state.beaconWires) {
+    const beacon = state.beacons[wire.beaconIndex];
+    if (!beacon) continue;
+    const pts = wire.points;
+    if (pts.length === 0) continue;
+    const { x: bx, y: by } = beacon;
+    const active = beacon.active;
+    // Solid colors, no pulsing — active style matches activated beacon border
+    const outerColor = active ? "rgba(50, 110, 170, 0.40)" : "rgba(60, 42, 22, 0.32)";
+    const coreColor  = active ? "rgba(120, 190, 230, 0.65)" : "rgba(219, 171, 99, 0.28)";
+
+    const sPx = (bx + 1) * TILE_SIZE - camera.x;
+    const sPy = (by + 1) * TILE_SIZE - camera.y;
+    const n = pts.length;
+    const hiddenStartTiles = 0;
+    const revealTiles = 5;
+
+    // Pre-compute segment midpoints for clean bezier chaining
+    // segs[i] = { ax, ay (start), cpx, cpy (control), ex, ey (end), alpha, startDistance, endDistance }
+    const segs = [];
+    let prevX = sPx, prevY = sPy;
+    let prevWorldX = bx + 1;
+    let prevWorldY = by + 1;
+    let traveledTiles = 0;
+    for (let i = 0; i < n; i++) {
+      const cur = pts[i];
+      const cpx = cur.x * TILE_SIZE - camera.x;
+      const cpy = cur.y * TILE_SIZE - camera.y;
+      const curWorldX = cur.x;
+      const curWorldY = cur.y;
+      const next = i + 1 < n ? pts[i + 1] : null;
+      const endWorldX = next ? (cur.x + next.x) / 2 : cur.x;
+      const endWorldY = next ? (cur.y + next.y) / 2 : cur.y;
+      const ex = next ? ((cur.x + next.x) / 2) * TILE_SIZE - camera.x : cpx;
+      const ey = next ? ((cur.y + next.y) / 2) * TILE_SIZE - camera.y : cpy;
+      const localAlpha = (
+        sampleVisibilityAlpha(prevWorldX, prevWorldY) +
+        sampleVisibilityAlpha(curWorldX, curWorldY) +
+        sampleVisibilityAlpha(endWorldX, endWorldY)
+      ) / 3;
+      const segmentLengthTiles = Math.hypot(endWorldX - prevWorldX, endWorldY - prevWorldY);
+      const startDistance = traveledTiles;
+      const endDistance = traveledTiles + segmentLengthTiles;
+      segs.push({ ax: prevX, ay: prevY, cpx, cpy, ex, ey, alpha: localAlpha, startDistance, endDistance });
+      prevX = ex; prevY = ey;
+      prevWorldX = endWorldX;
+      prevWorldY = endWorldY;
+      traveledTiles = endDistance;
+    }
+
+    for (let pass = 0; pass < 2; pass++) {
+      const strokeColor = pass === 0 ? outerColor : coreColor;
+      ctx.lineWidth = pass === 0 ? 6 : 2;
+      ctx.strokeStyle = strokeColor;
+
+      for (let i = 0; i < n; i++) {
+        const s = segs[i];
+        const segmentLengthTiles = s.endDistance - s.startDistance;
+        const subdivisions = Math.max(3, Math.ceil(segmentLengthTiles * 4));
+        let prevPointX = s.ax;
+        let prevPointY = s.ay;
+
+        for (let step = 1; step <= subdivisions; step++) {
+          const t = step / subdivisions;
+          const invT = 1 - t;
+          const pointX = invT * invT * s.ax + 2 * invT * t * s.cpx + t * t * s.ex;
+          const pointY = invT * invT * s.ay + 2 * invT * t * s.cpy + t * t * s.ey;
+          const pieceStartDistance = s.startDistance + segmentLengthTiles * ((step - 1) / subdivisions);
+          const pieceEndDistance = s.startDistance + segmentLengthTiles * t;
+          const pieceMidDistance = (pieceStartDistance + pieceEndDistance) * 0.5;
+          const revealT = clamp((pieceMidDistance - hiddenStartTiles) / revealTiles, 0, 1);
+          const reveal = revealT * revealT * (3 - 2 * revealT);
+          const tailDistance = traveledTiles - pieceMidDistance;
+          const tailT = clamp(tailDistance / tailFadeTiles, 0, 1);
+          const tailAlpha = tailT * tailT * (3 - 2 * tailT);
+          const pieceAlpha = tailAlpha * s.alpha * reveal;
+          if (pieceAlpha > 0.01) {
+            ctx.globalAlpha = pieceAlpha;
+            ctx.beginPath();
+            ctx.moveTo(prevPointX, prevPointY);
+            ctx.lineTo(pointX, pointY);
+            ctx.stroke();
+          }
+          prevPointX = pointX;
+          prevPointY = pointY;
+        }
+      }
+    }
+  }
+
+  ctx.restore();
 }
 
 function renderBeacon(camera) {
