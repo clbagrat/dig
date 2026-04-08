@@ -5150,7 +5150,7 @@ function updateBeaconWireBreaks(dt) {
     }
     pending.delay -= dt;
     if (pending.delay > 0) continue;
-    damageCell(pending.x, pending.y, getStrikeDamage() * 2);
+    damageCell(pending.x, pending.y, getStrikeDamage(), { suppressHazardPlayerDamage: true });
     state.beaconWireBreaks.splice(i, 1);
   }
 }
@@ -6904,7 +6904,7 @@ function damageCell(x, y, damage, options = {}) {
   if ((!options.ignoreHazardEffect || allowHazardChain) && hazardType && !state.hazardTriggeredMask[index]) {
     state.hazardTriggeredMask[index] = 1;
     triggerHazardEffect(hazardType, x, y, {
-      suppressPlayerDamage: !!options.allowHazardChain,
+      suppressPlayerDamage: !!options.suppressHazardPlayerDamage || !!options.allowHazardChain,
       delayedChain: allowHazardChain,
     });
   }
@@ -9593,20 +9593,62 @@ function updateBeaconActivationAnim() {
 
 function activateBeaconWires(beacon) {
   const beaconIndex = state.beacons.indexOf(beacon);
+  const wireHitRadiusTiles = 0.38;
   for (const wire of state.beaconWires) {
     if (wire.beaconIndex !== beaconIndex) continue;
-    let prevX = beacon.x + 1;
-    let prevY = beacon.y + 1;
+    const pts = wire.points;
+    if (pts.length === 0) continue;
+
+    let segStartX = beacon.x + 1;
+    let segStartY = beacon.y + 1;
+    let prevSampleX = segStartX;
+    let prevSampleY = segStartY;
     let traveledTiles = 0;
-    for (const p of wire.points) {
-      const tx = Math.round(p.x);
-      const ty = Math.round(p.y);
-      if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) continue;
-      traveledTiles += Math.hypot(p.x - prevX, p.y - prevY);
-      const startDelay = traveledTiles * (BEACON_WIRE_BREAK_WAVE_DELAY_MS / 1000);
-      scheduleBeaconWireBreak(tx, ty, startDelay);
-      prevX = p.x;
-      prevY = p.y;
+
+    for (let i = 0; i < pts.length; i++) {
+      const cur = pts[i];
+      const next = i + 1 < pts.length ? pts[i + 1] : null;
+      const segEndX = next ? (cur.x + next.x) / 2 : cur.x;
+      const segEndY = next ? (cur.y + next.y) / 2 : cur.y;
+      const segLengthTiles = Math.hypot(segEndX - segStartX, segEndY - segStartY);
+      const subdivisions = Math.max(4, Math.ceil(segLengthTiles * 6));
+
+      for (let step = 1; step <= subdivisions; step++) {
+        const t = step / subdivisions;
+        const invT = 1 - t;
+        const sampleX = invT * invT * segStartX + 2 * invT * t * cur.x + t * t * segEndX;
+        const sampleY = invT * invT * segStartY + 2 * invT * t * cur.y + t * t * segEndY;
+        const linkDist = Math.hypot(sampleX - prevSampleX, sampleY - prevSampleY);
+        const linkSamples = Math.max(1, Math.ceil(linkDist * 3));
+
+        for (let linkStep = 1; linkStep <= linkSamples; linkStep++) {
+          const lt = linkStep / linkSamples;
+          const worldX = prevSampleX + (sampleX - prevSampleX) * lt;
+          const worldY = prevSampleY + (sampleY - prevSampleY) * lt;
+          const distAlong = traveledTiles + linkDist * lt;
+          const startDelay = distAlong * (BEACON_WIRE_BREAK_WAVE_DELAY_MS / 1000);
+          const minX = Math.floor(worldX);
+          const maxX = Math.ceil(worldX);
+          const minY = Math.floor(worldY);
+          const maxY = Math.ceil(worldY);
+          for (let ty = minY; ty <= maxY; ty += 1) {
+            for (let tx = minX; tx <= maxX; tx += 1) {
+              if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) continue;
+              const dx = (tx + 0.5) - worldX;
+              const dy = (ty + 0.5) - worldY;
+              if (Math.hypot(dx, dy) > wireHitRadiusTiles) continue;
+              scheduleBeaconWireBreak(tx, ty, startDelay);
+            }
+          }
+        }
+
+        traveledTiles += linkDist;
+        prevSampleX = sampleX;
+        prevSampleY = sampleY;
+      }
+
+      segStartX = segEndX;
+      segStartY = segEndY;
     }
   }
 }
