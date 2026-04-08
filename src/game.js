@@ -2392,7 +2392,7 @@ function setupField(seedOverride = null) {
   state.base.x = map.base.x;
   state.base.y = map.base.y;
   for (const b of map.beacons) {
-    state.beacons.push({ x: b.x, y: b.y, active: false, wireActivationStart: null, wireDamageTriggered: false });
+    state.beacons.push({ x: b.x, y: b.y, active: false, wireActivationStart: null, wireDamageTriggered: false, wiresFreedToastShown: false, wireTrackedCells: [] });
   }
   state.beaconWires = map.beaconWires;
   state.perkMask.set(map.perkMask);
@@ -4963,6 +4963,12 @@ function update(dt) {
     if ((state.lastTs || 0) - beacon.wireActivationStart < BEACON_WIRE_FLARE_MS) continue;
     activateBeaconWires(beacon);
     beacon.wireDamageTriggered = true;
+  }
+  for (const beacon of state.beacons) {
+    if (!beacon.active || !beacon.wireDamageTriggered || beacon.wiresFreedToastShown === true) continue;
+    if (!areBeaconWiresFreed(beacon)) continue;
+    beacon.wiresFreedToastShown = true;
+    showPerkToast("Провода освобождены");
   }
   updateBeaconActivationAnim();
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
@@ -9617,9 +9623,11 @@ function updateBeaconActivationAnim() {
   }
 }
 
-function activateBeaconWires(beacon) {
+function forEachBeaconWireCoveredCell(beacon, visit) {
   const beaconIndex = state.beacons.indexOf(beacon);
+  if (beaconIndex < 0) return;
   const wireHitRadiusTiles = 0.38;
+
   for (const wire of state.beaconWires) {
     if (wire.beaconIndex !== beaconIndex) continue;
     const pts = wire.points;
@@ -9663,7 +9671,7 @@ function activateBeaconWires(beacon) {
               const dx = (tx + 0.5) - worldX;
               const dy = (ty + 0.5) - worldY;
               if (Math.hypot(dx, dy) > wireHitRadiusTiles) continue;
-              scheduleBeaconWireBreak(tx, ty, startDelay);
+              if (visit(tx, ty, startDelay) === false) return;
             }
           }
         }
@@ -9677,6 +9685,33 @@ function activateBeaconWires(beacon) {
       segStartY = segEndY;
     }
   }
+}
+
+function areBeaconWiresFreed(beacon) {
+  if (!Array.isArray(beacon.wireTrackedCells) || beacon.wireTrackedCells.length === 0) {
+    return false;
+  }
+  for (const index of beacon.wireTrackedCells) {
+    if (state.hardness[index] > 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function activateBeaconWires(beacon) {
+  const seen = new Set();
+  const tracked = new Set();
+  forEachBeaconWireCoveredCell(beacon, (x, y, startDelay) => {
+    const index = cellIndex(x, y);
+    if (seen.has(index)) return;
+    seen.add(index);
+    if (state.hardness[index] > 0 && !state.metalMask[index] && !state.beaconMask[index] && state.safeDoorMask[index] <= 0) {
+      tracked.add(index);
+    }
+    scheduleBeaconWireBreak(x, y, startDelay);
+  });
+  beacon.wireTrackedCells = [...tracked];
 }
 
 function renderBeaconWires(camera, startX, endX, startY, endY) {
