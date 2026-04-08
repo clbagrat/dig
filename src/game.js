@@ -6668,7 +6668,7 @@ function openSafeDoor(safeIdx, doorX, doorY) {
   }
 }
 
-function scatterGoldAroundTile(sourceX, sourceY, dropAmount) {
+function scatterGoldAroundTile(sourceX, sourceY, dropAmount, options = {}) {
   if (dropAmount <= 0) return false;
   // Collect valid drop candidates: regular block or empty ground, no metal
   const candidates = [];
@@ -6687,8 +6687,10 @@ function scatterGoldAroundTile(sourceX, sourceY, dropAmount) {
 
   if (candidates.length === 0) return false;
 
-  // Pick 3–5 random targets
-  const targetCount = Math.min(candidates.length, 3 + Math.floor(Math.random() * 3));
+  const minTargets = Math.max(1, Math.floor(options.minTargets ?? 3));
+  const maxTargets = Math.max(minTargets, Math.floor(options.maxTargets ?? 5));
+  const randomTargetCount = minTargets + Math.floor(Math.random() * (maxTargets - minTargets + 1));
+  const targetCount = Math.min(candidates.length, randomTargetCount);
   // Shuffle candidates and take first targetCount
   for (let i = candidates.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -6733,13 +6735,16 @@ function dropUnsafeGold() {
   const total = Math.floor(state.unsafeGold);
   state.unsafeGold = 0;
   const saveRate = [0, 0.30, 0.50, 0.70, 0.90][Math.min(4, state.insuranceLevel || 0)];
+  let remaining = total;
   if (saveRate > 0) {
     const saved = Math.floor(total * saveRate);
     state.gold += saved;
+    remaining -= saved;
     if (saved > 0) showPerkToast(`Страховка: +${saved} ●`);
   }
-  const dropAmount = Math.ceil(total * (1 - saveRate) / 2);
-  scatterGoldAroundTile(state.drill.x, state.drill.y, dropAmount);
+  const lostAmount = Math.floor(remaining * 0.3);
+  const dropAmount = Math.max(0, remaining - lostAmount);
+  scatterGoldAroundTile(state.drill.x, state.drill.y, dropAmount, { minTargets: 1, maxTargets: 1 });
 }
 
 function applyHazardDamage(amount, options = {}) {
