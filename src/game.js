@@ -1,6 +1,6 @@
 import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem } from "./shop.js?v=41";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
-import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, RARITY } from "./items-catalog.js?v=1";
+import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
 import {
   generateMap,
   mulberry32 as _mulberry32,
@@ -3421,6 +3421,8 @@ function getShopStatsSnapshot() {
     luck: state.luck,
 
     heatRate: state.heatRate,
+    heat: state.heat,
+    heatDamageBonus: state.heatDamageBonus,
     effectDurationRate: state.effectDurationRate,
     concentration: state.concentration,
     fuelDrainRate: state.fuelDrainRate,
@@ -4552,7 +4554,7 @@ function syncCrystalItemOffer() {
         <div class="crystal-item-offer__icon">${displayGood?.icon || "?"}</div>
         <div class="crystal-item-offer__name">${revealed ? displayGood?.name : "???"}</div>
         <div class="crystal-item-offer__rarity" style="color:${color}">${revealed ? rarityName : "·····"}</div>
-        <div class="crystal-item-offer__desc">${revealed ? (displayGood?.desc || "") : "Перемешивание..."}</div>
+        <div class="crystal-item-offer__desc">${revealed ? getGoodDescription(displayGood, rarity) : "Перемешивание..."}</div>
       </div>
       ${revealed ? `
         <div class="crystal-item-offer__actions">

@@ -2,7 +2,7 @@ import {
   ALL_EQUIPMENT, ALL_ITEMS, ALL_GOODS,
   CATEGORIES, INITIAL_CATEGORIES,
   RARITY, RARITY_NAMES, RARITY_COLORS, RARITY_EFFECT_MULT, RARITY_COST_MULT,
-  TAG_SYNERGIES,
+  TAG_SYNERGIES, getGoodDescription,
 } from "./items-catalog.js?v=1";
 import { DEPTH_LEVELS } from "./worldgen.js?v=1";
 
@@ -502,66 +502,6 @@ function formatStatValue(value, mode = "number") {
   return String(Math.round(value));
 }
 
-function getRarityTierValue(values, rarity) {
-  return values[Math.max(0, Math.min(values.length - 1, rarity))] || 0;
-}
-
-function statShort(key) {
-  const def = STAT_DEFS.find((d) => d.key === key);
-  return def ? def.shortLabel : key;
-}
-
-function getGoodDescription(good, rarity = RARITY.COMMON) {
-  if (!good) {
-    return "";
-  }
-  if (good.id === "thermo_drill") {
-    const flat = getRarityTierValue([0, 0, 20, 25, 30], rarity);
-    const drillScale = getRarityTierValue([0, 0, 15, 20, 25], rarity);
-    const heatBonus = getRarityTierValue([0, 0, 1, 2, 3], rarity);
-    return `Урон ${flat} (+${drillScale}% ${statShort("damageBonus")}). +${heatBonus} урона за каждые 10 ${statShort("maxHeat")}.`;
-  }
-  if (good.id === "basic_drill") {
-    const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
-    const damageScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
-    return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}).`;
-  }
-  if (good.id === "fragile_drill") {
-    const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
-    const damageScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
-    const speedBonus = getRarityTierValue([0, 10, 15, 20, 30], rarity);
-    return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}). +${speedBonus}% ${statShort("strikeSpeed")} пока есть броня.`;
-  }
-  if (good.id === "lucky_pickaxe") {
-    const flatDamage = getRarityTierValue([0, 10, 15, 20, 25], rarity);
-    const damageScale = getRarityTierValue([0, 10, 20, 30, 40], rarity);
-    const luckScale = getRarityTierValue([0, 10, 15, 20, 25], rarity);
-    const oreGain = getRarityTierValue([0, 1, 2, 3, 4], rarity);
-    return `Урон ${flatDamage} (${damageScale}% ${statShort("damageBonus")}, ${luckScale}% ${statShort("luck")}). При ударе по золотой жиле увеличит ее ценность на ${oreGain}.`;
-  }
-  if (good.id === "afterburner") {
-    const spd = getRarityTierValue([0, 15, 22, 30, 40], rarity);
-    return `+${spd}% ${statShort("strikeSpeed")}. −1 ${statShort("maxHp")} (не ниже 1).`;
-  }
-  if (good.id === "heavy_drill") {
-    const dp = getRarityTierValue([0, 8, 10, 12, 15], rarity);
-    return `+${dp} ${statShort("drillPower")}. Скорость −10%.`;
-  }
-  if (good.effect?.effectByRarity) {
-    const value = good.effect.effectByRarity[rarity] ?? good.effect.effectByRarity[1] ?? 0;
-    if (good.effect.stat === "strikeSpeed") {
-      return `+${Math.round(value)}% скорость бура.`;
-    }
-    if (good.effect.stat === "speedOfAutoClose") {
-      return `+${value}% скорость замыкания контура.`;
-    }
-    if (good.effect.stat === "weakSpotChance") {
-      return `+${Math.round(value * 100)}% шанс бреши в породе.`;
-    }
-  }
-  return good.desc || "";
-}
-
 const STAT_DEFS = [
   { key: "drillPower",                 label: "Сила бура",                      shortLabel: "БУР",    format: "fixed1" },
   { key: "damageBonus",                label: "Бонус к урону %",                shortLabel: "УРОН %", format: "percent" },
@@ -788,7 +728,7 @@ function renderDetail() {
     detail.hidden = false;
     document.getElementById("shopDetailIcon").textContent = def.icon;
     document.getElementById("shopDetailName").textContent = def.name;
-    const desc = getGoodDescription(def, part.rarity);
+    const desc = getGoodDescription(def, part.rarity, currentStatsCache);
     document.getElementById("shopDetailDesc").textContent = desc;
 
     const tagsEl = document.getElementById("shopDetailTags");
@@ -855,7 +795,7 @@ function renderDetail() {
   document.getElementById("shopDetailName").textContent = offering.good.name;
 
   // Description with rarity multiplier
-  const desc = getGoodDescription(offering.good, offering.rarity);
+  const desc = getGoodDescription(offering.good, offering.rarity, currentStatsCache);
   document.getElementById("shopDetailDesc").textContent = desc;
 
   // Tags for equipment

@@ -295,6 +295,10 @@ export const ALL_ITEMS = [
     name: "Форсажная камера",
     icon: "💨",
     desc: "+15% скорость бура. −1 макс. HP (не ниже 1).",
+    descParts: [
+      { type: "effect", index: 0 },
+      "−1 к макс. HP (не ниже 1)",
+    ],
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
@@ -1057,3 +1061,194 @@ export const ALL_ITEMS = [
 ];
 
 export const ALL_GOODS = [...ALL_EQUIPMENT, ...ALL_ITEMS];
+
+function clampRarity(rarity) {
+  return Math.max(RARITY.COMMON, Math.min(RARITY.LEGENDARY, rarity || RARITY.COMMON));
+}
+
+function getEffectValue(effect, rarity) {
+  if (!effect) return 0;
+  if (Array.isArray(effect.effectByRarity)) {
+    const tier = clampRarity(rarity);
+    return effect.effectByRarity[tier] ?? effect.effectByRarity[RARITY.COMMON] ?? 0;
+  }
+  if (typeof effect.value === "number") {
+    return effect.value;
+  }
+  return 0;
+}
+
+function formatDescriptionNumber(value) {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  if (Number.isInteger(rounded * 10)) return rounded.toFixed(1);
+  return rounded.toFixed(2);
+}
+
+function formatSignedDescriptionNumber(value) {
+  const sign = value >= 0 ? "+" : "−";
+  return `${sign}${formatDescriptionNumber(Math.abs(value))}`;
+}
+
+function formatSignedPercent(value, scale = 1) {
+  return `${formatSignedDescriptionNumber(value * scale)}%`;
+}
+
+function formatUnsignedPercent(value, scale = 1) {
+  return `${formatDescriptionNumber(Math.abs(value * scale))}%`;
+}
+
+const SIMPLE_STAT_DESCRIPTORS = {
+  drillPower: value => `${formatSignedDescriptionNumber(value)} к силе бура`,
+  strikeSpeed: value => `${formatSignedPercent(value)} к скорости бура`,
+  maxHp: value => `${formatSignedDescriptionNumber(value)} к макс. HP`,
+  maxFuel: value => `${formatSignedDescriptionNumber(value)} к макс. топливу`,
+  maxHeat: value => `${formatSignedDescriptionNumber(value)} к макс. нагреву`,
+  visionRadius: value => `${formatSignedDescriptionNumber(value)} к радиусу обзора`,
+  luck: value => `${formatSignedDescriptionNumber(value)} к удаче`,
+  armor: value => `${formatSignedDescriptionNumber(value)} к броне`,
+  weakSpotChance: value => `${formatSignedPercent(value, 100)} к шансу бреши`,
+  weakSpotMult: value => `${formatSignedDescriptionNumber(value)} к урону по бреши`,
+  damageBonus: value => `${formatSignedPercent(value)} к общему урону`,
+  heatRate: value => `${formatSignedPercent(value, 100)} к скорости нагрева`,
+  effectDurationRate: value => `${formatSignedPercent(value, 100)} к длительности эффектов`,
+  concentration: value => `${formatSignedPercent(value, 100)} к концентрации`,
+  fuelDrainRate: value => `${formatSignedPercent(value, 100)} к расходу топлива`,
+  miningGoldBonusMultiplier: value => `${formatSignedPercent(value, 100)} к золоту с жил`,
+  xpBonusMultiplier: value => `${formatSignedPercent(value, 100)} к опыту`,
+  bonusFindChance: value => `${formatSignedPercent(value, 100)} к шансу находки`,
+  speedOfAutoClose: value => `${formatSignedPercent(value)} к скорости автозамыкания`,
+  explosionDamageMultiplier: value => `${formatSignedPercent(value, 100)} к урону взрывов`,
+  heatExplosionRadiusBonus: value => `${formatSignedDescriptionNumber(value)} к радиусу взрыва перегрева`,
+  shopPriceDiscount: value => `${formatSignedPercent(value, 100)} к скидке в магазине`,
+  weakSpotFuelGain: value => `При ударе по бреши: ${formatSignedDescriptionNumber(value)} топлива`,
+  drillPowerPerLevel: value => `При каждом уровне: ${formatSignedDescriptionNumber(value)} к силе бура`,
+  fuelPerLevel: value => `При каждом уровне: ${formatSignedDescriptionNumber(value)} топлива`,
+  strikeSpeedPerLevel: value => `При каждом уровне: ${formatSignedPercent(value)} к скорости бура`,
+  healPerLevel: value => `При каждом уровне: лечение ${formatSignedDescriptionNumber(value)} HP`,
+  goldBonusPerLevel: value => `При каждом уровне: ${formatSignedPercent(value, 100)} к золоту с жил`,
+  loopLengthDamageBonus: value => `Каждая клетка контура даёт ${formatSignedPercent(value)} к урону бурения`,
+  loopLengthFuelBonus: value => `Каждая клетка контура даёт ${formatSignedDescriptionNumber(value)} топлива при подъёме`,
+  maxLoopLength: value => `${formatSignedDescriptionNumber(value)} к максимальной длине контура`,
+  loopSpawnBonusChance: value => `Замкнутый контур с шансом ${formatUnsignedPercent(value, 100)} создаёт бонус внутри`,
+  heatExplosionDamageBonus: value => `${formatSignedPercent(value, 100)} к урону взрыва от перегрева`,
+  crystalRewardRerolls: value => `${formatSignedDescriptionNumber(value)} попытка к выбору награды за рецепт`,
+  crystalGoldGain: value => `Подбор кристалла даёт ${formatSignedDescriptionNumber(value)} золота`,
+  crystalXpGain: value => `Подбор кристалла даёт ${formatSignedDescriptionNumber(value)} XP`,
+  adrenalineLevel: value => `При HP ≤ 1: +${value * 30}% к скорости бура`,
+  firstStrikeLevel: value => `После активации маяка: +${value * 40}% к урону бура на ${value * 6} сек`,
+  insuranceLevel: value => `При уроне сохраняет ${[0, 30, 50, 70, 90][Math.min(4, Math.max(0, value))] || 0}% небезопасного золота`,
+  heatEngineLevel: value => `До +${value * 40}% к скорости бура при максимальном нагреве`,
+  fuelConverterLevel: value => `Пополнение сверх макс. топлива даёт форсаж на ${2 + value} сек`,
+  loopChargeLevel: value => `${formatSignedDescriptionNumber(value)} уровень контурного заряда`,
+  stunDetonatorLevel: value => `При оглушении: взрыв вокруг бура${value > 1 ? ` x${value}` : ""}`,
+  breachMissileLevel: value => `При попадании в брешь запускает ${formatDescriptionNumber(value)} ракет${value >= 5 ? "" : value >= 2 ? "ы" : "у"}`,
+  cryoRocketCount: value => `За каждое сильное остывание выпускает ${formatDescriptionNumber(value)} крио-ракет${value >= 5 ? "" : value >= 2 ? "ы" : "у"}`,
+  fuelRocketLevel: value => `Пополнение топлива выпускает ${formatDescriptionNumber(value)} ракет${value >= 5 ? "" : value >= 2 ? "ы" : "у"}`,
+  radarCrystalModule: () => "Кольцевые подсказки на ближайшие кристаллы",
+  artifactRadarMode: () => "Радары маяков показывают фиолетовый указатель на ближайший артефакт",
+  goldRadarMode: () => "Радары маяков показывают жёлтый указатель на ближайшее золотое скопление (5+ блоков)",
+  navigatorMode: () => "Радары маяков показывают белый указатель на ближайший неактивированный маяк на той же глубине",
+  beaconCatalystLevel: () => "Активация маяка мгновенно завершает текущий рецепт",
+  levelCatalystLevel: () => "Повышение уровня мгновенно завершает текущий рецепт",
+  stunReservoirLevel: value => `При оглушении: ${formatSignedDescriptionNumber(value * 40)} топлива`,
+  stunAfterburnerLevel: value => `После оглушения включается форсаж; длительность = x${value * 2} от времени стана`,
+  weakSpotPierce: () => "Пробитие бреши насквозь",
+};
+
+const SPECIAL_DESCRIPTION_BUILDERS = {
+  thermo_drill(rarity, stats = null) {
+    const flat = getEffectValue({ effectByRarity: [0, 0, 20, 25, 30] }, rarity);
+    const drillScale = getEffectValue({ effectByRarity: [0, 0, 15, 20, 25] }, rarity);
+    const heatBonus = getEffectValue({ effectByRarity: [0, 0, 1, 2, 3] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const hasHeat = Number.isFinite(stats?.heat);
+    const hasHeatDamageBonus = Number.isFinite(stats?.heatDamageBonus);
+    let totalText = "";
+    if (hasDrillPower && hasHeat) {
+      const total = flat
+        + stats.drillPower * (drillScale / 100)
+        + Math.floor(stats.heat / 10) * heatBonus * (1 + (hasHeatDamageBonus ? stats.heatDamageBonus : 0));
+      totalText = ` [${formatDescriptionNumber(total)}]`;
+    }
+    return `Урон ${flat} + ${formatDescriptionNumber(drillScale)}% от силы бура + ${heatBonus} за каждые 10 нагрева${totalText}.`;
+  },
+  basic_drill(rarity, stats = null) {
+    const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const damageScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const totalText = hasDrillPower
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (damageScale / 100))}]`
+      : "";
+    return `Урон ${flatDamage} + ${formatDescriptionNumber(damageScale)}% от силы бура${totalText}.`;
+  },
+  fragile_drill(rarity, stats = null) {
+    const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const damageScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const speedBonus = getEffectValue({ effectByRarity: [0, 10, 15, 20, 30] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const totalText = hasDrillPower
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (damageScale / 100))}]`
+      : "";
+    return `Урон ${flatDamage} + ${formatDescriptionNumber(damageScale)}% от силы бура${totalText}.\n${formatSignedPercent(speedBonus)} к скорости бура, пока есть броня.`;
+  },
+  lucky_pickaxe(rarity, stats = null) {
+    const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const damageScale = getEffectValue({ effectByRarity: [0, 10, 20, 30, 40] }, rarity);
+    const luckScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const oreGain = getEffectValue({ effectByRarity: [0, 1, 2, 3, 4] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const hasLuck = Number.isFinite(stats?.luck);
+    const totalText = hasDrillPower && hasLuck
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (damageScale / 100) + stats.luck * (luckScale / 100))}]`
+      : "";
+    return `Урон ${flatDamage} + ${formatDescriptionNumber(damageScale)}% от силы бура + ${formatDescriptionNumber(luckScale)}% от удачи${totalText}.\nПри ударе по золотой жиле её ценность растёт на ${oreGain}.`;
+  },
+};
+
+function buildEffectDescription(effect, rarity) {
+  if (!effect?.stat) return "";
+  const value = getEffectValue(effect, rarity);
+  const formatter = SIMPLE_STAT_DESCRIPTORS[effect.stat];
+  return formatter ? formatter(value) : "";
+}
+
+export function getGoodDescription(good, rarity = RARITY.COMMON, stats = null) {
+  if (!good) return "";
+
+  const specialBuilder = SPECIAL_DESCRIPTION_BUILDERS[good.id];
+  if (specialBuilder) {
+    return specialBuilder(rarity, stats);
+  }
+
+  if (Array.isArray(good.descParts) && good.descParts.length > 0) {
+    const effects = Array.isArray(good.effect)
+      ? good.effect
+      : (good.effect ? [good.effect] : []);
+    return good.descParts
+      .map((part) => {
+        if (typeof part === "string") return part.trim();
+        if (part?.type === "effect") {
+          const effect = part.effect ?? effects[part.index ?? 0];
+          return buildEffectDescription(effect, rarity);
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join(".\n");
+  }
+
+  const effects = Array.isArray(good.effect)
+    ? good.effect
+    : (good.effect ? [good.effect] : []);
+  const autoLines = effects
+    .map(effect => buildEffectDescription(effect, rarity))
+    .filter(Boolean);
+
+  if (autoLines.length > 0) {
+    return `${autoLines.join(".\n")}.`;
+  }
+
+  return good.desc || "";
+}
