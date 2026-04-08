@@ -4593,8 +4593,9 @@ function syncTouchZonesInteractivity() {
   if (!touchZones) {
     return;
   }
-  touchZones.style.pointerEvents =
-    state.beaconActivationAnim || state.isChoosingPerk || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen || state.crystalItemOfferOpen ? "none" : "auto";
+  touchZones.style.pointerEvents = state.beaconActivationAnim || isAnyBlockingModalOpen()
+    ? "none"
+    : "auto";
   syncMoveAim();
 }
 
@@ -5032,6 +5033,19 @@ function updateCrystalItemOffer(dt) {
   syncCrystalItemOffer();
 }
 
+function isAnyBlockingModalOpen() {
+  return !!(
+    state.isChoosingPerk ||
+    state.manualModalOpen ||
+    state.shopModalOpen ||
+    state.debugPerkMenuOpen ||
+    state.crystalRewardModalOpen ||
+    state.artifactChoiceOpen ||
+    state.levelUpModalOpen ||
+    state.crystalItemOfferOpen
+  );
+}
+
 function showPadAt(x, y, pad, stick) {
   state.padCenterX = x;
   state.padCenterY = y;
@@ -5042,7 +5056,7 @@ function showPadAt(x, y, pad, stick) {
 }
 
 function syncMoveAim() {
-  if (state.beaconActivationAnim || state.manualModalOpen || state.shopModalOpen || state.debugPerkMenuOpen || state.crystalRewardModalOpen || state.artifactChoiceOpen || state.levelUpModalOpen || state.isChoosingPerk) {
+  if (state.beaconActivationAnim || isAnyBlockingModalOpen()) {
     state.moveAimX = 0;
     state.moveAimY = 0;
     return;
@@ -5129,6 +5143,25 @@ function update(dt) {
     return;
   }
 
+  if (state.crystalItemOfferOpen && !state.crystalItemOfferRevealed) {
+    updateCrystalItemOffer(dt);
+  }
+
+  if (state.crystalItemOfferOpen) {
+    return;
+  }
+
+  if (
+    state.manualModalOpen ||
+    state.shopModalOpen ||
+    state.debugPerkMenuOpen ||
+    state.artifactChoiceOpen ||
+    state.levelUpModalOpen ||
+    state.isChoosingPerk
+  ) {
+    return;
+  }
+
   if (state.crystalCompleteAnimDelay > 0) {
     state.crystalCompleteAnimDelay = Math.max(0, state.crystalCompleteAnimDelay - dt);
     if (state.crystalCompleteAnimDelay === 0) {
@@ -5136,17 +5169,9 @@ function update(dt) {
     }
   }
 
-  if (state.crystalItemOfferOpen && !state.crystalItemOfferRevealed) {
-    updateCrystalItemOffer(dt);
-  }
-
   maybeOpenPendingLevelReward();
 
-  if (state.levelUpModalOpen) {
-    return;
-  }
-
-  if (state.isChoosingPerk) {
+  if (isAnyBlockingModalOpen()) {
     return;
   }
 
