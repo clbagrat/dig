@@ -42,6 +42,9 @@ const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
 const IDLE_AUTO_CLOSE_PREVIEW_DELAY = 0.5;
 const IDLE_AUTO_CLOSE_PREVIEW_RETURN_DURATION = 0.24;
+const BEACON_ACTIVATION_MS = 2000;
+const BEACON_WIRE_BREAK_TELEGRAPH_MS = 700;
+const BEACON_WIRE_BREAK_WAVE_DELAY_MS = 70;
 const GAS_POCKET_GROUPS = 10;
 const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
@@ -440,6 +443,7 @@ const state = {
   activeWorms: [],
   beacons: [],
   beaconWires: [],
+  beaconWireBreaks: [],
   signalMovesLeft: 0,
   signalMovesMax: 0,
   signalPrevX: START_X,
@@ -1107,6 +1111,18 @@ function spawnBreakEffect(x, y, hardness, cause = "break") {
     time: BREAK_EFFECT_DURATION,
     duration: BREAK_EFFECT_DURATION,
     seed: (x * 92821 + y * 68917 + hardness * 131) % 1000,
+  });
+}
+
+function spawnBeaconWireDustEffect(x, y, progress = 0) {
+  state.effects.push({
+    kind: "wireDust",
+    x,
+    y,
+    progress,
+    time: 0.32,
+    duration: 0.32,
+    seed: (x * 48271 + y * 69621 + Math.round(progress * 1000)) % 1000,
   });
 }
 
@@ -2126,6 +2142,7 @@ function setupField(seedOverride = null) {
   state.keyBumpDir = null;
   state.beacons.length = 0;
   state.beaconWires = [];
+  state.beaconWireBreaks.length = 0;
   state.perkZones.length = 0;
   state.gasClouds.length = 0;
   state.steamJets.length = 0;
@@ -4909,6 +4926,7 @@ function update(dt) {
   updateWorms(dt);
   updatePerkZones(dt);
   updateChainExplosions(dt);
+  updateBeaconWireBreaks(dt);
   updateEffects(dt);
   updateGoldParticles(dt);
   updateDepthLevelTransition();
@@ -5091,6 +5109,49 @@ function updateExperienceParticles(dt) {
       if (particle.showTotal) showXpToast(particle.showTotal);
     }
     state.xpParticles.splice(i, 1);
+  }
+}
+
+function scheduleBeaconWireBreak(x, y, startDelay = 0) {
+  if (x < 0 || y < 0 || x >= GRID_W || y >= GRID_H) return;
+  const index = cellIndex(x, y);
+  if (state.hardness[index] <= 0 || state.metalMask[index]) return;
+  for (const pending of state.beaconWireBreaks) {
+    if (pending.index !== index) continue;
+    pending.startDelay = Math.min(pending.startDelay, startDelay);
+    return;
+  }
+  state.beaconWireBreaks.push({
+    x,
+    y,
+    index,
+    startDelay,
+    delay: BEACON_WIRE_BREAK_TELEGRAPH_MS / 1000,
+    dustTimer: 0.04 + state.worldRandom() * 0.08,
+  });
+}
+
+function updateBeaconWireBreaks(dt) {
+  for (let i = state.beaconWireBreaks.length - 1; i >= 0; i -= 1) {
+    const pending = state.beaconWireBreaks[i];
+    if (state.hardness[pending.index] <= 0 || state.metalMask[pending.index]) {
+      state.beaconWireBreaks.splice(i, 1);
+      continue;
+    }
+    if (pending.startDelay > 0) {
+      pending.startDelay -= dt;
+      continue;
+    }
+    pending.dustTimer -= dt;
+    if (pending.dustTimer <= 0) {
+      const progress = 1 - clamp(pending.delay / (BEACON_WIRE_BREAK_TELEGRAPH_MS / 1000), 0, 1);
+      spawnBeaconWireDustEffect(pending.x, pending.y, progress);
+      pending.dustTimer = 0.08 + state.worldRandom() * 0.12;
+    }
+    pending.delay -= dt;
+    if (pending.delay > 0) continue;
+    damageCell(pending.x, pending.y, getStrikeDamage() * 2);
+    state.beaconWireBreaks.splice(i, 1);
   }
 }
 
@@ -8079,6 +8140,21 @@ function renderEffects(camera) {
       ctx.beginPath();
       ctx.arc(cx, cy, 10 + progress * 16, 0, Math.PI * 2);
       ctx.fill();
+    } else if (effect.kind === "wireDust") {
+      const alpha = (1 - progress) * (0.22 + effect.progress * 0.24);
+      const lift = progress * (4 + effect.progress * 6);
+      for (let puff = 0; puff < 4; puff += 1) {
+        const angle = ((effect.seed + puff * 71) % 628) / 100;
+        const drift = 1.5 + puff * 0.8 + effect.progress * 1.5;
+        const px = cx + Math.cos(angle) * drift * progress * 4;
+        const py = cy + Math.sin(angle) * drift * progress * 2 - lift;
+        const size = 2 + ((effect.seed + puff * 19) % 2) + effect.progress * 1.2;
+        ctx.globalAlpha = alpha * (0.85 - puff * 0.12);
+        ctx.fillStyle = puff % 2 === 0 ? "#c6ab87" : "#8a6b4d";
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else if (effect.kind === "explosion") {
       const alpha = 1 - progress;
       const radius = TILE_SIZE * 0.35 + effect.radius * 8 * progress;
@@ -8818,6 +8894,19 @@ function render() {
         }
       }
 
+      if (!state.tunnelMask[index] && state.beaconWireBreaks.length > 0) {
+        for (const pending of state.beaconWireBreaks) {
+          if (pending.index !== index) continue;
+          if (pending.startDelay > 0) break;
+          const progress = 1 - clamp(pending.delay / (BEACON_WIRE_BREAK_TELEGRAPH_MS / 1000), 0, 1);
+          const intensity = 0.12 + progress * progress * 0.95;
+          const t = state.lastTs * 0.05 + x * 19 + y * 23;
+          sx += Math.sin(t) * intensity;
+          sy += Math.cos(t * 1.3) * intensity;
+          break;
+        }
+      }
+
       if (visibleAlpha <= 0.001) {
         ctx.globalAlpha = 0.16;
         if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
@@ -9486,7 +9575,7 @@ function updateBeaconActivationAnim() {
   const anim = state.beaconActivationAnim;
   if (!anim) return;
   const elapsed = (state.lastTs || 0) - anim.startTs;
-  if (elapsed < 2500) return; // 2000ms animation + 500ms pause
+  if (elapsed < BEACON_ACTIVATION_MS + 500) return; // animation + short pause
   // Animation done — execute pending action
   state.beaconActivationAnim = null;
   const pa = anim.pendingAction;
@@ -9506,14 +9595,18 @@ function activateBeaconWires(beacon) {
   const beaconIndex = state.beacons.indexOf(beacon);
   for (const wire of state.beaconWires) {
     if (wire.beaconIndex !== beaconIndex) continue;
+    let prevX = beacon.x + 1;
+    let prevY = beacon.y + 1;
+    let traveledTiles = 0;
     for (const p of wire.points) {
       const tx = Math.round(p.x);
       const ty = Math.round(p.y);
       if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) continue;
-      const idx = cellIndex(tx, ty);
-      if (state.hardness[idx] > 0 && !state.metalMask[idx]) {
-        breakCell(tx, ty, idx, { cause: "explosion" });
-      }
+      traveledTiles += Math.hypot(p.x - prevX, p.y - prevY);
+      const startDelay = traveledTiles * (BEACON_WIRE_BREAK_WAVE_DELAY_MS / 1000);
+      scheduleBeaconWireBreak(tx, ty, startDelay);
+      prevX = p.x;
+      prevY = p.y;
     }
   }
 }
@@ -9521,6 +9614,8 @@ function activateBeaconWires(beacon) {
 function renderBeaconWires(camera, startX, endX, startY, endY) {
   if (state.beaconWires.length === 0) return;
   const ctx = state.ctx;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const mixRgba = (from, to, t) => `rgba(${lerp(from[0], to[0], t)}, ${lerp(from[1], to[1], t)}, ${lerp(from[2], to[2], t)}, ${lerp(from[3], to[3], t)})`;
   const sampleVisibilityAlpha = (worldX, worldY) => {
     const baseX = Math.floor(worldX);
     const baseY = Math.floor(worldY);
@@ -9564,10 +9659,14 @@ function renderBeaconWires(camera, startX, endX, startY, endY) {
     const pts = wire.points;
     if (pts.length === 0) continue;
     const { x: bx, y: by } = beacon;
-    const active = beacon.active;
-    // Solid colors, no pulsing — active style matches activated beacon border
-    const outerColor = active ? "rgba(50, 110, 170, 0.40)" : "rgba(60, 42, 22, 0.32)";
-    const coreColor  = active ? "rgba(120, 190, 230, 0.65)" : "rgba(219, 171, 99, 0.28)";
+    const activationT = !beacon.active
+      ? 0
+      : beacon.activationAnimStart
+        ? clamp(((state.lastTs || 0) - beacon.activationAnimStart) / BEACON_ACTIVATION_MS, 0, 1)
+        : 1;
+    const colorT = activationT * activationT * activationT;
+    const outerColor = mixRgba([60, 42, 22, 0.32], [50, 110, 170, 0.40], colorT);
+    const coreColor = mixRgba([219, 171, 99, 0.28], [120, 190, 230, 0.65], colorT);
 
     const sPx = (bx + 1) * TILE_SIZE - camera.x;
     const sPy = (by + 1) * TILE_SIZE - camera.y;
@@ -9941,13 +10040,13 @@ function renderOneBeaconRadar(camera, beacon) {
   }
   const pulse = 0.55 + (Math.sin((state.lastTs || 0) * 0.008) * 0.5 + 0.5) * 0.45;
 
-  // Activation animation progress (0..1 over 2000ms)
+  // Activation animation progress (0..1 over BEACON_ACTIVATION_MS)
   // Phases: ring 0-40%, line 40-70%, dot 70-100%
   let animT = 1;
   if (beacon.activationAnimStart) {
     const elapsed = (state.lastTs || 0) - beacon.activationAnimStart;
-    if (elapsed < 2000) {
-      animT = elapsed / 2000;
+    if (elapsed < BEACON_ACTIVATION_MS) {
+      animT = elapsed / BEACON_ACTIVATION_MS;
     } else {
       beacon.activationAnimStart = null;
     }
