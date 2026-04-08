@@ -249,6 +249,7 @@ Activation:
 - after the animation the shop (or artifact choice) opens
 - when all beacon wires are fully freed, the contour hint appears around that beacon again
 - closing the contour around that already-active beacon a second time triggers `Full Freedom`: beacon wires fully fade out, then the beacon grants a bonus item reward
+- if beacon wires were already fully freed before the first activation, the beacon still opens the normal shop first; `Full Freedom` triggers only after the shop flow is closed
 - active beacons still accept contour-gold deposits
 
 Gameplay role:

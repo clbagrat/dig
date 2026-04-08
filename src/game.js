@@ -2408,6 +2408,7 @@ function setupField(seedOverride = null) {
       rewardRecipe: null,
       rewardRevealStart: 0,
       rewardGranted: false,
+      rewardAutoAfterShop: false,
     });
   }
   state.beaconWires = map.beaconWires;
@@ -2613,6 +2614,21 @@ function buildBeaconBonusRecipe(beacon) {
     recipe.push(available[pickIndex] || available[0]);
   }
   return recipe;
+}
+
+function beginFullFreedom(beacon, announce = true) {
+  const rewardRecipe = Array.isArray(beacon.rewardRecipe) && beacon.rewardRecipe.length > 0
+    ? beacon.rewardRecipe
+    : buildBeaconBonusRecipe(beacon);
+  beacon.rewardContourReady = false;
+  beacon.rewardClaimed = true;
+  beacon.rewardRecipe = rewardRecipe;
+  beacon.rewardRevealStart = state.lastTs || performance.now();
+  beacon.rewardGranted = false;
+  beacon.rewardAutoAfterShop = false;
+  if (announce) {
+    showPerkToast("Полная свобода");
+  }
 }
 
 function awardBonusGoldPerkChoice() {
@@ -3579,8 +3595,17 @@ function init() {
       playSound("shop_close");
       state.shopModalOpen = false;
       syncTouchZonesInteractivity();
+      for (const beacon of state.beacons) {
+        if (!beacon.rewardAutoAfterShop || beacon.rewardClaimed) continue;
+        beginFullFreedom(beacon);
+      }
       if (state.pendingBeaconWireActivation) {
-        state.pendingBeaconWireActivationAt = (state.lastTs || performance.now()) + BEACON_WIRE_POST_SHOP_DELAY_MS;
+        if (state.pendingBeaconWireActivation.rewardClaimed) {
+          state.pendingBeaconWireActivation = null;
+          state.pendingBeaconWireActivationAt = 0;
+        } else {
+          state.pendingBeaconWireActivationAt = (state.lastTs || performance.now()) + BEACON_WIRE_POST_SHOP_DELAY_MS;
+        }
       }
     } });
     bindUi();
@@ -8004,15 +8029,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       if (!beacon.rewardContourReady || beacon.rewardClaimed) {
         continue;
       }
-      const rewardRecipe = Array.isArray(beacon.rewardRecipe) && beacon.rewardRecipe.length > 0
-        ? beacon.rewardRecipe
-        : buildBeaconBonusRecipe(beacon);
-      beacon.rewardContourReady = false;
-      beacon.rewardClaimed = true;
-      beacon.rewardRecipe = rewardRecipe;
-      beacon.rewardRevealStart = state.lastTs || performance.now();
-      beacon.rewardGranted = false;
-      showPerkToast("Полная свобода");
+      beginFullFreedom(beacon);
       continue;
     }
     if (pathWithinBeaconArea) {
@@ -8040,6 +8057,9 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       const pendingAction = artifactRemaining > 0
         ? { type: "artifactChoice", remaining: artifactRemaining, beacon }
         : { type: "shop", beaconY: beacon.y };
+      if (beacon.rewardContourReady && !beacon.rewardClaimed) {
+        beacon.rewardAutoAfterShop = true;
+      }
       showPerkToast("Маяк активирован!");
       addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
       healPlayer(1, "Маяк");
@@ -9775,7 +9795,7 @@ function forEachBeaconWireCoveredCell(beacon, visit) {
 
 function areBeaconWiresFreed(beacon) {
   if (!Array.isArray(beacon.wireTrackedCells) || beacon.wireTrackedCells.length === 0) {
-    return false;
+    return beacon.wireDamageTriggered === true;
   }
   for (const index of beacon.wireTrackedCells) {
     if (state.hardness[index] > 0) {
