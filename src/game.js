@@ -1322,7 +1322,6 @@ function clearStoredGenerationConfig() {
 const GENERATION_QUICK_FIELDS = [
   { label: "Height", source: "height", min: 8, step: 1 },
   { label: "Width", source: "width", min: 6, max: GRID_W - 2, step: 1 },
-  { label: "Hidden Beacons", source: "rules.hiddenBeacons", min: 0, step: 1 },
   { label: "Perk Zone Count", source: "rules.perkZones", min: 0, step: 1 },
   { label: "Safe Count", source: "rules.safes", min: 0, step: 1 },
   { label: "Worm Nest Count", source: "rules.wormNests", min: 0, step: 1 },
