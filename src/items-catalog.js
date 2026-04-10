@@ -194,7 +194,7 @@ export const ALL_EQUIPMENT = [
     baseCost: 50,
     effect: [
       { stat: "stunDetonatorLevel", effectByRarity: [null, null, 1, 1, 2] },
-      { stat: "armor",              effectByRarity: [null, null, -1, -2, -2] },
+      { stat: "armor",              effectByRarity: [null, null, -25, -50, -50] },
     ],
   },
 
@@ -287,7 +287,7 @@ export const ALL_ITEMS = [
     tags: ["выживание"],
     minRarity: 1,
     baseCost: 50,
-    effect: { stat: "maxHp", value: 1 },
+    effect: { stat: "maxHp", value: 25 },
   },
   {
     id: "afterburner",
@@ -305,7 +305,7 @@ export const ALL_ITEMS = [
     baseCost: 60,
     effect: [
       { stat: "strikeSpeed", effectByRarity: [null, 15, 22, 30, 40] },
-      { stat: "maxHp",       effectByRarity: [null, -1, -1, -1, -1] },
+      { stat: "maxHp",       effectByRarity: [null, -25, -25, -25, -25] },
     ],
   },
   {
@@ -451,7 +451,7 @@ export const ALL_ITEMS = [
     baseCost: 50,
     effect: {
       stat: "healPerLevel",
-      effectByRarity: [null, 1, 1, 2, 3],
+      effectByRarity: [null, 25, 25, 50, 75],
     },
   },
   {
@@ -545,8 +545,8 @@ export const ALL_ITEMS = [
     minRarity: 2,
     baseCost: 45,
     effect: [
-      { stat: "healPerLevel", effectByRarity: [null, null, 1, 2, 3] },
-      { stat: "maxHp",        effectByRarity: [null, null, -1, -1, -1] },
+      { stat: "healPerLevel", effectByRarity: [null, null, 25, 50, 75] },
+      { stat: "maxHp",        effectByRarity: [null, null, -25, -25, -25] },
     ],
   },
   {
@@ -560,7 +560,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 40,
     effect: [
-      { stat: "armor",       effectByRarity: [null, 1, 2, 3, 5] },
+      { stat: "armor",       effectByRarity: [null, 25, 50, 75, 125] },
       { stat: "strikeSpeed", effectByRarity: [null, -8, -10, -12, -15] },
     ],
   },
@@ -661,7 +661,7 @@ export const ALL_ITEMS = [
     baseCost: 40,
     effect: [
       { stat: "bonusFindChance", effectByRarity: [null, 0.15, 0.22, 0.32, 0.45] },
-      { stat: "armor",           effectByRarity: [null, -1,   -1,   -2,   -2  ] },
+      { stat: "armor",           effectByRarity: [null, -25,  -25,  -50,  -50  ] },
     ],
   },
   {

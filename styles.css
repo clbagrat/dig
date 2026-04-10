@@ -897,6 +897,42 @@ strong {
   font-weight: 700;
 }
 
+.debug-generation__level-delete {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 7px;
+  border: 1px solid rgba(215, 100, 60, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(215, 100, 60, 0.7);
+  font-size: 12px;
+  font: inherit;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.debug-generation__level-delete:hover {
+  background: rgba(215, 100, 60, 0.15);
+  color: rgba(215, 100, 60, 1);
+}
+
+.debug-generation__add-level {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed rgba(215, 159, 73, 0.3);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.debug-generation__add-level:hover {
+  border-color: rgba(215, 159, 73, 0.6);
+  color: var(--text);
+}
+
 .debug-generation__level-meta {
   color: var(--muted);
   font-size: 11px;
@@ -946,6 +982,21 @@ strong {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.debug-generation__field-prev {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.45;
+}
+
+.debug-generation__field-prev::before {
+  content: "prev: ";
 }
 
 .debug-generation__field-input {

@@ -1,6 +1,6 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem } from "./shop.js?v=41";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems } from "./shop.js?v=41";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
-import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
+import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, ALL_EQUIPMENT, ALL_ITEMS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
 import {
   generateMap,
   mulberry32 as _mulberry32,
@@ -21,7 +21,7 @@ const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, ser
 const STEP_MS = 1000 / 60;
 const MAX_FRAME_MS = 100;
 const START_FUEL = 350;
-const START_HP = 4;
+const START_HP = 100;
 const MAX_HEAT = 100;
 const BASE_DRILL_DAMAGE = 20;
 const IDLE_FUEL_DRAIN = 0.8;
@@ -54,21 +54,21 @@ const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
 const METAL_VEIN_GROUPS = 16;
 const GOLD_ORE_GROUPS = 50;
-const GOLD_ORE_PER_BLOCK = 18;
+const GOLD_ORE_PER_BLOCK = 30;
 const GAS_SPREAD_INTERVAL = 2;
 const GAS_SPREAD_STEPS = 3;
-const GAS_DAMAGE = 1;
+const GAS_DAMAGE = 25;
 const BOULDER_DELAY = 1;
 const BOULDER_MOVE_INTERVAL = 0.12;
 const BOULDER_BREAK_LIMIT = 20;
-const BOULDER_DAMAGE = 5;
+const BOULDER_DAMAGE = 75;
 const BOULDER_MIN_START_DISTANCE = 4;
 const BEACON_COUNT = 5;
 const BEACON_MIN_DIST = 15;
 const BEACON_MAX_DIST = 60;
 const STEAM_RELEASE_DELAY = 2;
 const STEAM_LIFETIME = 3;
-const STEAM_DAMAGE = 1;
+const STEAM_DAMAGE = 25;
 const STEAM_RANGE = 99;
 const EXPLOSION_BREAK_DAMAGE = 9999;
 const ROCKET_ARMED_DURATION = 1.0;
@@ -89,7 +89,7 @@ const OVERFLOW_STUN_DURATION = 3;
 const HEAT_PER_STRIKE = 3;
 const HEAT_COOL_RATE = 8;
 const HEAT_STUN_DURATION = 3;
-const FUEL_DEPLETION_HP_COST = 1;
+const FUEL_DEPLETION_HP_COST = 25;
 const FUEL_DEPLETION_RECOVERY = 100;
 const IMPACT_EFFECT_DURATION = 0.22;
 const BREAK_EFFECT_DURATION = 0.42;
@@ -106,7 +106,7 @@ const TILE_SWAP_ANIMATION_DURATION = 0.18;
 const WORM_ACTIVATION_RADIUS = 10;
 const WORM_ATTACK_INTERVAL = 10;
 const WORM_SPEED = 4;
-const WORM_DAMAGE = 2;
+const WORM_DAMAGE = 50;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
@@ -131,7 +131,7 @@ const LEVEL_REWARD_POOL = [
   { stat: "speedOfAutoClose",          minRarity: 1, values: [3, 6, 10, 15],           label: "Скорость контура", fmt: v => `+${v}%` },
   { stat: "fuelPickupBonus",           minRarity: 2, values: [null, 5, 10, 15, 20],    label: "Бонус топлива",  fmt: v => `+${v}` },
   { stat: "maxHeat",                   minRarity: 2, values: [null, 5, 10, 15],        label: "Макс. жар",      fmt: v => `+${v}` },
-  { stat: "maxHp",                     minRarity: 3, values: [null, null, 1, 2],       label: "Макс. HP",       fmt: v => `+${v}` },
+  { stat: "maxHp",                     minRarity: 3, values: [null, null, 25, 50],     label: "Макс. HP",       fmt: v => `+${v}` },
   { stat: "xpBonusMultiplier",         minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Опыт",           fmt: v => `+${Math.round(v*100)}%` },
   { stat: "effectDurationRate",        minRarity: 2, values: [null, 0.10, 0.18, 0.28], label: "Длит. эффектов", fmt: v => `+${Math.round(v*100)}%` },
   { stat: "bonusFindChance",           minRarity: 2, values: [null, 0.10, 0.20, 0.35], label: "Чутьё",          fmt: v => `+${Math.round(v*100)}%` },
@@ -241,8 +241,8 @@ const HAZARD_TYPES = {
   VOLATILE: 2,
 };
 const HAZARD_DATA = {
-  [HAZARD_TYPES.SPIKE]: { damage: 1, color: "#ff6b48" },
-  [HAZARD_TYPES.VOLATILE]: { damage: 2, color: "#ffd166" },
+  [HAZARD_TYPES.SPIKE]: { damage: 25, color: "#ff6b48" },
+  [HAZARD_TYPES.VOLATILE]: { damage: 50, color: "#ffd166" },
 };
 
 const BLOCK_TYPES = [
@@ -347,6 +347,7 @@ const state = {
   effectDurationRate: 1,
   concentration: 1,
   fuelDrainRate: 1,
+  fuelToHpRate: 0.7,
   armor: 0,
   heatExplosionDamageBonus: 0,
   heatExplosionRadiusBonus: 0,
@@ -1462,6 +1463,9 @@ function renderGenerationQuickEditor() {
   }
   const totalHeight = config.reduce((sum, level) => sum + (Math.round(Number(level.height)) || 0), 0);
   const hostBaseCount = config.filter((level) => !!level.canHostBase).length;
+  const prevOpenStates = Array.from(
+    root.querySelectorAll(".debug-generation__level")
+  ).map((el) => el.open);
   root.innerHTML = "";
 
   const summary = document.createElement("div");
@@ -1479,18 +1483,25 @@ function renderGenerationQuickEditor() {
     const level = config[i];
     const card = document.createElement("details");
     card.className = "debug-generation__level";
-    if (i === 0) {
+    if (i < prevOpenStates.length ? prevOpenStates[i] : i === 0) {
       card.open = true;
     }
     const beacons = Number(level?.rules?.beacons) || 0;
     const hidden = Number(level?.rules?.hiddenBeacons) || 0;
     const upper = Number(level?.rules?.upperBeacons) || 0;
     const lower = Number(level?.rules?.lowerBeacons) || 0;
+    const prevLevel = i > 0 ? config[i - 1] : null;
+    const ph = (val) => val !== null && val !== undefined ? `<span class="debug-generation__field-prev">${val}</span>` : "";
+    const prevBeacons = prevLevel ? Number(prevLevel?.rules?.beacons) || 0 : null;
+    const prevHidden = prevLevel ? Number(prevLevel?.rules?.hiddenBeacons) || 0 : null;
+    const prevUpper = prevLevel ? Number(prevLevel?.rules?.upperBeacons) || 0 : null;
+    const prevLower = prevLevel ? Number(prevLevel?.rules?.lowerBeacons) || 0 : null;
     card.innerHTML = `
       <summary class="debug-generation__level-summary">
         <div class="debug-generation__level-header">
           <div class="debug-generation__level-title">Level ${i + 1}</div>
-      <div class="debug-generation__level-meta">Beacon split: hidden ${hidden}, upper ${upper}, lower ${lower}, flexible ${Math.max(0, beacons - upper - lower)}</div>
+          <div class="debug-generation__level-meta">Beacon split: hidden ${hidden}, upper ${upper}, lower ${lower}, flexible ${Math.max(0, beacons - upper - lower)}</div>
+          <button class="debug-generation__level-delete" data-action="delete-level" data-level-index="${i}" title="Delete level">✕</button>
         </div>
       </summary>
       <div class="debug-generation__level-body">
@@ -1503,7 +1514,7 @@ function renderGenerationQuickEditor() {
           <div class="debug-generation__triplet-title">Beacon Placement</div>
           <div class="debug-generation__triplet-grid">
             <label class="debug-generation__field">
-              <span class="debug-generation__field-label">Beacon Count</span>
+              <span class="debug-generation__field-label">Beacon Count${ph(prevBeacons)}</span>
               <input
                 class="debug-generation__field-input"
                 type="number"
@@ -1516,7 +1527,7 @@ function renderGenerationQuickEditor() {
               >
             </label>
             <label class="debug-generation__field">
-              <span class="debug-generation__field-label">Hidden Beacons</span>
+              <span class="debug-generation__field-label">Hidden Beacons${ph(prevHidden)}</span>
               <input
                 class="debug-generation__field-input"
                 type="number"
@@ -1529,7 +1540,7 @@ function renderGenerationQuickEditor() {
               >
             </label>
             <label class="debug-generation__field">
-              <span class="debug-generation__field-label">Upper Beacons</span>
+              <span class="debug-generation__field-label">Upper Beacons${ph(prevUpper)}</span>
               <input
                 class="debug-generation__field-input"
                 type="number"
@@ -1542,7 +1553,7 @@ function renderGenerationQuickEditor() {
               >
             </label>
             <label class="debug-generation__field">
-              <span class="debug-generation__field-label">Lower Beacons</span>
+              <span class="debug-generation__field-label">Lower Beacons${ph(prevLower)}</span>
               <input
                 class="debug-generation__field-input"
                 type="number"
@@ -1566,8 +1577,10 @@ function renderGenerationQuickEditor() {
       const fieldWrap = document.createElement("label");
       fieldWrap.className = "debug-generation__field";
       const value = getValueByPath(level, field.source);
+      const prevValue = prevLevel !== null ? getValueByPath(prevLevel, field.source) : null;
+      const prevValueFmt = prevValue !== null && Number.isFinite(Number(prevValue)) ? Math.round(Number(prevValue)) : null;
       fieldWrap.innerHTML = `
-        <span class="debug-generation__field-label">${field.label}</span>
+        <span class="debug-generation__field-label">${field.label}${ph(prevValueFmt)}</span>
         <input
           class="debug-generation__field-input"
           type="number"
@@ -1586,11 +1599,14 @@ function renderGenerationQuickEditor() {
       const field = GENERATION_TRIPLET_FIELDS[j];
       const wrap = document.createElement("div");
       wrap.className = "debug-generation__triplet";
+      const pt0 = prevLevel !== null ? getTripletValue(prevLevel, field.source, 0) : null;
+      const pt1 = prevLevel !== null ? getTripletValue(prevLevel, field.source, 1) : null;
+      const pt2 = prevLevel !== null ? getTripletValue(prevLevel, field.source, 2) : null;
       wrap.innerHTML = `
         <div class="debug-generation__triplet-title">${field.label}</div>
         <div class="debug-generation__triplet-grid">
           <label class="debug-generation__field">
-            <span class="debug-generation__field-label">Groups</span>
+            <span class="debug-generation__field-label">Groups${ph(pt0)}</span>
             <input
               class="debug-generation__field-input"
               type="number"
@@ -1604,7 +1620,7 @@ function renderGenerationQuickEditor() {
             >
           </label>
           <label class="debug-generation__field">
-            <span class="debug-generation__field-label">Min</span>
+            <span class="debug-generation__field-label">Min${ph(pt1)}</span>
             <input
               class="debug-generation__field-input"
               type="number"
@@ -1618,7 +1634,7 @@ function renderGenerationQuickEditor() {
             >
           </label>
           <label class="debug-generation__field">
-            <span class="debug-generation__field-label">Max</span>
+            <span class="debug-generation__field-label">Max${ph(pt2)}</span>
             <input
               class="debug-generation__field-input"
               type="number"
@@ -1638,6 +1654,12 @@ function renderGenerationQuickEditor() {
     levels.appendChild(card);
   }
   root.appendChild(levels);
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "debug-generation__add-level";
+  addBtn.dataset.action = "add-level";
+  addBtn.textContent = "+ Add level";
+  root.appendChild(addBtn);
 }
 
 function bindGenerationDebugControls() {
@@ -1711,6 +1733,34 @@ function bindGenerationDebugControls() {
       state.generationEditorStatus = "Generation config edited but not applied.";
       state.generationEditorStatusTone = "";
       syncGenerationDebugEditor();
+    });
+    debugGenerationQuickEditor.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const action = target.dataset.action;
+      if (action === "delete-level") {
+        event.preventDefault();
+        const levelIndex = Number(target.dataset.levelIndex);
+        const config = tryParseGenerationEditorText() || getGenerationConfig();
+        if (!Array.isArray(config) || config.length <= 1) return;
+        config.splice(levelIndex, 1);
+        config.forEach((l, idx) => { l.id = idx + 1; });
+        state.generationEditorText = JSON.stringify(config, null, 2);
+        state.generationEditorStatus = "Level deleted.";
+        state.generationEditorStatusTone = "";
+        syncGenerationDebugEditor();
+      } else if (action === "add-level") {
+        const config = tryParseGenerationEditorText() || getGenerationConfig();
+        if (!Array.isArray(config) || config.length === 0) return;
+        const last = config[config.length - 1];
+        const newLevel = JSON.parse(JSON.stringify(last));
+        newLevel.id = config.length + 1;
+        config.push(newLevel);
+        state.generationEditorText = JSON.stringify(config, null, 2);
+        state.generationEditorStatus = "Level added.";
+        state.generationEditorStatusTone = "";
+        syncGenerationDebugEditor();
+      }
     });
     debugGenerationQuickEditor.addEventListener("focusin", () => {
       setGenerationEditingActive(true, "Editing mode: simulation paused to reduce heat and battery drain.");
@@ -2190,6 +2240,7 @@ function setupField(seedOverride = null) {
   state.effectDurationRate = 1;
   state.concentration = 1;
   state.fuelDrainRate = 1;
+  state.fuelToHpRate = 0.7;
   state.armor = 0;
   state.heatExplosionDamageBonus = 0;
   state.heatExplosionRadiusBonus = 0;
@@ -2884,7 +2935,7 @@ function applyCrystalCatalystBonus(x, y) {
     addFuel(40, x, y);
   }
   if (state.crystalCatalystLevel >= 3) {
-    healPlayer(1, "Кристальный катализатор");
+    healPlayer(25, "Кристальный катализатор");
   }
 }
 
@@ -3089,11 +3140,11 @@ function applyTilePerk(perkType, x, y, showToast = true) {
       state.perkText = "Скорость";
       break;
     case 6:
-      healPlayer(1, "HP+");
+      healPlayer(25, "HP+");
       state.perkText = "HP+";
       break;
     case 7:
-      state.armor += 1;
+      state.armor += 25;
       state.perkText = "Броня";
       break;
     case 8:
@@ -3156,8 +3207,8 @@ function applyGoldPerk(perkType) {
       state.perkText = "Перегрузка";
       break;
     case 14:
-      state.maxHp += 1;
-      healPlayer(2, "Усиленный корпус");
+      state.maxHp += 25;
+      healPlayer(50, "Усиленный корпус");
       state.perkText = "Усиленный корпус";
       break;
     case 15:
@@ -3333,8 +3384,8 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       showPerkToast("Охлаждающие ракеты");
       break;
     case "reinforced_hull":
-      state.maxHp += Math.round(1 * m);
-      healPlayer(Math.round(2 * m), "Усиленный корпус");
+      state.maxHp += Math.round(25 * m);
+      healPlayer(Math.round(50 * m), "Усиленный корпус");
       showPerkToast("Усиленный корпус");
       break;
     case "adrenaline":
@@ -3430,6 +3481,7 @@ function getShopStatsSnapshot() {
     effectDurationRate: state.effectDurationRate,
     concentration: state.concentration,
     fuelDrainRate: state.fuelDrainRate,
+    fuelToHpRate: state.fuelToHpRate,
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier,
     shopPriceDiscount: state.shopPriceDiscount,
     fuelPickupBonus: state.fuelPickupBonus,
@@ -4090,6 +4142,14 @@ function bindUi() {
     });
   }
 
+  const debugZeroFuel = document.getElementById("debugZeroFuel");
+  if (debugZeroFuel) {
+    debugZeroFuel.addEventListener("click", () => {
+      state.fuel = 0;
+      showPerkToast("Топливо: 0");
+    });
+  }
+
   const debugHealFull = document.getElementById("debugHealFull");
   if (debugHealFull) {
     debugHealFull.addEventListener("click", () => {
@@ -4421,6 +4481,7 @@ function buildDebugPerkButtons() {
       { key: "fuel",                 label: "fuel",                  step: 50,   fmt: v => Math.round(v) },
       { key: "maxFuel",              label: "maxFuel",               step: 50,   fmt: v => Math.round(v) },
       { key: "fuelDrainRate",        label: "fuelDrainRate",         step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "fuelToHpRate",         label: "fuelToHpRate",          step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "heat",                 label: "heat",                  step: 10,   fmt: v => Math.round(v) },
       { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
       { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
@@ -5195,9 +5256,7 @@ function update(dt) {
     }
   }
 
-  state.fuel = Math.max(0, state.fuel - getIdleFuelDrain() * dt);
-  state.fuel = Math.min(state.maxFuel, state.fuel);
-  consumeFuelEmergency();
+  drainFuel(getIdleFuelDrain() * dt);
   state.struckThisFrame = false;
   state.drillIdleFrame = false;
   updateDrill(dt);
@@ -6765,6 +6824,23 @@ function dropUnsafeGold() {
   scatterGoldAroundTile(state.drill.x, state.drill.y, dropAmount, { minTargets: 1, maxTargets: 1 });
 }
 
+function drainFuel(amount) {
+  if (amount <= 0 || state.dead) return;
+  if (state.fuel >= amount) {
+    state.fuel -= amount;
+    state.outOfFuel = false;
+    return;
+  }
+  const fromFuel = state.fuel;
+  const fromHp = (amount - fromFuel) * Math.max(0, state.fuelToHpRate);
+  state.fuel = 0;
+  if (!state.outOfFuel) {
+    state.outOfFuel = true;
+    playSound("fuel_emergency");
+  }
+  applyHazardDamage(fromHp, { affectsArmor: false, dropOnDamage: false, silent: true });
+}
+
 function applyHazardDamage(amount, options = {}) {
   if (amount <= 0 || state.dead) {
     return;
@@ -6787,13 +6863,17 @@ function applyHazardDamage(amount, options = {}) {
   }
 
   state.hp = Math.max(0, state.hp - damageLeft);
-  playSound("player_hit");
-  state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
-  state.damageFlash = Math.min(1, state.damageFlash + 0.8);
+  if (options.silent !== true) {
+    playSound("player_hit");
+    state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
+    state.damageFlash = Math.min(1, state.damageFlash + 0.8);
+  }
   showHpToast(damageLeft);
-  dropUnsafeGold();
-  dropArtifactOnDamage();
-  dropKeyOnDamage();
+  if (options.dropOnDamage !== false) {
+    dropUnsafeGold();
+    dropArtifactOnDamage();
+    dropKeyOnDamage();
+  }
   if (state.hp <= 0) {
     playSound("player_death");
     state.dead = true;
@@ -6807,23 +6887,6 @@ function showHpToast(value) {
   debounceToast("hp", value, "#ff8a8a", v => `-${v} HP`);
 }
 
-function consumeFuelEmergency() {
-  if (state.dead) {
-    return;
-  }
-  if (state.fuel > 0) {
-    state.outOfFuel = false;
-    return;
-  }
-
-  state.fuel = 0;
-  state.outOfFuel = false;
-  playSound("fuel_emergency");
-  applyHazardDamage(FUEL_DEPLETION_HP_COST, { affectsArmor: false });
-  if (!state.dead) {
-    state.fuel = Math.min(state.maxFuel, state.fuel + FUEL_DEPLETION_RECOVERY);
-  }
-}
 
 function applyGasContactDamage() {
   if (state.gasMask[cellIndex(state.drill.x, state.drill.y)]) {
@@ -7822,7 +7885,7 @@ function updateDrill(dt) {
   state.drill.moveResumeTimer = Math.max(0, state.drill.moveResumeTimer - dt);
 
   if (state.stunTimer > 0) {
-    state.fuel = Math.max(0, state.fuel - 5 * dt);
+    drainFuel(5 * dt);
     state.drill.progress = 0;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 6);
     state.drill.strikeLatch = false;
@@ -7831,15 +7894,7 @@ function updateDrill(dt) {
 
   // Carrying key drains fuel passively
   if (state.heldKeyForSafe >= 0) {
-    state.fuel = Math.max(0, state.fuel - 4 * dt);
-  }
-
-  if (state.fuel <= 0) {
-    state.fuel = 0;
-    state.drill.progress = 0;
-    state.drill.strikeEnergy = 0;
-    state.drill.strikeLatch = false;
-    return;
+    drainFuel(4 * dt);
   }
 
   const absX = Math.abs(state.moveAimX);
@@ -7995,7 +8050,7 @@ function updateDrill(dt) {
     state.drill.strikePhase += dt * actionRate;
     state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
     if (state.overhealDrillTimer <= 0) {
-      state.fuel = Math.max(0, state.fuel - DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt);
+      drainFuel(DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt);
     }
     moveDrillRenderToward(state.drill.x, state.drill.y, dt);
     return;
@@ -8065,9 +8120,8 @@ function updateDrill(dt) {
 
   addHeatOnStrike(HEAT_PER_STRIKE * Math.max(0, state.heatRate));
 
-  if (state.fuel <= 0 && state.health[targetIndex] > 0) {
+  if (state.fuel <= 0) {
     state.fuel = 0;
-    return;
   }
 }
 
@@ -8283,7 +8337,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       }
       showPerkToast("Маяк активирован!");
       addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
-      healPlayer(1, "Маяк");
+      healPlayer(25, "Маяк");
       state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
     }
   }
@@ -11863,7 +11917,7 @@ function renderHud() {
   const left = state.width - 14 - totalWidth;
   const secondRowTop = top + panelHeight + 8;
 
-  const hpLabel = state.armor > 0 ? `${state.hp}/${state.maxHp} • A:${state.armor}` : `${state.hp}/${state.maxHp}`;
+  const hpLabel = state.armor > 0 ? `${Math.ceil(state.hp)}/${state.maxHp} • A:${state.armor}` : `${Math.ceil(state.hp)}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
   state.goldHitRect = { x: left, y: top, width: panelWidth, height: panelHeight };
 
@@ -11996,7 +12050,7 @@ function renderHud() {
   }
 
   renderHudCoreStats(left, detailTop, panelWidth, "СТАТЫ");
-  renderHudPerkColumn(left + panelWidth + gap, detailTop, panelWidth, "ПЕРКИ");
+  renderHudPerkColumn(14, state.height - 14, state.width - 28, "ПЕРКИ");
 
   ctx.save();
   ctx.fillStyle = "rgba(198, 171, 132, 0.68)";
@@ -12309,30 +12363,39 @@ function renderHudCoreStats(x, y, width, title) {
 function renderHudPerkColumn(x, y, width, title) {
   const ctx = state.ctx;
   const perkRows = [];
+
+  // 1. Equipped parts (equipment slots)
+  const equipped = getEquippedParts();
+  for (const part of equipped) {
+    const def = ALL_EQUIPMENT.find(e => e.id === part.id);
+    if (def) perkRows.push({ icon: def.icon || "?", label: null, isEquipment: true });
+  }
+
+  // 2. Purchased items
+  const purchased = getPurchasedItems();
+  for (const item of purchased) {
+    const def = ALL_ITEMS.find(e => e.id === item.id);
+    if (def) perkRows.push({ icon: def.icon || "?", label: null, isItem: true });
+  }
+
+  // 3. Gold perks
   for (let i = 1; i < GOLD_PERK_TYPES.length; i += 1) {
-    if (i === 21) {
-      continue;
-    }
-    if (!GOLD_PERK_TYPES[i]) {
-      continue;
-    }
+    if (i === 21) continue;
+    if (!GOLD_PERK_TYPES[i]) continue;
     const level = getGoldPerkCurrentLevel(i);
-    if (level <= 0) {
-      continue;
-    }
+    if (level <= 0) continue;
     perkRows.push({
       perkType: i,
       icon: GOLD_PERK_TYPES[i].icon || "?",
-      name: GOLD_PERK_TYPES[i].name,
       level,
     });
   }
 
-  const iconsPerRow = 9;
+  const iconsPerRow = Math.floor((width + 6) / (18 + 6));
   const iconSize = 18;
   const gap = 6;
   const rowHeight = 22;
-  const startRight = x + width - 10;
+  const startLeft = x + iconSize * 0.5;
 
   ctx.save();
   ctx.textBaseline = "middle";
@@ -12340,12 +12403,13 @@ function renderHudPerkColumn(x, y, width, title) {
   for (let i = 0; i < perkRows.length; i += 1) {
     const rowIndex = Math.floor(i / iconsPerRow);
     const colIndex = i % iconsPerRow;
-    const cx = startRight - colIndex * (iconSize + gap) - iconSize * 0.5;
-    const cy = y + 8 + rowIndex * rowHeight;
-    const perkType = perkRows[i].perkType;
-
-    ctx.fillStyle = "rgba(50, 28, 16, 0.42)";
-    ctx.strokeStyle = "rgba(215, 159, 73, 0.24)";
+    const cx = startLeft + colIndex * (iconSize + gap);
+    const cy = y - 8 - rowIndex * rowHeight;
+    const row = perkRows[i];
+    const isEquipment = !!row.isEquipment;
+    const isItem = !!row.isItem;
+    ctx.fillStyle = isEquipment ? "rgba(28, 40, 60, 0.6)" : isItem ? "rgba(28, 50, 28, 0.6)" : "rgba(50, 28, 16, 0.42)";
+    ctx.strokeStyle = isEquipment ? "rgba(100, 160, 255, 0.4)" : isItem ? "rgba(100, 200, 100, 0.4)" : "rgba(215, 159, 73, 0.24)";
     ctx.lineWidth = 1;
     drawRoundedRectPath(cx - iconSize * 0.5, cy - iconSize * 0.5, iconSize, iconSize, 7);
     ctx.fill();
@@ -12353,10 +12417,10 @@ function renderHudPerkColumn(x, y, width, title) {
     ctx.fillStyle = "#ffeacb";
     ctx.font = `700 10px ${HUD_FONT}`;
     ctx.textAlign = "center";
-    ctx.fillText(GOLD_PERK_TYPES[perkType].icon || "?", cx, cy + 0.5);
+    ctx.fillText(row.icon, cx, cy + 0.5);
 
-    if (perkRows[i].level >= 2) {
-      const badgeText = String(perkRows[i].level);
+    if (row.level >= 2) {
+      const badgeText = String(row.level);
       const badgeX = cx + iconSize * 0.35;
       const badgeY = cy - iconSize * 0.35;
       ctx.fillStyle = "rgba(36, 20, 12, 0.92)";

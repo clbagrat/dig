@@ -150,6 +150,10 @@ export function getEquippedParts() {
   return equippedParts.slice();
 }
 
+export function getPurchasedItems() {
+  return purchasedItems.slice();
+}
+
 export function grantItem(good, rarity) {
   purchasedItems.push({ id: good.id, rarity });
   document.dispatchEvent(new CustomEvent("shop:purchase-item", {
