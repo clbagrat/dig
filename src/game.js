@@ -275,7 +275,7 @@ const GOLD_PERK_TYPES = [
   null,
   null,
   null,
-  { name: "Контурный заряд", icon: "⬡", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
+  { name: "Контурный заряд", icon: "⬡", desc: "После замыкания контура на 3 сек усиливает drillPower по числу сломанных блоков" },
   { name: "Форсаж на нуле", icon: "⏚", desc: "Чем меньше топлива, тем быстрее следующий удар" },
   { name: "Саперный заряд", icon: "✦", desc: "Каждые N сломанных буром блоков кидает ракету с малым радиусом на дистанцию 1" },
   { name: "Топливный контур", icon: "⛽", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
@@ -492,16 +492,17 @@ const state = {
   weakSpotFuelGain: 0,
   insuranceLevel: 0,
   fuelConverterLevel: 0,
-  loopChargeLevel: 0,
+  contourChargeDamagePerCell: 0,
   loopChargeTimer: 0,
   loopChargeDuration: 0,
-  loopChargeDamageBonus: 0,
+  contourChargeDrillPowerBonus: 0,
   contourLengthDamageLevel: 0,
   loopLengthDamageBonus: 0,
   loopSpawnBonusChance: 0,
   contourResMultiplier: 1.15,
   loopPerkLevel: 0,
   lowFuelSpeedBonus: 0,
+  lowFuelStrikeSpeedApplied: 0,
   remoteBombLevel: 0,
   remoteBombInterval: 0,
   overhealOverdrive: false,
@@ -2328,16 +2329,17 @@ function setupField(seedOverride = null) {
   state.insuranceLevel = 0;
   state.fuelConverterLevel = 0;
   state.weakSpotMask.fill(0);
-  state.loopChargeLevel = 0;
+  state.contourChargeDamagePerCell = 0;
   state.loopChargeTimer = 0;
   state.loopChargeDuration = 0;
-  state.loopChargeDamageBonus = 0;
+  state.contourChargeDrillPowerBonus = 0;
   state.contourLengthDamageLevel = 0;
   state.loopLengthDamageBonus = 0;
   state.loopSpawnBonusChance = 0;
   state.contourResMultiplier = 1.15;
   state.loopPerkLevel = 0;
   state.lowFuelSpeedBonus = 0;
+  state.lowFuelStrikeSpeedApplied = 0;
   state.remoteBombLevel = 0;
   state.remoteBombInterval = 0;
   state.overhealOverdrive = false;
@@ -3153,8 +3155,7 @@ function applyGoldPerk(perkType) {
     case 4:
       break;
     case 5:
-      state.loopChargeLevel = Math.min(4, state.loopChargeLevel + 1);
-      state.loopChargeDuration = 2 + state.loopChargeLevel;
+      state.contourChargeDamagePerCell += 0.05;
       state.perkText = "Контурный заряд";
       break;
     case 6:
@@ -3309,8 +3310,7 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       showPerkToast("Усиленный бак");
       break;
     case "contour_charge":
-      state.loopChargeLevel = Math.min(4, (state.loopChargeLevel || 0) + 1);
-      state.loopChargeDuration = 2 + state.loopChargeLevel;
+      state.contourChargeDamagePerCell += 0.05 * m;
       showPerkToast("Контурный заряд");
       break;
     case "contour_trophy":
@@ -3400,7 +3400,7 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "speed": state.strikeSpeed -= 20 * m; break;
     case "spike_boost": state.spikeOverdriveLevel = Math.max(0, (state.spikeOverdriveLevel || 0) - 1); break;
     case "tank_boost": state.tankBoostLevel = Math.max(0, (state.tankBoostLevel || 0) - 1); break;
-    case "contour_charge": state.loopChargeLevel = Math.max(0, (state.loopChargeLevel || 0) - 1); state.loopChargeDuration = 2 + state.loopChargeLevel; break;
+    case "contour_charge": state.contourChargeDamagePerCell = Math.max(0, (state.contourChargeDamagePerCell || 0) - 0.05 * m); break;
     case "contour_trophy": state.loopPerkLevel = Math.max(0, (state.loopPerkLevel || 0) - 1); break;
     case "auto_contour": break;
     case "contour_resonance": state.contourLengthDamageLevel = Math.max(0, (state.contourLengthDamageLevel || 0) - 1); break;
@@ -4437,21 +4437,17 @@ function buildDebugPerkButtons() {
   // Core stats -/+ controls
   if (statsRoot) {
     const CORE_STATS = [
-      { key: "hp",                   label: "hp",                    step: 1,    fmt: v => Math.round(v) },
       { key: "maxHp",                label: "maxHp",                 step: 1,    fmt: v => Math.round(v) },
-      { key: "fuel",                 label: "fuel",                  step: 50,   fmt: v => Math.round(v) },
       { key: "maxFuel",              label: "maxFuel",               step: 50,   fmt: v => Math.round(v) },
       { key: "fuelDrainRate",        label: "fuelDrainRate",         step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "fuelToHpRate",         label: "fuelToHpRate",          step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "contourResMultiplier", label: "contourResMultiplier",  step: 0.05, fmt: v => v.toFixed(2) },
-      { key: "heat",                 label: "heat",                  step: 10,   fmt: v => Math.round(v) },
       { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
       { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
       { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
       { key: "weakSpotChance",       label: "Брешь%",                step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "weakSpotMult",         label: "хБрешь",                step: 0.5,  fmt: v => `x${v.toFixed(1)}` },
-      { key: "armor",                label: "armor",                 step: 1,    fmt: v => Math.round(v) },
       { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
       { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
       { key: "concentration",        label: "concentration (%)",     step: 5,    fmt: v => Math.round(v) },
@@ -4468,7 +4464,7 @@ function buildDebugPerkButtons() {
       { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
       { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "shopPriceDiscount",    label: "shopPriceDiscount",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "loopChargeDamageBonus", label: "loopChargeDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
+      { key: "contourChargeDamagePerCell", label: "contourChargePerCell", step: 1, fmt: v => Math.round(v) },
       { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
       { key: "loopSpawnBonusChance", label: "loopSpawnBonusChance",  step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "drillPowerPerLevel",   label: "drillPowerPerLevel",    step: 0.5,  fmt: v => v.toFixed(1) },
@@ -4477,9 +4473,6 @@ function buildDebugPerkButtons() {
       { key: "healPerLevel",         label: "healPerLevel",          step: 1,    fmt: v => Math.round(v) },
       { key: "goldBonusPerLevel",    label: "goldBonusPerLevel",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "bonusFindChance",      label: "bonusFindChance",       step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
-      { key: "level",                label: "level",                 step: 1,    fmt: v => Math.round(v) },
-      { key: "gold",                 label: "gold",                  step: 100,  fmt: v => Math.round(v) },
-      { key: "depth",                label: "depth",                 step: 1,    fmt: v => Math.round(v) },
     ];
     statsRoot.innerHTML = "";
     for (const def of CORE_STATS) {
@@ -5353,7 +5346,10 @@ function update(dt) {
     if (state.pathTailFade === 0) state.pathTailGhost = null;
   }
   if (state.loopChargeTimer === 0) {
-    state.loopChargeDamageBonus = 0;
+    if (state.contourChargeDrillPowerBonus > 0) {
+      state.drillPower = Math.max(0, state.drillPower - state.contourChargeDrillPowerBonus);
+      state.contourChargeDrillPowerBonus = 0;
+    }
   }
   for (let i = state.activeToasts.length - 1; i >= 0; i--) {
     state.activeToasts[i].time -= dt;
@@ -5690,12 +5686,6 @@ function prepareGoldPerkChoices() {
   if (state.tankBoostLevel < 3) {
     bag.push(30);
   }
-  if (state.loopChargeLevel >= 4) {
-    const idx = bag.indexOf(5);
-    if (idx !== -1) {
-      bag.splice(idx, 1);
-    }
-  }
   if (state.remoteBombInterval === 0 || state.remoteBombInterval > 15) {
     bag.push(7);
   }
@@ -5992,7 +5982,7 @@ function getGoldPerkNextLevel(perkType) {
     case 4:
       return 0;
     case 5:
-      return Math.min(4, state.loopChargeLevel + 1);
+      return Math.round(state.contourChargeDamagePerCell / 0.05) + 1;
     case 6:
       return Math.round(state.lowFuelSpeedBonus / 0.35) + 1;
     case 7:
@@ -6052,7 +6042,7 @@ function getGoldPerkCurrentLevel(perkType) {
     case 4:
       return 0;
     case 5:
-      return state.loopChargeLevel;
+      return Math.round(state.contourChargeDamagePerCell / 0.05);
     case 6:
       return Math.round(state.lowFuelSpeedBonus / 0.35);
     case 7:
@@ -6124,12 +6114,11 @@ function getGoldPerkPreview(perkType) {
       };
     }
     case 5: {
-      const nextLevel = Math.min(4, state.loopChargeLevel + 1);
-      const currentDuration = state.loopChargeDuration || 0;
-      const nextDuration = 2 + nextLevel;
+      const currentBonus = state.contourChargeDamagePerCell || 0;
+      const nextBonus = currentBonus + 0.05;
       return {
-        effect: "+5% урона за клетку в контуре",
-        compare: `Длительность ${currentDuration} → ${nextDuration} сек`,
+        effect: `+drillPower за сломанный блок на ${formatPerkNumber(getScaledEffectDuration(3))} сек`,
+        compare: `${formatPerkPercent(currentBonus)} → ${formatPerkPercent(nextBonus)} за блок`,
       };
     }
     case 6: {
@@ -6352,13 +6341,12 @@ function syncPerkChoiceOverlay() {
 }
 
 function getStrikeDamage() {
-  const chargeBoost = state.loopChargeTimer > 0 ? 1 + state.loopChargeDamageBonus : 1;
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01) + contourLength * (state.loopLengthDamageBonus || 0) * 0.01;
   const firstStrikeBoost = (state.firstStrikeTimer > 0 && state.firstStrikeLevel > 0) ? 1 + state.firstStrikeLevel * 0.4 : 1;
   let damage =
-    BASE_DRILL_DAMAGE * chargeBoost * contourBoost +
+    BASE_DRILL_DAMAGE * contourBoost +
     getBasicDrillDamageBonus() +
     getFragileDrillDamageBonus() +
     getLuckyPickaxeDamageBonus() +
@@ -7930,9 +7918,14 @@ function updateDrill(dt) {
     state.visibilityDirty = true;
   }
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
-  const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
+  const lowFuelStrikeSpeedBonus = fuelFactor * state.lowFuelSpeedBonus * 100;
+  const lowFuelStrikeSpeedDelta = lowFuelStrikeSpeedBonus - (state.lowFuelStrikeSpeedApplied || 0);
+  if (lowFuelStrikeSpeedDelta !== 0) {
+    state.strikeSpeed += lowFuelStrikeSpeedDelta;
+    state.lowFuelStrikeSpeedApplied = lowFuelStrikeSpeedBonus;
+  }
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
-  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
+  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus()) / 100) * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
   if (isWalkableTileIndex(targetIndex)) {
@@ -8207,6 +8200,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
 
   const affectedCells = [];
   const interiorCells = [];
+  let brokenCellCount = 0;
   for (let y = minY; y <= maxY; y += 1) {
     for (let x = minX; x <= maxX; x += 1) {
       if (!isPointInPolygon(x + 0.5, y + 0.5, polygon)) {
@@ -8219,16 +8213,18 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         continue;
       }
       affectedCells.push({ x, y });
-      damageCell(x, y, EXPLOSION_BREAK_DAMAGE, {
+      if (damageCell(x, y, EXPLOSION_BREAK_DAMAGE, {
         ignoreHazardEffect: true,
         allowHazardChain: true,
         cause: "explosion",
-      });
+      })) {
+        brokenCellCount += 1;
+      }
     }
   }
 
-  activateLoopCharge(interiorCells.length);
-  maybeSpawnLoopPerk(interiorCells);
+  activateLoopCharge(brokenCellCount);
+  maybeSpawnLoopPerk(interiorCells, brokenCellCount);
   spawnLoopFieldEffect(loopPath, affectedCells);
 
   for (const beacon of state.beacons) {
@@ -8298,13 +8294,17 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
 }
 
 function activateLoopCharge(cellCount) {
-  if (state.loopChargeLevel <= 0 || cellCount <= 0) {
+  if (state.contourChargeDamagePerCell <= 0 || cellCount <= 0) {
     return;
   }
-  state.loopChargeDuration = getScaledEffectDuration(Math.max(3, Math.min(6, 2 + state.loopChargeLevel)));
+  if (state.contourChargeDrillPowerBonus > 0) {
+    state.drillPower = Math.max(0, state.drillPower - state.contourChargeDrillPowerBonus);
+  }
+  state.loopChargeDuration = getScaledEffectDuration(3);
   state.loopChargeTimer = state.loopChargeDuration;
-  state.loopChargeDamageBonus = cellCount * 0.05;
-  showPerkToast(`Контурный заряд +${Math.round(state.loopChargeDamageBonus * 100)}%`);
+  state.contourChargeDrillPowerBonus = cellCount * state.contourChargeDamagePerCell;
+  state.drillPower += state.contourChargeDrillPowerBonus;
+  showPerkToast(`Контурный заряд +${formatPerkNumber(state.contourChargeDrillPowerBonus)} силы`);
 }
 
 function getLoopPerkBlockHardness(x, y) {
@@ -8329,8 +8329,8 @@ function getLoopPerkBlockHardness(x, y) {
   return clamp(1 + Math.round(centerRatio * 2 + state.worldRandom() * 2), 1, BLOCK_TYPES.length - 1);
 }
 
-function maybeSpawnLoopPerk(interiorCells) {
-  const chance = Math.min(1, getLoopPerkChance(interiorCells.length) + (state.loopSpawnBonusChance || 0));
+function maybeSpawnLoopPerk(interiorCells, brokenCellCount = 0) {
+  const chance = Math.min(1, getLoopPerkChance(brokenCellCount) + (state.loopSpawnBonusChance || 0));
   if (chance <= 0 || state.worldRandom() >= chance) {
     return;
   }
@@ -11753,7 +11753,7 @@ function renderHeatWarningStatus(camera) {
 }
 
 function renderLoopChargeStatus(camera) {
-  if (state.loopChargeTimer <= 0 || state.loopChargeDamageBonus <= 0) {
+  if (state.loopChargeTimer <= 0 || state.contourChargeDrillPowerBonus <= 0) {
     return;
   }
 
@@ -11762,7 +11762,7 @@ function renderLoopChargeStatus(camera) {
   const y = state.drill.renderY * TILE_SIZE - camera.y + 31;
   const width = 76;
   const ratio = clamp(state.loopChargeTimer / Math.max(1, state.loopChargeDuration || 3), 0, 1);
-  const text = `+${Math.round(state.loopChargeDamageBonus * 100)}%`;
+  const text = `+${formatPerkNumber(state.contourChargeDrillPowerBonus)} drill`;
 
   ctx.save();
   ctx.font = `700 11px ${HUD_FONT}`;
