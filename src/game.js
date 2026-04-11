@@ -40,6 +40,7 @@ const GOLD_PERK_LEVEL_MULTIPLIER_STEP = 0.05;
 const GOLD_PERK_POPUP_DELAY = 0.5;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
+const AUTO_CLOSE_SEC_PER_BLOCK = 0.52;
 const IDLE_AUTO_CLOSE_PREVIEW_DELAY = 0.5;
 const IDLE_AUTO_CLOSE_PREVIEW_RETURN_DURATION = 0.24;
 const BEACON_ACTIVATION_MS = 2000;
@@ -7924,7 +7925,12 @@ function updateDrill(dt) {
     } else {
       state.autoClosePreview = null;
     }
-    if (!state.idleAutoCloseTriggered && state.idleTime >= state.idleAutoCloseDelay / (1 + state.speedOfAutoClose / 100)) {
+    const _autoCloseCandidate = state.autoClosePreview;
+    const _autoCloseDistance = _autoCloseCandidate ? _autoCloseCandidate.distance : null;
+    const _autoCloseDelay = _autoCloseDistance !== null
+      ? Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, _autoCloseDistance * AUTO_CLOSE_SEC_PER_BLOCK / (1 + state.speedOfAutoClose / 100))
+      : state.idleAutoCloseDelay / (1 + state.speedOfAutoClose / 100);
+    if (!state.idleAutoCloseTriggered && state.idleTime >= _autoCloseDelay) {
       state.idleAutoCloseTriggered = true;
       if (!tryAutoCloseContour()) {
         state.autoClosePreviewFailed = true;
@@ -9963,7 +9969,11 @@ function renderAutoClosePreview(camera) {
     if (state.idleTime < IDLE_AUTO_CLOSE_PREVIEW_DELAY) {
       return;
     }
-    const duration = Math.max(0.01, state.idleAutoCloseDelay / (1 + state.speedOfAutoClose / 100) - IDLE_AUTO_CLOSE_PREVIEW_DELAY);
+    const _previewDistance = preview.distance ?? null;
+    const _previewTotalDelay = _previewDistance !== null
+      ? Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, _previewDistance * AUTO_CLOSE_SEC_PER_BLOCK / (1 + state.speedOfAutoClose / 100))
+      : state.idleAutoCloseDelay / (1 + state.speedOfAutoClose / 100);
+    const duration = Math.max(0.01, _previewTotalDelay - IDLE_AUTO_CLOSE_PREVIEW_DELAY);
     reveal = clamp((state.idleTime - IDLE_AUTO_CLOSE_PREVIEW_DELAY) / duration, 0, 1);
   }
   if (reveal <= 0) {
