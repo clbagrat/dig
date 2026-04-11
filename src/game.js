@@ -124,7 +124,7 @@ const LEVEL_REWARD_POOL = [
   { stat: "drillPower",                minRarity: 1, values: [0.3, 0.6, 1.0, 1.5],   label: "Сила бура",       fmt: v => `+${v}` },
   { stat: "strikeSpeed",               minRarity: 1, values: [3, 6, 10, 15],          label: "Скорость бура",   fmt: v => `+${v}%` },
   { stat: "damageBonus",               minRarity: 1, values: [0.03, 0.05, 0.08, 0.10], label: "Бонус урона",   fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "miningGoldBonusMultiplier", minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Золото",        fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "goldBonus", minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Золото",        fmt: v => `+${Math.round(v*100)}%` },
   { stat: "maxFuel",                   minRarity: 1, values: [10, 20, 30, 40],         label: "Макс. топливо", fmt: v => `+${v}` },
   { stat: "weakSpotChance",            minRarity: 1, values: [0.03, 0.05, 0.07, 0.11], label: "Шанс бреши",   fmt: v => `+${Math.round(v*100)}%` },
   { stat: "weakSpotMult",              minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],    label: "Урон по бреши",  fmt: v => `+${v}` },
@@ -469,7 +469,7 @@ const state = {
   crystalStatusText: "",
   strikeSpeed: 0,
   drillPower: BASE_DRILL_DAMAGE,
-  miningGoldBonusMultiplier: 0,
+  goldBonus: 0,
   shopPriceDiscount: 0,
   xpBonusMultiplier: 0,
   fuelPickupBonus: 0,
@@ -2313,7 +2313,7 @@ function setupField(seedOverride = null) {
   state.signalDirY = -1;
   state.strikeSpeed = 0;
   state.drillPower = BASE_DRILL_DAMAGE;
-  state.miningGoldBonusMultiplier = 0;
+  state.goldBonus = 0;
   state.shopPriceDiscount = 0;
   state.xpBonusMultiplier = 0;
   state.fuelPickupBonus = 0;
@@ -2931,7 +2931,7 @@ function applyCrystalCatalystBonus(x, y) {
     return;
   }
   playSound("crystal_catalyst", { volume: 0.6 });
-  state.unsafeGold += 30;
+  state.unsafeGold += applyGoldBonus(30);
   showGoldToast(30);
 
   if (state.crystalCatalystLevel >= 2) {
@@ -2946,7 +2946,7 @@ function collectCrystalTile(x, y, index, crystalType) {
   state.crystalMask[index] = 0;
   runFuelEvent(() => applyCrystalCatalystBonus(x, y));
   if (state.crystalGoldGain > 0) {
-    state.unsafeGold += state.crystalGoldGain;
+    state.unsafeGold += applyGoldBonus(state.crystalGoldGain);
     showGoldToast(state.crystalGoldGain);
   }
   if (state.crystalXpGain > 0) {
@@ -3485,7 +3485,7 @@ function getShopStatsSnapshot() {
     concentration: state.concentration,
     fuelDrainRate: state.fuelDrainRate,
     fuelToHpRate: state.fuelToHpRate,
-    miningGoldBonusMultiplier: state.miningGoldBonusMultiplier,
+    goldBonus: state.goldBonus,
     shopPriceDiscount: state.shopPriceDiscount,
     fuelPickupBonus: state.fuelPickupBonus,
     speedOfAutoClose: state.speedOfAutoClose,
@@ -4498,7 +4498,7 @@ function buildDebugPerkButtons() {
       { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
       { key: "concentration",        label: "concentration",         step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
-      { key: "miningGoldBonusMultiplier", label: "miningGoldBonus", step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+      { key: "goldBonus",            label: "goldBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
@@ -4961,7 +4961,7 @@ function applyLevelUpItemBonuses() {
     healPlayer(state.healPerLevel, "Регенерация через опыт");
   }
   if (state.goldBonusPerLevel > 0) {
-    state.miningGoldBonusMultiplier += state.goldBonusPerLevel;
+    state.goldBonus += state.goldBonusPerLevel;
   }
 }
 
@@ -5485,7 +5485,7 @@ function updateGoldParticles(dt) {
     if (active < p.duration) continue;
     // Particle arrived — credit unsafe gold (unless already credited as deposit)
     if (!p.skipCredit) {
-      state.unsafeGold += p.value;
+      state.unsafeGold += applyGoldBonus(p.value);
     } else if (p.destTileX !== undefined) {
       state.effects.push({
         kind: "depositArrival",
@@ -5509,7 +5509,7 @@ function updateExperienceParticles(dt) {
     }
     if (particle.isGold || particle.isGoldBonus) {
       playSound("gold_pickup", { volume: particle.isGoldBonus ? 0.8 : 0.7 });
-      state.unsafeGold += particle.value;
+      state.unsafeGold += applyGoldBonus(particle.value);
       if (particle.showTotal) showGoldToast(particle.showTotal);
     } else {
       playSound("xp_pickup", { volume: 0.6, pitch: 0.95 + Math.random() * 0.1 });
@@ -6513,11 +6513,11 @@ function getXpNeededForLevel(level) {
   return Math.round(40 * XP_INFLATION * 1.3 ** Math.max(0, level - 1));
 }
 
-function applyMiningGoldBonus(amount) {
+function applyGoldBonus(amount) {
   if (amount <= 0) {
     return 0;
   }
-  const multiplier = Math.max(0, 1 + (state.miningGoldBonusMultiplier || 0));
+  const multiplier = Math.max(0, 1 + (state.goldBonus || 0));
   const total = amount * multiplier + (state.goldBonusRemainder || 0);
   const whole = Math.max(1, Math.floor(total + 1e-9));
   state.goldBonusRemainder = Math.max(0, total - whole);
@@ -7395,13 +7395,10 @@ function breakCell(x, y, index, options = {}) {
   const hazardType = state.hazardMask[index];
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
   const baseGold = state.goldOreMask[index] ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier) : 0;
-  const totalGold = baseGold > 0 ? applyMiningGoldBonus(baseGold) : 0;
-  const bonusGold = totalGold - baseGold;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
   if (baseGold > 0) {
     playSound("block_break_ore");
     addToGoldPickupMask(x, y, baseGold);
-    if (bonusGold > 0) addToGoldBonusPickupMask(x, y, bonusGold);
   }
   const embeddedGold = Math.floor(state.droppedGoldMask[index]);
   if (embeddedGold > 0) {
@@ -7414,10 +7411,7 @@ function breakCell(x, y, index, options = {}) {
     state.microResourceRevealedMask[index] = 0;
     if (microRes === 1) {
       const microBase = Math.round(1 * goldMultiplier);
-      const microGoldTotal = applyMiningGoldBonus(microBase);
-      const microGoldBonus = microGoldTotal - microBase;
       addToGoldPickupMask(x, y, microBase);
-      if (microGoldBonus > 0) addToGoldBonusPickupMask(x, y, microGoldBonus);
     } else if (microRes === 2) {
       addFuel(Math.round(5 * goldMultiplier), x, y);
     } else if (microRes === 3) {
