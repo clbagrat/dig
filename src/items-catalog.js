@@ -471,21 +471,6 @@ export const ALL_ITEMS = [
   },
   // ── Heat ─────────────────────────────────────────────────────────────────────
   {
-    id: "heat_engine",
-    type: "item",
-    name: "Тепловой двигатель",
-    icon: "🔆",
-    desc: "До +40% скорость бура при макс. нагреве. +15% скорость нагрева.",
-    category: "heat",
-    tags: ["heat"],
-    minRarity: 2,
-    baseCost: 50,
-    effect: [
-      { stat: "heatEngineLevel", effectByRarity: [null, null, 1, 1, 2] },
-      { stat: "heatRate",        effectByRarity: [null, null, 0.15, 0.20, 0.30] },
-    ],
-  },
-  {
     id: "pressure_valve",
     name: "Предохранительный клапан",
     type: "item",
@@ -1139,7 +1124,6 @@ const SIMPLE_STAT_DESCRIPTORS = {
   adrenalineLevel: value => `При HP ≤ 1: +${value * 30}% к скорости бура`,
   firstStrikeLevel: value => `После активации маяка: +${value * 40}% к урону бура на ${value * 6} сек`,
   insuranceLevel: value => `При уроне сохраняет ${[0, 30, 50, 70, 90][Math.min(4, Math.max(0, value))] || 0}% небезопасного золота`,
-  heatEngineLevel: value => `До +${value * 40}% к скорости бура при максимальном нагреве`,
   fuelConverterLevel: value => `Пополнение сверх макс. топлива даёт форсаж на ${2 + value} сек`,
   loopChargeLevel: value => `${formatSignedDescriptionNumber(value)} уровень контурного заряда`,
   stunDetonatorLevel: value => `При оглушении: взрыв вокруг бура${value > 1 ? ` x${value}` : ""}`,
@@ -1164,12 +1148,11 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
     const heatBonus = getEffectValue({ effectByRarity: [0, 0, 1, 2, 3] }, rarity);
     const hasDrillPower = Number.isFinite(stats?.drillPower);
     const hasHeat = Number.isFinite(stats?.heat);
-    const hasHeatDamageBonus = Number.isFinite(stats?.heatDamageBonus);
     let totalText = "";
     if (hasDrillPower && hasHeat) {
       const total = flat
         + stats.drillPower * (drillScale / 100)
-        + Math.floor(stats.heat / 10) * heatBonus * (1 + (hasHeatDamageBonus ? stats.heatDamageBonus : 0));
+        + Math.floor(stats.heat / 10) * heatBonus;
       totalText = ` [${formatDescriptionNumber(total)}]`;
     }
     return `Урон ${flat} + ${formatDescriptionNumber(drillScale)}% от силы бура + ${heatBonus} за каждые 10 нагрева${totalText}.`;

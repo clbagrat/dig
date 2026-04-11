@@ -350,8 +350,6 @@ const state = {
   fuelDrainRate: 1,
   fuelToHpRate: 0.7,
   armor: 0,
-  heatDamageBonus: 0,
-  heatEngineLevel: 0,
   stunDetonatorLevel: 0,
   stunReservoirLevel: 0,
   stunAfterburnerLevel: 0,
@@ -2241,8 +2239,6 @@ function setupField(seedOverride = null) {
   state.fuelDrainRate = 1;
   state.fuelToHpRate = 0.7;
   state.armor = 0;
-  state.heatDamageBonus = 0;
-  state.heatEngineLevel = 0;
   state.stunDetonatorLevel = 0;
   state.stunReservoirLevel = 0;
   state.stunAfterburnerLevel = 0;
@@ -3470,7 +3466,6 @@ function getShopStatsSnapshot() {
 
     heatRate: state.heatRate,
     heat: state.heat,
-    heatDamageBonus: state.heatDamageBonus,
     effectDurationRate: state.effectDurationRate,
     concentration: state.concentration,
     fuelDrainRate: state.fuelDrainRate,
@@ -4496,7 +4491,6 @@ function buildDebugPerkButtons() {
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
       { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
       { key: "explosionRadiusBonus", label: "explosionRadiusBonus",  step: 0.5,  fmt: v => v.toFixed(1) },
-      { key: "heatDamageBonus",      label: "heatDamageBonus",       step: 5,    fmt: v => Math.round(v) },
       { key: "longDrillPower",       label: "longDrillPower",        step: 1,    fmt: v => Math.round(v) },
       { key: "diagonalDrillPower",   label: "diagonalDrillPower",    step: 1,    fmt: v => Math.round(v) },
       { key: "sideDrills",           label: "sideDrills",            step: 1,    fmt: v => Math.round(v) },
@@ -6452,11 +6446,6 @@ function getAdrenalineSpeedBonus() {
   return state.adrenalineLevel * 30;
 }
 
-function getHeatEngineSpeedBonus() {
-  if (!state.heatEngineLevel || state.maxHeat <= 0) return 0;
-  return state.heatEngineLevel * 40 * (state.heat / state.maxHeat);
-}
-
 function getBasicDrillDamageBonus() {
   let total = 0;
   for (const tier of getEquipmentTiers("basic_drill")) {
@@ -6484,7 +6473,7 @@ function getThermoDrillDamageBonus() {
     const flat = [0, 0, 20, 25, 30][tier] || 0;
     const drillScale = [0, 0, 0.15, 0.20, 0.25][tier] || 0;
     const heatBonus = [0, 0, 1, 2, 3][tier] || 0;
-    total += flat + state.drillPower * drillScale + Math.floor(state.heat / 10) * heatBonus * (1 + (state.heatDamageBonus || 0));
+    total += flat + state.drillPower * drillScale + Math.floor(state.heat / 10) * heatBonus;
   }
   return total;
 }
@@ -7977,7 +7966,7 @@ function updateDrill(dt) {
   const fuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelBoost = 1 + fuelFactor * state.lowFuelSpeedBonus;
   const overdriveBoost = state.overhealDrillTimer > 0 ? 1.75 : 1;
-  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus() + getHeatEngineSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
+  const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus()) / 100) * lowFuelBoost * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
   if (isWalkableTileIndex(targetIndex)) {
