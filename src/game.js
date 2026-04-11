@@ -7942,6 +7942,9 @@ function updateDrill(dt) {
         state.autoClosePreviewFailed = false;
       }
     }
+    if (_autoCloseCandidate && !state.idleAutoCloseTriggered) {
+      drainFuel(DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt);
+    }
     state.drill.progress = 0;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 5);
     state.drill.strikeLatch = false;
