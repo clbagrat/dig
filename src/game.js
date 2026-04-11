@@ -518,7 +518,6 @@ const state = {
   overdriveDisplayDuration: 0,
   idleTime: 0,
   idleAutoCloseTriggered: false,
-  idleAutoCloseDelay: IDLE_AUTO_CLOSE_DELAY,
   speedOfAutoClose: 0,
   damageBonus: 0,
   explosionDamageMultiplier: 1,
@@ -2362,7 +2361,6 @@ function setupField(seedOverride = null) {
   state.overdriveDisplayDuration = 0;
   state.idleTime = 0;
   state.idleAutoCloseTriggered = false;
-  state.idleAutoCloseDelay = IDLE_AUTO_CLOSE_DELAY;
   state.speedOfAutoClose = 0;
   state.damageBonus = 0;
   state.bonusFindChance = 0;
@@ -3222,7 +3220,6 @@ function applyGoldPerk(perkType) {
       state.perkText = "Контурный трофей";
       break;
     case 17:
-      state.idleAutoCloseDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
       state.perkText = "Автоконтур";
       break;
     case 18:
@@ -3353,7 +3350,6 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       showPerkToast("Контурный трофей");
       break;
     case "auto_contour":
-      state.idleAutoCloseDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
       showPerkToast("Автоконтур");
       break;
     case "contour_resonance":
@@ -3441,7 +3437,7 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "tank_boost": state.tankBoostLevel = Math.max(0, (state.tankBoostLevel || 0) - 1); break;
     case "contour_charge": state.loopChargeLevel = Math.max(0, (state.loopChargeLevel || 0) - 1); state.loopChargeDuration = 2 + state.loopChargeLevel; break;
     case "contour_trophy": state.loopPerkLevel = Math.max(0, (state.loopPerkLevel || 0) - 1); break;
-    case "auto_contour": state.idleAutoCloseDelay = Math.min(IDLE_AUTO_CLOSE_DELAY, state.idleAutoCloseDelay + 1); break;
+    case "auto_contour": break;
     case "contour_resonance": state.contourLengthDamageLevel = Math.max(0, (state.contourLengthDamageLevel || 0) - 1); break;
     case "contour_recovery": state.contourReturnFuelLevel = Math.max(0, (state.contourReturnFuelLevel || 0) - 1); break;
     case "heat_sink": state.maxHeat -= Math.round(20 * m); break;
@@ -4500,7 +4496,6 @@ function buildDebugPerkButtons() {
       { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelBonus",            label: "fuelBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
-      { key: "idleAutoCloseDelay",   label: "idleAutoCloseDelay",    step: 0.5,  fmt: v => v.toFixed(1) },
       { key: "maxLoopLength",        label: "maxLoopLength",         step: 1,    fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
       { key: "explosionDamageMultiplier", label: "explosionDmgMult", step: 0.1,  fmt: v => v.toFixed(2) },
@@ -5761,9 +5756,6 @@ function prepareGoldPerkChoices() {
   if (state.loopPerkLevel < 2) {
     bag.push(16);
   }
-  if (state.idleAutoCloseDelay > IDLE_AUTO_CLOSE_MIN_DELAY) {
-    bag.push(17);
-  }
   if (state.crystalCatalystLevel < 3) {
     bag.push(18);
   }
@@ -6065,7 +6057,7 @@ function getGoldPerkNextLevel(perkType) {
     case 16:
       return Math.min(2, state.loopPerkLevel + 1);
     case 17:
-      return IDLE_AUTO_CLOSE_DELAY - Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
+      return 0;
     case 18:
       return Math.min(3, state.crystalCatalystLevel + 1);
     case 19:
@@ -6125,7 +6117,7 @@ function getGoldPerkCurrentLevel(perkType) {
     case 16:
       return state.loopPerkLevel;
     case 17:
-      return Math.max(0, IDLE_AUTO_CLOSE_DELAY - state.idleAutoCloseDelay);
+      return 0;
     case 18:
       return state.crystalCatalystLevel;
     case 19:
@@ -6258,10 +6250,9 @@ function getGoldPerkPreview(perkType) {
       };
     }
     case 17: {
-      const nextDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay - 1);
       return {
         effect: "Контур дорисовывается сам в простое",
-        compare: `${state.idleAutoCloseDelay} → ${nextDelay} сек`,
+        compare: "",
       };
     }
     case 18: {
@@ -7946,7 +7937,7 @@ function updateDrill(dt) {
     const _autoCloseDistance = _autoCloseCandidate ? _autoCloseCandidate.distance : null;
     const _autoCloseDelay = _autoCloseDistance !== null
       ? Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, _autoCloseDistance * AUTO_CLOSE_SEC_PER_BLOCK / (1 + state.speedOfAutoClose / 100))
-      : state.idleAutoCloseDelay / (1 + state.speedOfAutoClose / 100);
+      : IDLE_AUTO_CLOSE_DELAY / (1 + state.speedOfAutoClose / 100);
     if (!state.idleAutoCloseTriggered && state.idleTime >= _autoCloseDelay) {
       state.idleAutoCloseTriggered = true;
       if (!tryAutoCloseContour()) {
@@ -9992,7 +9983,7 @@ function renderAutoClosePreview(camera) {
     const _previewDistance = preview.distance ?? null;
     const _previewTotalDelay = _previewDistance !== null
       ? Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, _previewDistance * AUTO_CLOSE_SEC_PER_BLOCK / (1 + state.speedOfAutoClose / 100))
-      : state.idleAutoCloseDelay / (1 + state.speedOfAutoClose / 100);
+      : IDLE_AUTO_CLOSE_DELAY / (1 + state.speedOfAutoClose / 100);
     const duration = Math.max(0.01, _previewTotalDelay - IDLE_AUTO_CLOSE_PREVIEW_DELAY);
     reveal = clamp((state.idleTime - IDLE_AUTO_CLOSE_PREVIEW_DELAY) / duration, 0, 1);
   }
@@ -11521,7 +11512,7 @@ function renderDrill(camera) {
   const strikeWave = Math.max(0, Math.sin(state.drill.strikePhase));
   const thrust = strikeWave * state.drill.strikeEnergy;
   const heatRatio = clamp(state.heat / Math.max(1, state.maxHeat), 0, 1);
-  const idleCharge = clamp(state.idleTime / Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, state.idleAutoCloseDelay), 0, 1);
+  const idleCharge = clamp(state.idleTime / IDLE_AUTO_CLOSE_DELAY, 0, 1);
   const idleBob = Math.sin(state.drill.strikePhase * 0.5) * 0.7;
   const bodyOffsetX = -state.drill.facingX * thrust * 2.2;
   const bodyOffsetY = -state.drill.facingY * thrust * 2.2 + idleBob;
