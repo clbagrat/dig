@@ -350,7 +350,6 @@ const state = {
   fuelDrainRate: 1,
   fuelToHpRate: 0.7,
   armor: 0,
-  heatExplosionDamageBonus: 0,
   heatExplosionRadiusBonus: 0,
   heatDamageBonus: 0,
   heatEngineLevel: 0,
@@ -520,7 +519,7 @@ const state = {
   idleAutoCloseTriggered: false,
   speedOfAutoClose: 0,
   damageBonus: 0,
-  explosionDamageMultiplier: 1,
+  explosionDamage: 1,
   bonusFindChance: 0,
   autoClosePreview: null,
   autoClosePreviewReturnTimer: 0,
@@ -2242,7 +2241,6 @@ function setupField(seedOverride = null) {
   state.fuelDrainRate = 1;
   state.fuelToHpRate = 0.7;
   state.armor = 0;
-  state.heatExplosionDamageBonus = 0;
   state.heatExplosionRadiusBonus = 0;
   state.heatDamageBonus = 0;
   state.heatEngineLevel = 0;
@@ -3482,7 +3480,7 @@ function getShopStatsSnapshot() {
     fuelBonus: state.fuelBonus,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
-    explosionDamageMultiplier: state.explosionDamageMultiplier,
+    explosionDamage: state.explosionDamage,
     weakSpotChance: state.weakSpotChance,
     weakSpotMult: state.weakSpotMult,
   };
@@ -4496,8 +4494,7 @@ function buildDebugPerkButtons() {
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
       { key: "maxLoopLength",        label: "maxLoopLength",         step: 1,    fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
-      { key: "explosionDamageMultiplier", label: "explosionDmgMult", step: 0.1,  fmt: v => v.toFixed(2) },
-      { key: "heatExplosionDamageBonus", label: "heatExplosionDmg",  step: 5,    fmt: v => Math.round(v) },
+      { key: "explosionDamage",      label: "explosionDamage",       step: 0.1,  fmt: v => v.toFixed(2) },
       { key: "heatExplosionRadiusBonus", label: "heatExplosionRad",  step: 1,    fmt: v => Math.round(v) },
       { key: "heatDamageBonus",      label: "heatDamageBonus",       step: 5,    fmt: v => Math.round(v) },
       { key: "longDrillPower",       label: "longDrillPower",        step: 1,    fmt: v => Math.round(v) },
@@ -5848,7 +5845,7 @@ function activateOverhealDrillBoost() {
 function triggerHeatOverload() {
   playSound("heat_overload");
   state.heat = 0;
-  const overloadDamage = getStrikeDamage() * (1 + (state.heatExplosionDamageBonus || 0));
+  const overloadDamage = getStrikeDamage();
   const overloadRadius = 1 + (state.heatExplosionRadiusBonus || 0);
   explodeAt(state.drill.x, state.drill.y, overloadDamage, overloadRadius, {
     guaranteedBreak: false,
@@ -7488,7 +7485,7 @@ const EXPLOSION_WAVE_DELAY = 0.05;
 
 function explodeAt(x, y, damage, radius = 2, options = {}) {
   spawnExplosionEffect(x, y, radius);
-  const scaledDamage = damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamageMultiplier || 0);
+  const scaledDamage = damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamage || 0);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(radius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
@@ -7540,7 +7537,7 @@ function detonateRocketEffect(effect) {
   if (effect.payload.kind === "radiusBomb") {
     const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
     if (distToPlayer <= effect.payload.radius) {
-      const scaledDamage = effect.payload.damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamageMultiplier || 1);
+      const scaledDamage = effect.payload.damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamage || 1);
       addHeatOnStrike(Math.round(scaledDamage * 0.3));
     }
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
