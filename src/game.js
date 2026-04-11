@@ -287,7 +287,7 @@ const GOLD_PERK_TYPES = [
   { name: "Усиленный корпус", icon: "✚", desc: "+1 к максимуму HP и лечит на 2" },
   { name: "Перелив адреналина", icon: "❤", desc: "Overheal дает 4 секунды бафа, потом растет до максимума 10" },
   { name: "Контурный трофей", icon: "◈", desc: "Большой контур может создать случайный перк внутри" },
-  { name: "Автоконтур", icon: "◎", desc: "-1 сек к задержке автозамыкания контура, до минимума 1" },
+  { name: "Автоконтур (удалён)", icon: "◎", desc: "" },
   { name: "Кристальный катализатор", icon: "✧", desc: "Кристаллы начинают давать золото, потом fuel и HP" },
   { name: "Шиповой форсаж", icon: "✹", desc: "Разбитые шипы дают overdrive-баф на 6/9/12 секунд" },
   { name: "Термозаряд", icon: "☇", desc: "Усиливает урон и радиус взрыва от перегрева" },
@@ -3220,7 +3220,6 @@ function applyGoldPerk(perkType) {
       state.perkText = "Контурный трофей";
       break;
     case 17:
-      state.perkText = "Автоконтур";
       break;
     case 18:
       state.crystalCatalystLevel = Math.min(3, state.crystalCatalystLevel + 1);
@@ -3350,7 +3349,6 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       showPerkToast("Контурный трофей");
       break;
     case "auto_contour":
-      showPerkToast("Автоконтур");
       break;
     case "contour_resonance":
       state.contourLengthDamageLevel = Math.min(4, (state.contourLengthDamageLevel || 0) + 1);
@@ -7937,7 +7935,7 @@ function updateDrill(dt) {
     const _autoCloseDistance = _autoCloseCandidate ? _autoCloseCandidate.distance : null;
     const _autoCloseDelay = _autoCloseDistance !== null
       ? Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, _autoCloseDistance * AUTO_CLOSE_SEC_PER_BLOCK / (1 + state.speedOfAutoClose / 100))
-      : IDLE_AUTO_CLOSE_DELAY / (1 + state.speedOfAutoClose / 100);
+      : Infinity;
     if (!state.idleAutoCloseTriggered && state.idleTime >= _autoCloseDelay) {
       state.idleAutoCloseTriggered = true;
       if (!tryAutoCloseContour()) {
@@ -9981,9 +9979,8 @@ function renderAutoClosePreview(camera) {
       return;
     }
     const _previewDistance = preview.distance ?? null;
-    const _previewTotalDelay = _previewDistance !== null
-      ? Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, _previewDistance * AUTO_CLOSE_SEC_PER_BLOCK / (1 + state.speedOfAutoClose / 100))
-      : IDLE_AUTO_CLOSE_DELAY / (1 + state.speedOfAutoClose / 100);
+    if (_previewDistance === null) return;
+    const _previewTotalDelay = Math.max(IDLE_AUTO_CLOSE_MIN_DELAY, _previewDistance * AUTO_CLOSE_SEC_PER_BLOCK / (1 + state.speedOfAutoClose / 100));
     const duration = Math.max(0.01, _previewTotalDelay - IDLE_AUTO_CLOSE_PREVIEW_DELAY);
     reveal = clamp((state.idleTime - IDLE_AUTO_CLOSE_PREVIEW_DELAY) / duration, 0, 1);
   }
