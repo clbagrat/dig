@@ -350,7 +350,6 @@ const state = {
   fuelDrainRate: 1,
   fuelToHpRate: 0.7,
   armor: 0,
-  heatExplosionRadiusBonus: 0,
   heatDamageBonus: 0,
   heatEngineLevel: 0,
   stunDetonatorLevel: 0,
@@ -2241,7 +2240,6 @@ function setupField(seedOverride = null) {
   state.fuelDrainRate = 1;
   state.fuelToHpRate = 0.7;
   state.armor = 0;
-  state.heatExplosionRadiusBonus = 0;
   state.heatDamageBonus = 0;
   state.heatEngineLevel = 0;
   state.stunDetonatorLevel = 0;
@@ -4495,7 +4493,6 @@ function buildDebugPerkButtons() {
       { key: "maxLoopLength",        label: "maxLoopLength",         step: 1,    fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
       { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
-      { key: "heatExplosionRadiusBonus", label: "heatExplosionRad",  step: 1,    fmt: v => Math.round(v) },
       { key: "heatDamageBonus",      label: "heatDamageBonus",       step: 5,    fmt: v => Math.round(v) },
       { key: "longDrillPower",       label: "longDrillPower",        step: 1,    fmt: v => Math.round(v) },
       { key: "diagonalDrillPower",   label: "diagonalDrillPower",    step: 1,    fmt: v => Math.round(v) },
@@ -5846,7 +5843,7 @@ function triggerHeatOverload() {
   playSound("heat_overload");
   state.heat = 0;
   const overloadDamage = getStrikeDamage();
-  const overloadRadius = 1 + (state.heatExplosionRadiusBonus || 0);
+  const overloadRadius = 1;
   explodeAt(state.drill.x, state.drill.y, overloadDamage, overloadRadius, {
     guaranteedBreak: false,
     cause: "explosion",
