@@ -130,7 +130,7 @@ const LEVEL_REWARD_POOL = [
   { stat: "weakSpotMult",              minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],    label: "Урон по бреши",  fmt: v => `+${v}` },
   { stat: "luck",                      minRarity: 1, values: [3, 5, 7, 11],            label: "Удача",          fmt: v => `+${v}` },
   { stat: "speedOfAutoClose",          minRarity: 1, values: [3, 6, 10, 15],           label: "Скорость контура", fmt: v => `+${v}%` },
-  { stat: "fuelPickupBonus",           minRarity: 2, values: [null, 5, 10, 15, 20],    label: "Бонус топлива",  fmt: v => `+${v}` },
+  { stat: "fuelBonus",           minRarity: 2, values: [null, 0.05, 0.10, 0.15, 0.20], label: "Бонус топлива", fmt: v => `+${Math.round(v*100)}%` },
   { stat: "maxHeat",                   minRarity: 2, values: [null, 5, 10, 15],        label: "Макс. жар",      fmt: v => `+${v}` },
   { stat: "maxHp",                     minRarity: 3, values: [null, null, 25, 50],     label: "Макс. HP",       fmt: v => `+${v}` },
   { stat: "xpBonusMultiplier",         minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Опыт",           fmt: v => `+${Math.round(v*100)}%` },
@@ -472,7 +472,7 @@ const state = {
   goldBonus: 0,
   shopPriceDiscount: 0,
   xpBonusMultiplier: 0,
-  fuelPickupBonus: 0,
+  fuelBonus: 0,
   overflowBomb: false,
   fuelEventDepth: 0,
   overflowTriggeredInEvent: false,
@@ -2315,7 +2315,7 @@ function setupField(seedOverride = null) {
   state.goldBonus = 0;
   state.shopPriceDiscount = 0;
   state.xpBonusMultiplier = 0;
-  state.fuelPickupBonus = 0;
+  state.fuelBonus = 0;
   state.overflowBomb = false;
   state.fuelEventDepth = 0;
   state.overflowTriggeredInEvent = false;
@@ -3202,7 +3202,7 @@ function applyGoldPerk(perkType) {
       break;
     case 13:
       state.overflowBomb = true;
-      state.fuelPickupBonus += 50;
+      state.fuelBonus += 0.20;
       state.maxFuel = Math.max(100, state.maxFuel - 150);
       state.fuel = Math.min(state.fuel, state.maxFuel);
       state.perkText = "Перегрузка";
@@ -3304,7 +3304,7 @@ function applyShopPerk(effectId, rarityMult, rarity) {
     case "fuel_circuit":
       break;
     case "recirculator":
-      state.fuelPickupBonus += Math.round(2 * m);
+      state.fuelBonus += 0.05 * m;
       showPerkToast("Рециркулятор");
       break;
     case "low_fuel_boost":
@@ -3313,7 +3313,7 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       break;
     case "overload":
       state.overflowBomb = true;
-      state.fuelPickupBonus += Math.round(50 * m);
+      state.fuelBonus += 0.20 * m;
       state.maxFuel = Math.max(100, state.maxFuel - 150);
       state.fuel = Math.min(state.fuel, state.maxFuel);
       showPerkToast("Перегрузка");
@@ -3430,9 +3430,9 @@ function removeShopPerk(effectId, rarityMult, rarity) {
       break;
     case "fuel_tank": state.maxFuel -= Math.round(60 * m); state.fuel = Math.min(state.fuel, state.maxFuel); break;
     case "fuel_circuit": break;
-    case "recirculator": state.fuelPickupBonus -= Math.round(2 * m); break;
+    case "recirculator": state.fuelBonus -= 0.05 * m; break;
     case "low_fuel_boost": state.lowFuelSpeedBonus -= 0.35 * m; break;
-    case "overload": state.overflowBomb = false; state.fuelPickupBonus -= Math.round(50 * m); break;
+    case "overload": state.overflowBomb = false; state.fuelBonus -= 0.20 * m; break;
     case "geo_lens": state.visionRadius = Math.max(VISION_RADIUS, state.visionRadius - Math.round(2 * m)); state.visibilityDirty = true; break;
     case "radar_module": state.radarCrystalModule = false; break;
     case "radar_booster": state.radarBoosterLevel = Math.max(0, (state.radarBoosterLevel || 0) - 1); break;
@@ -3485,7 +3485,7 @@ function getShopStatsSnapshot() {
     fuelToHpRate: state.fuelToHpRate,
     goldBonus: state.goldBonus,
     shopPriceDiscount: state.shopPriceDiscount,
-    fuelPickupBonus: state.fuelPickupBonus,
+    fuelBonus: state.fuelBonus,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
     explosionDamageMultiplier: state.explosionDamageMultiplier,
@@ -4498,7 +4498,7 @@ function buildDebugPerkButtons() {
       { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
       { key: "goldBonus",            label: "goldBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "fuelPickupBonus",      label: "fuelPickupBonus",       step: 10,   fmt: v => Math.round(v) },
+      { key: "fuelBonus",            label: "fuelBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
       { key: "idleAutoCloseDelay",   label: "idleAutoCloseDelay",    step: 0.5,  fmt: v => v.toFixed(1) },
       { key: "maxLoopLength",        label: "maxLoopLength",         step: 1,    fmt: v => Math.round(v) },
@@ -6647,7 +6647,7 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   }
 
   playSound("fuel_pickup", { volume: 0.7 });
-  const totalGain = amount + state.fuelPickupBonus;
+  const totalGain = Math.round(amount * Math.max(0, 1 + (state.fuelBonus || 0)));
   showFuelToast(totalGain);
   const overflow = state.fuel + totalGain - state.maxFuel;
   state.fuel = Math.min(state.maxFuel, state.fuel + totalGain);
