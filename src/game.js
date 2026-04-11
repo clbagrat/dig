@@ -346,7 +346,7 @@ const state = {
 
   heatRate: 1,
   effectDurationRate: 1,
-  concentration: 1,
+  concentration: 0,
   fuelDrainRate: 1,
   fuelToHpRate: 0.7,
   armor: 0,
@@ -2234,7 +2234,7 @@ function setupField(seedOverride = null) {
 
   state.heatRate = 1;
   state.effectDurationRate = 1;
-  state.concentration = 1;
+  state.concentration = 0;
   state.fuelDrainRate = 1;
   state.fuelToHpRate = 0.7;
   state.armor = 0;
@@ -4475,7 +4475,7 @@ function buildDebugPerkButtons() {
       { key: "armor",                label: "armor",                 step: 1,    fmt: v => Math.round(v) },
       { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
       { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
-      { key: "concentration",        label: "concentration",         step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "concentration",        label: "concentration (%)",     step: 5,    fmt: v => Math.round(v) },
       { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
       { key: "goldBonus",            label: "goldBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
@@ -5797,8 +5797,7 @@ function applyStun(duration, toastText = "") {
     return;
   }
   playSound("stun");
-  const concentration = Math.max(0.1, state.concentration || 1);
-  const actualDuration = Math.max(0.5, duration / concentration);
+  const actualDuration = Math.max(0.5, duration / Math.max(0.1, 1 + state.concentration / 100));
   const wasStunned = state.stunTimer > 0;
   state.stunTimer = Math.max(state.stunTimer, actualDuration);
   state.stunDisplayDuration = Math.max(state.stunDisplayDuration, actualDuration);

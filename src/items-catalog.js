@@ -727,7 +727,7 @@ export const ALL_ITEMS = [
     effect: [
       { stat: "heatExplosionDamageBonus", effectByRarity: [null, 0.25, 0.50, 0.75, 1.00] },
       { stat: "heatExplosionRadiusBonus", effectByRarity: [null, 0.5,  1.0,  1.5,  2.0 ] },
-      { stat: "concentration",            effectByRarity: [null, -0.10, -0.15, -0.20, -0.30] },
+      { stat: "concentration",            effectByRarity: [null, -10, -15, -20, -30] },
     ],
   },
   {
@@ -742,7 +742,7 @@ export const ALL_ITEMS = [
     baseCost: 35,
     effect: [
       { stat: "heatRate",      effectByRarity: [null, -0.15, -0.20, -0.30, -0.40] },
-      { stat: "concentration", effectByRarity: [null, -0.10, -0.15, -0.20, -0.30] },
+      { stat: "concentration", effectByRarity: [null, -10, -15, -20, -30] },
     ],
   },
   {
@@ -1098,7 +1098,7 @@ const SIMPLE_STAT_DESCRIPTORS = {
   damageBonus: value => `${formatSignedPercent(value)} к общему урону`,
   heatRate: value => `${formatSignedPercent(value, 100)} к скорости нагрева`,
   effectDurationRate: value => `${formatSignedPercent(value, 100)} к длительности эффектов`,
-  concentration: value => `${formatSignedPercent(value, 100)} к концентрации`,
+  concentration: value => `${formatSignedPercent(value, 1)} к концентрации`,
   fuelDrainRate: value => `${formatSignedPercent(value, 100)} к расходу топлива`,
   miningGoldBonusMultiplier: value => `${formatSignedPercent(value, 100)} к золоту с жил`,
   xpBonusMultiplier: value => `${formatSignedPercent(value, 100)} к опыту`,
