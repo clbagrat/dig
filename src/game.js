@@ -532,7 +532,7 @@ const state = {
   pathTailFade: 0,
   pathTailGhost: null,
   contourReturnFuelLevel: 0,
-  maxLoopLength: 12,
+  maxContour: 12,
   heatOverloadRocketLevel: 0,
   tankBoostLevel: 0,
   levelUpFlash: 0,
@@ -2371,7 +2371,7 @@ function setupField(seedOverride = null) {
   state.pathTailFade = 0;
   state.pathTailGhost = null;
   state.contourReturnFuelLevel = 0;
-  state.maxLoopLength = 12;
+  state.maxContour = 12;
   state.heatOverloadRocketLevel = 0;
   state.tankBoostLevel = 0;
   state.levelUpFlash = 0;
@@ -4487,7 +4487,7 @@ function buildDebugPerkButtons() {
       { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "fuelBonus",            label: "fuelBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
-      { key: "maxLoopLength",        label: "maxLoopLength",         step: 1,    fmt: v => Math.round(v) },
+      { key: "maxContour",        label: "maxContour",         step: 1,    fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
       { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
       { key: "explosionRadiusBonus", label: "explosionRadiusBonus",  step: 0.5,  fmt: v => v.toFixed(1) },
@@ -8216,7 +8216,7 @@ function extendPath(x, y, ignoreMaxLength = false) {
 
   state.depth = Math.max(state.depth, Math.abs(y - START_Y));
   state.pathTiles.push({ x, y });
-  if (!ignoreMaxLength && state.pathTiles.length > state.maxLoopLength) {
+  if (!ignoreMaxLength && state.pathTiles.length > state.maxContour) {
     state.pathTailGhost = state.pathTiles[0];
     state.pathTiles.shift();
     state.pathTailFade = 1;
