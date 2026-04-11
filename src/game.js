@@ -271,10 +271,10 @@ const TILE_PERK_TYPES = [
 
 const GOLD_PERK_TYPES = [
   null,
-  { name: "Боковые буры", icon: "⫼", desc: "Удар также бьет по двум боковым клеткам" },
   null,
-  { name: "Длинный бур", icon: "⇢", desc: "Бьет следующий тайл вперед, повторно усиливает дальний удар" },
-  { name: "Диагональные буры", icon: "✣", desc: "Бьют по диагоналям вперед, повторно усиливают дальний удар" },
+  null,
+  null,
+  null,
   { name: "Контурный заряд", icon: "⬡", desc: "После замыкания контура дает временный бонус к урону бура от числа клеток внутри" },
   { name: "Форсаж на нуле", icon: "⏚", desc: "Чем меньше топлива, тем быстрее следующий удар" },
   { name: "Саперный заряд", icon: "✦", desc: "Каждые N сломанных буром блоков кидает ракету с малым радиусом на дистанцию 1" },
@@ -483,9 +483,6 @@ const state = {
   goldClustersCache: null,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
-  sideDrills: 0,
-  longDrillPower: 0,
-  diagonalDrillPower: 0,
   weakSpotChance: 0,
   weakSpotMult: 2,
   weakSpotPierce: 0,
@@ -2321,9 +2318,6 @@ function setupField(seedOverride = null) {
   state.goldClustersCache = null;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
-  state.sideDrills = 0;
-  state.longDrillPower = 0;
-  state.diagonalDrillPower = 0;
   state.weakSpotChance = 0;
   state.weakSpotMult = 2;
   state.weakSpotPierce = 0;
@@ -3153,16 +3147,10 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
 function applyGoldPerk(perkType) {
   switch (perkType) {
     case 1:
-      state.sideDrills += 1;
-      state.perkText = "Боковые буры";
       break;
     case 3:
-      state.longDrillPower += 0.1;
-      state.perkText = "Длинный бур";
       break;
     case 4:
-      state.diagonalDrillPower += 0.05;
-      state.perkText = "Диагональные буры";
       break;
     case 5:
       state.loopChargeLevel = Math.min(4, state.loopChargeLevel + 1);
@@ -3267,16 +3255,8 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       showPerkToast("Мощность бура");
       break;
     case "side_drills":
-      state.sideDrills += 1;
-      showPerkToast("Боковые буры");
-      break;
     case "long_drill":
-      state.longDrillPower += 0.2 * m;
-      showPerkToast("Длинный бур");
-      break;
     case "diagonal_drills":
-      state.diagonalDrillPower += 0.2 * m;
-      showPerkToast("Диагональные буры");
       break;
     case "sapper_charge":
       state.remoteBombLevel += 1;
@@ -3402,9 +3382,9 @@ function removeShopPerk(effectId, rarityMult, rarity) {
   const m = rarityMult || 1;
   switch (effectId) {
     case "drill_power": state.strikeSpeed -= 15 * m; break;
-    case "side_drills": state.sideDrills = Math.max(0, state.sideDrills - 1); break;
-    case "long_drill": state.longDrillPower -= 0.2 * m; break;
-    case "diagonal_drills": state.diagonalDrillPower -= 0.2 * m; break;
+    case "side_drills": break;
+    case "long_drill": break;
+    case "diagonal_drills": break;
     case "sapper_charge":
       state.remoteBombLevel = Math.max(0, state.remoteBombLevel - 1);
       state.remoteBombInterval = state.remoteBombLevel > 0 ? Math.max(15, 30 - (state.remoteBombLevel - 1) * 5) : 0;
@@ -4484,9 +4464,6 @@ function buildDebugPerkButtons() {
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
       { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
       { key: "explosionRadiusBonus", label: "explosionRadiusBonus",  step: 0.5,  fmt: v => v.toFixed(1) },
-      { key: "longDrillPower",       label: "longDrillPower",        step: 1,    fmt: v => Math.round(v) },
-      { key: "diagonalDrillPower",   label: "diagonalDrillPower",    step: 1,    fmt: v => Math.round(v) },
-      { key: "sideDrills",           label: "sideDrills",            step: 1,    fmt: v => Math.round(v) },
       { key: "weakSpotPierce",       label: "weakSpotPierce",        step: 1,    fmt: v => Math.round(v) },
       { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
       { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
@@ -5697,7 +5674,7 @@ function rebuildVisibilityMask() {
 }
 
 function prepareGoldPerkChoices() {
-  const bag = [1, 3, 4, 5, 6, 8, 11, 14, 15, 20, 22, 23, 24, 25];
+  const bag = [5, 6, 8, 11, 14, 15, 20, 22, 23, 24, 25];
   if (state.contourLengthDamageLevel < 4) {
     bag.push(26);
   }
@@ -6009,11 +5986,11 @@ function getLoopPerkChance(cellCount, level = state.loopPerkLevel) {
 function getGoldPerkNextLevel(perkType) {
   switch (perkType) {
     case 1:
-      return state.sideDrills + 1;
+      return 0;
     case 3:
-      return Math.round(state.longDrillPower / 0.1) + 1;
+      return 0;
     case 4:
-      return Math.round(state.diagonalDrillPower / 0.05) + 1;
+      return 0;
     case 5:
       return Math.min(4, state.loopChargeLevel + 1);
     case 6:
@@ -6069,11 +6046,11 @@ function getGoldPerkNextLevel(perkType) {
 function getGoldPerkCurrentLevel(perkType) {
   switch (perkType) {
     case 1:
-      return state.sideDrills;
+      return 0;
     case 3:
-      return Math.round(state.longDrillPower / 0.1);
+      return 0;
     case 4:
-      return Math.round(state.diagonalDrillPower / 0.05);
+      return 0;
     case 5:
       return state.loopChargeLevel;
     case 6:
@@ -6129,27 +6106,21 @@ function getGoldPerkCurrentLevel(perkType) {
 function getGoldPerkPreview(perkType) {
   switch (perkType) {
     case 1: {
-      const currentPower = 0.5 + state.sideDrills * 0.25;
-      const nextPower = 0.5 + (state.sideDrills + 1) * 0.25;
       return {
-        effect: "Бьет слева и справа от героя",
-        compare: `Урон ${formatPerkPercent(currentPower)} → ${formatPerkPercent(nextPower)}`,
+        effect: "Удалён",
+        compare: "—",
       };
     }
     case 3: {
-      const currentPower = state.longDrillPower > 0 ? 0.1 + state.longDrillPower : 0;
-      const nextPower = 0.1 + state.longDrillPower + 0.1;
       return {
-        effect: "Бьет следующий тайл по прямой",
-        compare: `Урон ${formatPerkPercent(currentPower)} → ${formatPerkPercent(nextPower)}`,
+        effect: "Удалён",
+        compare: "—",
       };
     }
     case 4: {
-      const currentPower = state.diagonalDrillPower > 0 ? 0.15 + state.diagonalDrillPower : 0;
-      const nextPower = 0.15 + state.diagonalDrillPower + 0.05;
       return {
-        effect: "Бьет две диагонали вперед",
-        compare: `Урон ${formatPerkPercent(currentPower)} → ${formatPerkPercent(nextPower)}`,
+        effect: "Удалён",
+        compare: "—",
       };
     }
     case 5: {
@@ -7243,9 +7214,12 @@ function damageCell(x, y, damage, options = {}) {
   }
 
   const index = cellIndex(x, y);
+  const pierceLeft = options.pierceLeft ?? 0;
+  let pierceActive = !!options.pierceActive;
   if (options.byDrill && state.weakSpotMask[index]) {
     damage *= state.weakSpotMult;
     state.weakSpotMask[index] = 0;
+    pierceActive = true;
     spawnWeakSpotHitEffect(x, y, options.dirX ?? 0, options.dirY ?? 1);
     if (state.weakSpotFuelGain > 0) {
       addFuel(state.weakSpotFuelGain);
@@ -7253,12 +7227,15 @@ function damageCell(x, y, damage, options = {}) {
     for (let ri = 0; ri < state.breachMissileLevel; ri += 1) {
       fireRocket(x, y, BREACH_MISSILE_DAMAGE, BREACH_MISSILE_RADIUS, 1 + Math.floor(Math.random() * 3));
     }
-    if (state.weakSpotPierce > 0) {
-      const px = x + (options.dirX ?? 0);
-      const py = y + (options.dirY ?? 1);
-      damageCell(px, py, damage, { ...options, byDrill: true });
-    }
   }
+  const continuePierce = () => {
+    if (!pierceActive || pierceLeft <= 0) {
+      return;
+    }
+    const px = x + (options.dirX ?? 0);
+    const py = y + (options.dirY ?? 1);
+    damageCell(px, py, damage, { ...options, byDrill: true, pierceActive: true, pierceLeft: pierceLeft - 1 });
+  };
   if (state.tunnelMask[index]) {
     return false;
   }
@@ -7313,10 +7290,12 @@ function damageCell(x, y, damage, options = {}) {
   spawnDamageNumberEffect(x, y, actualDamage);
   state.health[index] -= spikeExplosion ? actualDamage : damage;
   if (state.health[index] > 0) {
+    continuePierce();
     return false;
   }
 
   breakCell(x, y, index, options);
+  continuePierce();
   return true;
 }
 
@@ -8067,29 +8046,13 @@ function updateDrill(dt) {
     byDrill: true,
     dirX: dx,
     dirY: dy,
+    pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)),
   });
   state.drill.progress += strikeDamage;
   state.cameraShake.amplitude = Math.max(
     state.cameraShake.amplitude,
     Math.min(1.8, 0.28 + hardness * 0.22) * Math.max(state.drill.strikeEnergy, 0.35),
   );
-
-  if (state.sideDrills > 0) {
-    const sideDamage = strikeDamage * (0.5 + state.sideDrills * 0.25);
-    damageCell(state.drill.x - dy, state.drill.y + dx, sideDamage, { byDrill: true, dirX: -dy, dirY: dx });
-    damageCell(state.drill.x + dy, state.drill.y - dx, sideDamage, { byDrill: true, dirX: dy, dirY: -dx });
-  }
-
-  if (state.longDrillPower > 0) {
-    const longDamage = strikeDamage * (0.1 + state.longDrillPower);
-    damageCell(targetX + dx, targetY + dy, longDamage, { byDrill: true, dirX: dx, dirY: dy });
-  }
-
-  if (state.diagonalDrillPower > 0) {
-    const diagonalDamage = strikeDamage * (0.15 + state.diagonalDrillPower);
-    damageCell(targetX - dy, targetY + dx, diagonalDamage, { byDrill: true, dirX: dx - dy, dirY: dy + dx });
-    damageCell(targetX + dy, targetY - dx, diagonalDamage, { byDrill: true, dirX: dx + dy, dirY: dy - dx });
-  }
 
   state.weakSpotMask.fill(0);
   if (state.weakSpotChance > 0 && state.health[targetIndex] > 0 && Math.random() < state.weakSpotChance) {
@@ -8102,11 +8065,6 @@ function updateDrill(dt) {
     _wcAdd(targetX, targetY);
     _wcAdd(state.drill.x - dy, state.drill.y + dx);
     _wcAdd(state.drill.x + dy, state.drill.y - dx);
-    if (state.longDrillPower > 0) _wcAdd(targetX + dx, targetY + dy);
-    if (state.diagonalDrillPower > 0) {
-      _wcAdd(targetX - dy, targetY + dx);
-      _wcAdd(targetX + dy, targetY - dx);
-    }
     if (weakCandidates.length > 0) {
       state.weakSpotMask[weakCandidates[Math.floor(Math.random() * weakCandidates.length)]] = state.lastTs || 1;
     }
