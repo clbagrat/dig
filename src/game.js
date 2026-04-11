@@ -507,6 +507,7 @@ const state = {
   loopLengthDamageBonus: 0,
   loopLengthFuelBonus: 0,
   loopSpawnBonusChance: 0,
+  contourResMultiplier: 1.15,
   loopPerkLevel: 0,
   lowFuelSpeedBonus: 0,
   remoteBombLevel: 0,
@@ -2351,6 +2352,7 @@ function setupField(seedOverride = null) {
   state.loopLengthDamageBonus = 0;
   state.loopLengthFuelBonus = 0;
   state.loopSpawnBonusChance = 0;
+  state.contourResMultiplier = 1.15;
   state.loopPerkLevel = 0;
   state.lowFuelSpeedBonus = 0;
   state.remoteBombLevel = 0;
@@ -2996,7 +2998,7 @@ function refreshSignalDirection(fromX = state.drill.x, fromY = state.drill.y) {
   state.signalDirY = dy / length;
 }
 
-function carveTunnel(x, y) {
+function carveTunnel(x, y, resMultiplier = 1) {
   const index = cellIndex(x, y);
   // Never carve through metal or locked safe doors
   if (state.metalMask[index]) return;
@@ -3019,7 +3021,7 @@ function carveTunnel(x, y) {
   }
 
   if (perkType > 0) {
-    collectPerkTile(x, y, index, perkType);
+    collectPerkTile(x, y, index, perkType, resMultiplier);
   }
 
   if (crystalType > 0) {
@@ -3032,10 +3034,10 @@ function carveTunnel(x, y) {
 
 }
 
-function collectPerkTile(x, y, index, perkType) {
+function collectPerkTile(x, y, index, perkType, resMultiplier = 1) {
   playSound("perk_pickup");
   state.perkMask[index] = 0;
-  runFuelEvent(() => applyTilePerk(perkType, x, y));
+  runFuelEvent(() => applyTilePerk(perkType, x, y, true, resMultiplier));
   state.outOfFuel = false;
 }
 
@@ -3101,12 +3103,12 @@ function updatePerkZones(dt) {
   }
 }
 
-function applyTilePerk(perkType, x, y, showToast = true) {
+function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
   switch (perkType) {
     case 1: {
       const fuelDelta = getTankFuelDelta();
       if (fuelDelta >= 0) {
-        addFuel(fuelDelta, x, y);
+        addFuel(Math.round(fuelDelta * resMultiplier), x, y);
       } else {
         state.fuel = Math.max(0, state.fuel + fuelDelta);
         showFuelToast(fuelDelta);
@@ -4482,6 +4484,7 @@ function buildDebugPerkButtons() {
       { key: "maxFuel",              label: "maxFuel",               step: 50,   fmt: v => Math.round(v) },
       { key: "fuelDrainRate",        label: "fuelDrainRate",         step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "fuelToHpRate",         label: "fuelToHpRate",          step: 0.1,  fmt: v => v.toFixed(1) },
+      { key: "contourResMultiplier", label: "contourResMultiplier",  step: 0.05, fmt: v => v.toFixed(2) },
       { key: "heat",                 label: "heat",                  step: 10,   fmt: v => Math.round(v) },
       { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
       { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
@@ -7382,14 +7385,15 @@ function breakCell(x, y, index, options = {}) {
     state.microResourceMask[index] = 0;
     state.microResourceRevealedMask[index] = 0;
     if (microRes === 1) {
-      const microGoldTotal = applyMiningGoldBonus(1);
-      const microGoldBonus = microGoldTotal - 1;
-      addToGoldPickupMask(x, y, 1);
+      const microBase = Math.round(1 * goldMultiplier);
+      const microGoldTotal = applyMiningGoldBonus(microBase);
+      const microGoldBonus = microGoldTotal - microBase;
+      addToGoldPickupMask(x, y, microBase);
       if (microGoldBonus > 0) addToGoldBonusPickupMask(x, y, microGoldBonus);
     } else if (microRes === 2) {
-      addFuel(5, x, y);
+      addFuel(Math.round(5 * goldMultiplier), x, y);
     } else if (microRes === 3) {
-      state.xpBonusPickupMask[cellIndex(x, y)] += XP_PER_BLOCK;
+      state.xpBonusPickupMask[cellIndex(x, y)] += Math.round(XP_PER_BLOCK * goldMultiplier);
     }
   }
   state.hardness[index] = 0;
@@ -7414,7 +7418,7 @@ function breakCell(x, y, index, options = {}) {
     triggerRemoteBombSquare(x, y, 1);
   }
 
-  carveTunnel(x, y);
+  carveTunnel(x, y, goldMultiplier);
   for (const beacon of state.beacons) {
     if (!beacon.hidden) {
       continue;
@@ -7425,7 +7429,7 @@ function breakCell(x, y, index, options = {}) {
     finalizeHiddenBeaconExcavation(beacon);
     break;
   }
-  spawnExperienceCrystal(x, y);
+  spawnExperienceCrystal(x, y, Math.round(XP_PER_BLOCK * goldMultiplier));
 
   // Check if a worm nest was destroyed
   for (const nest of state.wormNests) {
@@ -8262,7 +8266,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       }
       interiorCells.push({ x, y });
       const index = cellIndex(x, y);
-      state.loopGoldMask[index] = 0.5;
+      state.loopGoldMask[index] = state.contourResMultiplier;
       if (state.tunnelMask[index]) {
         continue;
       }
