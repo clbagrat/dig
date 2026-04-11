@@ -519,6 +519,7 @@ const state = {
   speedOfAutoClose: 0,
   damageBonus: 0,
   explosionDamage: 0,
+  explosionRadiusBonus: 0,
   bonusFindChance: 0,
   autoClosePreview: null,
   autoClosePreviewReturnTimer: 0,
@@ -2359,6 +2360,7 @@ function setupField(seedOverride = null) {
   state.idleAutoCloseTriggered = false;
   state.speedOfAutoClose = 0;
   state.damageBonus = 0;
+  state.explosionRadiusBonus = 0;
   state.bonusFindChance = 0;
   state.autoClosePreview = null;
   state.autoClosePreviewReturnTimer = 0;
@@ -4493,6 +4495,7 @@ function buildDebugPerkButtons() {
       { key: "maxLoopLength",        label: "maxLoopLength",         step: 1,    fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
       { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
+      { key: "explosionRadiusBonus", label: "explosionRadiusBonus",  step: 0.5,  fmt: v => v.toFixed(1) },
       { key: "heatDamageBonus",      label: "heatDamageBonus",       step: 5,    fmt: v => Math.round(v) },
       { key: "longDrillPower",       label: "longDrillPower",        step: 1,    fmt: v => Math.round(v) },
       { key: "diagonalDrillPower",   label: "diagonalDrillPower",    step: 1,    fmt: v => Math.round(v) },
@@ -7481,14 +7484,15 @@ function breakCell(x, y, index, options = {}) {
 const EXPLOSION_WAVE_DELAY = 0.05;
 
 function explodeAt(x, y, damage, radius = 2, options = {}) {
-  spawnExplosionEffect(x, y, radius);
+  const scaledRadius = radius + (state.explosionRadiusBonus || 0);
+  spawnExplosionEffect(x, y, scaledRadius);
   const scaledDamage = damage * (1 + state.damageBonus / 100) * (1 + state.explosionDamage / 100);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
-  const maxOffset = Math.ceil(radius);
+  const maxOffset = Math.ceil(scaledRadius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
     for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
       const dist = Math.hypot(ox, oy);
-      if (dist > radius) continue;
+      if (dist > scaledRadius) continue;
       const tx = x + ox;
       const ty = y + oy;
       const delay = Math.floor(dist) * EXPLOSION_WAVE_DELAY;
