@@ -506,7 +506,6 @@ const state = {
   loopChargeDamageBonus: 0,
   contourLengthDamageLevel: 0,
   loopLengthDamageBonus: 0,
-  loopLengthFuelBonus: 0,
   loopSpawnBonusChance: 0,
   contourResMultiplier: 1.15,
   loopPerkLevel: 0,
@@ -2351,7 +2350,6 @@ function setupField(seedOverride = null) {
   state.loopChargeDamageBonus = 0;
   state.contourLengthDamageLevel = 0;
   state.loopLengthDamageBonus = 0;
-  state.loopLengthFuelBonus = 0;
   state.loopSpawnBonusChance = 0;
   state.contourResMultiplier = 1.15;
   state.loopPerkLevel = 0;
@@ -4519,7 +4517,6 @@ function buildDebugPerkButtons() {
       { key: "shopPriceDiscount",    label: "shopPriceDiscount",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "loopChargeDamageBonus", label: "loopChargeDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
       { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
-      { key: "loopLengthFuelBonus",  label: "loopLengthFuelBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
       { key: "loopSpawnBonusChance", label: "loopSpawnBonusChance",  step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "drillPowerPerLevel",   label: "drillPowerPerLevel",    step: 0.5,  fmt: v => v.toFixed(1) },
       { key: "strikeSpeedPerLevel",  label: "strikeSpeedPerLevel",   step: 1,    fmt: v => Math.round(v) },
@@ -6650,8 +6647,7 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   }
 
   playSound("fuel_pickup", { volume: 0.7 });
-  const loopFuelBonus = (state.loopLengthFuelBonus || 0) > 0 ? Math.floor(state.pathTiles.length * state.loopLengthFuelBonus) : 0;
-  const totalGain = amount + state.fuelPickupBonus + loopFuelBonus;
+  const totalGain = amount + state.fuelPickupBonus;
   showFuelToast(totalGain);
   const overflow = state.fuel + totalGain - state.maxFuel;
   state.fuel = Math.min(state.maxFuel, state.fuel + totalGain);
