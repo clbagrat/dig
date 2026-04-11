@@ -519,7 +519,7 @@ const state = {
   idleAutoCloseTriggered: false,
   speedOfAutoClose: 0,
   damageBonus: 0,
-  explosionDamage: 1,
+  explosionDamage: 0,
   bonusFindChance: 0,
   autoClosePreview: null,
   autoClosePreviewReturnTimer: 0,
@@ -4494,7 +4494,7 @@ function buildDebugPerkButtons() {
       { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
       { key: "maxLoopLength",        label: "maxLoopLength",         step: 1,    fmt: v => Math.round(v) },
       { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
-      { key: "explosionDamage",      label: "explosionDamage",       step: 0.1,  fmt: v => v.toFixed(2) },
+      { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
       { key: "heatExplosionRadiusBonus", label: "heatExplosionRad",  step: 1,    fmt: v => Math.round(v) },
       { key: "heatDamageBonus",      label: "heatDamageBonus",       step: 5,    fmt: v => Math.round(v) },
       { key: "longDrillPower",       label: "longDrillPower",        step: 1,    fmt: v => Math.round(v) },
@@ -7485,7 +7485,7 @@ const EXPLOSION_WAVE_DELAY = 0.05;
 
 function explodeAt(x, y, damage, radius = 2, options = {}) {
   spawnExplosionEffect(x, y, radius);
-  const scaledDamage = damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamage || 0);
+  const scaledDamage = damage * (1 + state.damageBonus / 100) * (1 + state.explosionDamage / 100);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(radius);
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
@@ -7537,7 +7537,7 @@ function detonateRocketEffect(effect) {
   if (effect.payload.kind === "radiusBomb") {
     const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
     if (distToPlayer <= effect.payload.radius) {
-      const scaledDamage = effect.payload.damage * (1 + state.damageBonus / 100) * Math.max(0, state.explosionDamage || 1);
+      const scaledDamage = effect.payload.damage * (1 + state.damageBonus / 100) * (1 + state.explosionDamage / 100);
       addHeatOnStrike(Math.round(scaledDamage * 0.3));
     }
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
