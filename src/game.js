@@ -476,7 +476,6 @@ const state = {
   overflowOverdriveTimer: 0,
   stunTimer: 0,
   stunDisplayDuration: 0,
-  stunReduction: 0,
   radarCrystalModule: false,
   navigatorMode: false,
   artifactRadarMode: false,
@@ -2315,7 +2314,6 @@ function setupField(seedOverride = null) {
   state.overflowOverdriveTimer = 0;
   state.stunTimer = 0;
   state.stunDisplayDuration = 0;
-  state.stunReduction = 0;
   state.radarCrystalModule = false;
   state.navigatorMode = false;
   state.artifactRadarMode = false;
@@ -3234,8 +3232,6 @@ function applyGoldPerk(perkType) {
     case 24:
       break;
     case 25:
-      state.stunReduction += 0.4;
-      state.perkText = "Разгонные демпферы";
       break;
     case 26:
       state.contourLengthDamageLevel = Math.min(4, state.contourLengthDamageLevel + 1);
@@ -3361,8 +3357,6 @@ function applyShopPerk(effectId, rarityMult, rarity) {
     case "cooling_pulse":
       break;
     case "accel_dampers":
-      state.stunReduction += 0.4 * m;
-      showPerkToast("Разгонные демпферы");
       break;
     case "thermo_rockets":
       state.heatOverloadRocketLevel = Math.min(3, (state.heatOverloadRocketLevel || 0) + 1);
@@ -3435,7 +3429,7 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "heat_sink": state.maxHeat -= Math.round(20 * m); break;
     case "heat_drill": break;
     case "thermo_charge": break;
-    case "accel_dampers": state.stunReduction -= 0.4 * m; break;
+    case "accel_dampers": break;
     case "cooling_pulse": break;
     case "thermo_rockets": state.heatOverloadRocketLevel = Math.max(0, (state.heatOverloadRocketLevel || 0) - 1); break;
     case "cryo_rockets": state.coolingRocketLevel = Math.max(0, (state.coolingRocketLevel || 0) - 1); break;
@@ -4496,7 +4490,6 @@ function buildDebugPerkButtons() {
       { key: "sideDrills",           label: "sideDrills",            step: 1,    fmt: v => Math.round(v) },
       { key: "weakSpotPierce",       label: "weakSpotPierce",        step: 1,    fmt: v => Math.round(v) },
       { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
-      { key: "stunReduction",        label: "stunReduction",         step: 0.1,  fmt: v => v.toFixed(1) },
       { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "shopPriceDiscount",    label: "shopPriceDiscount",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "loopChargeDamageBonus", label: "loopChargeDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
@@ -5805,7 +5798,7 @@ function applyStun(duration, toastText = "") {
   }
   playSound("stun");
   const concentration = Math.max(0.1, state.concentration || 1);
-  const actualDuration = Math.max(0.5, duration / concentration - state.stunReduction);
+  const actualDuration = Math.max(0.5, duration / concentration);
   const wasStunned = state.stunTimer > 0;
   state.stunTimer = Math.max(state.stunTimer, actualDuration);
   state.stunDisplayDuration = Math.max(state.stunDisplayDuration, actualDuration);
@@ -6060,7 +6053,7 @@ function getGoldPerkNextLevel(perkType) {
     case 22:
       return Math.round((state.maxHeat - MAX_HEAT) / 20) + 1;
     case 25:
-      return Math.round(state.stunReduction / 0.4) + 1;
+      return 0;
     case 26:
       return Math.min(4, state.contourLengthDamageLevel + 1);
     case 27:
@@ -6120,7 +6113,7 @@ function getGoldPerkCurrentLevel(perkType) {
     case 22:
       return Math.max(0, Math.round((state.maxHeat - MAX_HEAT) / 20));
     case 25:
-      return Math.round(state.stunReduction / 0.4);
+      return 0;
     case 26:
       return state.contourLengthDamageLevel;
     case 27:
@@ -6298,10 +6291,7 @@ function getGoldPerkPreview(perkType) {
       };
     }
     case 25: {
-      return {
-        effect: "Меньше стан",
-        compare: `${Math.round(state.stunReduction / 0.4)} → ${Math.round(state.stunReduction / 0.4) + 1}`,
-      };
+      return { effect: "Разгонные демпферы (удалён)", compare: "—" };
     }
     case 26: {
       const caps = [0, 15, 30, 50, 100];
