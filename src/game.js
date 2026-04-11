@@ -3314,7 +3314,6 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       showPerkToast("Радарный модуль");
       break;
     case "radar_booster":
-      state.radarBoosterLevel = (state.radarBoosterLevel || 0) + 1;
       showPerkToast("Усилитель радара");
       break;
     case "speed":
@@ -3417,7 +3416,7 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "overload": state.overflowBomb = false; state.fuelBonus -= 0.20 * m; break;
     case "geo_lens": state.visionRadius = Math.max(VISION_RADIUS, state.visionRadius - Math.round(2 * m)); state.visibilityDirty = true; break;
     case "radar_module": state.radarCrystalModule = false; break;
-    case "radar_booster": state.radarBoosterLevel = Math.max(0, (state.radarBoosterLevel || 0) - 1); break;
+    case "radar_booster": break;
     case "speed": state.strikeSpeed -= 20 * m; break;
     case "spike_boost": state.spikeOverdriveLevel = Math.max(0, (state.spikeOverdriveLevel || 0) - 1); break;
     case "tank_boost": state.tankBoostLevel = Math.max(0, (state.tankBoostLevel || 0) - 1); break;
@@ -4501,7 +4500,6 @@ function buildDebugPerkButtons() {
       { key: "healPerLevel",         label: "healPerLevel",          step: 1,    fmt: v => Math.round(v) },
       { key: "goldBonusPerLevel",    label: "goldBonusPerLevel",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
       { key: "bonusFindChance",      label: "bonusFindChance",       step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
-      { key: "radarBoosterLevel",    label: "radarBoosterLevel",     step: 1,    fmt: v => Math.round(v) },
       { key: "level",                label: "level",                 step: 1,    fmt: v => Math.round(v) },
       { key: "gold",                 label: "gold",                  step: 100,  fmt: v => Math.round(v) },
       { key: "depth",                label: "depth",                 step: 1,    fmt: v => Math.round(v) },
