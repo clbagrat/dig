@@ -3074,7 +3074,7 @@ function collectPerkZone(zone) {
   showPerkToast(state.perkText);
 
   if (zone.perkType === 4) {
-    explodeAt(Math.round(zone.x), Math.round(zone.y), BASE_DRILL_DAMAGE, 3);
+    explodeAt(Math.round(zone.x), Math.round(zone.y), BASE_DRILL_DAMAGE, 3, { skipRadiusBonus: true });
     return;
   }
 
@@ -5584,11 +5584,12 @@ function updateChainExplosions(dt) {
         cause: "explosion",
       });
     } else if (task.kind === "volatile") {
-      explodeAt(task.x, task.y, task.damage, task.radius, { cause: "explosion" });
+      explodeAt(task.x, task.y, task.damage, task.radius, { cause: "explosion", skipRadiusBonus: true });
     } else if (task.kind === "gas") {
       removeGasCell(task.x, task.y);
       explodeAt(task.x, task.y, EXPLOSION_BREAK_DAMAGE, 2, {
         cause: "explosion",
+        skipRadiusBonus: true,
         triggerGas: true,
       });
     } else if (task.kind === "spike") {
@@ -7255,7 +7256,7 @@ function triggerHazardEffect(hazardType, x, y, options = {}) {
         radius: 1.25,
       });
     } else {
-      explodeAt(x, y, Math.max(1, BASE_DRILL_DAMAGE * 0.3), 1.25, { cause: "explosion" });
+      explodeAt(x, y, Math.max(1, BASE_DRILL_DAMAGE * 0.3), 1.25, { cause: "explosion", skipRadiusBonus: true });
     }
   }
 }
@@ -7484,7 +7485,7 @@ function breakCell(x, y, index, options = {}) {
 const EXPLOSION_WAVE_DELAY = 0.05;
 
 function explodeAt(x, y, damage, radius = 2, options = {}) {
-  const scaledRadius = radius + (state.explosionRadiusBonus || 0);
+  const scaledRadius = radius + (options.skipRadiusBonus ? 0 : (state.explosionRadiusBonus || 0));
   spawnExplosionEffect(x, y, scaledRadius);
   const scaledDamage = damage * (1 + state.damageBonus / 100) * (1 + state.explosionDamage / 100);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
