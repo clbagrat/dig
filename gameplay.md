@@ -128,6 +128,24 @@ Fuel can be modified by perks and upgrades.
 Important note:
 - `Перегрузка` reduces max fuel by `150`
 
+## Collapses
+
+There is a periodic collapse hazard tied to a collapse budget.
+
+Rules:
+- the run starts with `600` collapse points
+- every destroyed block subtracts its rock tier from that pool
+- every explosion additionally subtracts `10 * cellCountInExplosionRadius`
+- when the pool reaches `0`, one collapse is queued and the pool is refilled by `600`
+- the collapse telegraphs as a red danger zone above and around the driller on nearby empty tiles
+- after about `2.4` seconds, new rock blocks fall into those tiles
+- if the driller is still inside the collapse zone when it lands, the driller takes `25` damage
+
+Current block spawn:
+- collapse rock uses hardness based on current run depth
+- only nearby walkable tiles are selected
+- the collapse can seal recently opened tunnels and break an active contour path
+
 ## Gold
 
 Gold is earned from destroyed rock and scrap ore.
@@ -244,7 +262,7 @@ Count and placement:
 
 Activation:
 - a beacon is activated by closing a contour around its `2×2` core inside the beacon ring
-- on activation: full fuel restore and `+1 HP` heal trigger during the animation
+- on activation: full fuel restore triggers during the animation
 - a `2000 ms` radar animation plays (ring → line → dot), followed by a `500 ms` pause
 - after the animation the shop (or artifact choice) opens
 - some beacons can generate as hidden: their `2×2` core is buried under ordinary breakable blocks until activation

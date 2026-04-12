@@ -111,6 +111,12 @@ const WORM_DAMAGE = 50;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
+const COLLAPSE_BUDGET_INITIAL = 600;
+const COLLAPSE_WARNING_DURATION = 2.4;
+const COLLAPSE_DAMAGE = 25;
+const COLLAPSE_MIN_TILES = 3;
+const COLLAPSE_MAX_TILES = 6;
+const COLLAPSE_LAND_INTERVAL = 0.12;
 const XP_INFLATION = 10;
 const XP_PER_BLOCK = 1 * XP_INFLATION;
 const XP_PICKUP_RADIUS = 1;
@@ -336,6 +342,13 @@ const state = {
   lastTs: 0,
   fps: 0,
   fpsHistory: [],
+  hudBarFx: {
+    hp: { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 },
+    fuel: { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 },
+    heat: { ratio: 0, ghostRatio: 0, pulse: 0, deltaDir: 0, intensity: 0 },
+    xp: { ratio: 0, ghostRatio: 0, pulse: 0, deltaDir: 0, intensity: 0 },
+  },
+  lastFuelHudChangeKind: "active",
   fuel: START_FUEL,
   maxFuel: START_FUEL,
   hp: START_HP,
@@ -450,6 +463,9 @@ const state = {
   beacons: [],
   beaconWires: [],
   beaconWireBreaks: [],
+  collapseWarnings: [],
+  pendingCollapseCount: 0,
+  collapseBudget: COLLAPSE_BUDGET_INITIAL,
   pendingBeaconWireActivation: null,
   pendingBeaconWireActivationAt: 0,
   signalMovesLeft: 0,
@@ -2299,6 +2315,14 @@ function setupField(seedOverride = null) {
   state.signalPrevY = START_Y;
   state.signalDirX = 0;
   state.signalDirY = -1;
+  state.collapseWarnings.length = 0;
+  state.pendingCollapseCount = 0;
+  state.collapseBudget = COLLAPSE_BUDGET_INITIAL;
+  state.hudBarFx.hp = { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 };
+  state.hudBarFx.fuel = { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 };
+  state.hudBarFx.heat = { ratio: 0, ghostRatio: 0, pulse: 0, deltaDir: 0, intensity: 0 };
+  state.hudBarFx.xp = { ratio: 0, ghostRatio: 0, pulse: 0, deltaDir: 0, intensity: 0 };
+  state.lastFuelHudChangeKind = "active";
   state.strikeSpeed = 0;
   state.drillPower = BASE_DRILL_DAMAGE;
   state.goldBonus = 0;
@@ -2611,6 +2635,207 @@ function updateDepthLevelTransition() {
   showDepthTitle(levelNumber);
 }
 
+function getCollapseHardness(depth = state.depth) {
+  return clamp(1 + Math.floor(Math.max(0, depth) / 10), 1, BLOCK_TYPES.length - 1);
+}
+
+function spendCollapseBudget(amount) {
+  if (amount <= 0) {
+    return;
+  }
+  state.collapseBudget -= amount;
+  while (state.collapseBudget <= 0) {
+    state.pendingCollapseCount += 1;
+    state.collapseBudget += COLLAPSE_BUDGET_INITIAL;
+  }
+}
+
+function isCollapseCandidateCell(x, y) {
+  if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) {
+    return false;
+  }
+  const index = cellIndex(x, y);
+  if (!isWalkableTileIndex(index)) {
+    return false;
+  }
+  if ((x === START_X && y === START_Y) || (x === state.base.x && y === state.base.y)) {
+    return false;
+  }
+  if (
+    state.perkMask[index] > 0 ||
+    state.crystalMask[index] > 0 ||
+    state.artifactMask[index] > 0 ||
+    state.keyMask[index] > 0 ||
+    state.goldPickupMask[index] > 0 ||
+    state.xpPickupMask[index] > 0 ||
+    state.goldBonusPickupMask[index] > 0 ||
+    state.xpBonusPickupMask[index] > 0 ||
+    state.safeDoorMask[index] > 0
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function hasCollapseCeiling(x, y) {
+  for (let offset = 1; offset <= 3; offset += 1) {
+    const ny = y - offset;
+    if (ny < 1) {
+      break;
+    }
+    const index = cellIndex(x, ny);
+    if (!state.tunnelMask[index] || state.metalMask[index] || state.beaconMask[index] > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildCollapseWarningCells() {
+  const targetCount = clamp(COLLAPSE_MIN_TILES + Math.floor(state.depth / 20), COLLAPSE_MIN_TILES, COLLAPSE_MAX_TILES);
+  const offsets = [
+    { x: 0, y: 0 },
+    { x: 0, y: -1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+    { x: -1, y: -1 },
+    { x: 1, y: -1 },
+    { x: 0, y: -2 },
+    { x: -2, y: 0 },
+    { x: 2, y: 0 },
+    { x: -1, y: 1 },
+    { x: 1, y: 1 },
+    { x: -2, y: -1 },
+    { x: 2, y: -1 },
+    { x: 0, y: 1 },
+    { x: -2, y: 1 },
+    { x: 2, y: 1 },
+  ];
+  const preferred = [];
+  const fallback = [];
+  const seen = new Set();
+  for (const offset of offsets) {
+    const x = state.drill.x + offset.x;
+    const y = state.drill.y + offset.y;
+    const key = `${x},${y}`;
+    if (seen.has(key) || !isCollapseCandidateCell(x, y)) {
+      continue;
+    }
+    seen.add(key);
+    const cell = { x, y };
+    if (hasCollapseCeiling(x, y)) {
+      preferred.push(cell);
+    } else {
+      fallback.push(cell);
+    }
+  }
+  return preferred.concat(fallback).slice(0, targetCount);
+}
+
+function beginCollapseWarning() {
+  const cells = buildCollapseWarningCells();
+  state.pendingCollapseCount = Math.max(0, state.pendingCollapseCount - 1);
+  if (cells.length <= 0) {
+    return;
+  }
+  state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.6);
+  state.collapseWarnings.push({
+    cells,
+    timer: COLLAPSE_WARNING_DURATION,
+    duration: COLLAPSE_WARNING_DURATION,
+    hardness: getCollapseHardness(),
+    resolveIndex: 0,
+    landDelay: 0,
+    heroDamaged: false,
+    clearPath: false,
+  });
+  showPerkToast("Обрушение!");
+}
+
+function resolveNextCollapseCell(warning) {
+  if (!warning || !Array.isArray(warning.cells) || warning.resolveIndex >= warning.cells.length) {
+    return true;
+  }
+
+  const blockedKeys = new Set();
+  for (let i = warning.resolveIndex; i < warning.cells.length; i += 1) {
+    blockedKeys.add(`${warning.cells[i].x},${warning.cells[i].y}`);
+  }
+
+  const cell = warning.cells[warning.resolveIndex];
+  warning.resolveIndex += 1;
+  const key = `${cell.x},${cell.y}`;
+  if (!warning.heroDamaged && key === `${state.drill.x},${state.drill.y}`) {
+    warning.heroDamaged = true;
+    applyHazardDamage(COLLAPSE_DAMAGE);
+    const fallback = findNearestWalkableTileExcluding(state.drill.x, state.drill.y, blockedKeys);
+    if (fallback) {
+      state.drill.x = fallback.x;
+      state.drill.y = fallback.y;
+      state.drill.renderX = fallback.x;
+      state.drill.renderY = fallback.y;
+      state.drill.animFromX = fallback.x;
+      state.drill.animFromY = fallback.y;
+      state.drill.animToX = fallback.x;
+      state.drill.animToY = fallback.y;
+      refreshSignalDirection();
+      warning.clearPath = true;
+    } else {
+      return warning.resolveIndex >= warning.cells.length;
+    }
+  }
+
+  const index = cellIndex(cell.x, cell.y);
+  if (isWalkableTileIndex(index)) {
+    if (state.pathIndexByCell[index] !== -1) {
+      warning.clearPath = true;
+    }
+    removeGasCell(cell.x, cell.y);
+    state.steamMask[index] = 0;
+    state.tunnelMask[index] = 0;
+    state.hardness[index] = warning.hardness;
+    state.health[index] = BLOCK_TYPES[warning.hardness].hp;
+    state.hazardMask[index] = 0;
+    state.hazardTriggeredMask[index] = 0;
+    state.loopGoldMask[index] = 0;
+    spawnBreakEffect(cell.x, cell.y, warning.hardness, "collapse");
+    state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 0.7);
+  }
+
+  if (warning.resolveIndex >= warning.cells.length) {
+    if (warning.clearPath) {
+      state.pathTiles.length = 0;
+      rebuildPathIndex();
+    }
+    state.visibilityDirty = true;
+    return true;
+  }
+  warning.landDelay = COLLAPSE_LAND_INTERVAL;
+  state.visibilityDirty = true;
+  return false;
+}
+
+function updateCollapseWarnings(dt) {
+  for (let i = state.collapseWarnings.length - 1; i >= 0; i -= 1) {
+    const warning = state.collapseWarnings[i];
+    if (warning.timer > 0) {
+      warning.timer -= dt;
+      continue;
+    }
+    if (warning.landDelay > 0) {
+      warning.landDelay -= dt;
+      continue;
+    }
+    if (resolveNextCollapseCell(warning)) {
+      state.collapseWarnings.splice(i, 1);
+    }
+  }
+
+  if (state.collapseWarnings.length === 0 && state.pendingCollapseCount > 0) {
+    beginCollapseWarning();
+  }
+}
+
 function buildCrystalRecipePool(level, firstCrystalType) {
   const pool = [firstCrystalType];
   if (!level) {
@@ -2715,6 +2940,33 @@ function findNearestWalkableTileOutsideBeacon(beacon, fromX, fromY) {
       !isInsideBeaconCore(beacon, current.x, current.y) &&
       isWalkableTileIndex(cellIndex(current.x, current.y))
     ) {
+      return current;
+    }
+    for (let i = 0; i < CARDINAL_DIRS.length; i += 1) {
+      const nx = current.x + CARDINAL_DIRS[i].x;
+      const ny = current.y + CARDINAL_DIRS[i].y;
+      if (nx < 1 || ny < 1 || nx >= GRID_W - 1 || ny >= GRID_H - 1) {
+        continue;
+      }
+      const index = cellIndex(nx, ny);
+      if (visited[index]) {
+        continue;
+      }
+      visited[index] = 1;
+      queue.push({ x: nx, y: ny });
+    }
+  }
+  return null;
+}
+
+function findNearestWalkableTileExcluding(fromX, fromY, blockedKeys = new Set()) {
+  const visited = new Uint8Array(GRID_W * GRID_H);
+  const queue = [{ x: fromX, y: fromY }];
+  visited[cellIndex(fromX, fromY)] = 1;
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const key = `${current.x},${current.y}`;
+    if (!blockedKeys.has(key) && isWalkableTileIndex(cellIndex(current.x, current.y))) {
       return current;
     }
     for (let i = 0; i < CARDINAL_DIRS.length; i += 1) {
@@ -5146,9 +5398,9 @@ function frame(ts) {
     delta = Math.min(delta, MAX_FRAME_MS);
     const instantFps = delta > 0 ? 1000 / delta : 0;
     state.fps = state.fps > 0 ? state.fps * 0.88 + instantFps * 0.12 : instantFps;
-    state.fpsHistory.push(Math.round(instantFps));
-    if (state.fpsHistory.length > 40) state.fpsHistory.shift();
-    state.timeAcc += delta;
+  state.fpsHistory.push(Math.round(instantFps));
+  if (state.fpsHistory.length > 40) state.fpsHistory.shift();
+  state.timeAcc += delta;
 
     while (state.timeAcc >= STEP_MS) {
       update(STEP_MS / 1000);
@@ -5166,6 +5418,8 @@ function update(dt) {
   if (state.dead) {
     return;
   }
+
+  updateHudBarFx(dt);
 
   if (state.autoClosePreviewReturnTimer > 0) {
     state.autoClosePreviewReturnTimer = Math.max(0, state.autoClosePreviewReturnTimer - dt);
@@ -5229,10 +5483,11 @@ function update(dt) {
     }
   }
 
-  drainFuel(getIdleFuelDrain() * dt);
+  drainFuel(getIdleFuelDrain() * dt, { hudKind: "idle" });
   state.struckThisFrame = false;
   state.drillIdleFrame = false;
   updateDrill(dt);
+  updateCollapseWarnings(dt);
   updateGas(dt);
   updateSteam(dt);
   updateBoulders(dt);
@@ -6773,16 +7028,21 @@ function dropUnsafeGold() {
   scatterGoldAroundTile(state.drill.x, state.drill.y, dropAmount, { minTargets: 1, maxTargets: 1 });
 }
 
-function drainFuel(amount) {
+function drainFuel(amount, options = {}) {
   if (amount <= 0 || state.dead) return;
+  const hudKind = options.hudKind || "active";
   if (state.fuel >= amount) {
     state.fuel -= amount;
+    state.lastFuelHudChangeKind = hudKind;
     state.outOfFuel = false;
     return;
   }
   const fromFuel = state.fuel;
   const fromHp = (amount - fromFuel) * Math.max(0, state.fuelToHpRate);
   state.fuel = 0;
+  if (fromFuel > 0) {
+    state.lastFuelHudChangeKind = hudKind;
+  }
   if (!state.outOfFuel) {
     state.outOfFuel = true;
     playSound("fuel_emergency");
@@ -6817,7 +7077,9 @@ function applyHazardDamage(amount, options = {}) {
     state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.3);
     state.damageFlash = Math.min(1, state.damageFlash + 0.8);
   }
-  showHpToast(damageLeft);
+  if (options.silent !== true) {
+    showHpToast(damageLeft);
+  }
   if (options.dropOnDamage !== false) {
     dropUnsafeGold();
     dropArtifactOnDamage();
@@ -7318,6 +7580,7 @@ function breakCell(x, y, index, options = {}) {
   if (!blockType) {
     return;
   }
+  spendCollapseBudget(hardness);
   const hazardType = state.hazardMask[index];
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
   const baseGold = state.goldOreMask[index] ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier) : 0;
@@ -7433,12 +7696,15 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
   const scaledDamage = damage * (1 + state.damageBonus / 100) * (1 + state.explosionDamage / 100);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(scaledRadius);
+  let affectedCellCount = 0;
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
     for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
       const dist = Math.hypot(ox, oy);
       if (dist > scaledRadius) continue;
       const tx = x + ox;
       const ty = y + oy;
+      if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
+      affectedCellCount += 1;
       const delay = Math.floor(dist) * EXPLOSION_WAVE_DELAY;
       state.chainExplosions.push({
         kind: "explosionCell",
@@ -7449,6 +7715,7 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
       });
     }
   }
+  spendCollapseBudget(affectedCellCount * 10);
 }
 
 function spawnRocketEffect(fromX, fromY, targetX, targetY, payload, { instant = false } = {}) {
@@ -7891,7 +8158,7 @@ function updateDrill(dt) {
       }
     }
     if (_autoCloseCandidate && !state.idleAutoCloseTriggered) {
-      drainFuel(DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt);
+      drainFuel(DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt, { hudKind: "active" });
     }
     state.drill.progress = 0;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 5);
@@ -8285,7 +8552,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       }
       showPerkToast("Маяк активирован!");
       addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
-      healPlayer(25, "Маяк");
       state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
     }
   }
@@ -9672,6 +9938,7 @@ function render() {
   renderWorms(camera);
   renderDrill(camera);
   renderWormTelegraph(camera);
+  renderCollapseWarnings(camera);
   renderBaseProximityDot(camera);
   renderActiveToast(camera);
   if (!state.debugMapActive) {
@@ -9681,6 +9948,7 @@ function render() {
     renderOverdriveStatus(camera);
     renderStunStatus(camera);
     renderHeatWarningStatus(camera);
+    renderLowFuelStatus(camera);
     renderLoopChargeStatus(camera);
     renderVisionMask(camera);
   }
@@ -11377,6 +11645,46 @@ function renderWormTelegraph(camera) {
   ctx.restore();
 }
 
+function renderCollapseWarnings(camera) {
+  if (state.collapseWarnings.length === 0) {
+    return;
+  }
+  const ctx = state.ctx;
+  ctx.save();
+  for (const warning of state.collapseWarnings) {
+    const ratio = clamp(warning.timer / Math.max(0.1, warning.duration || COLLAPSE_WARNING_DURATION), 0, 1);
+    const pulse = Math.sin((state.lastTs || 0) * 0.02) * 0.5 + 0.5;
+    const startIndex = warning.timer > 0 ? 0 : (warning.resolveIndex || 0);
+    for (let i = startIndex; i < warning.cells.length; i += 1) {
+      const cell = warning.cells[i];
+      const index = cellIndex(cell.x, cell.y);
+      const visibleAlpha = clamp(state.visibleAlpha[index], 0, 1);
+      if (visibleAlpha <= 0.05) {
+        continue;
+      }
+      const sx = cell.x * TILE_SIZE - camera.x;
+      const sy = cell.y * TILE_SIZE - camera.y;
+      ctx.globalAlpha = visibleAlpha * (0.22 + pulse * 0.16);
+      ctx.fillStyle = "#b62020";
+      ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+      ctx.globalAlpha = visibleAlpha * (0.45 + (1 - ratio) * 0.25);
+      ctx.strokeStyle = "#ff5a5a";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+      ctx.globalAlpha = visibleAlpha * (0.16 + pulse * 0.12);
+      ctx.strokeStyle = "#ffd0d0";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(sx + 6, sy + 6);
+      ctx.lineTo(sx + TILE_SIZE - 6, sy + TILE_SIZE - 6);
+      ctx.moveTo(sx + TILE_SIZE - 6, sy + 6);
+      ctx.lineTo(sx + 6, sy + TILE_SIZE - 6);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function renderWormSegment(ctx, cx, cy, radius, alpha, color, tileX, tileY) {
   const idx = cellIndex(tileX, tileY);
   const isTunnel = state.tunnelMask[idx] || state.beaconMask[idx] === 1;
@@ -11752,6 +12060,35 @@ function renderHeatWarningStatus(camera) {
   ctx.restore();
 }
 
+function renderLowFuelStatus(camera) {
+  const threshold = state.maxFuel * 0.3;
+  if (state.maxFuel <= 0 || state.fuel > threshold) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y + 66;
+  const width = 64;
+  const ratio = clamp(state.fuel / Math.max(1, state.maxFuel), 0, 1);
+  const pulse = Math.sin((state.lastTs || 0) * 0.01) * 0.5 + 0.5;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(23, 14, 9, 0.82)";
+  ctx.strokeStyle = `rgba(255, 112, 112, ${0.3 + pulse * 0.2})`;
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = pulse > 0.5 ? "#ff6b57" : "#ff934f";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
+  ctx.restore();
+}
+
 function renderLoopChargeStatus(camera) {
   if (state.loopChargeTimer <= 0 || state.contourChargeDrillPowerBonus <= 0) {
     return;
@@ -12013,9 +12350,11 @@ function renderHud() {
   ctx.textAlign = "right";
   ctx.textBaseline = "top";
   const fpsText = `FPS ${Math.round(state.fps || 0)}`;
+  const collapseText = `COL ${Math.round(state.collapseBudget || 0)}`;
   const fpsX = state.width - 14;
   const fpsY = detailTop + 52;
   ctx.fillText(fpsText, fpsX, fpsY);
+  ctx.fillText(collapseText, fpsX, fpsY + 12);
   state.syncSoundToggleButton?.();
 
   // FPS sparkline graph
@@ -12094,6 +12433,11 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   const trackY = y + 12;
   const trackWidth = Math.max(44, width - 82);
   const trackHeight = 10;
+  const fx = getHudBarFx(label.toLowerCase(), ratio);
+  const ghostRatio = fx ? clamp(fx.ghostRatio, 0, 1) : ratio;
+  const pulse = fx ? fx.pulse : 0;
+  const deltaDir = fx ? fx.deltaDir : 0;
+  const intensity = fx ? fx.intensity : 0;
 
   drawHudPanel(x, y, width, height);
 
@@ -12112,6 +12456,16 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   drawRoundedRectPath(trackX, trackY, trackWidth, trackHeight, 999);
   ctx.fill();
 
+  const ghostStart = Math.min(ratio, ghostRatio);
+  const ghostWidth = Math.abs(ghostRatio - ratio) * trackWidth;
+  if (ghostWidth > 0.8) {
+    ctx.fillStyle = deltaDir < 0
+      ? `rgba(255, 104, 104, ${0.18 + intensity * 0.12 + pulse * (0.16 + intensity * 0.18)})`
+      : `rgba(122, 255, 176, ${0.16 + intensity * 0.1 + pulse * (0.14 + intensity * 0.16)})`;
+    drawRoundedRectPath(trackX + ghostStart * trackWidth, trackY, ghostWidth, trackHeight, 999);
+    ctx.fill();
+  }
+
   if (ratio > 0) {
     const gradient = ctx.createLinearGradient(trackX, trackY, trackX + trackWidth, trackY);
     gradient.addColorStop(0, colors[0]);
@@ -12119,6 +12473,31 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
     ctx.fillStyle = gradient;
     drawRoundedRectPath(trackX, trackY, trackWidth * ratio, trackHeight, 999);
     ctx.fill();
+  }
+
+  if (pulse > 0 && ratio > 0) {
+    const pulseWidth = Math.max(12, trackWidth * (0.08 + intensity * 0.12));
+    const slide = ((state.lastTs || 0) * (0.0016 + intensity * 0.0032)) % 1;
+    const travelWidth = Math.max(0, trackWidth * ratio - pulseWidth);
+    const pulseX = label === "FUEL" || label === "HP"
+      ? trackX + travelWidth * (1 - slide)
+      : trackX + travelWidth * slide;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const flashGradient = ctx.createLinearGradient(pulseX, trackY, pulseX + pulseWidth, trackY);
+    if (deltaDir < 0) {
+      flashGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
+      flashGradient.addColorStop(0.5, `rgba(255, 214, 170, ${0.08 + intensity * 0.08 + pulse * (0.14 + intensity * 0.24)})`);
+      flashGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    } else {
+      flashGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
+      flashGradient.addColorStop(0.5, `rgba(220, 255, 230, ${0.08 + intensity * 0.08 + pulse * (0.12 + intensity * 0.22)})`);
+      flashGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    }
+    ctx.fillStyle = flashGradient;
+    drawRoundedRectPath(trackX, trackY, trackWidth * ratio, trackHeight, 999);
+    ctx.fill();
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -12162,6 +12541,11 @@ function drawHudXpBar(x, y, width, height, label, value, ratio) {
   const trackY = y + 12;
   const trackWidth = Math.max(44, width - 82);
   const trackHeight = 10;
+  const fx = getHudBarFx("xp", ratio);
+  const ghostRatio = fx ? clamp(fx.ghostRatio, 0, 1) : ratio;
+  const barPulse = fx ? fx.pulse : 0;
+  const deltaDir = fx ? fx.deltaDir : 0;
+  const intensity = fx ? fx.intensity : 0;
 
   drawHudPanel(x, y, width, height);
 
@@ -12189,6 +12573,16 @@ function drawHudXpBar(x, y, width, height, label, value, ratio) {
   drawRoundedRectPath(trackX, trackY, trackWidth, trackHeight, trackHeight * 0.5);
   ctx.fill();
 
+  const ghostStart = Math.min(ratio, ghostRatio);
+  const ghostWidth = Math.abs(ghostRatio - ratio) * trackWidth;
+  if (ghostWidth > 0.8) {
+    ctx.fillStyle = deltaDir < 0
+      ? `rgba(255, 128, 128, ${0.16 + intensity * 0.08 + barPulse * (0.12 + intensity * 0.14)})`
+      : `rgba(186, 244, 255, ${0.14 + intensity * 0.08 + barPulse * (0.14 + intensity * 0.16)})`;
+    drawRoundedRectPath(trackX + ghostStart * trackWidth, trackY, ghostWidth, trackHeight, trackHeight * 0.5);
+    ctx.fill();
+  }
+
   const fillWidth = Math.max(0, trackWidth * ratio);
   if (fillWidth > 0) {
     const glow = 0.8 + Math.sin((state.lastTs || 0) * 0.004) * 0.1;
@@ -12196,7 +12590,77 @@ function drawHudXpBar(x, y, width, height, label, value, ratio) {
     drawRoundedRectPath(trackX, trackY, fillWidth, trackHeight, trackHeight * 0.5);
     ctx.fill();
   }
+
+  if (barPulse > 0 && fillWidth > 0) {
+    const pulseWidth = Math.max(12, trackWidth * (0.1 + intensity * 0.12));
+    const slide = ((state.lastTs || 0) * (0.0014 + intensity * 0.0028)) % 1;
+    const pulseX = trackX + Math.max(0, fillWidth - pulseWidth) * slide;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const flashGradient = ctx.createLinearGradient(pulseX, trackY, pulseX + pulseWidth, trackY);
+    flashGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
+    flashGradient.addColorStop(0.5, `rgba(232, 252, 255, ${0.08 + intensity * 0.08 + barPulse * (0.14 + intensity * 0.22)})`);
+    flashGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = flashGradient;
+    drawRoundedRectPath(trackX, trackY, fillWidth, trackHeight, trackHeight * 0.5);
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.restore();
+}
+
+function getHudBarFx(key, ratio) {
+  if (!state.hudBarFx[key]) {
+    state.hudBarFx[key] = { ratio, ghostRatio: ratio, pulse: 0, deltaDir: 0, intensity: 0 };
+  }
+  return state.hudBarFx[key];
+}
+
+function updateHudBarFx(dt) {
+  const ratios = {
+    hp: clamp(state.hp / Math.max(1, state.maxHp), 0, 1),
+    fuel: clamp(state.fuel / Math.max(1, state.maxFuel), 0, 1),
+    heat: clamp(state.heat / Math.max(1, state.maxHeat), 0, 1),
+    xp: clamp(state.xp / Math.max(1, state.xpToNext), 0, 1),
+  };
+  const harmfulDirection = {
+    hp: -1,
+    fuel: -1,
+    heat: 1,
+    xp: 0,
+  };
+
+  for (const [key, ratio] of Object.entries(ratios)) {
+    const fx = getHudBarFx(key, ratio);
+    const delta = ratio - fx.ratio;
+    if (Math.abs(delta) > 0.0005) {
+      const dir = Math.sign(delta);
+      const isHarmful = dir !== 0
+        && dir === harmfulDirection[key]
+        && (key !== "fuel" || state.lastFuelHudChangeKind !== "idle");
+      const rawIntensity = clamp(Math.abs(delta) / Math.max(dt, 0.0001) * 0.12, 0, 1);
+      const speedIntensity = rawIntensity * rawIntensity;
+      fx.deltaDir = isHarmful ? dir : 0;
+      fx.pulse = isHarmful ? 1 : 0;
+      fx.intensity = isHarmful ? Math.max(fx.intensity * 0.55, speedIntensity) : 0;
+      fx.ratio = ratio;
+      if (!isHarmful) {
+        fx.ghostRatio = ratio;
+      }
+    }
+    if (Math.abs(fx.ghostRatio - ratio) > 0.0005) {
+      const speed = fx.ghostRatio > ratio ? 4.6 : 6.8;
+      const follow = Math.min(1, dt * speed);
+      fx.ghostRatio += (ratio - fx.ghostRatio) * follow;
+    } else {
+      fx.ghostRatio = ratio;
+    }
+    fx.pulse = Math.max(0, fx.pulse - dt * 2.2);
+    fx.intensity = Math.max(0, fx.intensity - dt * 1.6);
+    if (fx.pulse === 0 && Math.abs(fx.ghostRatio - ratio) <= 0.0005) {
+      fx.deltaDir = 0;
+    }
+  }
 }
 
 function renderHudMiniPerkIcon(perkType, x, y, size) {
