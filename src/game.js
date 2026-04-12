@@ -78,6 +78,7 @@ const BREACH_MISSILE_RADIUS = 1.2;
 const FUEL_ROCKET_DAMAGE = 45;
 const FUEL_ROCKET_RADIUS = 1.5;
 const CRYO_ROCKET_DAMAGE = 28;
+const SHARD_DRILL_BLAST_RADIUS = 1.0;
 
 const ITEM_INSPECT_STAT_META = {
   adrenalineLevel: { label: "Адреналин", mode: "level" },
@@ -87,6 +88,7 @@ const ITEM_INSPECT_STAT_META = {
   bonusFindChance: { label: "Шанс находки", mode: "percent" },
   breachMissileLevel: { label: "Бреш-ракета", mode: "level" },
   concentration: { label: "Концентрация", mode: "multiplier" },
+  contourResMultiplier: { label: "Ресурс контура", mode: "percent" },
   cryoRocketCount: { label: "Крио-ракеты", mode: "level" },
   crystalGoldGain: { label: "Золото за кристалл", mode: "integer" },
   crystalRewardRerolls: { label: "Рероллы награды кристалла", mode: "level" },
@@ -95,12 +97,15 @@ const ITEM_INSPECT_STAT_META = {
   drillPower: { label: "Сила бура", mode: "fixed1" },
   drillPowerPerLevel: { label: "Сила бура за уровень", mode: "fixed1" },
   effectDurationRate: { label: "Длительность эффектов", mode: "multiplier" },
+  explosionDamage: { label: "Урон взрывов", mode: "rawpercent" },
   explosionDamageMultiplier: { label: "Урон взрывов", mode: "percent" },
   firstStrikeLevel: { label: "Первый удар", mode: "level" },
   fuelConverterLevel: { label: "Конвертер топлива", mode: "level" },
   fuelDrainRate: { label: "Расход топлива", mode: "multiplier" },
+  fuelToHpRate: { label: "Потери HP без топлива", mode: "percent" },
   fuelPerLevel: { label: "Топливо за уровень", mode: "integer" },
   fuelRocketLevel: { label: "Топливная ракета", mode: "level" },
+  goldBonus: { label: "Золото", mode: "percent" },
   goldBonusPerLevel: { label: "Золото за уровень", mode: "integer" },
   goldRadarMode: { label: "Золотой радар", mode: "toggle" },
   healPerLevel: { label: "Лечение за уровень", mode: "hp" },
@@ -113,15 +118,19 @@ const ITEM_INSPECT_STAT_META = {
   loopLengthDamageBonus: { label: "Урон за клетку контура", mode: "rawpercent" },
   loopLengthFuelBonus: { label: "Топливо за клетку контура", mode: "fixed1" },
   loopSpawnBonusChance: { label: "Шанс спавна контура", mode: "percent" },
+  lowFuelSpeedBonus: { label: "Скорость на низком топливе", mode: "percent" },
+  lowFuelDamageBonus: { label: "Урон на низком топливе", mode: "percent" },
   luck: { label: "Удача", mode: "integer" },
   maxFuel: { label: "Макс. топливо", mode: "integer" },
   maxHeat: { label: "Макс. жар", mode: "integer" },
   maxHp: { label: "Макс. HP", mode: "hp" },
+  maxContour: { label: "Длина контура", mode: "integer" },
   maxLoopLength: { label: "Длина контура", mode: "integer" },
   miningGoldBonusMultiplier: { label: "Добыча золота", mode: "percent" },
   navigatorMode: { label: "Навигатор маяков", mode: "toggle" },
   radarCrystalModule: { label: "Радар кристаллов", mode: "toggle" },
   shopPriceDiscount: { label: "Скидка магазина", mode: "percent" },
+  shardDrillLevel: { label: "Осколочный бур", mode: "level" },
   speedOfAutoClose: { label: "Скорость автозамыкания", mode: "rawpercent" },
   strikeSpeed: { label: "Скорость бурения", mode: "rawpercent" },
   strikeSpeedPerLevel: { label: "Скорость за уровень", mode: "rawpercent" },
@@ -139,8 +148,10 @@ const ITEM_INSPECT_STAT_META = {
 const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "thermo_drill",
   "basic_drill",
+  "tradeoff_drill",
   "fragile_drill",
   "lucky_pickaxe",
+  "shard_drill",
 ]);
 
 const DEBUG_CORE_STATS = [
@@ -170,6 +181,7 @@ const DEBUG_CORE_STATS = [
   { key: "weakSpotPierce",       label: "weakSpotPierce",        step: 1,    fmt: v => Math.round(v) },
   { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
   { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "lowFuelDamageBonus",   label: "lowFuelDamageBonus",    step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "shopPriceDiscount",    label: "shopPriceDiscount",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "contourChargeDamagePerCell", label: "contourChargePerCell", step: 1, fmt: v => Math.round(v) },
   { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
@@ -621,7 +633,9 @@ const state = {
   contourResMultiplier: 1.15,
   loopPerkLevel: 0,
   lowFuelSpeedBonus: 0,
+  lowFuelDamageBonus: 0,
   lowFuelStrikeSpeedApplied: 0,
+  shardDrillLevel: 0,
   remoteBombLevel: 0,
   remoteBombInterval: 0,
   overhealOverdrive: false,
@@ -2470,7 +2484,9 @@ function setupField(seedOverride = null) {
   state.contourResMultiplier = 1.15;
   state.loopPerkLevel = 0;
   state.lowFuelSpeedBonus = 0;
+  state.lowFuelDamageBonus = 0;
   state.lowFuelStrikeSpeedApplied = 0;
+  state.shardDrillLevel = 0;
   state.remoteBombLevel = 0;
   state.remoteBombInterval = 0;
   state.overhealOverdrive = false;
@@ -2481,6 +2497,7 @@ function setupField(seedOverride = null) {
   state.idleAutoCloseTriggered = false;
   state.speedOfAutoClose = 0;
   state.damageBonus = 0;
+  state.explosionDamage = 0;
   state.explosionRadiusBonus = 0;
   state.bonusFindChance = 0;
   state.autoClosePreview = null;
@@ -3727,11 +3744,18 @@ function applyShopPerk(effectId, rarityMult, rarity) {
     case "basic_drill":
       showPerkToast("Просто дрель");
       break;
+    case "tradeoff_drill":
+      showPerkToast("Разменный бур");
+      break;
     case "fragile_drill":
       showPerkToast("Хрупкий бур");
       break;
     case "lucky_pickaxe":
       showPerkToast("Кирка счастливчика");
+      break;
+    case "shard_drill":
+      state.shardDrillLevel += 1;
+      showPerkToast("Осколочный бур");
       break;
     default: {
       const good = ALL_GOODS.find(g => g.id === effectId);
@@ -3780,8 +3804,10 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "ore_collector": break;
     case "crystal_catalyst": state.crystalCatalystLevel = Math.max(0, (state.crystalCatalystLevel || 0) - 1); break;
     case "basic_drill": break;
+    case "tradeoff_drill": break;
     case "fragile_drill": break;
     case "lucky_pickaxe": break;
+    case "shard_drill": state.shardDrillLevel = Math.max(0, state.shardDrillLevel - 1); break;
     default: {
       const good = ALL_GOODS.find(g => g.id === effectId);
       if (good?.effect) reverseItemEffect(good.effect, rarityMult, rarity);
@@ -3812,9 +3838,15 @@ function getShopStatsSnapshot() {
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
     explosionDamage: state.explosionDamage,
+    lowFuelDamageBonus: state.lowFuelDamageBonus,
     weakSpotChance: state.weakSpotChance,
     weakSpotMult: state.weakSpotMult,
   };
+}
+
+function normalizeItemEffectStat(stat) {
+  if (stat === "maxLoopLength") return "maxContour";
+  return stat;
 }
 
 function applyItemEffect(effect, rarityMult, rarity) {
@@ -3822,25 +3854,26 @@ function applyItemEffect(effect, rarityMult, rarity) {
   const effects = Array.isArray(effect) ? effect : [effect];
   for (const e of effects) {
     if (!e.stat) continue;
+    const stat = normalizeItemEffectStat(e.stat);
     const value = e.effectByRarity
       ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
       : e.value * (rarityMult || 1);
-    if (e.stat === "goldRadarMode") {
+    if (stat === "goldRadarMode") {
       state.goldRadarMode = true;
       state.goldClustersCache = null;
-    } else if (e.stat === "artifactRadarMode") {
+    } else if (stat === "artifactRadarMode") {
       state.artifactRadarMode = true;
-    } else if (e.stat === "navigatorMode") {
+    } else if (stat === "navigatorMode") {
       state.navigatorMode = true;
-    } else if (e.stat === "radarCrystalModule") {
+    } else if (stat === "radarCrystalModule") {
       state.radarCrystalModule = true;
-    } else if (e.stat === "maxHp" && value < 0) {
+    } else if (stat === "maxHp" && value < 0) {
       state.maxHp = Math.max(1, state.maxHp + value);
       state.hp = Math.min(state.hp, state.maxHp);
     } else {
-      state[e.stat] = (state[e.stat] || 0) + value;
+      state[stat] = (state[stat] || 0) + value;
     }
-    if (e.stat === "visionRadius") state.visibilityDirty = true;
+    if (stat === "visionRadius") state.visibilityDirty = true;
   }
 }
 
@@ -3849,16 +3882,17 @@ function reverseItemEffect(effect, rarityMult, rarity) {
   const effects = Array.isArray(effect) ? effect : [effect];
   for (const e of effects) {
     if (!e.stat) continue;
+    const stat = normalizeItemEffectStat(e.stat);
     const value = e.effectByRarity
       ? (e.effectByRarity[rarity] ?? e.effectByRarity[1] ?? 0)
       : e.value * (rarityMult || 1);
-    if (e.stat === "maxHp" && value < 0) {
+    if (stat === "maxHp" && value < 0) {
       state.maxHp = Math.max(1, state.maxHp - value);
       state.hp = Math.min(state.hp, state.maxHp);
     } else {
-      state[e.stat] = (state[e.stat] || 0) - value;
+      state[stat] = (state[stat] || 0) - value;
     }
-    if (e.stat === "visionRadius") state.visibilityDirty = true;
+    if (stat === "visionRadius") state.visibilityDirty = true;
   }
 }
 
@@ -4197,6 +4231,14 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
       ];
     }
+    case "tradeoff_drill": {
+      const flatDamage = [0, 16, 22, 30, 40][rarity] || 0;
+      const weakSpotPenalty = [0, -0.3, -0.5, -0.7, -1.0][rarity] || 0;
+      return [
+        { label: "Плоский урон", value: `+${flatDamage}` },
+        { label: "Штраф к урону по бреши", value: formatPerkNumber(weakSpotPenalty) },
+      ];
+    }
     case "thermo_drill": {
       const flatDamage = [0, 0, 20, 25, 30][rarity] || 0;
       const damageScale = [0, 0, 15, 20, 25][rarity] || 0;
@@ -4233,6 +4275,17 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: "Скейл от удачи", value: `+${luckScale}%` },
         { label: "Рост ценности жилы", value: `+${oreGain}` },
         { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+      ];
+    }
+    case "shard_drill": {
+      const flatDamage = [0, 8, 12, 16, 20][rarity] || 0;
+      const weakSpotChance = [0, 0.04, 0.06, 0.08, 0.10][rarity] || 0;
+      const explosionDamage = [0, 20, 30, 45, 60][rarity] || 0;
+      return [
+        { label: "Плоский урон", value: `+${flatDamage}` },
+        { label: "Шанс бреши", value: `+${Math.round(weakSpotChance * 100)}%` },
+        { label: "Взрыв при брешь-ударе", value: `+${explosionDamage}` },
+        { label: "Радиус взрыва", value: formatPerkNumber(SHARD_DRILL_BLAST_RADIUS, 1) },
       ];
     }
     default:
@@ -6983,13 +7036,17 @@ function getStrikeDamage() {
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01) + contourLength * (state.loopLengthDamageBonus || 0) * 0.01;
   const firstStrikeBoost = (state.firstStrikeTimer > 0 && state.firstStrikeLevel > 0) ? 1 + state.firstStrikeLevel * 0.4 : 1;
+  const lowFuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
+  const lowFuelDamageBoost = 1 + lowFuelFactor * (state.lowFuelDamageBonus || 0);
   let damage =
     BASE_DRILL_DAMAGE * contourBoost +
     getBasicDrillDamageBonus() +
+    getTradeoffDrillDamageBonus() +
     getFragileDrillDamageBonus() +
     getLuckyPickaxeDamageBonus() +
+    getShardDrillDamageBonus() +
     getThermoDrillDamageBonus();
-  return damage * (1 + state.damageBonus / 100) * firstStrikeBoost;
+  return damage * (1 + state.damageBonus / 100) * firstStrikeBoost * lowFuelDamageBoost;
 }
 
 function getEquipmentTiers(effectId) {
@@ -7040,6 +7097,10 @@ function getBasicDrillDamageBonus() {
   return total;
 }
 
+function getTradeoffDrillDamageBonus() {
+  return sumEquipmentTierValues("tradeoff_drill", [0, 16, 22, 30, 40]);
+}
+
 function getLuckyPickaxeDamageBonus() {
   let total = 0;
   for (const tier of getEquipmentTiers("lucky_pickaxe")) {
@@ -7060,6 +7121,14 @@ function getThermoDrillDamageBonus() {
     total += flat + state.drillPower * drillScale + Math.floor(state.heat / 10) * heatBonus;
   }
   return total;
+}
+
+function getShardDrillDamageBonus() {
+  return sumEquipmentTierValues("shard_drill", [0, 8, 12, 16, 20]);
+}
+
+function getShardDrillExplosionDamage() {
+  return sumEquipmentTierValues("shard_drill", [0, 20, 30, 45, 60]);
 }
 
 function getLuckyPickaxeOreGain() {
@@ -7859,6 +7928,13 @@ function damageCell(x, y, damage, options = {}) {
     }
     for (let ri = 0; ri < state.breachMissileLevel; ri += 1) {
       fireRocket(x, y, BREACH_MISSILE_DAMAGE, BREACH_MISSILE_RADIUS, 1 + Math.floor(Math.random() * 3));
+    }
+    const shardBlastDamage = getShardDrillExplosionDamage();
+    if (shardBlastDamage > 0) {
+      explodeAt(x, y, shardBlastDamage, SHARD_DRILL_BLAST_RADIUS, {
+        guaranteedBreak: false,
+        skipRadiusBonus: true,
+      });
     }
   }
   const continuePierce = () => {

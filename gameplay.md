@@ -280,15 +280,17 @@ Gameplay role:
 ## Shop
 
 The shop opens after each beacon activation.
-It currently contains a minimal equipment pool.
+It now contains a broad baseline `Базовое` item pool plus a smaller set of specialized categories.
 
 Current available categories:
 - `Базовое`
 - `Экономика`
 
-Current available equipment:
-- `Просто дрель` — adds `10 / 15 / 20 / 25` damage plus `10% / 15% / 20% / 25%` of the `dmg` stat
-- `Кирка счастливчика` — adds bonus damage to every drill hit, and hits on gold ore increase that vein's final gold value
+Current available shop content includes:
+- baseline stat items for core build directions such as HP, fuel, heat, contour size, weak spots, explosion scaling, and per-level growth
+- tradeoff items where one stat rises while another falls, mostly concentrated in `Базовое`
+- equipment such as `Просто дрель`, `Разменный бур`, `Осколочный бур`, and `Кирка счастливчика`, which remain part of the early shop pool
+- a new low-fuel damage stat that can appear on shop items and scales drill damage as the tank empties
 
 ## Overflow / Remote Bomb Rules
 
