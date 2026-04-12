@@ -78,6 +78,109 @@ const BREACH_MISSILE_RADIUS = 1.2;
 const FUEL_ROCKET_DAMAGE = 45;
 const FUEL_ROCKET_RADIUS = 1.5;
 const CRYO_ROCKET_DAMAGE = 28;
+
+const ITEM_INSPECT_STAT_META = {
+  adrenalineLevel: { label: "Адреналин", mode: "level" },
+  armor: { label: "Броня", mode: "armor" },
+  artifactRadarMode: { label: "Радар артефактов", mode: "toggle" },
+  beaconCatalystLevel: { label: "Катализатор маяка", mode: "level" },
+  bonusFindChance: { label: "Шанс находки", mode: "percent" },
+  breachMissileLevel: { label: "Бреш-ракета", mode: "level" },
+  concentration: { label: "Концентрация", mode: "multiplier" },
+  cryoRocketCount: { label: "Крио-ракеты", mode: "level" },
+  crystalGoldGain: { label: "Золото за кристалл", mode: "integer" },
+  crystalRewardRerolls: { label: "Рероллы награды кристалла", mode: "level" },
+  crystalXpGain: { label: "XP за кристалл", mode: "integer" },
+  damageBonus: { label: "Урон", mode: "percent" },
+  drillPower: { label: "Сила бура", mode: "fixed1" },
+  drillPowerPerLevel: { label: "Сила бура за уровень", mode: "fixed1" },
+  effectDurationRate: { label: "Длительность эффектов", mode: "multiplier" },
+  explosionDamageMultiplier: { label: "Урон взрывов", mode: "percent" },
+  firstStrikeLevel: { label: "Первый удар", mode: "level" },
+  fuelConverterLevel: { label: "Конвертер топлива", mode: "level" },
+  fuelDrainRate: { label: "Расход топлива", mode: "multiplier" },
+  fuelPerLevel: { label: "Топливо за уровень", mode: "integer" },
+  fuelRocketLevel: { label: "Топливная ракета", mode: "level" },
+  goldBonusPerLevel: { label: "Золото за уровень", mode: "integer" },
+  goldRadarMode: { label: "Золотой радар", mode: "toggle" },
+  healPerLevel: { label: "Лечение за уровень", mode: "hp" },
+  heatExplosionDamageBonus: { label: "Урон перегрева", mode: "integer" },
+  heatExplosionRadiusBonus: { label: "Радиус перегрева", mode: "fixed1" },
+  heatRate: { label: "Скорость нагрева", mode: "multiplier" },
+  insuranceLevel: { label: "Страховка", mode: "level" },
+  levelCatalystLevel: { label: "Катализатор уровня", mode: "level" },
+  loopChargeLevel: { label: "Контурный заряд", mode: "level" },
+  loopLengthDamageBonus: { label: "Урон за клетку контура", mode: "rawpercent" },
+  loopLengthFuelBonus: { label: "Топливо за клетку контура", mode: "fixed1" },
+  loopSpawnBonusChance: { label: "Шанс спавна контура", mode: "percent" },
+  luck: { label: "Удача", mode: "integer" },
+  maxFuel: { label: "Макс. топливо", mode: "integer" },
+  maxHeat: { label: "Макс. жар", mode: "integer" },
+  maxHp: { label: "Макс. HP", mode: "hp" },
+  maxLoopLength: { label: "Длина контура", mode: "integer" },
+  miningGoldBonusMultiplier: { label: "Добыча золота", mode: "percent" },
+  navigatorMode: { label: "Навигатор маяков", mode: "toggle" },
+  radarCrystalModule: { label: "Радар кристаллов", mode: "toggle" },
+  shopPriceDiscount: { label: "Скидка магазина", mode: "percent" },
+  speedOfAutoClose: { label: "Скорость автозамыкания", mode: "rawpercent" },
+  strikeSpeed: { label: "Скорость бурения", mode: "rawpercent" },
+  strikeSpeedPerLevel: { label: "Скорость за уровень", mode: "rawpercent" },
+  stunAfterburnerLevel: { label: "Форсаж после стана", mode: "level" },
+  stunDetonatorLevel: { label: "Детонатор стана", mode: "level" },
+  stunReservoirLevel: { label: "Резервуар стана", mode: "level" },
+  visionRadius: { label: "Обзор", mode: "integer" },
+  weakSpotChance: { label: "Шанс бреши", mode: "percent" },
+  weakSpotFuelGain: { label: "Топливо за брешь", mode: "integer" },
+  weakSpotMult: { label: "Урон по бреши", mode: "percent" },
+  weakSpotPierce: { label: "Пробитие бреши", mode: "integer" },
+  xpBonusMultiplier: { label: "Опыт", mode: "percent" },
+};
+
+const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
+  "thermo_drill",
+  "basic_drill",
+  "fragile_drill",
+  "lucky_pickaxe",
+]);
+
+const DEBUG_CORE_STATS = [
+  { key: "maxHp",                label: "maxHp",                 step: 1,    fmt: v => Math.round(v) },
+  { key: "maxFuel",              label: "maxFuel",               step: 50,   fmt: v => Math.round(v) },
+  { key: "fuelDrainRate",        label: "fuelDrainRate",         step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: "fuelToHpRate",         label: "fuelToHpRate",          step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: "contourResMultiplier", label: "contourResMultiplier",  step: 0.05, fmt: v => v.toFixed(2) },
+  { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
+  { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
+  { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
+  { key: "weakSpotChance",       label: "Брешь%",                step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "weakSpotMult",         label: "хБрешь",                step: 0.5,  fmt: v => `x${v.toFixed(1)}` },
+  { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
+  { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
+  { key: "concentration",        label: "concentration (%)",     step: 5,    fmt: v => Math.round(v) },
+  { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
+  { key: "goldBonus",            label: "goldBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "fuelBonus",            label: "fuelBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
+  { key: "maxContour",           label: "maxContour",            step: 1,    fmt: v => Math.round(v) },
+  { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
+  { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
+  { key: "explosionRadiusBonus", label: "explosionRadiusBonus",  step: 0.5,  fmt: v => v.toFixed(1) },
+  { key: "weakSpotPierce",       label: "weakSpotPierce",        step: 1,    fmt: v => Math.round(v) },
+  { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
+  { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "shopPriceDiscount",    label: "shopPriceDiscount",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "contourChargeDamagePerCell", label: "contourChargePerCell", step: 1, fmt: v => Math.round(v) },
+  { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
+  { key: "loopSpawnBonusChance", label: "loopSpawnBonusChance",  step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "drillPowerPerLevel",   label: "drillPowerPerLevel",    step: 0.5,  fmt: v => v.toFixed(1) },
+  { key: "strikeSpeedPerLevel",  label: "strikeSpeedPerLevel",   step: 1,    fmt: v => Math.round(v) },
+  { key: "fuelPerLevel",         label: "fuelPerLevel",          step: 1,    fmt: v => Math.round(v) },
+  { key: "healPerLevel",         label: "healPerLevel",          step: 1,    fmt: v => Math.round(v) },
+  { key: "goldBonusPerLevel",    label: "goldBonusPerLevel",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "bonusFindChance",      label: "bonusFindChance",       step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
+];
 const CRYO_ROCKET_RADIUS = 1.0;
 const COOLING_ROCKET_DAMAGE = 30;
 const COOLING_ROCKET_RADIUS = 1.0;
@@ -569,6 +672,10 @@ const state = {
   damageFlash: 0,
   fatalErrorText: "",
   goldHitRect: null,
+  hudInspectableRects: [],
+  itemInspectModalOpen: false,
+  itemInspectItems: [],
+  itemInspectIndex: -1,
   sprites: null,
   effects: [],
   tileAnimations: [],
@@ -2410,6 +2517,10 @@ function setupField(seedOverride = null) {
   state.depthTitle.time = 0;
   state.damageFlash = 0;
   state.goldHitRect = null;
+  state.hudInspectableRects = [];
+  state.itemInspectModalOpen = false;
+  state.itemInspectItems = [];
+  state.itemInspectIndex = -1;
   state.effects.length = 0;
   state.tileAnimations.length = 0;
   state.tileAnimDest.clear();
@@ -4011,6 +4122,284 @@ function bindFatalErrorHandlers() {
   });
 }
 
+function getEffectValueForRarity(effect, rarity) {
+  if (!effect?.stat) {
+    return 0;
+  }
+  if (effect.effectByRarity) {
+    return effect.effectByRarity[rarity] ?? effect.effectByRarity[1] ?? 0;
+  }
+  return effect.value ?? 0;
+}
+
+function formatInspectSignedNumber(value, digits = 0) {
+  const rounded = digits > 0 ? value.toFixed(digits) : String(Math.round(value));
+  return `${value > 0 ? "+" : ""}${rounded}`;
+}
+
+function formatInspectEffectValue(stat, value) {
+  const meta = ITEM_INSPECT_STAT_META[stat] || { label: stat, mode: "integer" };
+  switch (meta.mode) {
+    case "armor":
+    case "hp":
+      return formatInspectSignedNumber(value / 25);
+    case "fixed1": {
+      const digits = Math.abs(value % 1) > 0.001 ? 1 : 0;
+      return formatInspectSignedNumber(value, digits);
+    }
+    case "integer":
+      return formatInspectSignedNumber(value);
+    case "rawpercent":
+      return `${formatInspectSignedNumber(value)}%`;
+    case "percent":
+      return `${formatInspectSignedNumber(value * 100)}%`;
+    case "multiplier":
+      return `${formatInspectSignedNumber((value - 1) * 100)}%`;
+    case "toggle":
+      return "Активно";
+    case "level":
+      return `ур. ${Math.max(0, Math.round(value))}`;
+    default:
+      return formatInspectSignedNumber(value);
+  }
+}
+
+function getInspectEffectLines(good, rarity) {
+  const specialLines = getSpecialInspectEffectLines(good, rarity);
+  if (specialLines.length > 0) {
+    return specialLines;
+  }
+  const effects = Array.isArray(good?.effect)
+    ? good.effect
+    : (good?.effect ? [good.effect] : []);
+  return effects
+    .filter((effect) => effect?.stat)
+    .map((effect) => {
+      const meta = ITEM_INSPECT_STAT_META[effect.stat] || { label: effect.stat, mode: "integer" };
+      const value = getEffectValueForRarity(effect, rarity);
+      return {
+        label: meta.label,
+        value: formatInspectEffectValue(effect.stat, value),
+      };
+    })
+    .filter((line) => line.value && line.value !== "+0" && line.value !== "+0%" && line.value !== "ур. 0");
+}
+
+function getSpecialInspectEffectLines(good, rarity) {
+  switch (good?.id) {
+    case "basic_drill": {
+      const flatDamage = [0, 10, 15, 20, 25][rarity] || 0;
+      const damageScale = [0, 10, 15, 20, 25][rarity] || 0;
+      const totalDamage = flatDamage + state.drillPower * (damageScale / 100);
+      return [
+        { label: "Плоский урон", value: `+${flatDamage}` },
+        { label: "Скейл от силы бура", value: `+${damageScale}%` },
+        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+      ];
+    }
+    case "thermo_drill": {
+      const flatDamage = [0, 0, 20, 25, 30][rarity] || 0;
+      const damageScale = [0, 0, 15, 20, 25][rarity] || 0;
+      const heatBonus = [0, 0, 1, 2, 3][rarity] || 0;
+      const totalDamage = flatDamage + state.drillPower * (damageScale / 100) + Math.floor(state.heat / 10) * heatBonus;
+      return [
+        { label: "Плоский урон", value: `+${flatDamage}` },
+        { label: "Скейл от силы бура", value: `+${damageScale}%` },
+        { label: "Урон за каждые 10 heat", value: `+${heatBonus}` },
+        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+      ].filter((line) => line.value !== "+0");
+    }
+    case "fragile_drill": {
+      const flatDamage = [0, 10, 15, 20, 25][rarity] || 0;
+      const damageScale = [0, 10, 15, 20, 25][rarity] || 0;
+      const speedBonus = [0, 10, 15, 20, 30][rarity] || 0;
+      const totalDamage = flatDamage + state.drillPower * (damageScale / 100);
+      return [
+        { label: "Плоский урон", value: `+${flatDamage}` },
+        { label: "Скейл от силы бура", value: `+${damageScale}%` },
+        { label: "Скорость при броне", value: `+${speedBonus}%` },
+        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+      ];
+    }
+    case "lucky_pickaxe": {
+      const flatDamage = [0, 10, 15, 20, 25][rarity] || 0;
+      const damageScale = [0, 10, 20, 30, 40][rarity] || 0;
+      const luckScale = [0, 10, 15, 20, 25][rarity] || 0;
+      const oreGain = [0, 1, 2, 3, 4][rarity] || 0;
+      const totalDamage = flatDamage + state.drillPower * (damageScale / 100) + state.luck * (luckScale / 100);
+      return [
+        { label: "Плоский урон", value: `+${flatDamage}` },
+        { label: "Скейл от силы бура", value: `+${damageScale}%` },
+        { label: "Скейл от удачи", value: `+${luckScale}%` },
+        { label: "Рост ценности жилы", value: `+${oreGain}` },
+        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+      ];
+    }
+    default:
+      return [];
+  }
+}
+
+function getDebugCoreStatLines() {
+  return DEBUG_CORE_STATS.map((def) => ({
+    label: def.label,
+    value: def.fmt(state[def.key] ?? 0),
+  }));
+}
+
+function buildItemInspectEntries() {
+  const entries = [];
+  const equipped = getEquippedParts();
+  for (let index = 0; index < equipped.length; index += 1) {
+    const part = equipped[index];
+    const def = ALL_EQUIPMENT.find((item) => item.id === part.id);
+    if (!def) continue;
+    entries.push({
+      key: `equipment:${index}:${part.id}:${part.rarity || RARITY.COMMON}`,
+      good: def,
+      rarity: part.rarity || RARITY.COMMON,
+      sourceLabel: `Слот ${index + 1}`,
+      stackCount: equipped.filter((entry) => entry.id === part.id).length,
+    });
+  }
+  const purchased = getPurchasedItems();
+  for (let index = 0; index < purchased.length; index += 1) {
+    const item = purchased[index];
+    const def = ALL_ITEMS.find((entry) => entry.id === item.id);
+    if (!def) continue;
+    entries.push({
+      key: `item:${index}:${item.id}:${item.rarity || RARITY.COMMON}`,
+      good: def,
+      rarity: item.rarity || RARITY.COMMON,
+      sourceLabel: "Инвентарь",
+      stackCount: purchased.filter((entry) => entry.id === item.id).length,
+    });
+  }
+  return entries;
+}
+
+function closeItemInspectModal() {
+  state.itemInspectModalOpen = false;
+  state.itemInspectItems = [];
+  state.itemInspectIndex = -1;
+  syncItemInspectModal();
+}
+
+function openItemInspectModal(entry) {
+  if (!entry?.good) {
+    return;
+  }
+  const items = buildItemInspectEntries();
+  const index = items.findIndex((item) => item.key === entry.key);
+  state.itemInspectItems = items;
+  state.itemInspectIndex = index >= 0 ? index : 0;
+  state.itemInspectModalOpen = true;
+  syncItemInspectModal();
+}
+
+function stepItemInspectModal(direction) {
+  if (!state.itemInspectModalOpen || state.itemInspectItems.length <= 1) {
+    return;
+  }
+  const count = state.itemInspectItems.length;
+  state.itemInspectIndex = (state.itemInspectIndex + direction + count) % count;
+  syncItemInspectModal();
+}
+
+function findHudInspectableAt(clientX, clientY) {
+  for (let i = state.hudInspectableRects.length - 1; i >= 0; i -= 1) {
+    const entry = state.hudInspectableRects[i];
+    if (isPointInsideRect(clientX, clientY, entry.rect)) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+function syncItemInspectModal() {
+  const overlay = document.getElementById("itemInspectModal");
+  const panel = overlay?.querySelector(".item-inspect-modal__panel");
+  if (!overlay || !panel) {
+    return;
+  }
+
+  const currentEntry = state.itemInspectItems[state.itemInspectIndex];
+  if (!state.itemInspectModalOpen || !currentEntry?.good) {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+    syncTouchZonesInteractivity();
+    return;
+  }
+
+  const { good, rarity, sourceLabel, stackCount } = currentEntry;
+  const rarityColor = RARITY_COLORS[rarity] || "#aaa";
+  const desc = getGoodDescription(good, rarity, getShopStatsSnapshot());
+  const category = CATEGORIES.find((entry) => entry.id === good.category);
+  const metaBits = [
+    sourceLabel,
+    category ? `${category.icon} ${category.name}` : null,
+    stackCount > 1 ? `Копий: ${stackCount}` : null,
+  ].filter(Boolean);
+  const characterStatLines = getDebugCoreStatLines();
+  const canNavigate = state.itemInspectItems.length > 1;
+  const positionText = `${state.itemInspectIndex + 1}/${state.itemInspectItems.length}`;
+
+  panel.innerHTML = `
+    <button id="itemInspectClose" class="item-inspect-modal__close" type="button" aria-label="Закрыть">✕</button>
+    <div class="item-inspect-modal__toolbar">
+      <button id="itemInspectPrev" class="item-inspect-modal__nav" type="button" ${canNavigate ? "" : "disabled"} aria-label="Предыдущий предмет">‹</button>
+      <div class="item-inspect-modal__position">${positionText}</div>
+      <button id="itemInspectNext" class="item-inspect-modal__nav" type="button" ${canNavigate ? "" : "disabled"} aria-label="Следующий предмет">›</button>
+    </div>
+    <div class="item-inspect-modal__head">
+      <div class="item-inspect-modal__icon" style="--inspect-color:${rarityColor}">${good.icon || "?"}</div>
+      <div class="item-inspect-modal__title-wrap">
+        <div class="item-inspect-modal__eyebrow">${good.type === "equipment" ? "Экипировка" : "Предмет"}</div>
+        <div class="item-inspect-modal__title">${good.name}</div>
+        <div class="item-inspect-modal__rarity" style="color:${rarityColor}">${RARITY_NAMES[rarity] || "Неизвестно"}</div>
+      </div>
+    </div>
+    <div class="item-inspect-modal__meta">${metaBits.map((bit) => `<span class="item-inspect-modal__chip">${bit}</span>`).join("")}</div>
+    <div class="item-inspect-modal__section">
+      <div class="item-inspect-modal__section-title">Описание</div>
+      <div class="item-inspect-modal__desc">${desc.replace(/\n/g, "<br>")}</div>
+    </div>
+    <div class="item-inspect-modal__section">
+      <div class="item-inspect-modal__section-title">Core Stats</div>
+      <div class="item-inspect-modal__stats item-inspect-modal__stats--character">
+        ${characterStatLines.map((line) => `
+          <div class="item-inspect-modal__stat">
+            <span class="item-inspect-modal__stat-label">${line.label}</span>
+            <span class="item-inspect-modal__stat-value">${line.value}</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  overlay.hidden = false;
+  overlay.removeAttribute("hidden");
+  overlay.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    "z-index:9998",
+    "display:flex",
+    "visibility:visible",
+    "pointer-events:auto",
+    "opacity:1",
+    "align-items:flex-end",
+    "justify-content:center",
+    "padding:20px",
+    "background:rgba(8,4,2,0.72)",
+    "backdrop-filter:blur(6px)",
+  ].join(";");
+
+  panel.querySelector("#itemInspectClose")?.addEventListener("click", closeItemInspectModal, { once: true });
+  panel.querySelector("#itemInspectPrev")?.addEventListener("click", () => stepItemInspectModal(-1), { once: true });
+  panel.querySelector("#itemInspectNext")?.addEventListener("click", () => stepItemInspectModal(1), { once: true });
+  syncTouchZonesInteractivity();
+}
+
 function init() {
   bindFatalErrorHandlers();
   try {
@@ -4069,6 +4458,8 @@ function bindUi() {
   const manualOverlay = document.getElementById("manualModal");
   const manualPanel = manualOverlay?.querySelector(".manual-modal__panel");
   const manualFrame = document.getElementById("manualFrame");
+  const itemInspectOverlay = document.getElementById("itemInspectModal");
+  const itemInspectPanel = itemInspectOverlay?.querySelector(".item-inspect-modal__panel");
   const debugClose = document.getElementById("debugPerkClose");
   const debugOverlay = document.getElementById("debugPerkMenu");
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
@@ -4113,7 +4504,16 @@ function bindUi() {
   };
 
   zone.addEventListener("pointerdown", (event) => {
-    if (state.beaconActivationAnim || state.debugPerkMenuOpen || state.manualModalOpen || state.shopModalOpen || state.levelUpModalOpen) {
+    if (state.beaconActivationAnim || isAnyBlockingModalOpen()) {
+      return;
+    }
+    const inspectEntry = findHudInspectableAt(event.clientX, event.clientY);
+    if (inspectEntry) {
+      event.preventDefault();
+      event.stopPropagation();
+      resetPad();
+      playSound("shop_open", { volume: 0.45 });
+      openItemInspectModal(inspectEntry);
       return;
     }
     if (state.goldHitRect && isPointInsideRect(event.clientX, event.clientY, state.goldHitRect)) {
@@ -4300,6 +4700,24 @@ function bindUi() {
       resetPad();
       state.manualModalOpen = false;
       syncManualModal();
+    });
+  }
+
+  if (itemInspectOverlay) {
+    itemInspectOverlay.addEventListener("click", (event) => {
+      if (event.target !== itemInspectOverlay) {
+        return;
+      }
+      closeItemInspectModal();
+    });
+  }
+
+  if (itemInspectPanel) {
+    itemInspectPanel.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    itemInspectPanel.addEventListener("click", (event) => {
+      event.stopPropagation();
     });
   }
 
@@ -4688,46 +5106,8 @@ function buildDebugPerkButtons() {
 
   // Core stats -/+ controls
   if (statsRoot) {
-    const CORE_STATS = [
-      { key: "maxHp",                label: "maxHp",                 step: 1,    fmt: v => Math.round(v) },
-      { key: "maxFuel",              label: "maxFuel",               step: 50,   fmt: v => Math.round(v) },
-      { key: "fuelDrainRate",        label: "fuelDrainRate",         step: 0.1,  fmt: v => v.toFixed(1) },
-      { key: "fuelToHpRate",         label: "fuelToHpRate",          step: 0.1,  fmt: v => v.toFixed(1) },
-      { key: "contourResMultiplier", label: "contourResMultiplier",  step: 0.05, fmt: v => v.toFixed(2) },
-      { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
-      { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
-      { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
-      { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
-      { key: "weakSpotChance",       label: "Брешь%",                step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "weakSpotMult",         label: "хБрешь",                step: 0.5,  fmt: v => `x${v.toFixed(1)}` },
-      { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
-      { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
-      { key: "concentration",        label: "concentration (%)",     step: 5,    fmt: v => Math.round(v) },
-      { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
-      { key: "goldBonus",            label: "goldBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "fuelBonus",            label: "fuelBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
-      { key: "maxContour",        label: "maxContour",         step: 1,    fmt: v => Math.round(v) },
-      { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
-      { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
-      { key: "explosionRadiusBonus", label: "explosionRadiusBonus",  step: 0.5,  fmt: v => v.toFixed(1) },
-      { key: "weakSpotPierce",       label: "weakSpotPierce",        step: 1,    fmt: v => Math.round(v) },
-      { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
-      { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "shopPriceDiscount",    label: "shopPriceDiscount",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "contourChargeDamagePerCell", label: "contourChargePerCell", step: 1, fmt: v => Math.round(v) },
-      { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
-      { key: "loopSpawnBonusChance", label: "loopSpawnBonusChance",  step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "drillPowerPerLevel",   label: "drillPowerPerLevel",    step: 0.5,  fmt: v => v.toFixed(1) },
-      { key: "strikeSpeedPerLevel",  label: "strikeSpeedPerLevel",   step: 1,    fmt: v => Math.round(v) },
-      { key: "fuelPerLevel",         label: "fuelPerLevel",          step: 1,    fmt: v => Math.round(v) },
-      { key: "healPerLevel",         label: "healPerLevel",          step: 1,    fmt: v => Math.round(v) },
-      { key: "goldBonusPerLevel",    label: "goldBonusPerLevel",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-      { key: "bonusFindChance",      label: "bonusFindChance",       step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
-    ];
     statsRoot.innerHTML = "";
-    for (const def of CORE_STATS) {
+    for (const def of DEBUG_CORE_STATS) {
       const row = document.createElement("div");
       row.className = "debug-stat-row";
       const nameEl = document.createElement("span");
@@ -5059,6 +5439,7 @@ function maybeOpenPendingLevelReward() {
   }
   if (
     state.beaconActivationAnim ||
+    state.itemInspectModalOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
@@ -5327,6 +5708,7 @@ function updateCrystalItemOffer(dt) {
 function isAnyBlockingModalOpen() {
   return !!(
     state.isChoosingPerk ||
+    state.itemInspectModalOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
@@ -5445,6 +5827,7 @@ function update(dt) {
   }
 
   if (
+    state.itemInspectModalOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
@@ -12208,6 +12591,7 @@ function renderHud() {
   const panelHeight = 34;
   const left = state.width - 14 - totalWidth;
   const secondRowTop = top + panelHeight + 8;
+  state.hudInspectableRects = [];
 
   const hpLabel = state.armor > 0 ? `${Math.ceil(state.hp)}/${state.maxHp} • A:${state.armor}` : `${Math.ceil(state.hp)}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
@@ -12785,16 +13169,44 @@ function renderHudPerkColumn(x, y, width, title) {
 
   // 1. Equipped parts (equipment slots)
   const equipped = getEquippedParts();
-  for (const part of equipped) {
+  for (let index = 0; index < equipped.length; index += 1) {
+    const part = equipped[index];
     const def = ALL_EQUIPMENT.find(e => e.id === part.id);
-    if (def) perkRows.push({ icon: def.icon || "?", label: null, isEquipment: true });
+    if (def) {
+      perkRows.push({
+        icon: def.icon || "?",
+        label: null,
+        isEquipment: true,
+        inspect: {
+          key: `equipment:${index}:${part.id}:${part.rarity || RARITY.COMMON}`,
+          good: def,
+          rarity: part.rarity || RARITY.COMMON,
+          sourceLabel: `Слот ${index + 1}`,
+          stackCount: equipped.filter((entry) => entry.id === part.id).length,
+        },
+      });
+    }
   }
 
   // 2. Purchased items
   const purchased = getPurchasedItems();
-  for (const item of purchased) {
+  for (let index = 0; index < purchased.length; index += 1) {
+    const item = purchased[index];
     const def = ALL_ITEMS.find(e => e.id === item.id);
-    if (def) perkRows.push({ icon: def.icon || "?", label: null, isItem: true });
+    if (def) {
+      perkRows.push({
+        icon: def.icon || "?",
+        label: null,
+        isItem: true,
+        inspect: {
+          key: `item:${index}:${item.id}:${item.rarity || RARITY.COMMON}`,
+          good: def,
+          rarity: item.rarity || RARITY.COMMON,
+          sourceLabel: "Инвентарь",
+          stackCount: purchased.filter((entry) => entry.id === item.id).length,
+        },
+      });
+    }
   }
 
   // 3. Gold perks
@@ -12810,10 +13222,10 @@ function renderHudPerkColumn(x, y, width, title) {
     });
   }
 
-  const iconsPerRow = Math.floor((width + 6) / (18 + 6));
-  const iconSize = 18;
+  const iconsPerRow = Math.floor((width + 6) / (25 + 6));
+  const iconSize = 25;
   const gap = 6;
-  const rowHeight = 22;
+  const rowHeight = 29;
   const startLeft = x + iconSize * 0.5;
 
   ctx.save();
@@ -12833,6 +13245,21 @@ function renderHudPerkColumn(x, y, width, title) {
     drawRoundedRectPath(cx - iconSize * 0.5, cy - iconSize * 0.5, iconSize, iconSize, 7);
     ctx.fill();
     ctx.stroke();
+    if (row.inspect) {
+      ctx.strokeStyle = "rgba(255, 240, 214, 0.12)";
+      ctx.lineWidth = 0.8;
+      drawRoundedRectPath(cx - iconSize * 0.5 + 2, cy - iconSize * 0.5 + 2, iconSize - 4, iconSize - 4, 5);
+      ctx.stroke();
+      state.hudInspectableRects.push({
+        ...row.inspect,
+        rect: {
+          x: cx - iconSize * 0.5,
+          y: cy - iconSize * 0.5,
+          width: iconSize,
+          height: iconSize,
+        },
+      });
+    }
     ctx.fillStyle = "#ffeacb";
     ctx.font = `700 10px ${HUD_FONT}`;
     ctx.textAlign = "center";
