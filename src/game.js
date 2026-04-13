@@ -230,7 +230,7 @@ const CONTOUR_ENEMY_SPAWN_CHANCE_PER_TILE = 0.006;
 const CONTOUR_ENEMY_MIN_PATH_LENGTH = 4;
 const CONTOUR_ENEMY_SPEED = 2.0;
 const CONTOUR_ENEMY_TURN_DELAY = 0.38;
-const CONTOUR_ENEMY_BASE_HP = 15;
+const CONTOUR_ENEMY_BASE_HP = 30;
 const CONTOUR_ENEMY_HP_PER_TILE = 7;
 const CONTOUR_ENEMY_BASE_REWARD = 5;
 const CONTOUR_ENEMY_REWARD_PER_TILE = 3;
@@ -7983,12 +7983,14 @@ function bfsContourEnemyPath(startX, startY, targetX, targetY) {
 
 function spawnContourEnemy() {
   const tail = state.pathTiles[0];
-  const hp = CONTOUR_ENEMY_BASE_HP;
+  const depthMult = Math.pow(1.8, (state.currentDepthLevel || 1) - 1);
+  const hp = Math.round(CONTOUR_ENEMY_BASE_HP * depthMult);
   state.contourEnemy = {
     x: tail.x, y: tail.y,
     renderX: tail.x, renderY: tail.y,
     hp, maxHp: hp,
-    reward: CONTOUR_ENEMY_BASE_REWARD,
+    depthMult,
+    reward: Math.round(CONTOUR_ENEMY_BASE_REWARD * depthMult),
     tilesEaten: 0,
     mode: 'eating',
     attackTimer: CONTOUR_ENEMY_ATTACK_INTERVAL,
@@ -8095,14 +8097,7 @@ function updateContourEnemy(dt) {
   if (state.dead) return;
   const path = state.pathTiles;
 
-  if (!state.contourEnemy) {
-    if (path.length >= CONTOUR_ENEMY_MIN_PATH_LENGTH) {
-      if (Math.random() < (path.length - 1) * CONTOUR_ENEMY_SPAWN_CHANCE_PER_TILE * dt) {
-        spawnContourEnemy();
-      }
-    }
-    return;
-  }
+  if (!state.contourEnemy) return;
 
   const enemy = state.contourEnemy;
   enemy.bobPhase += dt * 4;
@@ -8118,7 +8113,7 @@ function updateContourEnemy(dt) {
     enemy.attackTelegraphTimer -= dt;
     if (enemy.attackTelegraphTimer <= 0) {
       if (state.drill.x === enemy.attackTargetX && state.drill.y === enemy.attackTargetY) {
-        applyHazardDamage(CONTOUR_ENEMY_DAMAGE);
+        applyHazardDamage(Math.round(CONTOUR_ENEMY_DAMAGE * enemy.depthMult));
         playSound("worm_attack");
       }
       enemy.attackPhase = null;
@@ -8308,6 +8303,11 @@ function breakCell(x, y, index, options = {}) {
     return;
   }
   spendCollapseBudget(hardness);
+  if (!state.contourEnemy && state.pathTiles.length >= CONTOUR_ENEMY_MIN_PATH_LENGTH) {
+    const depthMult = Math.pow(2, (state.currentDepthLevel || 1) - 1);
+    const chance = (state.pathTiles.length - 1) * CONTOUR_ENEMY_SPAWN_CHANCE_PER_TILE * depthMult;
+    if (Math.random() < chance) spawnContourEnemy();
+  }
   const hazardType = state.hazardMask[index];
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
   const baseGold = state.goldOreMask[index] ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier) : 0;
