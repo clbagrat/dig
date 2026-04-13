@@ -269,9 +269,8 @@ Activation:
 - hidden beacons do not get the normal 1-tile open ring; that area is filled with ordinary excavatable blocks as well
 - the beacon is rendered under those blocks and gets revealed as the core is excavated; on activation it becomes a normal beacon core
 - once a hidden core is fully excavated, it immediately solidifies into a normal non-walkable beacon core; if the player stands on it, the drill is pushed to the nearest free tile and the current contour is cleared
-- when all beacon wires are fully freed, the contour hint appears around that beacon again
-- closing the contour around that already-active beacon a second time triggers `Full Freedom`: beacon wires fully fade out, then the beacon grants a bonus item reward
-- if beacon wires were already fully freed before the first activation, the beacon still opens the normal shop first; `Full Freedom` triggers only after the shop flow is closed
+- when all beacon wires are fully freed, `Full Freedom` triggers automatically: beacon wires fully fade out, then the beacon grants a bonus item reward
+- if beacon wires were already fully freed before the first activation, the beacon still opens the normal shop first; `Full Freedom` triggers automatically after the shop flow is closed
 - active beacons still accept contour-gold deposits
 
 Gameplay role:

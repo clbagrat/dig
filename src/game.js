@@ -5961,7 +5961,11 @@ function update(dt) {
     beacon.rewardContourReady = true;
     beacon.rewardRecipe = buildBeaconBonusRecipe(beacon);
     showPerkToast("Провода освобождены");
-    showPerkToast("Замкни контур ещё раз");
+    if (state.shopModalOpen || state.beaconActivationAnim) {
+      beacon.rewardAutoAfterShop = true;
+    } else {
+      beginFullFreedom(beacon, false);
+    }
   }
   for (const beacon of state.beacons) {
     if (!beacon.rewardClaimed || beacon.rewardGranted || beacon.rewardRevealStart <= 0) continue;
@@ -8974,10 +8978,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     if (!pathWithinBeaconArea) continue;
     if (beacon.hidden && !isBeaconFullyExcavated(beacon)) continue;
     if (beacon.active) {
-      if (!beacon.rewardContourReady || beacon.rewardClaimed) {
-        continue;
-      }
-      beginFullFreedom(beacon);
       continue;
     }
     if (pathWithinBeaconArea) {
@@ -9006,9 +9006,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       const pendingAction = artifactRemaining > 0
         ? { type: "artifactChoice", remaining: artifactRemaining, beacon }
         : { type: "shop", beaconY: beacon.y };
-      if (beacon.rewardContourReady && !beacon.rewardClaimed) {
-        beacon.rewardAutoAfterShop = true;
-      }
       showPerkToast("Маяк активирован!");
       addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
       state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
@@ -11110,8 +11107,8 @@ function renderOneBeacon(camera, beacon, options = {}) {
   ctx.closePath();
   ctx.fill();
 
-  // Contour hint for initial activation and post-wire bonus reward.
-  if ((!active || (beacon.rewardContourReady && !beacon.rewardClaimed)) && !options.suppressContourHint) {
+  // Contour hint for initial activation only.
+  if (!active && !options.suppressContourHint) {
     const ringPath = [
       { x: bx - 1, y: by - 1 },
       { x: bx,     y: by - 1 },
@@ -11141,14 +11138,10 @@ function renderOneBeacon(camera, beacon, options = {}) {
     }
     ctx.closePath();
     ctx.lineWidth = 8;
-    ctx.strokeStyle = beacon.rewardContourReady
-      ? "rgba(60, 82, 120, 0.34)"
-      : "rgba(60, 42, 22, 0.32)";
+    ctx.strokeStyle = "rgba(60, 42, 22, 0.32)";
     ctx.stroke();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = beacon.rewardContourReady
-      ? "rgba(180, 226, 255, 0.42)"
-      : "rgba(219, 171, 99, 0.25)";
+    ctx.strokeStyle = "rgba(219, 171, 99, 0.25)";
     ctx.stroke();
 
     ctx.restore();
