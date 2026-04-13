@@ -226,6 +226,20 @@ const WORM_DAMAGE = 50;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
+const CONTOUR_ENEMY_SPAWN_CHANCE_PER_TILE = 0.006;
+const CONTOUR_ENEMY_MIN_PATH_LENGTH = 4;
+const CONTOUR_ENEMY_SPEED = 2.0;
+const CONTOUR_ENEMY_TURN_DELAY = 0.38;
+const CONTOUR_ENEMY_BASE_HP = 15;
+const CONTOUR_ENEMY_HP_PER_TILE = 7;
+const CONTOUR_ENEMY_BASE_REWARD = 5;
+const CONTOUR_ENEMY_REWARD_PER_TILE = 3;
+const CONTOUR_ENEMY_ATTACK_INTERVAL = 1.8;
+const CONTOUR_ENEMY_ATTACK_RANGE = 2;
+const CONTOUR_ENEMY_ATTACK_TELEGRAPH = 0.55;
+const CONTOUR_ENEMY_DAMAGE = 22;
+const CONTOUR_ENEMY_EXTRA_HEAT = 14;
+const CONTOUR_ENEMY_STUN_DURATION = 0.7;
 const COLLAPSE_BUDGET_INITIAL = 600;
 const COLLAPSE_WARNING_DURATION = 2.4;
 const COLLAPSE_DAMAGE = 25;
@@ -575,6 +589,7 @@ const state = {
   pickupRadarTargetY: 0,
   wormNests: [],
   activeWorms: [],
+  contourEnemy: null,
   beacons: [],
   beaconWires: [],
   beaconWireBreaks: [],
@@ -2339,6 +2354,7 @@ function setupField(seedOverride = null) {
   state.safes.length = 0;
   state.wormNests.length = 0;
   state.activeWorms.length = 0;
+  state.contourEnemy = null;
   state.safeDoorMask.fill(0);
   state.keyMask.fill(0);
   state.safeInteriorMask.fill(0);
@@ -4936,6 +4952,41 @@ function bindUi() {
     });
   }
 
+  const debugSpawnContourEnemy = document.getElementById("debugSpawnContourEnemy");
+  if (debugSpawnContourEnemy) {
+    debugSpawnContourEnemy.addEventListener("click", () => {
+      state.contourEnemy = null;
+      if (state.pathTiles.length >= 2) {
+        spawnContourEnemy();
+        showPerkToast("Враг заспавнен");
+      } else {
+        // Force-spawn at drill position even without contour
+        const hp = CONTOUR_ENEMY_BASE_HP;
+        const fx = state.drill.x + (state.drill.facingX || 1) * 3;
+        const fy = state.drill.y + (state.drill.facingY || 0) * 3;
+        state.contourEnemy = {
+          x: fx, y: fy,
+          renderX: fx, renderY: fy,
+          prevX: fx, prevY: fy,
+          hp, maxHp: hp,
+          reward: CONTOUR_ENEMY_BASE_REWARD,
+          tilesEaten: 0,
+          mode: 'pathing', turnDelayTimer: 0,
+          attackTimer: CONTOUR_ENEMY_ATTACK_INTERVAL,
+          attackPhase: null, attackTelegraphTimer: 0,
+          attackTargetX: 0, attackTargetY: 0,
+          facingX: 0, facingY: 1, stunTimer: 0,
+          knockbackTimer: 0,
+          knockbackFromX: fx, knockbackFromY: fy,
+          bobPhase: 0,
+        };
+        showPerkToast("Враг заспавнен рядом");
+      }
+      state.debugPerkMenuOpen = false;
+      syncDebugPerkOverlay();
+    });
+  }
+
   const debugTeleportWorm = document.getElementById("debugTeleportWorm");
   if (debugTeleportWorm) {
     debugTeleportWorm.addEventListener("click", () => {
@@ -5928,6 +5979,7 @@ function update(dt) {
   updateSteam(dt);
   updateBoulders(dt);
   updateWorms(dt);
+  updateContourEnemy(dt);
   updatePerkZones(dt);
   updateChainExplosions(dt);
   updateBeaconWireBreaks(dt);
@@ -7889,6 +7941,218 @@ function updateWorms(dt) {
   }
 }
 
+// ─── Contour enemy ────────────────────────────────────────────────────────────
+
+function bfsContourEnemyPath(startX, startY, targetX, targetY) {
+  if (startX === targetX && startY === targetY) return [];
+  const N = GRID_W * GRID_H;
+  const parent = new Int32Array(N).fill(-1);
+  const startIdx = startY * GRID_W + startX;
+  const targetIdx = targetY * GRID_W + targetX;
+  parent[startIdx] = startIdx;
+  const queue = [startIdx];
+  let qi = 0;
+  while (qi < queue.length) {
+    const cur = queue[qi++];
+    const cx = cur % GRID_W;
+    const cy = (cur / GRID_W) | 0;
+    const ns = [
+      cx > 0        ? cur - 1      : -1,
+      cx < GRID_W-1 ? cur + 1      : -1,
+      cy > 0        ? cur - GRID_W : -1,
+      cy < GRID_H-1 ? cur + GRID_W : -1,
+    ];
+    for (const nidx of ns) {
+      if (nidx < 0 || parent[nidx] !== -1) continue;
+      if (!state.tunnelMask[nidx] && nidx !== targetIdx) continue;
+      parent[nidx] = cur;
+      if (nidx === targetIdx) {
+        const path = [];
+        let c = targetIdx;
+        while (c !== startIdx) {
+          path.unshift({ x: c % GRID_W, y: (c / GRID_W) | 0 });
+          c = parent[c];
+        }
+        return path;
+      }
+      queue.push(nidx);
+    }
+  }
+  return null;
+}
+
+function spawnContourEnemy() {
+  const tail = state.pathTiles[0];
+  const hp = CONTOUR_ENEMY_BASE_HP;
+  state.contourEnemy = {
+    x: tail.x, y: tail.y,
+    renderX: tail.x, renderY: tail.y,
+    hp, maxHp: hp,
+    reward: CONTOUR_ENEMY_BASE_REWARD,
+    tilesEaten: 0,
+    mode: 'eating',
+    attackTimer: CONTOUR_ENEMY_ATTACK_INTERVAL,
+    attackPhase: null,
+    attackTelegraphTimer: 0,
+    attackTargetX: 0,
+    attackTargetY: 0,
+    facingX: 0, facingY: 1,
+    stunTimer: 0,
+    bobPhase: 0,
+  };
+  playSound("worm_spawn");
+}
+
+function hitContourEnemy(damage) {
+  const enemy = state.contourEnemy;
+  if (!enemy || enemy.stunTimer > 0) return;
+  enemy.hp -= damage;
+  spawnDamageNumberEffect(enemy.x, enemy.y, damage);
+  addHeatOnStrike(CONTOUR_ENEMY_EXTRA_HEAT);
+  state.drill.moveResumeTimer = Math.max(state.drill.moveResumeTimer, POST_BREAK_MOVE_DELAY * 1.5);
+  if (enemy.hp <= 0) {
+    spawnGoldParticles(enemy.x, enemy.y, enemy.reward);
+    spawnExperienceParticles(enemy.x, enemy.y, Math.max(1, enemy.tilesEaten * 2 + 5));
+    playSound("block_break", { pitch: 0.6 });
+    state.contourEnemy = null;
+    return;
+  }
+  enemy.stunTimer = CONTOUR_ENEMY_STUN_DURATION;
+  enemy.attackPhase = null;
+  enemy.attackTimer = CONTOUR_ENEMY_ATTACK_INTERVAL;
+}
+
+function contourEnemyGlide(enemy, dt) {
+  const dx = enemy.x - enemy.renderX;
+  const dy = enemy.y - enemy.renderY;
+  const dist = Math.hypot(dx, dy);
+  const step = CONTOUR_ENEMY_SPEED * dt;
+  if (dist <= step) {
+    enemy.renderX = enemy.x;
+    enemy.renderY = enemy.y;
+    return true;
+  }
+  enemy.renderX += (dx / dist) * step;
+  enemy.renderY += (dy / dist) * step;
+  return false;
+}
+
+function contourEnemyPickNext(enemy) {
+  const path = state.pathTiles;
+  const hx = state.drill.x, hy = state.drill.y;
+
+  if (Math.abs(hx - enemy.x) + Math.abs(hy - enemy.y) <= 1) return;
+
+  // Rejoin contour if possible
+  if (enemy.mode === 'pathing' && path.length >= 2 &&
+      path[0].x === enemy.x && path[0].y === enemy.y) {
+    enemy.mode = 'eating';
+  }
+
+  let nextX = -1, nextY = -1;
+
+  if (enemy.mode === 'eating') {
+    if (path.length >= 2 && path[0].x === enemy.x && path[0].y === enemy.y) {
+      const next = path[1];
+      if (!(next.x === hx && next.y === hy)) {
+        path.shift();
+        rebuildPathIndex();
+        enemy.hp += CONTOUR_ENEMY_HP_PER_TILE;
+        enemy.maxHp = enemy.hp;
+        enemy.reward += CONTOUR_ENEMY_REWARD_PER_TILE;
+        enemy.tilesEaten++;
+        nextX = next.x;
+        nextY = next.y;
+      }
+    } else {
+      enemy.mode = 'pathing';
+    }
+  }
+
+  if (enemy.mode === 'pathing') {
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    let best = null, bestDist = Infinity;
+    for (const [ddx, ddy] of dirs) {
+      const nx = enemy.x + ddx, ny = enemy.y + ddy;
+      if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
+      if (nx === hx && ny === hy) continue;
+      if (!state.tunnelMask[cellIndex(nx, ny)]) continue;
+      const d = Math.abs(nx - hx) + Math.abs(ny - hy);
+      if (d < bestDist) { bestDist = d; best = { x: nx, y: ny }; }
+    }
+    if (best) { nextX = best.x; nextY = best.y; }
+  }
+
+  if (nextX >= 0) {
+    enemy.facingX = nextX - enemy.x;
+    enemy.facingY = nextY - enemy.y;
+    enemy.x = nextX;
+    enemy.y = nextY;
+  }
+}
+
+function updateContourEnemy(dt) {
+  if (state.dead) return;
+  const path = state.pathTiles;
+
+  if (!state.contourEnemy) {
+    if (path.length >= CONTOUR_ENEMY_MIN_PATH_LENGTH) {
+      if (Math.random() < (path.length - 1) * CONTOUR_ENEMY_SPAWN_CHANCE_PER_TILE * dt) {
+        spawnContourEnemy();
+      }
+    }
+    return;
+  }
+
+  const enemy = state.contourEnemy;
+  enemy.bobPhase += dt * 4;
+
+  // Stun: frozen in place
+  if (enemy.stunTimer > 0) {
+    enemy.stunTimer -= dt;
+    return;
+  }
+
+  // Telegraph phase
+  if (enemy.attackPhase === 'telegraph') {
+    enemy.attackTelegraphTimer -= dt;
+    if (enemy.attackTelegraphTimer <= 0) {
+      if (state.drill.x === enemy.attackTargetX && state.drill.y === enemy.attackTargetY) {
+        applyHazardDamage(CONTOUR_ENEMY_DAMAGE);
+        playSound("worm_attack");
+      }
+      enemy.attackPhase = null;
+      enemy.attackTimer = CONTOUR_ENEMY_ATTACK_INTERVAL;
+    }
+    // Keep render gliding to logical position during telegraph
+    contourEnemyGlide(enemy, dt);
+    return;
+  }
+
+  // Attack timer
+  enemy.attackTimer -= dt;
+  if (enemy.attackTimer <= 0) {
+    const adx = state.drill.x - enemy.x;
+    const ady = state.drill.y - enemy.y;
+    if (Math.abs(adx) + Math.abs(ady) <= CONTOUR_ENEMY_ATTACK_RANGE) {
+      const tx = enemy.x + (Math.abs(adx) >= Math.abs(ady) ? Math.sign(adx) : 0);
+      const ty = enemy.y + (Math.abs(ady) >  Math.abs(adx) ? Math.sign(ady) : 0);
+      enemy.attackPhase = 'telegraph';
+      enemy.attackTelegraphTimer = CONTOUR_ENEMY_ATTACK_TELEGRAPH;
+      enemy.attackTargetX = tx;
+      enemy.attackTargetY = ty;
+      enemy.facingX = tx - enemy.x;
+      enemy.facingY = ty - enemy.y;
+    } else {
+      enemy.attackTimer = CONTOUR_ENEMY_ATTACK_INTERVAL * 0.4;
+    }
+  }
+
+  // Move render toward logical position; pick next tile on arrival
+  const arrived = contourEnemyGlide(enemy, dt);
+  if (arrived) contourEnemyPickNext(enemy);
+}
+
 function triggerHazardEffect(hazardType, x, y, options = {}) {
   if (!hazardType) {
     return;
@@ -8658,7 +8922,10 @@ function updateDrill(dt) {
   const actionRate = STRIKE_CYCLE_SPEED * (1 + (state.strikeSpeed + getFragileDrillSpeedBonus() + getAdrenalineSpeedBonus()) / 100) * overdriveBoost;
   const actionInterval = (Math.PI * 2) / actionRate;
 
-  if (isWalkableTileIndex(targetIndex)) {
+  const enemyBlocksTarget = state.contourEnemy !== null &&
+    state.contourEnemy.x === targetX && state.contourEnemy.y === targetY;
+
+  if (isWalkableTileIndex(targetIndex) && !enemyBlocksTarget) {
     if (state.drill.moveResumeTimer > 0) {
       state.drill.strikePhase += dt * actionRate;
       state.drill.progress = 0;
@@ -8771,6 +9038,9 @@ function updateDrill(dt) {
     dirY: dy,
     pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)),
   });
+  if (state.contourEnemy && state.contourEnemy.x === targetX && state.contourEnemy.y === targetY) {
+    hitContourEnemy(strikeDamage);
+  }
   state.drill.progress += strikeDamage;
   state.cameraShake.amplitude = Math.max(
     state.cameraShake.amplitude,
@@ -10392,6 +10662,7 @@ function render() {
   renderBase(camera);
   renderBoulders(camera);
   renderWorms(camera);
+  renderContourEnemy(camera);
   renderDrill(camera);
   renderWormTelegraph(camera);
   renderCollapseWarnings(camera);
@@ -12193,6 +12464,93 @@ function renderWorms(camera) {
       ctx.fill();
     }
   }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function renderContourEnemy(camera) {
+  const enemy = state.contourEnemy;
+  if (!enemy) return;
+  const ctx = state.ctx;
+  const tileIdx = cellIndex(enemy.x, enemy.y);
+  const vis = clamp(state.visibleAlpha[tileIdx], 0, 1);
+  if (vis < 0.05) return;
+
+  // Telegraph warning on target cell
+  if (enemy.attackPhase === 'telegraph') {
+    const ratio = 1 - enemy.attackTelegraphTimer / CONTOUR_ENEMY_ATTACK_TELEGRAPH;
+    const pulse = Math.sin(ratio * Math.PI * 5) * 0.5 + 0.5;
+    const tx = enemy.attackTargetX * TILE_SIZE - camera.x;
+    const ty = enemy.attackTargetY * TILE_SIZE - camera.y;
+    ctx.save();
+    ctx.globalAlpha = vis * (0.35 + pulse * 0.45);
+    ctx.fillStyle = "#ff2222";
+    ctx.fillRect(tx + 2, ty + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    ctx.globalAlpha = vis * (0.7 + pulse * 0.3);
+    ctx.strokeStyle = "#ff6666";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tx + 1, ty + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+    ctx.restore();
+  }
+
+  const px = enemy.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const py = enemy.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+
+  // Scale grows with tilesEaten: 1x at 0 tiles, up to ~2.2x at 20 tiles
+  const sc = 1 + Math.min(enemy.tilesEaten, 20) * 0.06;
+
+  const wingFlap = Math.sin(enemy.bobPhase);
+  const bob = Math.sin(enemy.bobPhase * 0.7) * 2.5 * sc;
+
+  ctx.save();
+  ctx.globalAlpha = vis;
+
+  // Drop shadow
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.ellipse(px, py + 8 * sc, 8 * sc, 3 * sc, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wings
+  ctx.fillStyle = "#2a1540";
+  ctx.beginPath();
+  ctx.moveTo(px - 2 * sc, py + bob);
+  ctx.quadraticCurveTo(px - 14 * sc, py + bob - 8 * sc + wingFlap * 10 * sc, px - 11 * sc, py + bob + 6 * sc);
+  ctx.quadraticCurveTo(px - 6 * sc, py + bob + 3 * sc, px - 2 * sc, py + bob + 2 * sc);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(px + 2 * sc, py + bob);
+  ctx.quadraticCurveTo(px + 14 * sc, py + bob - 8 * sc + wingFlap * 10 * sc, px + 11 * sc, py + bob + 6 * sc);
+  ctx.quadraticCurveTo(px + 6 * sc, py + bob + 3 * sc, px + 2 * sc, py + bob + 2 * sc);
+  ctx.fill();
+
+  // Body (flash white when stunned)
+  ctx.fillStyle = enemy.stunTimer > 0 && Math.floor(enemy.stunTimer * 10) % 2 === 0 ? "#ffffff" : "#5a2a7a";
+  ctx.beginPath();
+  ctx.ellipse(px, py + bob, 6 * sc, 7 * sc, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = "#ffdd44";
+  ctx.beginPath();
+  ctx.arc(px - 2.5 * sc, py + bob - 2 * sc, 1.8 * sc, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(px + 2.5 * sc, py + bob - 2 * sc, 1.8 * sc, 0, Math.PI * 2);
+  ctx.fill();
+
+  // HP bar (only shown after first hit)
+  if (enemy.hp < enemy.maxHp) {
+    const barW = Math.round(22 * sc), barH = 3;
+    const barX = px - barW / 2;
+    const barY = py + bob - 16 * sc;
+    const ratio = Math.max(0, enemy.hp / enemy.maxHp);
+    ctx.fillStyle = "#1a0a0a";
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = ratio > 0.5 ? "#55cc33" : ratio > 0.25 ? "#ffaa00" : "#cc2222";
+    ctx.fillRect(barX, barY, barW * ratio, barH);
+  }
+
   ctx.globalAlpha = 1;
   ctx.restore();
 }
