@@ -1,4 +1,5 @@
 import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems } from "./shop.js?v=41";
+import { t, setLocale, getLocale } from "./i18n.js";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, ALL_EQUIPMENT, ALL_ITEMS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
 import {
@@ -80,70 +81,76 @@ const FUEL_ROCKET_RADIUS = 1.5;
 const CRYO_ROCKET_DAMAGE = 28;
 const SHARD_DRILL_BLAST_RADIUS = 1.0;
 
-const ITEM_INSPECT_STAT_META = {
-  adrenalineLevel: { label: "Адреналин", mode: "level" },
-  armor: { label: "Броня", mode: "armor" },
-  artifactRadarMode: { label: "Радар артефактов", mode: "toggle" },
-  beaconCatalystLevel: { label: "Катализатор маяка", mode: "level" },
-  bonusFindChance: { label: "Шанс находки", mode: "percent" },
-  breachMissileLevel: { label: "Бреш-ракета", mode: "level" },
-  concentration: { label: "Концентрация", mode: "multiplier" },
-  contourResMultiplier: { label: "Ресурс контура", mode: "percent" },
-  cryoRocketCount: { label: "Крио-ракеты", mode: "level" },
-  crystalGoldGain: { label: "Золото за кристалл", mode: "integer" },
-  crystalRewardRerolls: { label: "Рероллы награды кристалла", mode: "level" },
-  crystalXpGain: { label: "XP за кристалл", mode: "integer" },
-  damageBonus: { label: "Урон", mode: "percent" },
-  drillPower: { label: "Сила бура", mode: "fixed1" },
-  drillPowerPerLevel: { label: "Сила бура за уровень", mode: "fixed1" },
-  effectDurationRate: { label: "Длительность эффектов", mode: "multiplier" },
-  explosionDamage: { label: "Урон взрывов", mode: "rawpercent" },
-  explosionDamageMultiplier: { label: "Урон взрывов", mode: "percent" },
-  firstStrikeLevel: { label: "Первый удар", mode: "level" },
-  fuelConverterLevel: { label: "Конвертер топлива", mode: "level" },
-  fuelDrainRate: { label: "Расход топлива", mode: "multiplier" },
-  fuelToHpRate: { label: "Потери HP без топлива", mode: "percent" },
-  fuelPerLevel: { label: "Топливо за уровень", mode: "integer" },
-  fuelRocketLevel: { label: "Топливная ракета", mode: "level" },
-  goldBonus: { label: "Золото", mode: "percent" },
-  goldBonusPerLevel: { label: "Золото за уровень", mode: "integer" },
-  goldRadarMode: { label: "Золотой радар", mode: "toggle" },
-  healPerLevel: { label: "Лечение за уровень", mode: "hp" },
-  heatExplosionDamageBonus: { label: "Урон перегрева", mode: "integer" },
-  heatExplosionRadiusBonus: { label: "Радиус перегрева", mode: "fixed1" },
-  heatRate: { label: "Скорость нагрева", mode: "multiplier" },
-  insuranceLevel: { label: "Страховка", mode: "level" },
-  levelCatalystLevel: { label: "Катализатор уровня", mode: "level" },
-  loopChargeLevel: { label: "Контурный заряд", mode: "level" },
-  loopLengthDamageBonus: { label: "Урон за клетку контура", mode: "rawpercent" },
-  loopLengthFuelBonus: { label: "Топливо за клетку контура", mode: "fixed1" },
-  loopSpawnBonusChance: { label: "Шанс спавна контура", mode: "percent" },
-  lowFuelSpeedBonus: { label: "Скорость на низком топливе", mode: "percent" },
-  lowFuelDamageBonus: { label: "Урон на низком топливе", mode: "percent" },
-  luck: { label: "Удача", mode: "integer" },
-  maxFuel: { label: "Макс. топливо", mode: "integer" },
-  maxHeat: { label: "Макс. жар", mode: "integer" },
-  maxHp: { label: "Макс. HP", mode: "hp" },
-  maxContour: { label: "Длина контура", mode: "integer" },
-  maxLoopLength: { label: "Длина контура", mode: "integer" },
-  miningGoldBonusMultiplier: { label: "Добыча золота", mode: "percent" },
-  navigatorMode: { label: "Навигатор маяков", mode: "toggle" },
-  radarCrystalModule: { label: "Радар кристаллов", mode: "toggle" },
-  shopPriceDiscount: { label: "Скидка магазина", mode: "percent" },
-  shardDrillLevel: { label: "Осколочный бур", mode: "level" },
-  speedOfAutoClose: { label: "Скорость автозамыкания", mode: "rawpercent" },
-  strikeSpeed: { label: "Скорость бурения", mode: "rawpercent" },
-  strikeSpeedPerLevel: { label: "Скорость за уровень", mode: "rawpercent" },
-  stunAfterburnerLevel: { label: "Форсаж после стана", mode: "level" },
-  stunDetonatorLevel: { label: "Детонатор стана", mode: "level" },
-  stunReservoirLevel: { label: "Резервуар стана", mode: "level" },
-  visionRadius: { label: "Обзор", mode: "integer" },
-  weakSpotChance: { label: "Шанс бреши", mode: "percent" },
-  weakSpotFuelGain: { label: "Топливо за брешь", mode: "integer" },
-  weakSpotMult: { label: "Урон по бреши", mode: "percent" },
-  weakSpotPierce: { label: "Пробитие бреши", mode: "integer" },
-  xpBonusMultiplier: { label: "Опыт", mode: "percent" },
-};
+const ITEM_INSPECT_STAT_META = new Proxy({
+  adrenalineLevel:           { key: "stat.adrenalineLevel",           mode: "level" },
+  armor:                     { key: "stat.armor",                     mode: "armor" },
+  artifactRadarMode:         { key: "stat.artifactRadarMode",         mode: "toggle" },
+  beaconCatalystLevel:       { key: "stat.beaconCatalystLevel",       mode: "level" },
+  bonusFindChance:           { key: "stat.bonusFindChance",           mode: "percent" },
+  breachMissileLevel:        { key: "stat.breachMissileLevel",        mode: "level" },
+  concentration:             { key: "stat.concentration",             mode: "multiplier" },
+  contourResMultiplier:      { key: "stat.contourResMultiplier",      mode: "percent" },
+  cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
+  crystalGoldGain:           { key: "stat.crystalGoldGain",           mode: "integer" },
+  crystalRewardRerolls:      { key: "stat.crystalRewardRerolls",      mode: "level" },
+  crystalXpGain:             { key: "stat.crystalXpGain",             mode: "integer" },
+  damageBonus:               { key: "stat.damageBonus",               mode: "percent" },
+  drillPower:                { key: "stat.drillPower",                mode: "fixed1" },
+  drillPowerPerLevel:        { key: "stat.drillPowerPerLevel",        mode: "fixed1" },
+  effectDurationRate:        { key: "stat.effectDurationRate",        mode: "multiplier" },
+  explosionDamage:           { key: "stat.explosionDamage",           mode: "rawpercent" },
+  explosionDamageMultiplier: { key: "stat.explosionDamageMultiplier", mode: "percent" },
+  firstStrikeLevel:          { key: "stat.firstStrikeLevel",          mode: "level" },
+  fuelConverterLevel:        { key: "stat.fuelConverterLevel",        mode: "level" },
+  fuelDrainRate:             { key: "stat.fuelDrainRate",             mode: "multiplier" },
+  fuelToHpRate:              { key: "stat.fuelToHpRate",              mode: "percent" },
+  fuelPerLevel:              { key: "stat.fuelPerLevel",              mode: "integer" },
+  fuelRocketLevel:           { key: "stat.fuelRocketLevel",           mode: "level" },
+  goldBonus:                 { key: "stat.goldBonus",                 mode: "percent" },
+  goldBonusPerLevel:         { key: "stat.goldBonusPerLevel",         mode: "integer" },
+  goldRadarMode:             { key: "stat.goldRadarMode",             mode: "toggle" },
+  healPerLevel:              { key: "stat.healPerLevel",              mode: "hp" },
+  heatExplosionDamageBonus:  { key: "stat.heatExplosionDamageBonus",  mode: "integer" },
+  heatExplosionRadiusBonus:  { key: "stat.heatExplosionRadiusBonus",  mode: "fixed1" },
+  heatRate:                  { key: "stat.heatRate",                  mode: "multiplier" },
+  insuranceLevel:            { key: "stat.insuranceLevel",            mode: "level" },
+  levelCatalystLevel:        { key: "stat.levelCatalystLevel",        mode: "level" },
+  loopChargeLevel:           { key: "stat.loopChargeLevel",           mode: "level" },
+  loopLengthDamageBonus:     { key: "stat.loopLengthDamageBonus",     mode: "rawpercent" },
+  loopLengthFuelBonus:       { key: "stat.loopLengthFuelBonus",       mode: "fixed1" },
+  loopSpawnBonusChance:      { key: "stat.loopSpawnBonusChance",      mode: "percent" },
+  lowFuelSpeedBonus:         { key: "stat.lowFuelSpeedBonus",         mode: "percent" },
+  lowFuelDamageBonus:        { key: "stat.lowFuelDamageBonus",        mode: "percent" },
+  luck:                      { key: "stat.luck",                      mode: "integer" },
+  maxFuel:                   { key: "stat.maxFuel",                   mode: "integer" },
+  maxHeat:                   { key: "stat.maxHeat",                   mode: "integer" },
+  maxHp:                     { key: "stat.maxHp",                     mode: "hp" },
+  maxContour:                { key: "stat.maxContour",                mode: "integer" },
+  maxLoopLength:             { key: "stat.maxLoopLength",             mode: "integer" },
+  miningGoldBonusMultiplier: { key: "stat.miningGoldBonusMultiplier", mode: "percent" },
+  navigatorMode:             { key: "stat.navigatorMode",             mode: "toggle" },
+  radarCrystalModule:        { key: "stat.radarCrystalModule",        mode: "toggle" },
+  shopPriceDiscount:         { key: "stat.shopPriceDiscount",         mode: "percent" },
+  shardDrillLevel:           { key: "stat.shardDrillLevel",           mode: "level" },
+  speedOfAutoClose:          { key: "stat.speedOfAutoClose",          mode: "rawpercent" },
+  strikeSpeed:               { key: "stat.strikeSpeed",               mode: "rawpercent" },
+  strikeSpeedPerLevel:       { key: "stat.strikeSpeedPerLevel",       mode: "rawpercent" },
+  stunAfterburnerLevel:      { key: "stat.stunAfterburnerLevel",      mode: "level" },
+  stunDetonatorLevel:        { key: "stat.stunDetonatorLevel",        mode: "level" },
+  stunReservoirLevel:        { key: "stat.stunReservoirLevel",        mode: "level" },
+  visionRadius:              { key: "stat.visionRadius",              mode: "integer" },
+  weakSpotChance:            { key: "stat.weakSpotChance",            mode: "percent" },
+  weakSpotFuelGain:          { key: "stat.weakSpotFuelGain",          mode: "integer" },
+  weakSpotMult:              { key: "stat.weakSpotMult",              mode: "percent" },
+  weakSpotPierce:            { key: "stat.weakSpotPierce",            mode: "integer" },
+  xpBonusMultiplier:         { key: "stat.xpBonusMultiplier",        mode: "percent" },
+}, {
+  get(target, prop) {
+    const entry = target[prop];
+    if (!entry) return undefined;
+    return { label: t(entry.key), mode: entry.mode };
+  },
+});
 
 const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "thermo_drill",
@@ -164,8 +171,8 @@ const DEBUG_CORE_STATS = [
   { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
   { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
   { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
-  { key: "weakSpotChance",       label: "Брешь%",                step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: "weakSpotMult",         label: "хБрешь",                step: 0.5,  fmt: v => `x${v.toFixed(1)}` },
+  { key: "weakSpotChance",       label: "Breach%",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "weakSpotMult",         label: "xBreach",               step: 0.5,  fmt: v => `x${v.toFixed(1)}` },
   { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
   { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
   { key: "concentration",        label: "concentration (%)",     step: 5,    fmt: v => Math.round(v) },
@@ -256,24 +263,22 @@ const DEBUG_MODE = new URLSearchParams(location.search).has("debug-map");
 // Each entry: { stat, minRarity, values: [C, U, R, L], label, fmt }
 // fmt(value) → display string for the label
 const LEVEL_REWARD_POOL = [
-  { stat: "drillPower",                minRarity: 1, values: [0.3, 0.6, 1.0, 1.5],   label: "Сила бура",       fmt: v => `+${v}` },
-  { stat: "strikeSpeed",               minRarity: 1, values: [3, 6, 10, 15],          label: "Скорость бура",   fmt: v => `+${v}%` },
-  { stat: "damageBonus",               minRarity: 1, values: [0.03, 0.05, 0.08, 0.10], label: "Бонус урона",   fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "goldBonus", minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Золото",        fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "maxFuel",                   minRarity: 1, values: [10, 20, 30, 40],         label: "Макс. топливо", fmt: v => `+${v}` },
-  { stat: "weakSpotChance",            minRarity: 1, values: [0.03, 0.05, 0.07, 0.11], label: "Шанс бреши",   fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "weakSpotMult",              minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],    label: "Урон по бреши",  fmt: v => `+${v}` },
-  { stat: "luck",                      minRarity: 1, values: [3, 5, 7, 11],            label: "Удача",          fmt: v => `+${v}` },
-  { stat: "speedOfAutoClose",          minRarity: 1, values: [3, 6, 10, 15],           label: "Скорость контура", fmt: v => `+${v}%` },
-  { stat: "fuelBonus",           minRarity: 2, values: [null, 0.05, 0.10, 0.15, 0.20], label: "Бонус топлива", fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "maxHeat",                   minRarity: 2, values: [null, 5, 10, 15],        label: "Макс. жар",      fmt: v => `+${v}` },
-  { stat: "maxHp",                     minRarity: 3, values: [null, null, 25, 50],     label: "Макс. HP",       fmt: v => `+${v}` },
-  { stat: "xpBonusMultiplier",         minRarity: 1, values: [0.03, 0.06, 0.10, 0.15], label: "Опыт",           fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "effectDurationRate",        minRarity: 2, values: [null, 0.10, 0.18, 0.28], label: "Длит. эффектов", fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "bonusFindChance",           minRarity: 2, values: [null, 0.10, 0.20, 0.35], label: "Чутьё",          fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "drillPower",       minRarity: 1, values: [0.3, 0.6, 1.0, 1.5],          get label() { return t("reward.drillPower"); },       fmt: v => `+${v}` },
+  { stat: "strikeSpeed",      minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.strikeSpeed"); },      fmt: v => `+${v}%` },
+  { stat: "damageBonus",      minRarity: 1, values: [0.03, 0.05, 0.08, 0.10],       get label() { return t("reward.damageBonus"); },      fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "goldBonus",        minRarity: 1, values: [0.03, 0.06, 0.10, 0.15],       get label() { return t("reward.goldBonus"); },        fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "maxFuel",          minRarity: 1, values: [10, 20, 30, 40],               get label() { return t("reward.maxFuel"); },          fmt: v => `+${v}` },
+  { stat: "weakSpotChance",   minRarity: 1, values: [0.03, 0.05, 0.07, 0.11],       get label() { return t("reward.weakSpotChance"); },   fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "weakSpotMult",     minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],           get label() { return t("reward.weakSpotMult"); },     fmt: v => `+${v}` },
+  { stat: "luck",             minRarity: 1, values: [3, 5, 7, 11],                  get label() { return t("reward.luck"); },             fmt: v => `+${v}` },
+  { stat: "speedOfAutoClose", minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.speedOfAutoClose"); }, fmt: v => `+${v}%` },
+  { stat: "fuelBonus",        minRarity: 2, values: [null, 0.05, 0.10, 0.15, 0.20], get label() { return t("reward.fuelBonus"); },        fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "maxHeat",          minRarity: 2, values: [null, 5, 10, 15],              get label() { return t("reward.maxHeat"); },          fmt: v => `+${v}` },
+  { stat: "maxHp",            minRarity: 3, values: [null, null, 25, 50],           get label() { return t("reward.maxHp"); },            fmt: v => `+${v}` },
+  { stat: "xpBonusMultiplier",minRarity: 1, values: [0.03, 0.06, 0.10, 0.15],       get label() { return t("reward.xpBonusMultiplier"); },fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "effectDurationRate",minRarity: 2, values: [null, 0.10, 0.18, 0.28],      get label() { return t("reward.effectDurationRate"); },fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "bonusFindChance",  minRarity: 2, values: [null, 0.10, 0.20, 0.35],       get label() { return t("reward.bonusFindChance"); },  fmt: v => `+${Math.round(v*100)}%` },
 ];
-
-const RARITY_NAMES_RU = { 1: "Обычный", 2: "Необычный", 3: "Редкий", 4: "Легендарный" };
 
 function rollLevelRewardRarity(playerLevel) {
   const t = Math.min(playerLevel / 12, 1);
@@ -309,7 +314,7 @@ function generateLevelRewardChoices(playerLevel) {
       value,
       rarity,
       label: `${entry.fmt(value)} ${entry.label}`,
-      description: RARITY_NAMES_RU[rarity],
+      description: RARITY_NAMES[rarity],
     });
   }
   return choices;
@@ -394,14 +399,14 @@ const BLOCK_TYPES = [
 
 const TILE_PERK_TYPES = [
   null,
-  { name: "Бак", icon: "F", color: "#ffcf7a", desc: "+60 топлива прямо сейчас" },
-  { name: "Радар", icon: "R", color: "#f2ede2", desc: "+10 сек направляющего радара" },
-  { name: "Бур", icon: "D", color: "#ff9f6b", desc: "+0.35 к силе удара бура" },
-  { name: "Бомба", icon: "*", color: "#c796ff", desc: "Ракета на дистанцию 2 в направлении бурения с взрывом x10" },
-  { name: "Скорость", icon: "S", color: "#9fd7ff", desc: "+10% к скорости нового удара" },
-  { name: "HP+", icon: "H", color: "#73e58f", desc: "+1 к текущему здоровью" },
-  { name: "Броня", icon: "A", color: "#b4d7ff", desc: "+1 брони против внешней опасности" },
-  { name: "Форсаж", icon: "⚡", color: "#ff4444", desc: "+3 сек форсажа бура" },
+  { get name() { return t("perk.tile.tank.name"); },  icon: "F", color: "#ffcf7a", get desc() { return t("perk.tile.tank.desc"); } },
+  { get name() { return t("perk.tile.radar.name"); }, icon: "R", color: "#f2ede2", get desc() { return t("perk.tile.radar.desc"); } },
+  { get name() { return t("perk.tile.drill.name"); }, icon: "D", color: "#ff9f6b", get desc() { return t("perk.tile.drill.desc"); } },
+  { get name() { return t("perk.tile.bomb.name"); },  icon: "*", color: "#c796ff", get desc() { return t("perk.tile.bomb.desc"); } },
+  { get name() { return t("perk.tile.speed.name"); }, icon: "S", color: "#9fd7ff", get desc() { return t("perk.tile.speed.desc"); } },
+  { get name() { return t("perk.tile.hp.name"); },    icon: "H", color: "#73e58f", get desc() { return t("perk.tile.hp.desc"); } },
+  { get name() { return t("perk.tile.armor.name"); }, icon: "A", color: "#b4d7ff", get desc() { return t("perk.tile.armor.desc"); } },
+  { get name() { return t("perk.tile.boost.name"); }, icon: "⚡", color: "#ff4444", get desc() { return t("perk.tile.boost.desc"); } },
 ];
 
 const GOLD_PERK_TYPES = [
@@ -410,41 +415,41 @@ const GOLD_PERK_TYPES = [
   null,
   null,
   null,
-  { name: "Контурный заряд", icon: "⬡", desc: "После замыкания контура на 3 сек усиливает drillPower по числу сломанных блоков" },
-  { name: "Форсаж на нуле", icon: "⏚", desc: "Чем меньше топлива, тем быстрее следующий удар" },
-  { name: "Саперный заряд", icon: "✦", desc: "Каждые N сломанных буром блоков кидает ракету с малым радиусом на дистанцию 1" },
-  { name: "Топливный контур", icon: "⛽", desc: "Любой перк дает +50 топлива, Бак дает на 50 меньше" },
-  { name: "Линза обзора", icon: "◉", desc: "+1 к радиусу обзора, до максимума 9" },
-  { name: "Радарный модуль", icon: "⌖", desc: "Отмечает ближайшие кристаллы на радаре" },
-  { name: "Ломосбор", icon: "●", desc: "+2 золота за каждый разрушенный блок" },
+  { get name() { return t("perk.gold.contour_charge.name"); },     icon: "⬡" },
+  { get name() { return t("perk.gold.empty_boost.name"); },         icon: "⏚" },
+  { get name() { return t("perk.gold.sapper_charge.name"); },       icon: "✦" },
+  { get name() { return t("perk.gold.fuel_contour.name"); },        icon: "⛽" },
+  { get name() { return t("perk.gold.vision_lens.name"); },         icon: "◉" },
+  { get name() { return t("perk.gold.radar_module.name"); },        icon: "⌖" },
+  { get name() { return t("perk.gold.ore_collector.name"); },       icon: "●" },
   null,
-  { name: "Перегрузка", icon: "⚡", desc: "Переполнение топлива дает 3 сек форсажа, затем взрыв и оглушение" },
-  { name: "Усиленный корпус", icon: "✚", desc: "+1 к максимуму HP и лечит на 2" },
-  { name: "Перелив адреналина", icon: "❤", desc: "Overheal дает 4 секунды бафа, потом растет до максимума 10" },
-  { name: "Контурный трофей", icon: "◈", desc: "Большой контур может создать случайный перк внутри" },
-  { name: "Автоконтур (удалён)", icon: "◎", desc: "" },
-  { name: "Кристальный катализатор", icon: "✧", desc: "Кристаллы начинают давать золото, потом fuel и HP" },
-  { name: "Шиповой форсаж", icon: "✹", desc: "Разбитые шипы дают overdrive-баф на 6/9/12 секунд" },
-  { name: "Термозаряд", icon: "☇", desc: "Усиливает урон и радиус взрыва от перегрева" },
-  { name: "Терморасширение", icon: "☍", desc: "Скрыто: слито в Термозаряд" },
-  { name: "Теплоотвод", icon: "⬢", desc: "Повышает предел нагрева до перегрева" },
-  { name: "Накал бура", icon: "❉", desc: "Повышает урон бура в зависимости от нагрева" },
-  { name: "Импульс остывания", icon: "⌁", desc: "При полном остывании дает 5 сек радара" },
-  { name: "Разгонные демпферы", icon: "◍", desc: "Сокращают оглушение и ускоряют набор heat" },
-  { name: "Контурный резонанс", icon: "⟲", desc: "+1% урона за каждую единицу длины контура до капа уровня" },
-  { name: "Охлаждающие ракеты", icon: "❄", desc: "За каждые N остывшего heat выпускают ракету с малым радиусом на дистанцию 1-3" },
-  { name: "Рекуперация контура", icon: "↺", desc: "Возврат по своему контуру дает топливо за шаг" },
-  { name: "Терморакеты", icon: "☄", desc: "Перегрев выпускает ракеты с малым радиусом на дистанцию 1-3" },
-  { name: "Усиленный бак", icon: "◌", desc: "Бак дает больше топлива, но растет расход в секунду" },
+  { get name() { return t("perk.gold.overload.name"); },            icon: "⚡" },
+  { get name() { return t("perk.gold.reinforced_hull.name"); },     icon: "✚" },
+  { get name() { return t("perk.gold.adrenaline_overflow.name"); }, icon: "❤" },
+  { get name() { return t("perk.gold.contour_trophy.name"); },      icon: "◈" },
+  { get name() { return t("perk.gold.auto_contour.name"); },        icon: "◎" },
+  { get name() { return t("perk.gold.crystal_catalyst.name"); },    icon: "✧" },
+  { get name() { return t("perk.gold.spike_boost.name"); },         icon: "✹" },
+  { get name() { return t("perk.gold.heat_charge.name"); },         icon: "☇" },
+  { get name() { return t("perk.gold.thermal_expansion.name"); },   icon: "☍" },
+  { get name() { return t("perk.gold.heat_sink.name"); },           icon: "⬢" },
+  { get name() { return t("perk.gold.drill_heat.name"); },          icon: "❉" },
+  { get name() { return t("perk.gold.cool_pulse.name"); },          icon: "⌁" },
+  { get name() { return t("perk.gold.stun_dampers.name"); },        icon: "◍" },
+  { get name() { return t("perk.gold.contour_resonance.name"); },   icon: "⟲" },
+  { get name() { return t("perk.gold.cooling_rockets.name"); },     icon: "❄" },
+  { get name() { return t("perk.gold.contour_recovery.name"); },    icon: "↺" },
+  { get name() { return t("perk.gold.heat_rockets.name"); },        icon: "☄" },
+  { get name() { return t("perk.gold.reinforced_tank.name"); },     icon: "◌" },
 ];
 
 const CRYSTAL_TYPES = [
   null,
-  { name: "Красный", color: "#ff4747", glow: "rgba(255,71,71,0.24)" },
-  { name: "Желтый", color: "#ffd166", glow: "rgba(255,209,102,0.22)" },
-  { name: "Светлый", color: "#f2ede2", glow: "rgba(242,237,226,0.24)" },
-  { name: "Зеленый", color: "#73e58f", glow: "rgba(115,229,143,0.22)" },
-  { name: "Синий", color: "#72b7ff", glow: "rgba(114,183,255,0.22)" },
+  { get name() { return t("crystal.red"); },    color: "#ff4747", glow: "rgba(255,71,71,0.24)" },
+  { get name() { return t("crystal.yellow"); }, color: "#ffd166", glow: "rgba(255,209,102,0.22)" },
+  { get name() { return t("crystal.light"); },  color: "#f2ede2", glow: "rgba(242,237,226,0.24)" },
+  { get name() { return t("crystal.green"); },  color: "#73e58f", glow: "rgba(115,229,143,0.22)" },
+  { get name() { return t("crystal.blue"); },   color: "#72b7ff", glow: "rgba(114,183,255,0.22)" },
 ];
 const CRYSTAL_REWARD_TILE_PERKS = [0, 3, 1, 2, 6, 5];
 const TILES_PER_CRYSTAL_TILE = 22;
@@ -536,6 +541,7 @@ const state = {
   pendingPerkDelay: 0,
   bonusPerkChoices: 0,
   perkRerolls: 0,
+  menuOpen: false,
   manualModalOpen: false,
   shopModalOpen: false,
   beaconActivationAnim: null, // { beacon, startTs, pendingAction }
@@ -562,7 +568,7 @@ const state = {
   crystalItemOfferRevealed: false,
   crystalItemOfferShuffleTick: 0,
   crystalItemOfferPreview: null,
-  crystalItemOfferTitle: "Рецепт собран",
+  crystalItemOfferTitle: "",
   crystalCompleteAnimDelay: 0,
   crystalCompleteAnimRecipe: [],
   nextGoldPerkAt: GOLD_PERK_BASE_COST,
@@ -604,7 +610,7 @@ const state = {
   signalPrevY: START_Y,
   signalDirX: 0,
   signalDirY: -1,
-  perkText: "Нет",
+  perkText: t("toast.none"),
   crystalRecipe: [],
   crystalCollected: [0, 0, 0, 0, 0, 0],
   crystalProgress: 0,
@@ -2021,7 +2027,7 @@ function syncDebugMapGenerationPanelCollapse() {
   }
 
   generationSection.hidden = state.debugMapGenerationPanelCollapsed;
-  closeButton.textContent = state.debugMapGenerationPanelCollapsed ? "Развернуть" : "Свернуть";
+  closeButton.textContent = state.debugMapGenerationPanelCollapsed ? t("ui.expand") : t("ui.collapse");
   panel.style.width = state.debugMapGenerationPanelCollapsed
     ? "min(320px, calc(100vw - 24px))"
     : "min(560px, calc(100vw - 24px))";
@@ -2070,7 +2076,7 @@ function showDebugMapGenerationPanel() {
   }
   if (closeButton) {
     closeButton.hidden = false;
-    closeButton.textContent = state.debugMapGenerationPanelCollapsed ? "Развернуть" : "Свернуть";
+    closeButton.textContent = state.debugMapGenerationPanelCollapsed ? t("ui.expand") : t("ui.collapse");
     if (!closeButton.dataset.boundDebugMapToggle) {
       closeButton.addEventListener("click", () => {
         state.debugMapGenerationPanelCollapsed = !state.debugMapGenerationPanelCollapsed;
@@ -2413,7 +2419,7 @@ function setupField(seedOverride = null) {
   state.levelRewardQueue = [];
   state.levelUpModalOpen = false;
   state.depth = 0;
-  state.perkText = "Нет";
+  state.perkText = t("toast.none");
   state.crystalRecipe = [];
   state.crystalCollected = [0, 0, 0, 0, 0, 0];
   state.crystalProgress = 0;
@@ -2423,6 +2429,7 @@ function setupField(seedOverride = null) {
   state.pendingPerkDelay = 0;
   state.bonusPerkChoices = 0;
   state.perkRerolls = 2;
+  state.menuOpen = false;
   state.manualModalOpen = false;
   state.debugPerkMenuOpen = false;
   state.debugPerkSelection = "";
@@ -2440,7 +2447,7 @@ function setupField(seedOverride = null) {
   state.crystalItemOfferRevealed = false;
   state.crystalItemOfferShuffleTick = 0;
   state.crystalItemOfferPreview = null;
-  state.crystalItemOfferTitle = "Рецепт собран";
+  state.crystalItemOfferTitle = t("ui.recipe_complete");
   state.crystalCompleteAnimDelay = 0;
   state.crystalCompleteAnimRecipe = [];
   state.nextGoldPerkAt = GOLD_PERK_BASE_COST;
@@ -2766,7 +2773,7 @@ function showDepthTitle(level) {
     return;
   }
   playSound("depth_announce");
-  state.depthTitle.text = `Глубина ${level}`;
+  state.depthTitle.text = t("ui.depth", { level });
   state.depthTitle.time = 1.8;
 }
 
@@ -2893,7 +2900,7 @@ function beginCollapseWarning() {
     heroDamaged: false,
     clearPath: false,
   });
-  showPerkToast("Обрушение!");
+  showPerkToast(t("toast.collapse"));
 }
 
 function resolveNextCollapseCell(warning) {
@@ -3177,7 +3184,7 @@ function finalizeHiddenBeaconExcavation(beacon) {
       state.visibilityDirty = true;
     }
   }
-  showPerkToast("Маяк раскопан");
+  showPerkToast(t("toast.beacon_excavated"));
   return true;
 }
 
@@ -3223,7 +3230,7 @@ function beginFullFreedom(beacon, announce = true) {
   beacon.rewardGranted = false;
   beacon.rewardAutoAfterShop = false;
   if (announce) {
-    showPerkToast("Полная свобода");
+    showPerkToast(t("toast.full_freedom"));
   }
 }
 
@@ -3277,7 +3284,7 @@ function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y, optio
   state.crystalItemOfferRevealed = false;
   state.crystalItemOfferShuffleTick = 0;
   state.crystalItemOfferPreview = getRandomShuffleItem();
-  state.crystalItemOfferTitle = options.title || "Рецепт собран";
+  state.crystalItemOfferTitle = options.title || t("ui.recipe_complete");
   state.crystalCompleteAnimDelay = delaySeconds;
   if (!showRecipeAnimation) {
     return;
@@ -3318,7 +3325,7 @@ function applyCrystalCatalystBonus(x, y) {
     addFuel(40, x, y);
   }
   if (state.crystalCatalystLevel >= 3) {
-    healPlayer(25, "Кристальный катализатор");
+    healPlayer(25, t("toast.crystal_catalyst_heal"));
   }
 }
 
@@ -3355,7 +3362,7 @@ function collectCrystalTile(x, y, index, crystalType) {
     if (state.crystalProgress >= state.crystalRecipe.length) {
       const firstCrystalType = state.crystalRecipe[0];
       const completedRecipe = [...state.crystalRecipe];
-      showPerkToast("Кристаллы собраны");
+      showPerkToast(t("toast.crystals_collected"));
       playSound("recipe_complete");
       clearCrystalRecipe();
       grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y);
@@ -3364,7 +3371,7 @@ function collectCrystalTile(x, y, index, crystalType) {
   }
 
   playSound("crystal_wrong");
-  applyStun(1, "Неверный кристалл");
+  applyStun(1, t("toast.wrong_crystal"));
 }
 
 function getDistanceToBase(x, y) {
@@ -3494,18 +3501,18 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
         state.fuel = Math.max(0, state.fuel + fuelDelta);
         showFuelToast(fuelDelta);
       }
-      state.perkText = "Бак";
+      state.perkText = t("perk.tile.tank.name");
       break;
     }
     case 2:
       state.signalMovesLeft += RADAR_BASE_DURATION;
       state.signalMovesMax = Math.max(state.signalMovesMax, state.signalMovesLeft);
       refreshSignalDirection(x, y);
-      state.perkText = "Радар";
+      state.perkText = t("perk.tile.radar.name");
       break;
     case 3:
       state.drillPower += 0.35;
-      state.perkText = "Бур";
+      state.perkText = t("perk.tile.drill.name");
       break;
     case 4: {
       const targetX = clamp(x + state.drill.facingX * 2, 1, GRID_W - 2);
@@ -3515,24 +3522,24 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
         damage: BASE_DRILL_DAMAGE * 10,
         radius: 2,
       }, { instant: true });
-      state.perkText = "Бомба";
+      state.perkText = t("perk.tile.bomb.name");
       break;
     }
     case 5:
       state.strikeSpeed += 10;
-      state.perkText = "Скорость";
+      state.perkText = t("perk.tile.speed.name");
       break;
     case 6:
-      healPlayer(25, "HP+");
-      state.perkText = "HP+";
+      healPlayer(25, t("toast.hp_plus"));
+      state.perkText = t("perk.tile.hp.name");
       break;
     case 7:
       state.armor += 25;
-      state.perkText = "Броня";
+      state.perkText = t("perk.tile.armor.name");
       break;
     case 8:
       activateDrillOverdrive(3, "");
-      state.perkText = "Форсаж";
+      state.perkText = t("perk.tile.boost.name");
       break;
     default:
       break;
@@ -3552,26 +3559,26 @@ function applyGoldPerk(perkType) {
       break;
     case 5:
       state.contourChargeDamagePerCell += 0.05;
-      state.perkText = "Контурный заряд";
+      state.perkText = t("perk.gold.contour_charge.name");
       break;
     case 6:
       state.lowFuelSpeedBonus += 0.35;
-      state.perkText = "Форсаж на нуле";
+      state.perkText = t("perk.gold.empty_boost.name");
       break;
     case 7:
       state.remoteBombLevel += 1;
       state.remoteBombInterval = Math.max(15, state.remoteBombInterval > 0 ? state.remoteBombInterval - 5 : 30);
-      state.perkText = "Саперный заряд";
+      state.perkText = t("perk.gold.sapper_charge.name");
       break;
     case 8:
       break;
     case 9:
       state.visionRadius = Math.min(9, state.visionRadius + 1);
-      state.perkText = "Линза обзора";
+      state.perkText = t("perk.gold.vision_lens.name");
       break;
     case 10:
       state.radarCrystalModule = true;
-      state.perkText = "Радарный модуль";
+      state.perkText = t("perk.gold.radar_module.name");
       break;
     case 11:
       break;
@@ -3580,38 +3587,38 @@ function applyGoldPerk(perkType) {
       state.fuelBonus += 0.20;
       state.maxFuel = Math.max(100, state.maxFuel - 150);
       state.fuel = Math.min(state.fuel, state.maxFuel);
-      state.perkText = "Перегрузка";
+      state.perkText = t("perk.gold.overload.name");
       break;
     case 14:
       state.maxHp += 25;
-      healPlayer(50, "Усиленный корпус");
-      state.perkText = "Усиленный корпус";
+      healPlayer(50, t("toast.reinforced_hull_heal"));
+      state.perkText = t("perk.gold.reinforced_hull.name");
       break;
     case 15:
       state.overhealOverdrive = true;
       state.overhealOverdriveDuration = Math.min(10, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 2 : 4);
-      state.perkText = "Перелив адреналина";
+      state.perkText = t("perk.gold.adrenaline_overflow.name");
       break;
     case 16:
       state.loopPerkLevel = Math.min(2, state.loopPerkLevel + 1);
-      state.perkText = "Контурный трофей";
+      state.perkText = t("perk.gold.contour_trophy.name");
       break;
     case 17:
       break;
     case 18:
       state.crystalCatalystLevel = Math.min(3, state.crystalCatalystLevel + 1);
-      state.perkText = "Кристальный катализатор";
+      state.perkText = t("perk.gold.crystal_catalyst.name");
       break;
     case 19:
       state.spikeOverdriveLevel = Math.min(3, state.spikeOverdriveLevel + 1);
-      state.perkText = "Шиповой форсаж";
+      state.perkText = t("perk.gold.spike_boost.name");
       break;
     case 20:
     case 21:
       break;
     case 22:
       state.maxHeat += 20;
-      state.perkText = "Теплоотвод";
+      state.perkText = t("perk.gold.heat_sink.name");
       break;
     case 23:
     case 24:
@@ -3620,23 +3627,23 @@ function applyGoldPerk(perkType) {
       break;
     case 26:
       state.contourLengthDamageLevel = Math.min(4, state.contourLengthDamageLevel + 1);
-      state.perkText = "Контурный резонанс";
+      state.perkText = t("perk.gold.contour_resonance.name");
       break;
     case 27:
       state.coolingRocketLevel = Math.min(3, state.coolingRocketLevel + 1);
-      state.perkText = "Охлаждающие ракеты";
+      state.perkText = t("perk.gold.cooling_rockets.name");
       break;
     case 28:
       state.contourReturnFuelLevel = Math.min(3, state.contourReturnFuelLevel + 1);
-      state.perkText = "Рекуперация контура";
+      state.perkText = t("perk.gold.contour_recovery.name");
       break;
     case 29:
       state.heatOverloadRocketLevel = Math.min(3, state.heatOverloadRocketLevel + 1);
-      state.perkText = "Терморакеты";
+      state.perkText = t("perk.gold.heat_rockets.name");
       break;
     case 30:
       state.tankBoostLevel = Math.min(3, state.tankBoostLevel + 1);
-      state.perkText = "Усиленный бак";
+      state.perkText = t("perk.gold.reinforced_tank.name");
       break;
     default:
       break;
@@ -3649,7 +3656,7 @@ function applyShopPerk(effectId, rarityMult, rarity) {
   switch (effectId) {
     case "drill_power":
       state.strikeSpeed += 15 * m;
-      showPerkToast("Мощность бура");
+      showPerkToast(t("toast.drill_power"));
       break;
     case "side_drills":
     case "long_drill":
@@ -3658,74 +3665,74 @@ function applyShopPerk(effectId, rarityMult, rarity) {
     case "sapper_charge":
       state.remoteBombLevel += 1;
       state.remoteBombInterval = Math.max(15, state.remoteBombInterval > 0 ? state.remoteBombInterval - 5 : 30);
-      showPerkToast("Саперный заряд");
+      showPerkToast(t("toast.sapper_charge"));
       break;
     case "fuel_tank":
       state.maxFuel += Math.round(60 * m);
-      showPerkToast("Расширенный бак");
+      showPerkToast(t("toast.expanded_tank"));
       break;
     case "fuel_circuit":
       break;
     case "recirculator":
       state.fuelBonus += 0.05 * m;
-      showPerkToast("Рециркулятор");
+      showPerkToast(t("toast.recirculator"));
       break;
     case "low_fuel_boost":
       state.lowFuelSpeedBonus += 0.35 * m;
-      showPerkToast("Форсаж на нуле");
+      showPerkToast(t("toast.empty_boost"));
       break;
     case "overload":
       state.overflowBomb = true;
       state.fuelBonus += 0.20 * m;
       state.maxFuel = Math.max(100, state.maxFuel - 150);
       state.fuel = Math.min(state.fuel, state.maxFuel);
-      showPerkToast("Перегрузка");
+      showPerkToast(t("toast.overload"));
       break;
     case "geo_lens":
       state.visionRadius = Math.min(12, state.visionRadius + Math.round(2 * m));
       state.visibilityDirty = true;
-      showPerkToast("Гео-линза");
+      showPerkToast(t("toast.geo_lens"));
       break;
     case "radar_module":
       state.radarCrystalModule = true;
-      showPerkToast("Радарный модуль");
+      showPerkToast(t("toast.radar_module"));
       break;
     case "radar_booster":
-      showPerkToast("Усилитель радара");
+      showPerkToast(t("toast.radar_amplifier"));
       break;
     case "speed":
       state.strikeSpeed += 20 * m;
-      showPerkToast("Скорость бура");
+      showPerkToast(t("toast.drill_speed"));
       break;
     case "spike_boost":
       state.spikeOverdriveLevel = Math.min(3, (state.spikeOverdriveLevel || 0) + 1);
-      showPerkToast("Шиповой форсаж");
+      showPerkToast(t("toast.spike_boost"));
       break;
     case "tank_boost":
       state.tankBoostLevel = Math.min(3, (state.tankBoostLevel || 0) + 1);
-      showPerkToast("Усиленный бак");
+      showPerkToast(t("toast.reinforced_tank"));
       break;
     case "contour_charge":
       state.contourChargeDamagePerCell += 0.05 * m;
-      showPerkToast("Контурный заряд");
+      showPerkToast(t("toast.contour_charge"));
       break;
     case "contour_trophy":
       state.loopPerkLevel = Math.min(2, (state.loopPerkLevel || 0) + 1);
-      showPerkToast("Контурный трофей");
+      showPerkToast(t("toast.contour_trophy"));
       break;
     case "auto_contour":
       break;
     case "contour_resonance":
       state.contourLengthDamageLevel = Math.min(4, (state.contourLengthDamageLevel || 0) + 1);
-      showPerkToast("Контурный резонанс");
+      showPerkToast(t("toast.contour_resonance"));
       break;
     case "contour_recovery":
       state.contourReturnFuelLevel = Math.min(3, (state.contourReturnFuelLevel || 0) + 1);
-      showPerkToast("Рекуперация контура");
+      showPerkToast(t("toast.contour_recovery"));
       break;
     case "heat_sink":
       state.maxHeat += Math.round(20 * m);
-      showPerkToast("Теплоотвод");
+      showPerkToast(t("toast.heat_sink"));
       break;
     case "heat_drill":
     case "thermo_charge":
@@ -3735,43 +3742,43 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       break;
     case "thermo_rockets":
       state.heatOverloadRocketLevel = Math.min(3, (state.heatOverloadRocketLevel || 0) + 1);
-      showPerkToast("Терморакеты");
+      showPerkToast(t("toast.heat_rockets"));
       break;
     case "cryo_rockets":
       state.coolingRocketLevel = Math.min(3, (state.coolingRocketLevel || 0) + 1);
-      showPerkToast("Охлаждающие ракеты");
+      showPerkToast(t("toast.cooling_rockets"));
       break;
     case "reinforced_hull":
       state.maxHp += Math.round(25 * m);
-      healPlayer(Math.round(50 * m), "Усиленный корпус");
-      showPerkToast("Усиленный корпус");
+      healPlayer(Math.round(50 * m), t("toast.reinforced_hull_heal"));
+      showPerkToast(t("toast.reinforced_hull"));
       break;
     case "adrenaline":
       state.overhealOverdrive = true;
       state.overhealOverdriveDuration = Math.min(10, (state.overhealOverdriveDuration || 0) + Math.round(2 * m));
-      showPerkToast("Перелив адреналина");
+      showPerkToast(t("toast.adrenaline_overflow"));
       break;
     case "ore_collector":
       break;
     case "crystal_catalyst":
       state.crystalCatalystLevel = Math.min(3, (state.crystalCatalystLevel || 0) + 1);
-      showPerkToast("Кристальный катализатор");
+      showPerkToast(t("toast.crystal_catalyst"));
       break;
     case "basic_drill":
-      showPerkToast("Просто дрель");
+      showPerkToast(t("item.basic_drill.name"));
       break;
     case "tradeoff_drill":
-      showPerkToast("Разменный бур");
+      showPerkToast(t("item.tradeoff_drill.name"));
       break;
     case "fragile_drill":
-      showPerkToast("Хрупкий бур");
+      showPerkToast(t("item.fragile_drill.name"));
       break;
     case "lucky_pickaxe":
-      showPerkToast("Кирка счастливчика");
+      showPerkToast(t("item.lucky_pickaxe.name"));
       break;
     case "shard_drill":
       state.shardDrillLevel += 1;
-      showPerkToast("Осколочный бур");
+      showPerkToast(t("item.shard_drill.name"));
       break;
     default: {
       const good = ALL_GOODS.find(g => g.id === effectId);
@@ -3918,7 +3925,7 @@ async function openDebugMapWindow() {
   url.searchParams.set("seed", String(state.worldSeed));
   const popup = window.open(url.toString(), "_blank");
   if (!popup) {
-    showPerkToast("Браузер заблокировал debug map");
+    showPerkToast(t("toast.browser_blocked_map"));
   }
 }
 
@@ -4206,9 +4213,9 @@ function formatInspectEffectValue(stat, value) {
     case "multiplier":
       return `${formatInspectSignedNumber((value - 1) * 100)}%`;
     case "toggle":
-      return "Активно";
+      return t("ui.active");
     case "level":
-      return `ур. ${Math.max(0, Math.round(value))}`;
+      return t("ui.level_val", { val: Math.max(0, Math.round(value)) });
     default:
       return formatInspectSignedNumber(value);
   }
@@ -4232,7 +4239,7 @@ function getInspectEffectLines(good, rarity) {
         value: formatInspectEffectValue(effect.stat, value),
       };
     })
-    .filter((line) => line.value && line.value !== "+0" && line.value !== "+0%" && line.value !== "ур. 0");
+    .filter((line) => line.value && line.value !== "+0" && line.value !== "+0%" && line.value !== t("ui.level_val", { val: 0 }));
 }
 
 function getSpecialInspectEffectLines(good, rarity) {
@@ -4242,17 +4249,17 @@ function getSpecialInspectEffectLines(good, rarity) {
       const damageScale = [0, 10, 15, 20, 25][rarity] || 0;
       const totalDamage = flatDamage + state.drillPower * (damageScale / 100);
       return [
-        { label: "Плоский урон", value: `+${flatDamage}` },
-        { label: "Скейл от силы бура", value: `+${damageScale}%` },
-        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.drill_scale"), value: `+${damageScale}%` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
       ];
     }
     case "tradeoff_drill": {
       const flatDamage = [0, 16, 22, 30, 40][rarity] || 0;
       const weakSpotPenalty = [0, -0.3, -0.5, -0.7, -1.0][rarity] || 0;
       return [
-        { label: "Плоский урон", value: `+${flatDamage}` },
-        { label: "Штраф к урону по бреши", value: formatPerkNumber(weakSpotPenalty) },
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.breach_penalty"), value: formatPerkNumber(weakSpotPenalty) },
       ];
     }
     case "thermo_drill": {
@@ -4261,10 +4268,10 @@ function getSpecialInspectEffectLines(good, rarity) {
       const heatBonus = [0, 0, 1, 2, 3][rarity] || 0;
       const totalDamage = flatDamage + state.drillPower * (damageScale / 100) + Math.floor(state.heat / 10) * heatBonus;
       return [
-        { label: "Плоский урон", value: `+${flatDamage}` },
-        { label: "Скейл от силы бура", value: `+${damageScale}%` },
-        { label: "Урон за каждые 10 heat", value: `+${heatBonus}` },
-        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.drill_scale"), value: `+${damageScale}%` },
+        { label: t("inspect.heat_bonus"), value: `+${heatBonus}` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
       ].filter((line) => line.value !== "+0");
     }
     case "fragile_drill": {
@@ -4273,10 +4280,10 @@ function getSpecialInspectEffectLines(good, rarity) {
       const speedBonus = [0, 10, 15, 20, 30][rarity] || 0;
       const totalDamage = flatDamage + state.drillPower * (damageScale / 100);
       return [
-        { label: "Плоский урон", value: `+${flatDamage}` },
-        { label: "Скейл от силы бура", value: `+${damageScale}%` },
-        { label: "Скорость при броне", value: `+${speedBonus}%` },
-        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.drill_scale"), value: `+${damageScale}%` },
+        { label: t("inspect.speed_with_armor"), value: `+${speedBonus}%` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
       ];
     }
     case "lucky_pickaxe": {
@@ -4286,11 +4293,11 @@ function getSpecialInspectEffectLines(good, rarity) {
       const oreGain = [0, 1, 2, 3, 4][rarity] || 0;
       const totalDamage = flatDamage + state.drillPower * (damageScale / 100) + state.luck * (luckScale / 100);
       return [
-        { label: "Плоский урон", value: `+${flatDamage}` },
-        { label: "Скейл от силы бура", value: `+${damageScale}%` },
-        { label: "Скейл от удачи", value: `+${luckScale}%` },
-        { label: "Рост ценности жилы", value: `+${oreGain}` },
-        { label: "Текущий урон", value: formatPerkNumber(totalDamage) },
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.drill_scale"), value: `+${damageScale}%` },
+        { label: t("inspect.luck_scale"), value: `+${luckScale}%` },
+        { label: t("inspect.vein_value"), value: `+${oreGain}` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
       ];
     }
     case "shard_drill": {
@@ -4298,10 +4305,10 @@ function getSpecialInspectEffectLines(good, rarity) {
       const weakSpotChance = [0, 0.04, 0.06, 0.08, 0.10][rarity] || 0;
       const explosionDamage = [0, 20, 30, 45, 60][rarity] || 0;
       return [
-        { label: "Плоский урон", value: `+${flatDamage}` },
-        { label: "Шанс бреши", value: `+${Math.round(weakSpotChance * 100)}%` },
-        { label: "Взрыв при брешь-ударе", value: `+${explosionDamage}` },
-        { label: "Радиус взрыва", value: formatPerkNumber(SHARD_DRILL_BLAST_RADIUS, 1) },
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.breach_chance"), value: `+${Math.round(weakSpotChance * 100)}%` },
+        { label: t("inspect.breach_explosion"), value: `+${explosionDamage}` },
+        { label: t("inspect.explosion_radius"), value: formatPerkNumber(SHARD_DRILL_BLAST_RADIUS, 1) },
       ];
     }
     default:
@@ -4327,7 +4334,7 @@ function buildItemInspectEntries() {
       key: `equipment:${index}:${part.id}:${part.rarity || RARITY.COMMON}`,
       good: def,
       rarity: part.rarity || RARITY.COMMON,
-      sourceLabel: `Слот ${index + 1}`,
+      sourceLabel: t("ui.slot", { n: index + 1 }),
       stackCount: equipped.filter((entry) => entry.id === part.id).length,
     });
   }
@@ -4340,7 +4347,7 @@ function buildItemInspectEntries() {
       key: `item:${index}:${item.id}:${item.rarity || RARITY.COMMON}`,
       good: def,
       rarity: item.rarity || RARITY.COMMON,
-      sourceLabel: "Инвентарь",
+      sourceLabel: t("ui.inventory"),
       stackCount: purchased.filter((entry) => entry.id === item.id).length,
     });
   }
@@ -4407,30 +4414,30 @@ function syncItemInspectModal() {
   const metaBits = [
     sourceLabel,
     category ? `${category.icon} ${category.name}` : null,
-    stackCount > 1 ? `Копий: ${stackCount}` : null,
+    stackCount > 1 ? t("ui.copies", { count: stackCount }) : null,
   ].filter(Boolean);
   const characterStatLines = getDebugCoreStatLines();
   const canNavigate = state.itemInspectItems.length > 1;
   const positionText = `${state.itemInspectIndex + 1}/${state.itemInspectItems.length}`;
 
   panel.innerHTML = `
-    <button id="itemInspectClose" class="item-inspect-modal__close" type="button" aria-label="Закрыть">✕</button>
+    <button id="itemInspectClose" class="item-inspect-modal__close" type="button" aria-label="${t("ui.close_item")}">✕</button>
     <div class="item-inspect-modal__toolbar">
-      <button id="itemInspectPrev" class="item-inspect-modal__nav" type="button" ${canNavigate ? "" : "disabled"} aria-label="Предыдущий предмет">‹</button>
+      <button id="itemInspectPrev" class="item-inspect-modal__nav" type="button" ${canNavigate ? "" : "disabled"} aria-label="${t("ui.prev_item")}">‹</button>
       <div class="item-inspect-modal__position">${positionText}</div>
-      <button id="itemInspectNext" class="item-inspect-modal__nav" type="button" ${canNavigate ? "" : "disabled"} aria-label="Следующий предмет">›</button>
+      <button id="itemInspectNext" class="item-inspect-modal__nav" type="button" ${canNavigate ? "" : "disabled"} aria-label="${t("ui.next_item")}">›</button>
     </div>
     <div class="item-inspect-modal__head">
       <div class="item-inspect-modal__icon" style="--inspect-color:${rarityColor}">${good.icon || "?"}</div>
       <div class="item-inspect-modal__title-wrap">
-        <div class="item-inspect-modal__eyebrow">${good.type === "equipment" ? "Экипировка" : "Предмет"}</div>
+        <div class="item-inspect-modal__eyebrow">${good.type === "equipment" ? t("ui.equipment") : t("ui.item")}</div>
         <div class="item-inspect-modal__title">${good.name}</div>
-        <div class="item-inspect-modal__rarity" style="color:${rarityColor}">${RARITY_NAMES[rarity] || "Неизвестно"}</div>
+        <div class="item-inspect-modal__rarity" style="color:${rarityColor}">${RARITY_NAMES[rarity] || "Unknown"}</div>
       </div>
     </div>
     <div class="item-inspect-modal__meta">${metaBits.map((bit) => `<span class="item-inspect-modal__chip">${bit}</span>`).join("")}</div>
     <div class="item-inspect-modal__section">
-      <div class="item-inspect-modal__section-title">Описание</div>
+      <div class="item-inspect-modal__section-title">${t("ui.description")}</div>
       <div class="item-inspect-modal__desc">${desc.replace(/\n/g, "<br>")}</div>
     </div>
     <div class="item-inspect-modal__section">
@@ -4520,8 +4527,11 @@ function bindUi() {
   const perkButtons = document.querySelectorAll("[data-perk-slot]");
   const rerollButton = document.getElementById("perkReroll");
   const shopOpenBtn = document.getElementById("shopOpen");
+  const menuToggle = document.getElementById("menuToggle");
+  const menuPanel = document.getElementById("menuPanel");
   const reloadButton = document.getElementById("reloadGame");
   const soundToggle = document.getElementById("soundToggle");
+  const langToggle = document.getElementById("langToggle");
   const manualOpen = document.getElementById("manualOpen");
   const manualClose = document.getElementById("manualClose");
   const manualOverlay = document.getElementById("manualModal");
@@ -4543,17 +4553,28 @@ function bindUi() {
   window.visualViewport?.addEventListener("resize", resize);
   bindGenerationDebugControls();
 
+  const closeMenu = () => {
+    if (menuPanel) menuPanel.hidden = true;
+    state.menuOpen = false;
+  };
+
+  const syncLangToggle = () => {
+    if (!langToggle) return;
+    const locale = getLocale();
+    langToggle.textContent = locale === "en" ? "🌐 EN → RU" : "🌐 RU → EN";
+  };
+
   const syncSoundToggle = () => {
     if (!soundToggle) return;
     const muted = isMuted();
     const preload = getSoundPreloadProgress();
     const loadingText = !muted && preload.total > 0 && preload.percent < 100 ? ` ${preload.percent}%` : "";
-    soundToggle.textContent = `${muted ? "🔇" : "🔊"}${loadingText}`;
-    soundToggle.setAttribute("aria-label", muted ? "Включить звук" : "Выключить звук");
-    soundToggle.classList.toggle("top-action-button--selected", !muted);
+    soundToggle.textContent = `${muted ? "🔇" : "🔊"} Sound${loadingText}`;
+    soundToggle.setAttribute("aria-label", muted ? t("ui.enable_sound") : t("ui.disable_sound"));
   };
 
   syncSoundToggle();
+  syncLangToggle();
 
   const syncKeyboardAim = () => {
     const left = keysDown.has("arrowleft") || keysDown.has("a") || keysDown.has("ф");
@@ -4670,6 +4691,21 @@ function bindUi() {
     });
   }
 
+  if (menuToggle && menuPanel) {
+    menuToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      state.menuOpen = !state.menuOpen;
+      menuPanel.hidden = !state.menuOpen;
+      resetPad();
+    });
+    menuPanel.addEventListener("click", (event) => {
+      if (event.target === menuPanel) {
+        closeMenu();
+      }
+    });
+  }
+
   if (reloadButton) {
     reloadButton.addEventListener("click", (event) => {
       event.preventDefault();
@@ -4684,6 +4720,17 @@ function bindUi() {
       event.stopPropagation();
       setMuted(!isMuted());
       syncSoundToggle();
+      closeMenu();
+    });
+  }
+
+  if (langToggle) {
+    langToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setLocale(getLocale() === "en" ? "ru" : "en");
+      closeMenu();
+      window.location.reload();
     });
   }
 
@@ -4744,6 +4791,7 @@ function bindUi() {
     manualOpen.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      closeMenu();
       resetPad();
       if (manualFrame) {
         manualFrame.src = `./manual.html?v=${Date.now()}`;
@@ -4822,7 +4870,7 @@ function bindUi() {
     debugAddGold.addEventListener("click", () => {
       state.gold += 500;
       renderShop(state.gold, getShopStatsSnapshot());
-      showPerkToast("+500 золота");
+      showPerkToast(t("toast.gold_added"));
     });
   }
 
@@ -4830,7 +4878,7 @@ function bindUi() {
   if (debugAddUnsafeGold) {
     debugAddUnsafeGold.addEventListener("click", () => {
       state.unsafeGold += 100;
-      showPerkToast("+100 грязного золота");
+      showPerkToast(t("toast.unsafe_gold_added"));
     });
   }
 
@@ -4838,7 +4886,7 @@ function bindUi() {
   if (debugAddFuel) {
     debugAddFuel.addEventListener("click", () => {
       state.fuel = Math.min(state.fuel + 200, state.maxFuel);
-      showPerkToast("+200 топлива");
+      showPerkToast(t("toast.fuel_added"));
     });
   }
 
@@ -4846,7 +4894,7 @@ function bindUi() {
   if (debugZeroFuel) {
     debugZeroFuel.addEventListener("click", () => {
       state.fuel = 0;
-      showPerkToast("Топливо: 0");
+      showPerkToast(t("toast.fuel_zero"));
     });
   }
 
@@ -4854,7 +4902,7 @@ function bindUi() {
   if (debugHealFull) {
     debugHealFull.addEventListener("click", () => {
       state.hp = state.maxHp;
-      showPerkToast("HP восстановлено");
+      showPerkToast(t("toast.hp_restored"));
     });
   }
 
@@ -4862,7 +4910,7 @@ function bindUi() {
   if (debugGiveArtifact) {
     debugGiveArtifact.addEventListener("click", () => {
       state.artifactCount++;
-      showPerkToast("Артефакт выдан!");
+      showPerkToast(t("toast.artifact_given"));
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
     });
@@ -4881,9 +4929,9 @@ function bindUi() {
       }
       if (nearest !== null) {
         state.heldKeyForSafe = nearest;
-        showPerkToast(`Ключ выдан (сейф #${nearest})`);
+        showPerkToast(t("toast.key_given", { id: nearest }));
       } else {
-        showPerkToast("Нет закрытых сейфов");
+        showPerkToast(t("toast.no_closed_safes"));
       }
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
@@ -4911,7 +4959,7 @@ function bindUi() {
         state.pathTiles.length = 0;
         state.pathTiles.push({ x: tx, y: ty });
         rebuildPathIndex();
-        showPerkToast(`Телепорт к маяку (${nearest.x}, ${nearest.y})`);
+        showPerkToast(t("toast.teleport_beacon", { x: nearest.x, y: nearest.y }));
         state.debugPerkMenuOpen = false;
         syncDebugPerkOverlay();
       }
@@ -4943,9 +4991,9 @@ function bindUi() {
         state.pathTiles.length = 0;
         state.pathTiles.push({ x: tx, y: ty });
         rebuildPathIndex();
-        showPerkToast(`Телепорт к сейфу (${nearest.doorX}, ${nearest.doorY})`);
+        showPerkToast(t("toast.teleport_safe", { x: nearest.doorX, y: nearest.doorY }));
       } else {
-        showPerkToast("Нет закрытых сейфов");
+        showPerkToast(t("toast.no_closed_safes"));
       }
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
@@ -4958,7 +5006,7 @@ function bindUi() {
       state.contourEnemy = null;
       if (state.pathTiles.length >= 2) {
         spawnContourEnemy();
-        showPerkToast("Враг заспавнен");
+        showPerkToast(t("toast.enemy_spawned"));
       } else {
         // Force-spawn at drill position even without contour
         const hp = CONTOUR_ENEMY_BASE_HP;
@@ -4980,7 +5028,7 @@ function bindUi() {
           knockbackFromX: fx, knockbackFromY: fy,
           bobPhase: 0,
         };
-        showPerkToast("Враг заспавнен рядом");
+        showPerkToast(t("toast.enemy_spawned_nearby"));
       }
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
@@ -5009,9 +5057,9 @@ function bindUi() {
         state.pathTiles.length = 0;
         state.pathTiles.push({ x: tx, y: ty });
         rebuildPathIndex();
-        showPerkToast(`Телепорт к гнезду (${nearest.x}, ${nearest.y})`);
+        showPerkToast(t("toast.teleport_beacon", { x: nearest.x, y: nearest.y }));
       } else {
-        showPerkToast("Нет гнёзд червей");
+        showPerkToast(t("toast.no_worm_nests"));
       }
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
@@ -5036,9 +5084,9 @@ function bindUi() {
       state.pathTiles.length = 0;
       state.pathTiles.push({ x: tx, y: ty });
       rebuildPathIndex();
-      showPerkToast(`Зона ${TILE_PERK_TYPES[perkType].name} (${Math.round(nearest.x)}, ${Math.round(nearest.y)})`);
+      showPerkToast(t("toast.zone", { name: TILE_PERK_TYPES[perkType].name, x: Math.round(nearest.x), y: Math.round(nearest.y) }));
     } else {
-      showPerkToast(`Нет зон: ${TILE_PERK_TYPES[perkType].name}`);
+      showPerkToast(t("toast.no_zones", { name: TILE_PERK_TYPES[perkType].name }));
     }
     state.debugPerkMenuOpen = false;
     syncDebugPerkOverlay();
@@ -5074,9 +5122,9 @@ function bindUi() {
         const cat = locked[Math.floor(Math.random() * locked.length)];
         unlockCategory(cat.id);
         addSlot();
-        showPerkToast(`Открыта: ${cat.icon} ${cat.name}`);
+        showPerkToast(t("toast.category_unlocked", { icon: cat.icon, name: cat.name }));
       } else {
-        showPerkToast("Все категории уже открыты");
+        showPerkToast(t("toast.all_categories_unlocked"));
       }
     });
   }
@@ -5098,9 +5146,9 @@ function bindUi() {
         const recipe = [...state.crystalRecipe];
         clearCrystalRecipe();
         grantCrystalRecipeReward(firstType, recipe, state.drill.x, state.drill.y);
-        showPerkToast("Рецепт выполнен!");
+        showPerkToast(t("toast.recipe_done"));
       } else {
-        showPerkToast("Нет активного рецепта");
+        showPerkToast(t("toast.no_active_recipe"));
       }
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
@@ -5195,12 +5243,12 @@ function buildDebugPerkButtons() {
       const button = document.createElement("button");
       button.type = "button";
       button.className = `debug-perk-menu__button${unlocked ? " debug-perk-menu__button--selected" : ""}`;
-      button.innerHTML = `<span class="debug-perk-menu__button-name">${cat.icon} ${cat.name}</span><span class="debug-perk-menu__button-meta">${unlocked ? "✓ Открыт" : "🔒 Закрыт — нажми чтобы открыть"}</span>`;
+      button.innerHTML = `<span class="debug-perk-menu__button-name">${cat.icon} ${cat.name}</span><span class="debug-perk-menu__button-meta">${unlocked ? t("ui.cat_unlocked") : t("ui.cat_locked")}</span>`;
       button.addEventListener("click", () => {
         if (!unlocked) {
           unlockCategory(cat.id);
           addSlot();
-          showPerkToast(`Открыта: ${cat.icon} ${cat.name}`);
+          showPerkToast(t("toast.category_unlocked", { icon: cat.icon, name: cat.name }));
         }
         buildDebugPerkButtons();
       });
@@ -5251,7 +5299,7 @@ function buildDebugPerkButtons() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `debug-perk-menu__button${isSelected ? " debug-perk-menu__button--selected" : ""}`;
-    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon" style="--perk-icon:${JSON.stringify(perk.color)}">${perk.icon}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">Еще раз: выдать перк</span>` : ""}`;
+    button.innerHTML = `<span class="debug-perk-menu__button-name"><span class="debug-perk-menu__icon" style="--perk-icon:${JSON.stringify(perk.color)}">${perk.icon}</span>${perk.name}</span>${isSelected ? `<span class="debug-perk-menu__button-meta">${perk.desc}</span><span class="debug-perk-menu__button-meta">${t("ui.perk_click_again")}</span>` : ""}`;
     button.addEventListener("click", () => {
       if (state.debugPerkSelection !== key) {
         state.debugPerkSelection = key;
@@ -5324,17 +5372,17 @@ function syncCrystalItemOffer() {
 
   overlay.innerHTML = `
     <div class="crystal-item-offer__panel">
-      <div class="crystal-item-offer__eyebrow">${state.crystalItemOfferTitle || "Рецепт собран"}</div>
+      <div class="crystal-item-offer__eyebrow">${state.crystalItemOfferTitle || t("ui.recipe_complete")}</div>
       <div class="crystal-item-offer__card ${revealed ? "crystal-item-offer__card--revealed" : "crystal-item-offer__card--shuffling"}" style="--offer-color:${color}">
         <div class="crystal-item-offer__icon">${displayGood?.icon || "?"}</div>
         <div class="crystal-item-offer__name">${revealed ? displayGood?.name : "???"}</div>
         <div class="crystal-item-offer__rarity" style="color:${color}">${revealed ? rarityName : "·····"}</div>
-        <div class="crystal-item-offer__desc">${revealed ? getGoodDescription(displayGood, rarity) : "Перемешивание..."}</div>
+        <div class="crystal-item-offer__desc">${revealed ? getGoodDescription(displayGood, rarity) : t("ui.shuffling")}</div>
       </div>
       ${revealed ? `
         <div class="crystal-item-offer__actions">
-          <button class="crystal-item-offer__btn crystal-item-offer__btn--accept" type="button" id="crystalItemAccept" style="border-color:${color}">Взять</button>
-          <button class="crystal-item-offer__btn crystal-item-offer__btn--decline" type="button" id="crystalItemDecline">Отказаться</button>
+          <button class="crystal-item-offer__btn crystal-item-offer__btn--accept" type="button" id="crystalItemAccept" style="border-color:${color}">${t("ui.take")}</button>
+          <button class="crystal-item-offer__btn crystal-item-offer__btn--decline" type="button" id="crystalItemDecline">${t("ui.decline")}</button>
         </div>
       ` : ""}
     </div>
@@ -5352,14 +5400,14 @@ function acceptCrystalItemOffer() {
   grantItem(state.crystalItemOfferGood, state.crystalItemOfferRarity);
   state.crystalItemOfferOpen = false;
   state.crystalItemOfferGood = null;
-  state.crystalItemOfferTitle = "Рецепт собран";
+  state.crystalItemOfferTitle = t("ui.recipe_complete");
   syncCrystalItemOffer();
 }
 
 function declineCrystalItemOffer() {
   state.crystalItemOfferOpen = false;
   state.crystalItemOfferGood = null;
-  state.crystalItemOfferTitle = "Рецепт собран";
+  state.crystalItemOfferTitle = t("ui.recipe_complete");
   syncCrystalItemOffer();
 }
 
@@ -5454,7 +5502,7 @@ function buildCrystalRewardCard(perkType, isRevealed, isShuffling) {
     return `<div class="crystal-reward__placeholder">...</div>`;
   }
   const perk = TILE_PERK_TYPES[perkType];
-  return `<div class="crystal-reward__tile" style="--perk-color:${perk.color}"><span class="crystal-reward__tile-icon">${perk.icon}</span></div><div class="crystal-reward__name">${isRevealed ? perk.name : "???"}</div><div class="crystal-reward__desc">${isRevealed ? perk.desc : "Перемешивание..."}</div>`;
+  return `<div class="crystal-reward__tile" style="--perk-color:${perk.color}"><span class="crystal-reward__tile-icon">${perk.icon}</span></div><div class="crystal-reward__name">${isRevealed ? perk.name : "???"}</div><div class="crystal-reward__desc">${isRevealed ? perk.desc : t("ui.shuffling")}</div>`;
 }
 
 function syncCrystalRewardOverlay() {
@@ -5544,6 +5592,7 @@ function maybeOpenPendingLevelReward() {
   if (
     state.beaconActivationAnim ||
     state.itemInspectModalOpen ||
+    state.menuOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
@@ -5577,9 +5626,9 @@ function syncLevelUpModal() {
     syncTouchZonesInteractivity();
     return;
   }
-  eyebrow.textContent = `Уровень ${entry.level}`;
-  title.textContent = "Выберите награду";
-  text.textContent = "Выберите один бонус.";
+  eyebrow.textContent = t("levelup.eyebrow", { level: entry.level });
+  title.textContent = t("levelup.title");
+  text.textContent = t("levelup.text");
   choices.innerHTML = rewardChoices.map((choice) => {
     const color = RARITY_COLORS[choice.rarity] || "#aaa";
     const rarityName = RARITY_NAMES[choice.rarity] || "";
@@ -5610,7 +5659,7 @@ function closeLevelUpModal() {
 
 function grantLevelRewardArtifact() {
   state.artifactCount++;
-  showPerkToast("Артефакт получен!");
+  showPerkToast(t("toast.artifact_received"));
 }
 
 function restorePlayerFully() {
@@ -5621,9 +5670,9 @@ function restorePlayerFully() {
   }
   const missingHp = Math.max(0, state.maxHp - state.hp);
   if (missingHp > 0) {
-    healPlayer(missingHp, "Полное восстановление");
+    healPlayer(missingHp, t("toast.full_recovery"));
   }
-  showPerkToast("Полное восстановление");
+  showPerkToast(t("toast.full_recovery"));
 }
 
 function applyLevelUpItemBonuses() {
@@ -5637,7 +5686,7 @@ function applyLevelUpItemBonuses() {
     addFuel(state.fuelPerLevel, state.drill.x, state.drill.y);
   }
   if (state.healPerLevel > 0) {
-    healPlayer(state.healPerLevel, "Регенерация через опыт");
+    healPlayer(state.healPerLevel, t("toast.xp_regen"));
   }
   if (state.goldBonusPerLevel > 0) {
     state.goldBonus += state.goldBonusPerLevel;
@@ -5651,7 +5700,7 @@ function applyLevelReward(choiceId) {
   const { stat, value, label } = choice;
   if (stat === "maxHp") {
     state.maxHp += value;
-    healPlayer(value, "Награда уровня");
+    healPlayer(value, t("toast.reward_level"));
   } else {
     state[stat] = (state[stat] || 0) + value;
   }
@@ -5691,7 +5740,7 @@ function openNextArtifactChoice() {
     state.artifactChoiceRemaining--;
     unlockCategory(locked[0].id);
     addSlot();
-    showPerkToast(`Открыта категория: ${locked[0].icon} ${locked[0].name}`);
+    showPerkToast(t("toast.category_unlocked", { icon: locked[0].icon, name: locked[0].name }));
     openNextArtifactChoice();
     return;
   }
@@ -5726,7 +5775,7 @@ function buildArtifactChoiceCard(category) {
   return `
     <div class="artifact-choice__card-icon">${category.icon}</div>
     <div class="artifact-choice__card-name">${category.name}</div>
-    <div class="artifact-choice__card-nodes"><div class="artifact-choice__node">+1 слот корпуса</div></div>
+    <div class="artifact-choice__card-nodes"><div class="artifact-choice__node">${t("ui.hull_slot")}</div></div>
   `;
 }
 
@@ -5736,7 +5785,7 @@ function pickArtifactChoice(idx) {
   unlockCategory(chosen.id);
   addSlot();
   closeArtifactChoice();
-  showPerkToast(`Открыта категория: ${chosen.icon} ${chosen.name}`);
+  showPerkToast(t("toast.category_unlocked", { icon: chosen.icon, name: chosen.name }));
   openNextArtifactChoice();
 }
 
@@ -5813,6 +5862,7 @@ function isAnyBlockingModalOpen() {
   return !!(
     state.isChoosingPerk ||
     state.itemInspectModalOpen ||
+    state.menuOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
@@ -5932,6 +5982,7 @@ function update(dt) {
 
   if (
     state.itemInspectModalOpen ||
+    state.menuOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
@@ -6012,7 +6063,7 @@ function update(dt) {
     beacon.wiresFreedToastShown = true;
     beacon.rewardContourReady = true;
     beacon.rewardRecipe = buildBeaconBonusRecipe(beacon);
-    showPerkToast("Провода освобождены");
+    showPerkToast(t("toast.wires_freed"));
     if (state.shopModalOpen || state.beaconActivationAnim) {
       beacon.rewardAutoAfterShop = true;
     } else {
@@ -6029,7 +6080,7 @@ function update(dt) {
     beacon.rewardGranted = true;
     playSound("recipe_complete");
     grantCrystalRecipeReward(rewardRecipe[0], rewardRecipe, beacon.x, beacon.y, {
-      title: "Полная свобода",
+      title: t("ui.full_freedom"),
       showRecipeAnimation: false,
       delaySeconds: 0,
     });
@@ -6044,7 +6095,7 @@ function update(dt) {
   state.overflowOverdriveTimer = Math.max(0, state.overflowOverdriveTimer - dt);
   if (hadOverflowSurge && state.overflowOverdriveTimer === 0 && !state.dead) {
     explodeAt(state.drill.x, state.drill.y, EXPLOSION_BREAK_DAMAGE, 2);
-    applyStun(OVERFLOW_STUN_DURATION, "Оглушение");
+    applyStun(OVERFLOW_STUN_DURATION, t("toast.stun"));
     state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 2.4);
     state.damageFlash = Math.min(1, state.damageFlash + 0.65);
   }
@@ -6054,7 +6105,7 @@ function update(dt) {
     state.stunDisplayDuration = 0;
     if (prevStunTimer > 0 && state.stunAfterburnerLevel > 0) {
       const afterDuration = getScaledEffectDuration(prevStunTimer * state.stunAfterburnerLevel * 2);
-      activateDrillOverdrive(afterDuration, "Форсаж после стана");
+      activateDrillOverdrive(afterDuration, t("toast.afterburner_after_stun"));
     }
   }
   if (!state.struckThisFrame && state.drillIdleFrame) {
@@ -6530,7 +6581,7 @@ function triggerOverflowSurge() {
   playSound("overflow_surge");
   state.resolvingOverflowBomb = true;
   try {
-    state.overflowOverdriveTimer = activateDrillOverdrive(OVERFLOW_OVERDRIVE_DURATION, "Перегрузка");
+    state.overflowOverdriveTimer = activateDrillOverdrive(OVERFLOW_OVERDRIVE_DURATION, t("toast.overflow_overdrive"));
   } finally {
     state.resolvingOverflowBomb = false;
   }
@@ -6538,7 +6589,7 @@ function triggerOverflowSurge() {
 
 function activateOverhealDrillBoost() {
   playSound("overheal_boost");
-  activateDrillOverdrive(state.overhealOverdriveDuration || 4, "Перелив адреналина");
+  activateDrillOverdrive(state.overhealOverdriveDuration || 4, t("toast.adrenaline_boost"));
 }
 
 function triggerHeatOverload() {
@@ -6553,7 +6604,7 @@ function triggerHeatOverload() {
   for (let i = 0; i < state.heatOverloadRocketLevel; i += 1) {
     fireRocket(state.drill.x, state.drill.y, OVERLOAD_ROCKET_DAMAGE, OVERLOAD_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
   }
-  applyStun(HEAT_STUN_DURATION, "Перегрев");
+  applyStun(HEAT_STUN_DURATION, t("toast.heat_overload"));
   state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 2.8);
   state.damageFlash = Math.min(1, state.damageFlash + 0.75);
 }
@@ -6844,19 +6895,19 @@ function getGoldPerkPreview(perkType) {
   switch (perkType) {
     case 1: {
       return {
-        effect: "Удалён",
+        effect: t("preview.removed"),
         compare: "—",
       };
     }
     case 3: {
       return {
-        effect: "Удалён",
+        effect: t("preview.removed"),
         compare: "—",
       };
     }
     case 4: {
       return {
-        effect: "Удалён",
+        effect: t("preview.removed"),
         compare: "—",
       };
     }
@@ -6864,66 +6915,66 @@ function getGoldPerkPreview(perkType) {
       const currentBonus = state.contourChargeDamagePerCell || 0;
       const nextBonus = currentBonus + 0.05;
       return {
-        effect: `+drillPower за сломанный блок на ${formatPerkNumber(getScaledEffectDuration(3))} сек`,
-        compare: `${formatPerkPercent(currentBonus)} → ${formatPerkPercent(nextBonus)} за блок`,
+        effect: t("preview.contour_charge.effect", { dur: formatPerkNumber(getScaledEffectDuration(3)) }),
+        compare: t("preview.contour_charge.compare", { current: formatPerkPercent(currentBonus), next: formatPerkPercent(nextBonus) }),
       };
     }
     case 6: {
       return {
-        effect: "Ускоряет бур при низком топливе",
-        compare: `Бонус ${formatPerkPercent(state.lowFuelSpeedBonus)} → ${formatPerkPercent(state.lowFuelSpeedBonus + 0.35)}`,
+        effect: t("preview.empty_boost.effect"),
+        compare: t("preview.empty_boost.compare", { current: formatPerkPercent(state.lowFuelSpeedBonus), next: formatPerkPercent(state.lowFuelSpeedBonus + 0.35) }),
       };
     }
     case 7: {
       const currentInterval = state.remoteBombInterval || 0;
       const nextInterval = Math.max(15, currentInterval > 0 ? currentInterval - 5 : 30);
       return {
-        effect: "Ракета за сломанные буром блоки",
-        compare: `Интервал ${currentInterval || 30} → ${nextInterval}`,
+        effect: t("preview.sapper_charge.effect"),
+        compare: t("preview.sapper_charge.compare", { current: currentInterval || 30, next: nextInterval }),
       };
     }
     case 8: {
       return {
-        effect: "Топливный контур (устарел)",
+        effect: t("preview.fuel_contour.effect"),
         compare: "—",
       };
     }
     case 9: {
       const nextRadius = Math.min(9, state.visionRadius + 1);
       return {
-        effect: "+1 радиус (макс. 9)",
-        compare: `Радиус ${state.visionRadius} → ${nextRadius}`,
+        effect: t("preview.vision_lens.effect"),
+        compare: t("preview.vision_lens.compare", { current: state.visionRadius, next: nextRadius }),
       };
     }
     case 10: {
       return {
-        effect: "Показывает ближайшие кристаллы на кольце радара",
-        compare: state.radarCrystalModule ? "Уже активно" : "Выкл → Вкл",
+        effect: t("preview.radar_module.effect"),
+        compare: state.radarCrystalModule ? t("preview.radar_module.compare_active") : t("preview.radar_module.compare_inactive"),
       };
     }
     case 11: {
       return {
-        effect: "Ломосбор (устарел)",
+        effect: t("preview.ore_collector.effect"),
         compare: "—",
       };
     }
     case 13: {
       return {
-        effect: "Переполнение дает форсаж, потом взрыв",
-        compare: `Бак ${state.maxFuel} → ${Math.max(100, state.maxFuel - 150)}`,
+        effect: t("preview.overload.effect"),
+        compare: t("preview.overload.compare", { current: state.maxFuel, next: Math.max(100, state.maxFuel - 150) }),
       };
     }
     case 14: {
       return {
-        effect: "+1 макс HP, +2 лечение",
-        compare: `Макс HP ${state.maxHp} → ${state.maxHp + 1}`,
+        effect: t("preview.reinforced_hull.effect"),
+        compare: t("preview.reinforced_hull.compare", { current: state.maxHp, next: state.maxHp + 1 }),
       };
     }
     case 15: {
       const nextDuration = Math.min(10, state.overhealOverdriveDuration > 0 ? state.overhealOverdriveDuration + 2 : 4);
       return {
-        effect: "Лишнее лечение включает форсаж",
-        compare: `Длительность ${state.overhealOverdriveDuration || 0} → ${nextDuration} сек`,
+        effect: t("preview.adrenaline_overflow.effect"),
+        compare: t("preview.adrenaline_overflow.compare", { current: state.overhealOverdriveDuration || 0, next: nextDuration }),
       };
     }
     case 16: {
@@ -6932,26 +6983,26 @@ function getGoldPerkPreview(perkType) {
       const nextSmall = getLoopPerkChance(0, Math.min(2, state.loopPerkLevel + 1));
       const nextLarge = getLoopPerkChance(9, Math.min(2, state.loopPerkLevel + 1));
       return {
-        effect: "Малый и большой контур могут дать тайловый перк",
+        effect: t("preview.contour_trophy.effect"),
         compare: `${formatPerkPercent(currentSmall)}/${formatPerkPercent(currentLarge)} → ${formatPerkPercent(nextSmall)}/${formatPerkPercent(nextLarge)}`,
       };
     }
     case 17: {
       return {
-        effect: "Контур дорисовывается сам в простое",
+        effect: t("preview.auto_contour.effect"),
         compare: "",
       };
     }
     case 18: {
       const level = state.crystalCatalystLevel;
-      let effect = "Бонусы за кристаллы";
+      let effect = t("preview.crystal_catalyst.effect");
       let compare = "0 → +30 gold";
       if (level === 1) {
         compare = "+30 gold → +40 fuel";
       } else if (level === 2) {
         compare = "+40 fuel → +1 HP";
       } else if (level >= 3) {
-        compare = "Макс.";
+        compare = t("preview.crystal_catalyst.compare_max");
       }
       return { effect, compare };
     }
@@ -6960,42 +7011,42 @@ function getGoldPerkPreview(perkType) {
       const currentDuration = durations[state.spikeOverdriveLevel] || 0;
       const nextDuration = durations[Math.min(3, state.spikeOverdriveLevel + 1)] || 12;
       return {
-        effect: "Разбитые шипы дают форсаж",
-        compare: `${currentDuration} → ${nextDuration} сек`,
+        effect: t("preview.spike_boost.effect"),
+        compare: t("preview.spike_boost.compare", { current: currentDuration, next: nextDuration }),
       };
     }
     case 20: {
       return {
-        effect: "Термозаряд (устарел)",
+        effect: t("preview.heat_charge.effect"),
         compare: "—",
       };
     }
     case 21: {
       return {
-        effect: "Слит в Термозаряд",
+        effect: t("preview.heat_sink_merged.effect"),
         compare: "—",
       };
     }
     case 22: {
       return {
-        effect: "+20 к лимиту перегрева",
+        effect: t("preview.heat_sink.effect"),
         compare: `${state.maxHeat} → ${state.maxHeat + 20}`,
       };
     }
     case 23: {
       return {
-        effect: "Накал бура (устарел)",
+        effect: t("preview.drill_heat.effect"),
         compare: "—",
       };
     }
     case 24: {
       return {
-        effect: "Импульс остывания (устарел)",
+        effect: t("preview.cool_pulse.effect"),
         compare: "—",
       };
     }
     case 25: {
-      return { effect: "Разгонные демпферы (удалён)", compare: "—" };
+      return { effect: t("preview.stun_dampers.effect"), compare: "—" };
     }
     case 26: {
       const caps = [0, 15, 30, 50, 100];
@@ -7003,7 +7054,7 @@ function getGoldPerkPreview(perkType) {
       const currentBonus = Math.min(caps[state.contourLengthDamageLevel] || 0, contourLength);
       const nextCap = caps[Math.min(4, state.contourLengthDamageLevel + 1)] || 100;
       return {
-        effect: `+1% урона за длину контура (макс. ${nextCap}%)`,
+        effect: t("preview.contour_resonance.effect", { cap: nextCap }),
         compare: `${currentBonus}% → ${Math.min(nextCap, contourLength)}%`,
       };
     }
@@ -7012,8 +7063,8 @@ function getGoldPerkPreview(perkType) {
       const currentThreshold = thresholds[state.coolingRocketLevel] || 50;
       const nextThreshold = thresholds[Math.min(3, state.coolingRocketLevel + 1)] || 30;
       return {
-        effect: "Остывание выпускает ракету малого радиуса",
-        compare: `${currentThreshold} → ${nextThreshold} heat`,
+        effect: t("preview.cooling_rockets.effect"),
+        compare: t("preview.cooling_rockets.compare", { current: currentThreshold, next: nextThreshold }),
       };
     }
     case 28: {
@@ -7021,7 +7072,7 @@ function getGoldPerkPreview(perkType) {
       const currentGain = gains[state.contourReturnFuelLevel] || 0;
       const nextGain = gains[Math.min(3, state.contourReturnFuelLevel + 1)] || 5;
       return {
-        effect: "Шаг назад по контуру дает топливо",
+        effect: t("preview.contour_recovery.effect"),
         compare: `${currentGain} → ${nextGain}`,
       };
     }
@@ -7029,7 +7080,7 @@ function getGoldPerkPreview(perkType) {
       const currentCount = state.heatOverloadRocketLevel;
       const nextCount = Math.min(3, currentCount + 1);
       return {
-        effect: "Перегрев выпускает ракеты малого радиуса",
+        effect: t("preview.heat_rockets.effect"),
         compare: `${currentCount} → ${nextCount}`,
       };
     }
@@ -7042,13 +7093,13 @@ function getGoldPerkPreview(perkType) {
       const nextBaseDrain = IDLE_FUEL_DRAIN + Math.floor(state.goldPerkLevel / 3);
       const nextDrain = nextBaseDrain + Math.max(1, nextBaseDrain * 0.1) * Math.min(3, state.tankBoostLevel + 1);
       return {
-        effect: "Бак сильнее, но растет расход в секунду",
-        compare: `Бак ${formatSignedNumber(currentTank)} / ${formatPerkNumber(currentDrain)} → ${formatSignedNumber(nextTank)} / ${formatPerkNumber(nextDrain)}`,
+        effect: t("preview.reinforced_tank.effect"),
+        compare: t("preview.reinforced_tank.compare", { currentTank: formatSignedNumber(currentTank), currentDrain: formatPerkNumber(currentDrain), nextTank: formatSignedNumber(nextTank), nextDrain: formatPerkNumber(nextDrain) }),
       };
     }
     default:
       return {
-        effect: "Без данных",
+        effect: t("preview.no_data.effect"),
         compare: "—",
       };
   }
@@ -7065,13 +7116,13 @@ function syncPerkChoiceOverlay() {
   const rerollButton = document.getElementById("perkReroll");
   const rerollCount = document.getElementById("perkRerollCount");
   if (subtitle) {
-    subtitle.textContent = `Апгрейд за ${getGoldPerkCost(state.goldPerkLevel)} золота`;
+    subtitle.textContent = t("ui.upgrade_cost_dynamic", { cost: getGoldPerkCost(state.goldPerkLevel) });
   }
   if (rerollButton) {
     rerollButton.disabled = !state.isChoosingPerk || state.perkRerolls <= 0;
   }
   if (rerollCount) {
-    rerollCount.textContent = `Рероллы ${state.perkRerolls}`;
+    rerollCount.textContent = t("ui.rerolls", { count: state.perkRerolls });
   }
   syncDebugPerkOverlay();
   const buttons = document.querySelectorAll("[data-perk-slot]");
@@ -7083,7 +7134,7 @@ function syncPerkChoiceOverlay() {
       continue;
     }
     const preview = getGoldPerkPreview(perkType);
-    button.innerHTML = `<span class="perk-option__top"><span class="perk-option__title"><span class="perk-option__icon">${getGoldPerkIconMarkup(perkType, "perk-option__icon-svg")}</span><span class="perk-option__name">${GOLD_PERK_TYPES[perkType].name}</span></span><span class="perk-option__level">Лвл ${getGoldPerkNextLevel(perkType)}</span></span><span class="perk-option__effect">${preview.effect}</span><span class="perk-option__compare">${preview.compare}</span>`;
+    button.innerHTML = `<span class="perk-option__top"><span class="perk-option__title"><span class="perk-option__icon">${getGoldPerkIconMarkup(perkType, "perk-option__icon-svg")}</span><span class="perk-option__name">${GOLD_PERK_TYPES[perkType].name}</span></span><span class="perk-option__level">${t("ui.level_badge", { level: getGoldPerkNextLevel(perkType) })}</span></span><span class="perk-option__effect">${preview.effect}</span><span class="perk-option__compare">${preview.compare}</span>`;
   }
 }
 
@@ -7247,7 +7298,7 @@ function gainExperience(amount) {
     state.levelUpPulse = 0.9;
     state.levelUpModalDelay = 0.9;
     spawnLevelUpBurst(state.drill.x, state.drill.y);
-    showPerkToast(`Уровень ${state.level}`);
+    showPerkToast(t("toast.level", { level: state.level }));
   }
 }
 
@@ -7343,7 +7394,7 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   }
   if (state.fuelConverterLevel > 0 && overflow > 0) {
     const duration = getScaledEffectDuration(2 + state.fuelConverterLevel);
-    activateDrillOverdrive(duration, "Переработчик топлива");
+    activateDrillOverdrive(duration, t("toast.fuel_converter_boost"));
   }
   for (let ri = 0; ri < state.fuelRocketLevel; ri += 1) {
     fireRocket(state.drill.x, state.drill.y, FUEL_ROCKET_DAMAGE, FUEL_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
@@ -7368,12 +7419,12 @@ function dropArtifactOnDamage() {
     if (!state.tunnelMask[ci]) continue;
     if (c.x === state.drill.x && c.y === state.drill.y) continue;
     state.artifactMask[ci] = 1;
-    showPerkToast("Артефакт потерян!");
+    showPerkToast(t("toast.artifact_lost"));
     return;
   }
   // Fallback: drop on self
   state.artifactMask[cellIndex(state.drill.x, state.drill.y)] = 1;
-  showPerkToast("Артефакт потерян!");
+  showPerkToast(t("toast.artifact_lost"));
 }
 
 function dropKeyOnDamage() {
@@ -7395,7 +7446,7 @@ function dropKeyOnDamage() {
     state.heldKeyForSafe = -1;
     state.keyBumpTime = 0;
     state.keyBumpDir = null;
-    showPerkToast("Ключ потерян!");
+    showPerkToast(t("toast.key_lost"));
     return;
   }
   // fallback: drop on self
@@ -7404,7 +7455,7 @@ function dropKeyOnDamage() {
   state.heldKeyForSafe = -1;
   state.keyBumpTime = 0;
   state.keyBumpDir = null;
-  showPerkToast("Ключ потерян!");
+  showPerkToast(t("toast.key_lost"));
 }
 
 function openSafeDoor(safeIdx, doorX, doorY) {
@@ -7440,7 +7491,7 @@ function openSafeDoor(safeIdx, doorX, doorY) {
     // Artifact in center
     const center = cells[Math.floor(cells.length / 2)];
     state.artifactMask[cellIndex(center.x, center.y)] = 1;
-    showPerkToast("Сейф открыт! Артефакт внутри!");
+    showPerkToast(t("toast.safe_opened_artifact"));
   } else {
     // 3 random perks: damage(3) or speed(5)
     const perkPool = [3, 5]; // Бур, Скорость
@@ -7453,7 +7504,7 @@ function openSafeDoor(safeIdx, doorX, doorY) {
       const perkType = perkPool[Math.floor(Math.random() * perkPool.length)];
       state.perkMask[cellIndex(shuffled[p].x, shuffled[p].y)] = perkType;
     }
-    showPerkToast("Сейф открыт! Перки внутри!");
+    showPerkToast(t("toast.safe_opened_perks"));
   }
 }
 
@@ -7529,7 +7580,7 @@ function dropUnsafeGold() {
     const saved = Math.floor(total * saveRate);
     state.gold += saved;
     remaining -= saved;
-    if (saved > 0) showPerkToast(`Страховка: +${saved} ●`);
+    if (saved > 0) showPerkToast(t("toast.insurance", { saved }));
   }
   const lostAmount = Math.floor(remaining * 0.3);
   const dropAmount = Math.max(0, remaining - lostAmount);
@@ -7571,11 +7622,11 @@ function applyHazardDamage(amount, options = {}) {
     if (absorbed > 0 && damageLeft <= 0) {
       state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.1);
       state.damageFlash = Math.min(1, state.damageFlash + 0.45);
-      showPerkToast(`Броня -${absorbed}`);
+      showPerkToast(t("toast.armor_absorbed", { amount: absorbed }));
       return;
     }
     if (absorbed > 0) {
-      showPerkToast(`Броня -${absorbed}`);
+      showPerkToast(t("toast.armor_absorbed", { amount: absorbed }));
     }
   }
 
@@ -8342,7 +8393,7 @@ function breakCell(x, y, index, options = {}) {
   }
   if (hazardType === HAZARD_TYPES.SPIKE && state.spikeOverdriveLevel > 0) {
     const durations = [0, 6, 9, 12];
-    activateDrillOverdrive(durations[state.spikeOverdriveLevel] || 6, "Шиповой форсаж");
+    activateDrillOverdrive(durations[state.spikeOverdriveLevel] || 6, t("toast.spike_boost_activated"));
   }
   state.hazardMask[index] = 0;
   state.hazardTriggeredMask[index] = 0;
@@ -8382,7 +8433,7 @@ function breakCell(x, y, index, options = {}) {
         spawnGoldParticles(x, y, reward);
         state.unsafeGold += reward;
       }
-      showPerkToast(scattered ? `Гнездо уничтожено! ${reward} золота рассыпалось` : `Гнездо уничтожено! +${reward} золота`);
+      showPerkToast(scattered ? t("toast.nest_destroyed_scattered", { reward }) : t("toast.nest_destroyed", { reward }));
       break;
     }
   }
@@ -8542,7 +8593,7 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
     state.artifactMask[moveIndex] = 0;
     state.artifactCount++;
     playSound("artifact_pickup");
-    showPerkToast("Артефакт подобран!");
+    showPerkToast(t("toast.artifact_picked_up"));
   }
   // Pick up key by walking over it
   if (state.heldKeyForSafe === -1 && state.keyMask[moveIndex] > 0) {
@@ -8552,7 +8603,7 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
     state.keyBumpTime = 0;
     state.keyBumpDir = null;
     playSound("key_pickup");
-    showPerkToast("Ключ подобран! Неси к замку");
+    showPerkToast(t("toast.key_picked_up"));
     triggerPickupRadar("key", toX, toY);
   }
   state.signalPrevX = toX;
@@ -8877,7 +8928,7 @@ function updateDrill(dt) {
       if (!tryAutoCloseContour()) {
         state.autoClosePreviewFailed = true;
         state.autoClosePreviewReturnTimer = IDLE_AUTO_CLOSE_PREVIEW_RETURN_DURATION;
-        showPerkToast("Контур не найден");
+        showPerkToast(t("toast.contour_not_found"));
       } else {
         state.autoClosePreview = null;
         state.autoClosePreviewReturnTimer = 0;
@@ -8985,7 +9036,7 @@ function updateDrill(dt) {
       state.heldKeyForSafe = -1;
       state.keyBumpTime = 0;
       state.keyBumpDir = null;
-      showPerkToast("Ключ выброшен");
+      showPerkToast(t("toast.key_dropped"));
     }
     state.drill.strikePhase += dt * actionRate * 0.3;
     state.drill.strikeEnergy = Math.max(0, state.drill.strikeEnergy - dt * 3);
@@ -9276,7 +9327,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       const pendingAction = artifactRemaining > 0
         ? { type: "artifactChoice", remaining: artifactRemaining, beacon }
         : { type: "shop", beaconY: beacon.y };
-      showPerkToast("Маяк активирован!");
+      showPerkToast(t("toast.beacon_activated"));
       addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
       state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
     }
@@ -9296,7 +9347,7 @@ function activateLoopCharge(cellCount) {
   state.loopChargeTimer = state.loopChargeDuration;
   state.contourChargeDrillPowerBonus = cellCount * state.contourChargeDamagePerCell;
   state.drillPower += state.contourChargeDrillPowerBonus;
-  showPerkToast(`Контурный заряд +${formatPerkNumber(state.contourChargeDrillPowerBonus)} силы`);
+  showPerkToast(t("toast.contour_charge_power", { val: formatPerkNumber(state.contourChargeDrillPowerBonus) }));
 }
 
 function getLoopPerkBlockHardness(x, y) {
@@ -9360,7 +9411,7 @@ function maybeSpawnLoopPerk(interiorCells, brokenCellCount = 0) {
   state.hazardTriggeredMask[index] = 0;
   state.loopGoldMask[index] = 0;
   state.perkMask[index] = chooseTilePerkForPosition(cell.x, cell.y, state.worldRandom);
-  showPerkToast("Контурный трофей");
+  showPerkToast(t("toast.contour_trophy"));
 }
 
 function isPointInPolygon(px, py, polygon) {
@@ -10698,18 +10749,18 @@ function render() {
     ctx.fillStyle = "#ffffff";
     ctx.font = `700 28px ${HUD_FONT}`;
     ctx.textAlign = "center";
-    ctx.fillText("База найдена", state.width * 0.5, state.height * 0.46);
+    ctx.fillText(t("ui.base_found"), state.width * 0.5, state.height * 0.46);
     ctx.font = `400 16px ${HUD_FONT}`;
-    ctx.fillText("Ты добрался до спрятанной цели. Можно расширять мета-игру поиска.", state.width * 0.5, state.height * 0.52);
+    ctx.fillText(t("ui.base_found_desc"), state.width * 0.5, state.height * 0.52);
   } else if (state.dead) {
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(0, 0, state.width, state.height);
     ctx.fillStyle = "#ffe2d5";
     ctx.font = `700 28px ${HUD_FONT}`;
     ctx.textAlign = "center";
-    ctx.fillText("Бур разбит", state.width * 0.5, state.height * 0.46);
+    ctx.fillText(t("ui.drill_broken"), state.width * 0.5, state.height * 0.46);
     ctx.font = `400 16px ${HUD_FONT}`;
-    ctx.fillText("Опасные блоки нужно обходить или добивать осторожно.", state.width * 0.5, state.height * 0.52);
+    ctx.fillText(t("ui.drill_broken_desc"), state.width * 0.5, state.height * 0.52);
   }
 }
 
@@ -13093,7 +13144,7 @@ function renderHud() {
     ctx.font = `700 10px ${HUD_FONT}`;
     ctx.fillStyle = "#c8a96e";
     ctx.textAlign = "left";
-    ctx.fillText(`ГЛУБИНА ${state.currentDepthLevel}`, infoX + 12, midY);
+    ctx.fillText(t("ui.depth_hud", { level: state.currentDepthLevel }), infoX + 12, midY);
     ctx.textAlign = "right";
     const beaconDone = beaconsTotal > 0 && beaconsActive === beaconsTotal;
     ctx.fillStyle = beaconDone ? "#7de87d" : "#e5f8ff";
@@ -13148,12 +13199,12 @@ function renderHud() {
     ctx.font = `700 10px ${HUD_FONT}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("КЛЮЧ", keyX + 26, keyY + 12);
+    ctx.fillText(t("ui.key_hud"), keyX + 26, keyY + 12);
     ctx.restore();
   }
 
-  renderHudCoreStats(left, detailTop, panelWidth, "СТАТЫ");
-  renderHudPerkColumn(14, state.height - 14, state.width - 28, "ПЕРКИ");
+  renderHudCoreStats(left, detailTop, panelWidth, t("ui.stats_hud"));
+  renderHudPerkColumn(14, state.height - 14, state.width - 28, t("ui.perks_hud"));
 
   ctx.save();
   ctx.fillStyle = "rgba(198, 171, 132, 0.68)";
@@ -13608,7 +13659,7 @@ function renderHudPerkColumn(x, y, width, title) {
           key: `equipment:${index}:${part.id}:${part.rarity || RARITY.COMMON}`,
           good: def,
           rarity: part.rarity || RARITY.COMMON,
-          sourceLabel: `Слот ${index + 1}`,
+          sourceLabel: t("ui.slot", { n: index + 1 }),
           stackCount: equipped.filter((entry) => entry.id === part.id).length,
         },
       });
@@ -13629,7 +13680,7 @@ function renderHudPerkColumn(x, y, width, title) {
           key: `item:${index}:${item.id}:${item.rarity || RARITY.COMMON}`,
           good: def,
           rarity: item.rarity || RARITY.COMMON,
-          sourceLabel: "Инвентарь",
+          sourceLabel: t("ui.inventory"),
           stackCount: purchased.filter((entry) => entry.id === item.id).length,
         },
       });
@@ -13814,13 +13865,13 @@ function initDebugMapMode() {
 
     // Marker layers — drawn on top of real game tiles
     const MARKERS = [
-      { id: "beacon",   label: "Маяк",     color: "#ff8800", visible: true },
-      { id: "artifact", label: "Артефакт", color: "#ffff50", visible: true },
-      { id: "safe",     label: "Сейф",     color: "#8888ff", visible: true },
-      { id: "worm",     label: "Червь",    color: "#ff4444", visible: true },
-      { id: "boulder",  label: "Камень",   color: "#c8a040", visible: true },
-      { id: "base",     label: "База",     color: "#00ff88", visible: true },
-      { id: "start",    label: "Старт",    color: "#ffffff", visible: true },
+      { id: "beacon",   label: t("map.beacon"),   color: "#ff8800", visible: true },
+      { id: "artifact", label: t("map.artifact"), color: "#ffff50", visible: true },
+      { id: "safe",     label: t("map.safe"),     color: "#8888ff", visible: true },
+      { id: "worm",     label: t("map.worm"),     color: "#ff4444", visible: true },
+      { id: "boulder",  label: t("map.boulder"),  color: "#c8a040", visible: true },
+      { id: "base",     label: t("map.base"),     color: "#00ff88", visible: true },
+      { id: "start",    label: t("map.start"),    color: "#ffffff", visible: true },
     ];
     function markerOn(id) { return MARKERS.find((m) => m.id === id)?.visible ?? true; }
 

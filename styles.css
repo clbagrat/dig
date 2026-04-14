@@ -116,6 +116,66 @@ body {
   transform: scale(0.96);
 }
 
+.menu-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 6, 4, 0.72);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.menu-modal[hidden] { display: none; }
+
+.menu-modal__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 35% 20%, rgba(255, 228, 181, 0.1), transparent 40%),
+    linear-gradient(180deg, rgba(93, 57, 27, 0.28), rgba(18, 10, 7, 0.15)),
+    var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 179, 0.08),
+    0 18px 42px var(--shadow);
+  min-width: 200px;
+}
+
+.menu-modal__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: 700 16px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  white-space: nowrap;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.menu-modal__item:active {
+  background: rgba(255, 228, 181, 0.1);
+  transform: scale(0.97);
+}
+
+.menu-modal__sep {
+  height: 1px;
+  margin: 2px 8px;
+  background: var(--panel-border);
+  opacity: 0.5;
+}
+
 .manual-modal {
   position: absolute;
   inset: 0;

@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+
 export const RARITY = {
   COMMON: 1,
   UNCOMMON: 2,
@@ -5,12 +7,9 @@ export const RARITY = {
   LEGENDARY: 4,
 };
 
-export const RARITY_NAMES = {
-  1: "Обычный",
-  2: "Необычный",
-  3: "Редкий",
-  4: "Легендарный",
-};
+export const RARITY_NAMES = new Proxy({}, {
+  get(_, key) { return t(`rarity.${key}`); },
+});
 
 export const RARITY_COLORS = {
   1: "#aaa",
@@ -33,18 +32,23 @@ export const RARITY_COST_MULT = {
   4: 5,
 };
 
-export const CATEGORIES = [
-  { id: "basic", name: "Базовое", icon: "D" },
-  { id: "economy", name: "Экономика", icon: "●" },
-  { id: "maintenance", name: "Обслуживание", icon: "💧" },
-  { id: "heat", name: "Нагрев", icon: "🔥" },
-  { id: "выживание", name: "Выживание", icon: "❤️" },
-  { id: "поиск_бреши", name: "Поиск бреши", icon: "🎯" },
-  { id: "ракеты", name: "Ракеты", icon: "🚀" },
-  { id: "контур", name: "Контур", icon: "⚡" },
-  { id: "навигация", name: "Навигация", icon: "🔭" },
-  { id: "алхимия", name: "Алхимия", icon: "⚗️" },
+const CATEGORY_DEFS = [
+  { id: "basic",        icon: "D"  },
+  { id: "economy",      icon: "●"  },
+  { id: "maintenance",  icon: "💧" },
+  { id: "heat",         icon: "🔥" },
+  { id: "выживание",    icon: "❤️" },
+  { id: "поиск_бреши",  icon: "🎯" },
+  { id: "ракеты",       icon: "🚀" },
+  { id: "контур",       icon: "⚡" },
+  { id: "навигация",    icon: "🔭" },
+  { id: "алхимия",      icon: "⚗️" },
 ];
+
+export const CATEGORIES = CATEGORY_DEFS.map(c => ({
+  ...c,
+  get name() { return t(`category.${c.id}`); },
+}));
 
 export const INITIAL_CATEGORIES = ["basic"];
 export const TAG_SYNERGIES = {};
@@ -734,10 +738,12 @@ export const ALL_ITEMS = [
     name: "Форсажная камера",
     icon: "💨",
     desc: "+15% скорость бура. −1 макс. HP (не ниже 1).",
-    descParts: [
-      { type: "effect", index: 0 },
-      "−1 к макс. HP (не ниже 1)",
-    ],
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        t("item.afterburner.hp_penalty"),
+      ];
+    },
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
@@ -1486,6 +1492,18 @@ export const ALL_ITEMS = [
 
 export const ALL_GOODS = [...ALL_EQUIPMENT, ...ALL_ITEMS];
 
+// Apply i18n name getters to every item/equipment object.
+// Falls back to the original Russian name if no translation key exists.
+for (const item of ALL_GOODS) {
+  const fallback = item.name;
+  const key = `item.${item.id}.name`;
+  Object.defineProperty(item, "name", {
+    get() { const v = t(key); return v !== key ? v : fallback; },
+    configurable: true,
+    enumerable: true,
+  });
+}
+
 function clampRarity(rarity) {
   return Math.max(RARITY.COMMON, Math.min(RARITY.LEGENDARY, rarity || RARITY.COMMON));
 }
@@ -1524,68 +1542,68 @@ function formatUnsignedPercent(value, scale = 1) {
 }
 
 const SIMPLE_STAT_DESCRIPTORS = {
-  drillPower: value => `${formatSignedDescriptionNumber(value)} к силе бура`,
-  strikeSpeed: value => `${formatSignedPercent(value)} к скорости бура`,
-  maxHp: value => `${formatSignedDescriptionNumber(value)} к макс. HP`,
-  maxFuel: value => `${formatSignedDescriptionNumber(value)} к макс. топливу`,
-  maxHeat: value => `${formatSignedDescriptionNumber(value)} к макс. нагреву`,
-  visionRadius: value => `${formatSignedDescriptionNumber(value)} к радиусу обзора`,
-  luck: value => `${formatSignedDescriptionNumber(value)} к удаче`,
-  armor: value => `${formatSignedDescriptionNumber(value)} к броне`,
-  weakSpotChance: value => `${formatSignedPercent(value, 100)} к шансу бреши`,
-  weakSpotMult: value => `${formatSignedDescriptionNumber(value)} к урону по бреши`,
-  damageBonus: value => `${formatSignedPercent(value)} к общему урону`,
-  heatRate: value => `${formatSignedPercent(value, 100)} к скорости нагрева`,
-  effectDurationRate: value => `${formatSignedPercent(value, 100)} к длительности эффектов`,
-  concentration: value => `${formatSignedPercent(value, 1)} к концентрации`,
-  fuelDrainRate: value => `${formatSignedPercent(value, 100)} к расходу топлива`,
-  fuelToHpRate: value => `${formatSignedPercent(value, 100)} к потерям HP без топлива`,
-  contourResMultiplier: value => `${formatSignedPercent(value, 100)} к ресурсу контура`,
-  goldBonus: value => `${formatSignedPercent(value, 100)} к золоту`,
-  miningGoldBonusMultiplier: value => `${formatSignedPercent(value, 100)} к золоту с жил`,
-  xpBonusMultiplier: value => `${formatSignedPercent(value, 100)} к опыту`,
-  fuelBonus: value => `${formatSignedPercent(value, 100)} к бонусу топлива`,
-  bonusFindChance: value => `${formatSignedPercent(value, 100)} к шансу находки`,
-  speedOfAutoClose: value => `${formatSignedPercent(value)} к скорости автозамыкания`,
-  maxContour: value => `${formatSignedDescriptionNumber(value)} к максимальной длине контура`,
-  explosionDamageMultiplier: value => `${formatSignedPercent(value, 100)} к урону взрывов`,
-  explosionDamage: value => `${formatSignedPercent(value)} к урону взрывов`,
-  heatExplosionRadiusBonus: value => `${formatSignedDescriptionNumber(value)} к радиусу взрыва перегрева`,
-  shopPriceDiscount: value => `${formatSignedPercent(value, 100)} к скидке в магазине`,
-  weakSpotFuelGain: value => `При ударе по бреши: ${formatSignedDescriptionNumber(value)} топлива`,
-  lowFuelSpeedBonus: value => `При низком топливе: ${formatSignedPercent(value, 100)} к скорости бура`,
-  lowFuelDamageBonus: value => `При низком топливе: ${formatSignedPercent(value, 100)} к урону бура`,
-  drillPowerPerLevel: value => `При каждом уровне: ${formatSignedDescriptionNumber(value)} к силе бура`,
-  fuelPerLevel: value => `При каждом уровне: ${formatSignedDescriptionNumber(value)} топлива`,
-  strikeSpeedPerLevel: value => `При каждом уровне: ${formatSignedPercent(value)} к скорости бура`,
-  healPerLevel: value => `При каждом уровне: лечение ${formatSignedDescriptionNumber(value)} HP`,
-  goldBonusPerLevel: value => `При каждом уровне: ${formatSignedPercent(value, 100)} к золоту с жил`,
-  loopLengthDamageBonus: value => `Каждая клетка контура даёт ${formatSignedPercent(value)} к урону бурения`,
-  loopLengthFuelBonus: value => `Каждая клетка контура даёт ${formatSignedDescriptionNumber(value)} топлива при подъёме`,
-  maxLoopLength: value => `${formatSignedDescriptionNumber(value)} к максимальной длине контура`,
-  loopSpawnBonusChance: value => `Замкнутый контур с шансом ${formatUnsignedPercent(value, 100)} создаёт бонус внутри`,
-  heatExplosionDamageBonus: value => `${formatSignedPercent(value, 100)} к урону взрыва от перегрева`,
-  crystalRewardRerolls: value => `${formatSignedDescriptionNumber(value)} попытка к выбору награды за рецепт`,
-  crystalGoldGain: value => `Подбор кристалла даёт ${formatSignedDescriptionNumber(value)} золота`,
-  crystalXpGain: value => `Подбор кристалла даёт ${formatSignedDescriptionNumber(value)} XP`,
-  adrenalineLevel: value => `При HP ≤ 1: +${value * 30}% к скорости бура`,
-  firstStrikeLevel: value => `После активации маяка: +${value * 40}% к урону бура на ${value * 6} сек`,
-  insuranceLevel: value => `При уроне сохраняет ${[0, 30, 50, 70, 90][Math.min(4, Math.max(0, value))] || 0}% небезопасного золота`,
-  fuelConverterLevel: value => `Пополнение сверх макс. топлива даёт форсаж на ${2 + value} сек`,
-  loopChargeLevel: value => `${formatSignedDescriptionNumber(value)} уровень контурного заряда`,
-  stunDetonatorLevel: value => `При оглушении: взрыв вокруг бура${value > 1 ? ` x${value}` : ""}`,
-  breachMissileLevel: value => `При попадании в брешь запускает ${formatDescriptionNumber(value)} ракет${value >= 5 ? "" : value >= 2 ? "ы" : "у"}`,
-  cryoRocketCount: value => `За каждое сильное остывание выпускает ${formatDescriptionNumber(value)} крио-ракет${value >= 5 ? "" : value >= 2 ? "ы" : "у"}`,
-  fuelRocketLevel: value => `Пополнение топлива выпускает ${formatDescriptionNumber(value)} ракет${value >= 5 ? "" : value >= 2 ? "ы" : "у"}`,
-  radarCrystalModule: () => "Кольцевые подсказки на ближайшие кристаллы",
-  artifactRadarMode: () => "Радары маяков показывают фиолетовый указатель на ближайший артефакт",
-  goldRadarMode: () => "Радары маяков показывают жёлтый указатель на ближайшее золотое скопление (5+ блоков)",
-  navigatorMode: () => "Радары маяков показывают белый указатель на ближайший неактивированный маяк на той же глубине",
-  beaconCatalystLevel: () => "Активация маяка мгновенно завершает текущий рецепт",
-  levelCatalystLevel: () => "Повышение уровня мгновенно завершает текущий рецепт",
-  stunReservoirLevel: value => `При оглушении: ${formatSignedDescriptionNumber(value * 40)} топлива`,
-  stunAfterburnerLevel: value => `После оглушения включается форсаж; длительность = x${value * 2} от времени стана`,
-  weakSpotPierce: () => "Пробитие бреши насквозь",
+  drillPower: value => t("desc.drillPower", { val: formatSignedDescriptionNumber(value) }),
+  strikeSpeed: value => t("desc.strikeSpeed", { val: formatSignedPercent(value) }),
+  maxHp: value => t("desc.maxHp", { val: formatSignedDescriptionNumber(value) }),
+  maxFuel: value => t("desc.maxFuel", { val: formatSignedDescriptionNumber(value) }),
+  maxHeat: value => t("desc.maxHeat", { val: formatSignedDescriptionNumber(value) }),
+  visionRadius: value => t("desc.visionRadius", { val: formatSignedDescriptionNumber(value) }),
+  luck: value => t("desc.luck", { val: formatSignedDescriptionNumber(value) }),
+  armor: value => t("desc.armor", { val: formatSignedDescriptionNumber(value) }),
+  weakSpotChance: value => t("desc.weakSpotChance", { val: formatSignedPercent(value, 100) }),
+  weakSpotMult: value => t("desc.weakSpotMult", { val: formatSignedDescriptionNumber(value) }),
+  damageBonus: value => t("desc.damageBonus", { val: formatSignedPercent(value) }),
+  heatRate: value => t("desc.heatRate", { val: formatSignedPercent(value, 100) }),
+  effectDurationRate: value => t("desc.effectDurationRate", { val: formatSignedPercent(value, 100) }),
+  concentration: value => t("desc.concentration", { val: formatSignedPercent(value, 1) }),
+  fuelDrainRate: value => t("desc.fuelDrainRate", { val: formatSignedPercent(value, 100) }),
+  fuelToHpRate: value => t("desc.fuelToHpRate", { val: formatSignedPercent(value, 100) }),
+  contourResMultiplier: value => t("desc.contourResMultiplier", { val: formatSignedPercent(value, 100) }),
+  goldBonus: value => t("desc.goldBonus", { val: formatSignedPercent(value, 100) }),
+  miningGoldBonusMultiplier: value => t("desc.miningGoldBonusMultiplier", { val: formatSignedPercent(value, 100) }),
+  xpBonusMultiplier: value => t("desc.xpBonusMultiplier", { val: formatSignedPercent(value, 100) }),
+  fuelBonus: value => t("desc.fuelBonus", { val: formatSignedPercent(value, 100) }),
+  bonusFindChance: value => t("desc.bonusFindChance", { val: formatSignedPercent(value, 100) }),
+  speedOfAutoClose: value => t("desc.speedOfAutoClose", { val: formatSignedPercent(value) }),
+  maxContour: value => t("desc.maxContour", { val: formatSignedDescriptionNumber(value) }),
+  explosionDamageMultiplier: value => t("desc.explosionDamageMultiplier", { val: formatSignedPercent(value, 100) }),
+  explosionDamage: value => t("desc.explosionDamage", { val: formatSignedPercent(value) }),
+  heatExplosionRadiusBonus: value => t("desc.heatExplosionRadiusBonus", { val: formatSignedDescriptionNumber(value) }),
+  shopPriceDiscount: value => t("desc.shopPriceDiscount", { val: formatSignedPercent(value, 100) }),
+  weakSpotFuelGain: value => t("desc.weakSpotFuelGain", { val: formatSignedDescriptionNumber(value) }),
+  lowFuelSpeedBonus: value => t("desc.lowFuelSpeedBonus", { val: formatSignedPercent(value, 100) }),
+  lowFuelDamageBonus: value => t("desc.lowFuelDamageBonus", { val: formatSignedPercent(value, 100) }),
+  drillPowerPerLevel: value => t("desc.drillPowerPerLevel", { val: formatSignedDescriptionNumber(value) }),
+  fuelPerLevel: value => t("desc.fuelPerLevel", { val: formatSignedDescriptionNumber(value) }),
+  strikeSpeedPerLevel: value => t("desc.strikeSpeedPerLevel", { val: formatSignedPercent(value) }),
+  healPerLevel: value => t("desc.healPerLevel", { val: formatSignedDescriptionNumber(value) }),
+  goldBonusPerLevel: value => t("desc.goldBonusPerLevel", { val: formatSignedPercent(value, 100) }),
+  loopLengthDamageBonus: value => t("desc.loopLengthDamageBonus", { val: formatSignedPercent(value) }),
+  loopLengthFuelBonus: value => t("desc.loopLengthFuelBonus", { val: formatSignedDescriptionNumber(value) }),
+  maxLoopLength: value => t("desc.maxLoopLength", { val: formatSignedDescriptionNumber(value) }),
+  loopSpawnBonusChance: value => t("desc.loopSpawnBonusChance", { val: formatUnsignedPercent(value, 100) }),
+  heatExplosionDamageBonus: value => t("desc.heatExplosionDamageBonus", { val: formatSignedPercent(value, 100) }),
+  crystalRewardRerolls: value => t("desc.crystalRewardRerolls", { val: formatSignedDescriptionNumber(value) }),
+  crystalGoldGain: value => t("desc.crystalGoldGain", { val: formatSignedDescriptionNumber(value) }),
+  crystalXpGain: value => t("desc.crystalXpGain", { val: formatSignedDescriptionNumber(value) }),
+  adrenalineLevel: value => t("desc.adrenalineLevel", { val: value * 30 }),
+  firstStrikeLevel: value => t("desc.firstStrikeLevel", { val: value * 40, dur: value * 6 }),
+  insuranceLevel: value => t("desc.insuranceLevel", { pct: [0, 30, 50, 70, 90][Math.min(4, Math.max(0, value))] || 0 }),
+  fuelConverterLevel: value => t("desc.fuelConverterLevel", { sec: 2 + value }),
+  loopChargeLevel: value => t("desc.loopChargeLevel", { val: formatSignedDescriptionNumber(value) }),
+  stunDetonatorLevel: value => t("desc.stunDetonatorLevel", { val: value }),
+  breachMissileLevel: value => t("desc.breachMissileLevel", { val: formatDescriptionNumber(value) }),
+  cryoRocketCount: value => t("desc.cryoRocketCount", { val: formatDescriptionNumber(value) }),
+  fuelRocketLevel: value => t("desc.fuelRocketLevel", { val: formatDescriptionNumber(value) }),
+  radarCrystalModule: () => t("desc.radarCrystalModule"),
+  artifactRadarMode: () => t("desc.artifactRadarMode"),
+  goldRadarMode: () => t("desc.goldRadarMode"),
+  navigatorMode: () => t("desc.navigatorMode"),
+  beaconCatalystLevel: () => t("desc.beaconCatalystLevel"),
+  levelCatalystLevel: () => t("desc.levelCatalystLevel"),
+  stunReservoirLevel: value => t("desc.stunReservoirLevel", { val: formatSignedDescriptionNumber(value * 40) }),
+  stunAfterburnerLevel: value => t("desc.stunAfterburnerLevel", { val: value * 2 }),
+  weakSpotPierce: () => t("desc.weakSpotPierce"),
 };
 
 const SPECIAL_DESCRIPTION_BUILDERS = {
@@ -1597,12 +1615,10 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
     const hasHeat = Number.isFinite(stats?.heat);
     let totalText = "";
     if (hasDrillPower && hasHeat) {
-      const total = flat
-        + stats.drillPower * (drillScale / 100)
-        + Math.floor(stats.heat / 10) * heatBonus;
+      const total = flat + stats.drillPower * (drillScale / 100) + Math.floor(stats.heat / 10) * heatBonus;
       totalText = ` [${formatDescriptionNumber(total)}]`;
     }
-    return `Урон ${flat} + ${formatDescriptionNumber(drillScale)}% от силы бура + ${heatBonus} за каждые 10 нагрева${totalText}.`;
+    return t("desc.special.thermo_drill", { flat, scale: formatDescriptionNumber(drillScale), heat: heatBonus, total: totalText });
   },
   basic_drill(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
@@ -1611,15 +1627,13 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
     const totalText = hasDrillPower
       ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (damageScale / 100))}]`
       : "";
-    return `Урон ${flatDamage} + ${formatDescriptionNumber(damageScale)}% от силы бура${totalText}.`;
+    return t("desc.special.basic_drill", { flat: flatDamage, scale: formatDescriptionNumber(damageScale), total: totalText });
   },
   tradeoff_drill(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 16, 22, 30, 40] }, rarity);
     const penalty = getEffectValue({ effectByRarity: [0, -0.3, -0.5, -0.7, -1.0] }, rarity);
-    const totalText = Number.isFinite(stats?.drillPower)
-      ? ` [${formatDescriptionNumber(flatDamage)}]`
-      : "";
-    return `Урон ${flatDamage}${totalText}.\n${formatSignedDescriptionNumber(penalty)} к урону по бреши.`;
+    const totalText = Number.isFinite(stats?.drillPower) ? ` [${formatDescriptionNumber(flatDamage)}]` : "";
+    return t("desc.special.tradeoff_drill", { flat: flatDamage, total: totalText, penalty: formatSignedDescriptionNumber(penalty) });
   },
   fragile_drill(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
@@ -1629,7 +1643,7 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
     const totalText = hasDrillPower
       ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (damageScale / 100))}]`
       : "";
-    return `Урон ${flatDamage} + ${formatDescriptionNumber(damageScale)}% от силы бура${totalText}.\n${formatSignedPercent(speedBonus)} к скорости бура, пока есть броня.`;
+    return t("desc.special.fragile_drill", { flat: flatDamage, scale: formatDescriptionNumber(damageScale), total: totalText, speed: formatSignedPercent(speedBonus) });
   },
   lucky_pickaxe(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
@@ -1641,16 +1655,14 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
     const totalText = hasDrillPower && hasLuck
       ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (damageScale / 100) + stats.luck * (luckScale / 100))}]`
       : "";
-    return `Урон ${flatDamage} + ${formatDescriptionNumber(damageScale)}% от силы бура + ${formatDescriptionNumber(luckScale)}% от удачи${totalText}.\nПри ударе по золотой жиле её ценность растёт на ${oreGain}.`;
+    return t("desc.special.lucky_pickaxe", { flat: flatDamage, scale: formatDescriptionNumber(damageScale), luck: formatDescriptionNumber(luckScale), total: totalText, ore: oreGain });
   },
   shard_drill(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 8, 12, 16, 20] }, rarity);
     const weakSpotChance = getEffectValue({ effectByRarity: [0, 0.04, 0.06, 0.08, 0.10] }, rarity);
     const explosionDamage = getEffectValue({ effectByRarity: [0, 20, 30, 45, 60] }, rarity);
-    const totalText = Number.isFinite(stats?.drillPower)
-      ? ` [${formatDescriptionNumber(flatDamage)}]`
-      : "";
-    return `Урон ${flatDamage}${totalText} + ${formatDescriptionNumber(weakSpotChance * 100)}% к шансу бреши.\nПри попадании в брешь: взрыв на ${formatDescriptionNumber(explosionDamage)} урона.`;
+    const totalText = Number.isFinite(stats?.drillPower) ? ` [${formatDescriptionNumber(flatDamage)}]` : "";
+    return t("desc.special.shard_drill", { flat: flatDamage, total: totalText, chance: formatDescriptionNumber(weakSpotChance * 100), explosion: formatDescriptionNumber(explosionDamage) });
   },
 };
 

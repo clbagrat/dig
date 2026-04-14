@@ -5,6 +5,7 @@ import {
   TAG_SYNERGIES, getGoodDescription,
 } from "./items-catalog.js?v=1";
 import { DEPTH_LEVELS } from "./worldgen.js?v=1";
+import { t } from "./i18n.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function renderShop(currentGold, stats = null) {
   const goldEl = document.getElementById("shopGoldValue");
   if (goldEl) goldEl.textContent = Math.floor(currentGold);
   const titleEl = document.getElementById("shopTitle");
-  if (titleEl) titleEl.textContent = `Ур.${shopLevel} · Глубина ${currentDepthLevel}`;
+  if (titleEl) titleEl.textContent = t("shop.title", { level: shopLevel, depth: currentDepthLevel });
   renderStats(true);
   renderOfferings();
   renderSlots();
@@ -449,12 +450,12 @@ function buildDOM() {
     <div class="shop-stack">
       <div class="shop-panel">
         <div class="shop-head">
-          <span class="shop-head__title" id="shopTitle">Магазин</span>
+          <span class="shop-head__title" id="shopTitle">Shop</span>
           <span class="shop-head__gold">
             <span class="shop-head__gold-icon"></span>
             <span id="shopGoldValue">0</span>
           </span>
-          <button id="shopReroll" class="shop-reroll" type="button">Перебросить</button>
+          <button id="shopReroll" class="shop-reroll" type="button">Reroll</button>
           <button id="shopClose" class="shop-close" type="button">✕</button>
         </div>
         <div class="shop-offerings" id="shopOfferings"></div>
@@ -507,23 +508,23 @@ function formatStatValue(value, mode = "number") {
 }
 
 const STAT_DEFS = [
-  { key: "drillPower",                 label: "Сила бура",                      shortLabel: "БУР",    format: "fixed1" },
-  { key: "damageBonus",                label: "Бонус к урону %",                shortLabel: "УРОН %", format: "percent" },
-  { key: "strikeSpeed",                label: "Скорость бурения %",             shortLabel: "СКОР %", format: "rawpercent" },
-  { key: "maxHp",                      label: "Макс. жизни",                    shortLabel: "ЖЗН",    format: null },
-  { key: "maxFuel",                    label: "Макс. топливо",                  shortLabel: "ТОПЛ",   format: null },
-  { key: "maxHeat",                    label: "Макс. жар",                      shortLabel: "ЖАР",    format: null },
-  { key: "heatRate",                   label: "Скорость нагрева",               shortLabel: "ЖАР+",   format: "multiplier" },
-  { key: "effectDurationRate",         label: "Длительность эффектов",          shortLabel: "ЭФКТ",   format: "multiplier" },
-  { key: "concentration",              label: "Концентрация",                   shortLabel: "КОН",    format: "multiplier" },
-  { key: "fuelDrainRate",              label: "Расход топлива",                 shortLabel: "РАСХ",   format: "multiplier" },
-  { key: "visionRadius",               label: "Радиус обзора",                  shortLabel: "ОБЗ",    format: null },
-  { key: "luck",                       label: "Удача",                          shortLabel: "УДЧ",    format: null },
-  { key: "weakSpotChance",             label: "Шанс нахождения бреши",          shortLabel: "Брешь%", format: "percent" },
-  { key: "weakSpotMult",               label: "Урон по бреши",                  shortLabel: "хБрешь", format: "multiplier" },
-  { key: "miningGoldBonusMultiplier",  label: "Бонус к добыче золота",          shortLabel: "ЗОЛ",    format: "percent" },
-  { key: "fuelPickupBonus",            label: "Бонус к добыче топлива",         shortLabel: "ТОПЛ+",  format: null },
-  { key: "speedOfAutoClose",           label: "Скорость закрытия контура %",    shortLabel: "КОНТ%",  format: "rawpercent" },
+  { key: "drillPower",                get label() { return t("shop.stat.drillPower.label"); },                get shortLabel() { return t("shop.stat.drillPower.short"); },                format: "fixed1" },
+  { key: "damageBonus",               get label() { return t("shop.stat.damageBonus.label"); },               get shortLabel() { return t("shop.stat.damageBonus.short"); },               format: "percent" },
+  { key: "strikeSpeed",               get label() { return t("shop.stat.strikeSpeed.label"); },               get shortLabel() { return t("shop.stat.strikeSpeed.short"); },               format: "rawpercent" },
+  { key: "maxHp",                     get label() { return t("shop.stat.maxHp.label"); },                     get shortLabel() { return t("shop.stat.maxHp.short"); },                     format: null },
+  { key: "maxFuel",                   get label() { return t("shop.stat.maxFuel.label"); },                   get shortLabel() { return t("shop.stat.maxFuel.short"); },                   format: null },
+  { key: "maxHeat",                   get label() { return t("shop.stat.maxHeat.label"); },                   get shortLabel() { return t("shop.stat.maxHeat.short"); },                   format: null },
+  { key: "heatRate",                  get label() { return t("shop.stat.heatRate.label"); },                  get shortLabel() { return t("shop.stat.heatRate.short"); },                  format: "multiplier" },
+  { key: "effectDurationRate",        get label() { return t("shop.stat.effectDurationRate.label"); },        get shortLabel() { return t("shop.stat.effectDurationRate.short"); },        format: "multiplier" },
+  { key: "concentration",             get label() { return t("shop.stat.concentration.label"); },             get shortLabel() { return t("shop.stat.concentration.short"); },             format: "multiplier" },
+  { key: "fuelDrainRate",             get label() { return t("shop.stat.fuelDrainRate.label"); },             get shortLabel() { return t("shop.stat.fuelDrainRate.short"); },             format: "multiplier" },
+  { key: "visionRadius",              get label() { return t("shop.stat.visionRadius.label"); },              get shortLabel() { return t("shop.stat.visionRadius.short"); },              format: null },
+  { key: "luck",                      get label() { return t("shop.stat.luck.label"); },                      get shortLabel() { return t("shop.stat.luck.short"); },                      format: null },
+  { key: "weakSpotChance",            get label() { return t("shop.stat.weakSpotChance.label"); },            get shortLabel() { return t("shop.stat.weakSpotChance.short"); },            format: "percent" },
+  { key: "weakSpotMult",              get label() { return t("shop.stat.weakSpotMult.label"); },              get shortLabel() { return t("shop.stat.weakSpotMult.short"); },              format: "multiplier" },
+  { key: "miningGoldBonusMultiplier", get label() { return t("shop.stat.miningGoldBonusMultiplier.label"); }, get shortLabel() { return t("shop.stat.miningGoldBonusMultiplier.short"); }, format: "percent" },
+  { key: "fuelPickupBonus",           get label() { return t("shop.stat.fuelPickupBonus.label"); },           get shortLabel() { return t("shop.stat.fuelPickupBonus.short"); },           format: null },
+  { key: "speedOfAutoClose",          get label() { return t("shop.stat.speedOfAutoClose.label"); },          get shortLabel() { return t("shop.stat.speedOfAutoClose.short"); },          format: "rawpercent" },
 ];
 
 function renderStats(short = false) {
@@ -598,8 +599,8 @@ function renderOfferings() {
     const empty = document.createElement("div");
     empty.className = "shop-empty";
     empty.innerHTML = `
-      <div class="shop-empty__title">Магазин пуст</div>
-      <div class="shop-empty__text">Все предметы и экипировка удалены из игры.</div>
+      <div class="shop-empty__title">${t("shop.empty.title")}</div>
+      <div class="shop-empty__text">${t("shop.empty.text")}</div>
     `;
     container.appendChild(empty);
     return;
@@ -611,7 +612,7 @@ function renderOfferings() {
 
     if (!offering) {
       card.className = "shop-card shop-card--sold";
-      card.innerHTML = `<div class="shop-card__sold">Продано</div>`;
+      card.innerHTML = `<div class="shop-card__sold">${t("shop.sold")}</div>`;
       container.appendChild(card);
       continue;
     }
@@ -637,7 +638,7 @@ function renderOfferings() {
     card.dataset.offeringIdx = i;
 
     const typeLabel = isEquip ? "⛏" : "✧";
-    const mergeLabel = isMerge ? `<div class="shop-card__merge">⬆ Объединить</div>` : "";
+    const mergeLabel = isMerge ? `<div class="shop-card__merge">${t("shop.merge_label")}</div>` : "";
     const catId = offering.good.category;
     const catDef = catId ? CATEGORIES.find(c => c.id === catId) : null;
     const catLabel = catDef ? `<div class="shop-card__category">${catDef.icon} ${catDef.name}</div>` : "";
@@ -704,7 +705,7 @@ function renderRerollButton() {
   btn.hidden = false;
   const cost = getRerollCost();
   const canAfford = currentGoldCache >= cost;
-  btn.textContent = `Перебросить — ${cost} ●`;
+  btn.textContent = t("shop.reroll_btn", { cost });
   btn.className = "shop-reroll" + (canAfford ? "" : " shop-reroll--poor");
   btn.disabled = !canAfford;
 }
@@ -750,15 +751,15 @@ function renderDetail() {
 
     const buyBtn = document.getElementById("shopDetailBuy");
     if (hasMergeTarget) {
-      buyBtn.textContent = "⬆ Выбери второй слот для объединения ↓";
+      buyBtn.textContent = t("shop.detail.choose_merge_slot");
       buyBtn.className = "shop-detail__buy shop-detail__buy--merge";
       buyBtn.disabled = true;
     } else if (part.rarity >= RARITY.LEGENDARY) {
-      buyBtn.textContent = "Максимальная редкость";
+      buyBtn.textContent = t("shop.detail.max_rarity");
       buyBtn.className = "shop-detail__buy shop-detail__buy--poor";
       buyBtn.disabled = true;
     } else {
-      buyBtn.textContent = "Нет второго такого предмета";
+      buyBtn.textContent = t("shop.detail.no_second_item");
       buyBtn.className = "shop-detail__buy shop-detail__buy--poor";
       buyBtn.disabled = true;
     }
@@ -766,7 +767,7 @@ function renderDetail() {
     const sellValue = Math.floor(Math.round(def.baseCost * RARITY_COST_MULT[part.rarity]) * 0.5);
     const sellBtn = document.getElementById("shopDetailSell");
     sellBtn.hidden = false;
-    sellBtn.textContent = `Продать — +${sellValue} ●`;
+    sellBtn.textContent = t("shop.detail.sell", { value: sellValue });
     sellBtn.dataset.slotIdx = selectedSlotIdx;
     document.getElementById("shopDetailLock").hidden = true;
     return;
@@ -784,7 +785,7 @@ function renderDetail() {
   const lockBtn = document.getElementById("shopDetailLock");
   if (lockBtn) {
     lockBtn.hidden = false;
-    lockBtn.textContent = isLocked ? "Открепить" : "Закрепить";
+    lockBtn.textContent = isLocked ? t("shop.detail.unpin") : t("shop.detail.pin");
     lockBtn.className = "shop-detail__lock" + (isLocked ? " shop-detail__lock--active" : "");
     lockBtn.dataset.lockIdx = selectedOfferingIdx;
   }
@@ -822,25 +823,25 @@ function renderDetail() {
   // Buy button
   const buyBtn = document.getElementById("shopDetailBuy");
   if (replaceMode) {
-    buyBtn.textContent = "Выбери слот для замены ↓";
+    buyBtn.textContent = t("shop.detail.choose_replace_slot");
     buyBtn.className = "shop-detail__buy shop-detail__buy--replace";
     buyBtn.disabled = true;
   } else if (isMerge) {
     if (canAfford) {
-      buyBtn.textContent = `⬆ Объединить — ${cost} ●`;
+      buyBtn.textContent = t("shop.detail.merge", { cost });
       buyBtn.className = "shop-detail__buy shop-detail__buy--merge";
       buyBtn.disabled = false;
     } else {
-      buyBtn.textContent = `Нужно ${cost} ●`;
+      buyBtn.textContent = t("shop.detail.need_gold", { cost });
       buyBtn.className = "shop-detail__buy shop-detail__buy--poor";
       buyBtn.disabled = true;
     }
   } else if (canAfford) {
-    buyBtn.textContent = `Купить — ${cost} ●`;
+    buyBtn.textContent = t("shop.detail.buy", { cost });
     buyBtn.className = "shop-detail__buy shop-detail__buy--ok";
     buyBtn.disabled = false;
   } else {
-    buyBtn.textContent = `Нужно ${cost} ●`;
+    buyBtn.textContent = t("shop.detail.need_gold", { cost });
     buyBtn.className = "shop-detail__buy shop-detail__buy--poor";
     buyBtn.disabled = true;
   }
