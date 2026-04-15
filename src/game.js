@@ -3864,12 +3864,15 @@ function getShopStatsSnapshot() {
     goldBonus: state.goldBonus,
     shopPriceDiscount: state.shopPriceDiscount,
     fuelBonus: state.fuelBonus,
+    goldBonusPerLevel: state.goldBonusPerLevel,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
     explosionDamage: state.explosionDamage,
     lowFuelDamageBonus: state.lowFuelDamageBonus,
     weakSpotChance: state.weakSpotChance,
     weakSpotMult: state.weakSpotMult,
+    miningGoldBonusMultiplier: state.miningGoldBonusMultiplier || 0,
+    fuelPickupBonus: state.fuelPickupBonus || 0,
   };
 }
 
@@ -4723,7 +4726,7 @@ function bindUi() {
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
       playSound("shop_open");
-      openShop(state.gold, null, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
+      openShop(state.gold, state.currentDepthLevel, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
     });
   }
 
@@ -5146,7 +5149,7 @@ function bindUi() {
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
       playSound("shop_open");
-      openShop(state.gold, null, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
+      openShop(state.gold, state.currentDepthLevel, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
     });
   }
 
