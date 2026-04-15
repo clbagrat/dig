@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems } from "./shop.js?v=41";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems } from "./shop.js?v=42";
 import { t, setLocale, getLocale } from "./i18n.js";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, ALL_EQUIPMENT, ALL_ITEMS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
@@ -3873,6 +3873,34 @@ function getShopStatsSnapshot() {
   };
 }
 
+function getShopDefaultStatsSnapshot() {
+  return {
+    drillPower: BASE_DRILL_DAMAGE,
+    strikeSpeed: 0,
+    maxHp: START_HP,
+    maxFuel: START_FUEL,
+    maxHeat: MAX_HEAT,
+    visionRadius: VISION_RADIUS,
+    luck: 0,
+    heatRate: 1,
+    effectDurationRate: 1,
+    concentration: 0,
+    fuelDrainRate: 1,
+    fuelToHpRate: 0,
+    goldBonus: 0,
+    shopPriceDiscount: 0,
+    fuelBonus: 0,
+    speedOfAutoClose: 0,
+    damageBonus: 0,
+    explosionDamage: 0,
+    lowFuelDamageBonus: 0,
+    weakSpotChance: 0,
+    weakSpotMult: 2,
+    miningGoldBonusMultiplier: 0,
+    fuelPickupBonus: 0,
+  };
+}
+
 function normalizeItemEffectStat(stat) {
   if (stat === "maxLoopLength") return "maxContour";
   return stat;
@@ -4491,7 +4519,8 @@ function init() {
     state.sprites = createSpriteAtlas();
     resize();
     setupField();
-    initShop({ onClose: () => {
+    initShop({
+      onClose: () => {
       playSound("shop_close");
       state.shopModalOpen = false;
       syncTouchZonesInteractivity();
@@ -4507,7 +4536,8 @@ function init() {
           state.pendingBeaconWireActivationAt = (state.lastTs || performance.now()) + BEACON_WIRE_POST_SHOP_DELAY_MS;
         }
       }
-    } });
+      },
+    });
     bindUi();
     requestAnimationFrame(frame);
   } catch (error) {
@@ -4693,7 +4723,7 @@ function bindUi() {
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
       playSound("shop_open");
-      openShop(state.gold, null, state.luck, getShopStatsSnapshot());
+      openShop(state.gold, null, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
     });
   }
 
@@ -4746,7 +4776,7 @@ function bindUi() {
     state.gold = Math.max(0, state.gold - cost);
     if (isMerge) removeShopPerk(effectId, oldRarityMultiplier, oldRarity);
     applyShopPerk(effectId, rarityMultiplier, rarity);
-    renderShop(state.gold, getShopStatsSnapshot());
+    renderShop(state.gold, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
   });
 
   document.addEventListener("shop:purchase-item", (e) => {
@@ -4754,7 +4784,7 @@ function bindUi() {
     playSound("purchase");
     state.gold = Math.max(0, state.gold - cost);
     applyItemEffect(effect, rarityMultiplier, rarity);
-    renderShop(state.gold, getShopStatsSnapshot());
+    renderShop(state.gold, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
   });
 
   document.addEventListener("shop:recycle", (e) => {
@@ -4762,14 +4792,14 @@ function bindUi() {
     playSound("recycle");
     removeShopPerk(effectId, rarityMultiplier, rarity);
     state.gold += refund;
-    renderShop(state.gold, getShopStatsSnapshot());
+    renderShop(state.gold, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
   });
 
-  document.addEventListener("shop:reroll", (e) => {
+  document.addEventListener("shop:rarity-upgrade", (e) => {
     const { cost } = e.detail;
     playSound("reroll");
     state.gold = Math.max(0, state.gold - cost);
-    renderShop(state.gold, getShopStatsSnapshot());
+    renderShop(state.gold, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
   });
 
   document.addEventListener("shop:synergies-changed", (e) => {
@@ -4875,7 +4905,7 @@ function bindUi() {
   if (debugAddGold) {
     debugAddGold.addEventListener("click", () => {
       state.gold += 500;
-      renderShop(state.gold, getShopStatsSnapshot());
+      renderShop(state.gold, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
       showPerkToast(t("toast.gold_added"));
     });
   }
@@ -5116,7 +5146,7 @@ function bindUi() {
       state.shopModalOpen = true;
       syncTouchZonesInteractivity();
       playSound("shop_open");
-      openShop(state.gold, null, state.luck, getShopStatsSnapshot());
+      openShop(state.gold, null, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
     });
   }
 
@@ -5733,7 +5763,7 @@ function openNextArtifactChoice() {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
     playSound("shop_open");
-    openShop(state.gold, state.currentDepthLevel, state.luck, getShopStatsSnapshot());
+    openShop(state.gold, state.currentDepthLevel, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
     return;
   }
   const locked = getLockedCategories();
@@ -11021,7 +11051,7 @@ function updateBeaconActivationAnim() {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
     playSound("shop_open");
-    openShop(state.gold, pa.depthLevel ?? state.currentDepthLevel, state.luck, getShopStatsSnapshot());
+    openShop(state.gold, pa.depthLevel ?? state.currentDepthLevel, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
   }
 }
 

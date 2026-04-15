@@ -153,7 +153,8 @@ Gold is earned from destroyed rock and scrap ore.
 
 Gold is spent in the beacon shop:
 - each beacon opens a shop when activated
-- the shop can offer equipment from unlocked categories
+- in each shop cycle the player picks one free offer, then pays `100 gold` for the next cycle
+- if gold is below `100`, the shop closes automatically
 - the driller starts the run with one equipped `common` copy of `Просто дрель`
 
 ## Experience And Levels
@@ -280,11 +281,20 @@ Gameplay role:
 ## Shop
 
 The shop opens after each beacon activation.
-It now contains a broad baseline `Базовое` item pool plus a smaller set of specialized categories.
+Each cycle offers:
+- `2` goods from the baseline `Базовое` category
+- `1` good from each additional category unlocked through artifacts
 
 Current available categories:
 - `Базовое`
 - `Экономика`
+
+Cycle rules:
+- offered goods are free to take
+- after taking any offer, `100 gold` is charged and the shop immediately generates a fresh set
+- skipping is not allowed while enough gold remains for another cycle
+- the shop closes itself when gold drops below `100`
+- once per shop visit, a paid action can increase rarity of the currently shown offers
 
 Current available shop content includes:
 - baseline stat items for core build directions such as HP, fuel, heat, contour size, weak spots, explosion scaling, and per-level growth
