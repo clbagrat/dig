@@ -2825,6 +2825,12 @@ function isCollapseCandidateCell(x, y) {
   ) {
     return false;
   }
+  for (const beacon of state.beacons) {
+    if (!beacon) continue;
+    if (x >= beacon.x - 1 && x <= beacon.x + 2 && y >= beacon.y - 1 && y <= beacon.y + 2) {
+      return false;
+    }
+  }
   return true;
 }
 

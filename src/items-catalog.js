@@ -979,22 +979,6 @@ export const ALL_ITEMS = [
       { stat: "maxHp",        effectByRarity: [null, null, -25, -25, -25] },
     ],
   },
-  {
-    id: "reinforced_frame",
-    type: "item",
-    name: "Усиленная рама",
-    icon: "🦺",
-    desc: "+1 броня. −8% скорость бура.",
-    category: "выживание",
-    tags: ["выживание"],
-    minRarity: 1,
-    baseCost: 40,
-    effect: [
-      { stat: "armor",       effectByRarity: [null, 25, 50, 75, 125] },
-      { stat: "strikeSpeed", effectByRarity: [null, -8, -10, -12, -15] },
-    ],
-  },
-
   // ── Поиск бреши ───────────────────────────────────────────────────────────────
   {
     id: "resonance_tip",

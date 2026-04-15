@@ -144,6 +144,7 @@ Rules:
 Current block spawn:
 - collapse rock uses hardness based on current run depth
 - only nearby walkable tiles are selected
+- collapse tiles are never selected inside the beacon activation area (`2×2` core + `1` tile ring)
 - the collapse can seal recently opened tunnels and break an active contour path
 
 ## Gold
