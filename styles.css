@@ -625,6 +625,43 @@ strong {
   margin-top: 20px;
 }
 
+.artifact-choice__cards[hidden] {
+  display: none;
+}
+
+.artifact-choice__continue {
+  margin-top: 20px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(180, 120, 255, 0.4);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(120, 60, 180, 0.2), rgba(18, 10, 7, 0.08)),
+    rgba(22, 12, 8, 0.85);
+  color: #e8d0ff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+
+.artifact-choice__continue:hover,
+.artifact-choice__continue:focus-visible {
+  border-color: rgba(200, 160, 255, 0.65);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(140, 80, 220, 0.25);
+}
+
+.artifact-choice__continue:active {
+  transform: translateY(0);
+}
+
+.artifact-choice__continue[hidden] {
+  display: none;
+}
+
 .artifact-choice__card {
   min-height: 180px;
   border: 1px solid rgba(180, 120, 255, 0.25);
@@ -1824,25 +1861,30 @@ strong {
 }
 
 .shop-head__title {
+  order: 2;
   flex: 1;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+  text-align: center;
 }
 
 .shop-head__gold {
+  order: 1;
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  border: 1px solid rgba(215, 159, 73, 0.25);
+  border: none;
   border-radius: 8px;
   background: rgba(30, 14, 4, 0.6);
   font-size: 13px;
   font-weight: 700;
   color: var(--accent);
+  position: relative;
+  overflow: visible;
 }
 
 .shop-head__gold-icon {
@@ -1856,7 +1898,58 @@ strong {
   margin-bottom: 1px;
 }
 
+.shop-head__gold--spend {
+  animation: shop-gold-spend 360ms cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.shop-head__gold-spent {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #ff8686;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: shop-gold-spent-float 420ms cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+}
+
+@keyframes shop-gold-spend {
+  0% {
+    transform: translateY(0) scale(1);
+    border-color: rgba(215, 159, 73, 0.25);
+    box-shadow: 0 0 0 rgba(255, 95, 95, 0);
+  }
+  45% {
+    transform: translateY(-1px) scale(1.06);
+    border-color: rgba(255, 120, 120, 0.7);
+    box-shadow: 0 0 14px rgba(255, 95, 95, 0.35);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    border-color: rgba(215, 159, 73, 0.25);
+    box-shadow: 0 0 0 rgba(255, 95, 95, 0);
+  }
+}
+
+@keyframes shop-gold-spent-float {
+  0% {
+    transform: translateY(0) scale(0.9);
+    opacity: 0;
+  }
+  25% {
+    transform: translateY(3px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(14px) scale(1);
+    opacity: 0;
+  }
+}
+
 .shop-reroll {
+  order: 3;
+  margin-left: auto;
   padding: 7px 12px;
   border: 1px solid rgba(215, 159, 73, 0.3);
   border-radius: 8px;
@@ -1876,6 +1969,15 @@ strong {
   color: var(--muted);
   opacity: 0.45;
   border-color: rgba(215, 159, 73, 0.15);
+}
+
+.shop-reroll--used {
+  color: rgba(215, 159, 73, 0.55);
+  opacity: 0.35;
+  border-color: rgba(215, 159, 73, 0.14);
+  background: rgba(30, 14, 4, 0.34);
+  cursor: default;
+  filter: saturate(0.45);
 }
 
 .shop-close {
@@ -2055,6 +2157,52 @@ strong {
 
 .shop-card--fading {
   opacity: 0.18;
+}
+
+.shop-card--enter {
+  animation: shop-card-enter 320ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  animation-delay: var(--shop-enter-delay, 0ms);
+}
+
+.shop-card--rarity-bump-up {
+  animation: shop-card-rarity-bump-up 190ms cubic-bezier(0.22, 0.82, 0.24, 1) both;
+}
+
+.shop-card--rarity-settle {
+  animation: shop-card-rarity-settle 200ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+@keyframes shop-card-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shop-card-rarity-bump-up {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    transform: translateY(-2px) scale(1.06);
+    filter: brightness(1.1);
+  }
+}
+
+@keyframes shop-card-rarity-settle {
+  0% {
+    transform: translateY(-2px) scale(1.06);
+    filter: brightness(1.1);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
 }
 
 .shop-card--sold {

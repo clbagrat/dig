@@ -64,12 +64,13 @@
       </div>
       <div id="artifactChoice" class="artifact-choice" hidden>
         <div class="artifact-choice__panel">
-          <div class="artifact-choice__title" data-i18n="ui.choose_category">Choose Category</div>
-          <div class="artifact-choice__subtitle" data-i18n="ui.artifact_subtitle">Artifact activated — unlock a new category and get a slot</div>
-          <div class="artifact-choice__cards">
+          <div id="artifactChoiceTitle" class="artifact-choice__title" data-i18n="ui.choose_category">Choose Category</div>
+          <div id="artifactChoiceSubtitle" class="artifact-choice__subtitle" data-i18n="ui.artifact_subtitle">Artifact activated — unlock a new category and get a slot</div>
+          <div id="artifactChoiceCards" class="artifact-choice__cards">
             <button id="artifactChoiceCard0" class="artifact-choice__card"></button>
             <button id="artifactChoiceCard1" class="artifact-choice__card"></button>
           </div>
+          <button id="artifactChoiceContinue" class="artifact-choice__continue" type="button" data-i18n="ui.continue" hidden>Continue</button>
         </div>
       </div>
       <div id="crystalReward" class="crystal-reward" hidden>
@@ -186,6 +187,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js?v=59"></script>
+    <script type="module" src="./src/game.js?v=60"></script>
   </body>
 </html>

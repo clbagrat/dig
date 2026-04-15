@@ -291,10 +291,21 @@ Current available categories:
 
 Cycle rules:
 - offered goods are free to take
-- after taking any offer, `100 gold` is charged and the shop immediately generates a fresh set
+- the first taken offer in a visit is always free
+- after taking any offer, reroll cost is charged only if there is enough gold for a new set; then the shop immediately generates a fresh set
+- reroll cost formula: `30 + 10 * (N - 1)`, where `N = current shop level + rerolls already made in this shop visit`
 - skipping is not allowed while enough gold remains for another cycle
-- the shop closes itself when gold drops below `100`
-- once per shop visit, a paid action can increase rarity of the currently shown offers
+- the shop closes itself when gold drops below the current reroll cost
+- once per offered set, a paid action can increase rarity of the currently shown offers
+- rarity upgrade cost is `50%` of the current reroll cost
+
+Artifact-to-shop progression:
+- activations `1-2`: unlock a new category and add `+1` slot (category can be chosen if multiple are locked)
+- activation `3`: unlock a new category and replace one baseline offer slot with category offers (no extra slot)
+- activation `4`: no category choice; `1` offer is guaranteed at least `Uncommon`
+- activation `5`: no category choice; `2` offers are guaranteed at least `Uncommon`
+- activation `6`: no category choice; `1` offer is guaranteed at least `Uncommon` and `1` at least `Rare`
+- activation `7+`: no category choice; artifact converts into `500 gold`
 
 Current available shop content includes:
 - baseline stat items for core build directions such as HP, fuel, heat, contour size, weak spots, explosion scaling, and per-level growth

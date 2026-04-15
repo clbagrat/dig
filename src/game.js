@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems } from "./shop.js?v=42";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems, replaceOneBaseOfferWithSpecial, setShopRarityGuarantees } from "./shop.js?v=43";
 import { t, setLocale, getLocale } from "./i18n.js";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, ALL_EQUIPMENT, ALL_ITEMS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
@@ -581,9 +581,14 @@ const state = {
   boulders: [],
   artifactCount: 0,
   artifactChoiceOpen: false,
+  artifactChoiceMode: "category",
   artifactChoiceCategories: [],
   artifactChoicePendingBeacon: null,
   artifactChoiceRemaining: 0,
+  artifactChoiceGrantSlot: true,
+  artifactChoiceReplaceBaseSlot: false,
+  artifactChoiceBenefitSubtitleKey: "",
+  artifactActivationCount: 0,
   // Safe/key system
   safes: [],
   heldKeyForSafe: -1,      // index of safe this key belongs to, -1 = no key
@@ -2353,9 +2358,14 @@ function setupField(seedOverride = null) {
   state.artifactMask.fill(0);
   state.artifactCount = 0;
   state.artifactChoiceOpen = false;
+  state.artifactChoiceMode = "category";
   state.artifactChoiceCategories = [];
   state.artifactChoicePendingBeacon = null;
   state.artifactChoiceRemaining = 0;
+  state.artifactChoiceGrantSlot = true;
+  state.artifactChoiceReplaceBaseSlot = false;
+  state.artifactChoiceBenefitSubtitleKey = "";
+  state.artifactActivationCount = 0;
   resetShopState();
   state.safes.length = 0;
   state.wormNests.length = 0;
@@ -5235,6 +5245,11 @@ function bindUi() {
 
   if (artifactChoiceOverlay) {
     artifactChoiceOverlay.addEventListener("click", (event) => {
+      const continueBtn = event.target.closest("#artifactChoiceContinue");
+      if (continueBtn) {
+        continueArtifactBenefitChoice();
+        return;
+      }
       const card = event.target.closest(".artifact-choice__card");
       if (!card) return;
       const idx = card.id === "artifactChoiceCard0" ? 0 : 1;
@@ -5762,35 +5777,92 @@ function claimLevelReward(choiceId) {
 
 function openNextArtifactChoice() {
   if (state.artifactChoiceRemaining <= 0) {
-    const beacon = state.artifactChoicePendingBeacon;
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
     playSound("shop_open");
     openShop(state.gold, state.currentDepthLevel, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
     return;
   }
+
+  state.artifactChoiceRemaining--;
+  state.artifactActivationCount += 1;
+  const activation = state.artifactActivationCount;
+
+  if (activation <= 2) {
+    beginArtifactCategoryChoice({ grantSlot: true, replaceBaseSlot: false });
+    return;
+  }
+  if (activation === 3) {
+    beginArtifactCategoryChoice({ grantSlot: false, replaceBaseSlot: true });
+    return;
+  }
+  if (activation === 4) {
+    setShopRarityGuarantees(1, 0);
+    openArtifactBenefitChoice("ui.artifact_benefit_one_uncommon");
+    return;
+  }
+  if (activation === 5) {
+    setShopRarityGuarantees(2, 0);
+    openArtifactBenefitChoice("ui.artifact_benefit_two_uncommon");
+    return;
+  }
+  if (activation === 6) {
+    setShopRarityGuarantees(1, 1);
+    openArtifactBenefitChoice("ui.artifact_benefit_one_uncommon_one_rare");
+    return;
+  }
+
+  state.gold += 500;
+  showGoldToast(500);
+  openArtifactBenefitChoice("ui.artifact_benefit_gold");
+}
+
+function beginArtifactCategoryChoice({ grantSlot, replaceBaseSlot }) {
   const locked = getLockedCategories();
   if (locked.length === 0) {
-    state.artifactChoiceRemaining = 0;
+    if (replaceBaseSlot) {
+      state.gold += 500;
+      showGoldToast(500);
+      openArtifactBenefitChoice("ui.artifact_benefit_gold");
+      return;
+    }
     openNextArtifactChoice();
     return;
   }
+  state.artifactChoiceMode = "category";
+  state.artifactChoiceGrantSlot = !!grantSlot;
+  state.artifactChoiceReplaceBaseSlot = !!replaceBaseSlot;
   if (locked.length === 1) {
-    state.artifactChoiceRemaining--;
-    unlockCategory(locked[0].id);
-    addSlot();
-    showPerkToast(t("toast.category_unlocked", { icon: locked[0].icon, name: locked[0].name }));
+    applyArtifactCategoryChoice(locked[0]);
     openNextArtifactChoice();
     return;
   }
   // 2+ locked: show choice modal for this artifact
-  state.artifactChoiceRemaining--;
   const shuffled = locked.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   state.artifactChoiceCategories = [shuffled[0], shuffled[1]];
+  openArtifactChoice();
+}
+
+function applyArtifactCategoryChoice(chosen) {
+  unlockCategory(chosen.id);
+  if (state.artifactChoiceGrantSlot) {
+    addSlot();
+  }
+  if (state.artifactChoiceReplaceBaseSlot) {
+    replaceOneBaseOfferWithSpecial();
+    showPerkToast(t("toast.artifact_replace_basic_offer"));
+  }
+  showPerkToast(t("toast.category_unlocked", { icon: chosen.icon, name: chosen.name }));
+}
+
+function openArtifactBenefitChoice(subtitleKey) {
+  state.artifactChoiceMode = "benefit";
+  state.artifactChoiceCategories = [];
+  state.artifactChoiceBenefitSubtitleKey = subtitleKey;
   openArtifactChoice();
 }
 
@@ -5803,6 +5875,31 @@ function openArtifactChoice() {
   overlay.style.cssText =
     "position:absolute;inset:0;z-index:9999;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;background:rgba(10,8,6,0.85);";
 
+  const titleEl = document.getElementById("artifactChoiceTitle");
+  const subtitleEl = document.getElementById("artifactChoiceSubtitle");
+  const cardsRoot = document.getElementById("artifactChoiceCards");
+  const continueBtn = document.getElementById("artifactChoiceContinue");
+  const isBenefitMode = state.artifactChoiceMode === "benefit";
+
+  if (titleEl) titleEl.textContent = isBenefitMode ? t("ui.artifact_benefit_title") : t("ui.choose_category");
+  if (subtitleEl) {
+    if (isBenefitMode) {
+      subtitleEl.textContent = t(state.artifactChoiceBenefitSubtitleKey || "ui.artifact_subtitle");
+    } else if (state.artifactChoiceReplaceBaseSlot) {
+      subtitleEl.textContent = t("ui.artifact_subtitle_replace_basic");
+    } else {
+      subtitleEl.textContent = t("ui.artifact_subtitle");
+    }
+  }
+  if (cardsRoot) cardsRoot.hidden = isBenefitMode;
+  if (continueBtn) {
+    continueBtn.hidden = !isBenefitMode;
+    continueBtn.disabled = !isBenefitMode;
+  }
+  if (isBenefitMode) {
+    return;
+  }
+
   const [t0, t1] = state.artifactChoiceCategories;
   const card0 = document.getElementById("artifactChoiceCard0");
   const card1 = document.getElementById("artifactChoiceCard1");
@@ -5811,25 +5908,34 @@ function openArtifactChoice() {
 }
 
 function buildArtifactChoiceCard(category) {
+  const nodeText = state.artifactChoiceGrantSlot ? t("ui.hull_slot") : t("ui.replace_basic_offer");
   return `
     <div class="artifact-choice__card-icon">${category.icon}</div>
     <div class="artifact-choice__card-name">${category.name}</div>
-    <div class="artifact-choice__card-nodes"><div class="artifact-choice__node">${t("ui.hull_slot")}</div></div>
+    <div class="artifact-choice__card-nodes"><div class="artifact-choice__node">${nodeText}</div></div>
   `;
 }
 
 function pickArtifactChoice(idx) {
-  if (!state.artifactChoiceOpen || !state.artifactChoiceCategories[idx]) return;
+  if (!state.artifactChoiceOpen || state.artifactChoiceMode !== "category" || !state.artifactChoiceCategories[idx]) return;
   const chosen = state.artifactChoiceCategories[idx];
-  unlockCategory(chosen.id);
-  addSlot();
+  applyArtifactCategoryChoice(chosen);
   closeArtifactChoice();
-  showPerkToast(t("toast.category_unlocked", { icon: chosen.icon, name: chosen.name }));
+  openNextArtifactChoice();
+}
+
+function continueArtifactBenefitChoice() {
+  if (!state.artifactChoiceOpen || state.artifactChoiceMode !== "benefit") return;
+  closeArtifactChoice();
   openNextArtifactChoice();
 }
 
 function closeArtifactChoice() {
   state.artifactChoiceOpen = false;
+  state.artifactChoiceMode = "category";
+  state.artifactChoiceGrantSlot = true;
+  state.artifactChoiceReplaceBaseSlot = false;
+  state.artifactChoiceBenefitSubtitleKey = "";
   state.artifactChoiceCategories = [];
   state.artifactChoicePendingBeacon = null;
   const overlay = document.getElementById("artifactChoice");

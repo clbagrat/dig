@@ -15,8 +15,9 @@ const MAX_SLOTS = 6;
 const INITIAL_SLOTS = 2;
 const BASE_CATEGORY_ID = INITIAL_CATEGORIES[0] ?? "basic";
 const BASE_CATEGORY_OFFERS = 2;
-const SHOP_SELECTION_COST = 100;
-const RARITY_UPGRADE_COST = 100;
+const SHOP_SELECTION_BASE_COST = 30;
+const SHOP_SELECTION_STEP_PER_N = 10;
+const RARITY_UPGRADE_BASE_RATIO = 0.5;
 
 // ── Module state ─────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,10 @@ let currentGoldCache = 0;
 let currentLuckCache = 0;
 let rarityBoostLevel = 0;
 let rarityUpgradeUsed = false;
+let shopSelectionCount = 0;
+let baseCategoryOffersCount = BASE_CATEGORY_OFFERS;
+let guaranteedUncommonOffers = 0;
+let guaranteedRareOffers = 0;
 let currentStatsCache = null;
 let defaultStatsCache = null;
 let onCloseCallback = null;
@@ -40,6 +45,9 @@ let replaceMode = false;     // true when choosing slot to replace
 let prevTagCounts = {};      // previous tag counts for synergy delta
 let purchaseAnimating = false;
 let previousRenderedStats = null;
+let lastRenderedOfferingsSignature = "";
+let suppressNextOfferingsEnterAnimation = false;
+let nextOfferingsAnimationClass = "";
 
 function getStarterEquipment() {
   return [{ id: "basic_drill", rarity: RARITY.COMMON }];
@@ -64,7 +72,9 @@ export function openShop(currentGold, depthLevel, luck = 0, stats = null, defaul
   shopLevel += 1;
   rarityBoostLevel = 0;
   rarityUpgradeUsed = false;
+  shopSelectionCount = 0;
   previousRenderedStats = null;
+  lastRenderedOfferingsSignature = "";
   selectedOfferingIdx = -1;
   selectedSlotIdx = -1;
   replaceMode = false;
@@ -82,6 +92,7 @@ export function closeShop() {
   selectedOfferingIdx = -1;
   selectedSlotIdx = -1;
   replaceMode = false;
+  lastRenderedOfferingsSignature = "";
   overlay.hidden = true;
   overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
   onCloseCallback?.();
@@ -95,10 +106,6 @@ export function renderShop(currentGold, stats = null, defaultStats = null) {
   }
   if (defaultStats) {
     defaultStatsCache = { ...defaultStats };
-  }
-  if (currentGoldCache < SHOP_SELECTION_COST) {
-    closeShop();
-    return;
   }
   const goldEl = document.getElementById("shopGoldValue");
   if (goldEl) goldEl.textContent = Math.floor(currentGold);
@@ -146,6 +153,15 @@ export function unlockCategory(categoryId) {
   unlockedCategories.add(categoryId);
 }
 
+export function replaceOneBaseOfferWithSpecial() {
+  baseCategoryOffersCount = Math.max(1, baseCategoryOffersCount - 1);
+}
+
+export function setShopRarityGuarantees(uncommonCount = 0, rareCount = 0) {
+  guaranteedUncommonOffers = Math.max(0, Math.floor(uncommonCount || 0));
+  guaranteedRareOffers = Math.max(0, Math.floor(rareCount || 0));
+}
+
 export function getLockedCategories() {
   return CATEGORIES.filter(c => !unlockedCategories.has(c.id));
 }
@@ -158,12 +174,17 @@ export function resetShopState() {
   currentOfferings = [];
   rarityBoostLevel = 0;
   rarityUpgradeUsed = false;
+  shopSelectionCount = 0;
+  baseCategoryOffersCount = BASE_CATEGORY_OFFERS;
+  guaranteedUncommonOffers = 0;
+  guaranteedRareOffers = 0;
   shopLevel = 0;
   currentDepthLevel = 1;
   currentStatsCache = null;
   defaultStatsCache = null;
   prevTagCounts = {};
   previousRenderedStats = null;
+  lastRenderedOfferingsSignature = "";
 }
 
 export function getEquippedParts() {
@@ -214,7 +235,7 @@ function getOfferCategories() {
     .filter((category) => category.id !== BASE_CATEGORY_ID && unlockedCategories.has(category.id))
     .map((category) => category.id);
   return [
-    ...Array.from({ length: BASE_CATEGORY_OFFERS }, () => BASE_CATEGORY_ID),
+    ...Array.from({ length: baseCategoryOffersCount }, () => BASE_CATEGORY_ID),
     ...unlockedSpecial,
   ];
 }
@@ -225,15 +246,28 @@ function rollOfferings(luck) {
   const usedIds = new Set();
   const categories = getOfferCategories();
   const offerings = [];
+  const offerIndices = categories.map((_, idx) => idx);
+  for (let i = offerIndices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [offerIndices[i], offerIndices[j]] = [offerIndices[j], offerIndices[i]];
+  }
+  const rareTargetCount = Math.min(offerIndices.length, guaranteedRareOffers);
+  const rareTargetSet = new Set(offerIndices.slice(0, rareTargetCount));
+  const uncommonPool = offerIndices.filter((idx) => !rareTargetSet.has(idx));
+  const uncommonTargetCount = Math.min(uncommonPool.length, guaranteedUncommonOffers);
+  const uncommonTargetSet = new Set(uncommonPool.slice(0, uncommonTargetCount));
 
   for (let i = 0; i < categories.length; i += 1) {
     const categoryId = categories[i];
     const rolled = Math.min(RARITY.LEGENDARY, rollRarity(currentDepthLevel, luck) + rarityBoostLevel);
+    let effectiveRarity = rolled;
+    if (rareTargetSet.has(i)) effectiveRarity = Math.max(effectiveRarity, RARITY.RARE);
+    else if (uncommonTargetSet.has(i)) effectiveRarity = Math.max(effectiveRarity, RARITY.UNCOMMON);
     const categoryCandidates = ALL_GOODS.filter((good) =>
       good.category === categoryId &&
       !usedIds.has(good.id) &&
       !(good.unique && getItemStacks(good.id) > 0) &&
-      (good.minRarity ?? RARITY.COMMON) <= rolled
+      (good.minRarity ?? RARITY.COMMON) <= effectiveRarity
     );
 
     let pick = null;
@@ -265,7 +299,7 @@ function rollOfferings(luck) {
     }
 
     usedIds.add(pick.id);
-    offerings.push({ good: pick, rarity: clampRarityForGood(pick, rolled) });
+    offerings.push({ good: pick, rarity: clampRarityForGood(pick, effectiveRarity) });
   }
 
   currentOfferings = offerings;
@@ -274,7 +308,29 @@ function rollOfferings(luck) {
 // ── Cost calculation ─────────────────────────────────────────────────────────────
 
 function getRarityUpgradeCost() {
-  return RARITY_UPGRADE_COST;
+  return Math.max(1, Math.round(getSelectionCost() * RARITY_UPGRADE_BASE_RATIO));
+}
+
+function getSelectionCost() {
+  const n = Math.max(1, (shopLevel || 1) + shopSelectionCount);
+  return Math.max(1, Math.round(SHOP_SELECTION_BASE_COST + SHOP_SELECTION_STEP_PER_N * (n - 1)));
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function applyPostSelectionReroll(canReroll) {
+  selectedOfferingIdx = -1;
+  selectedSlotIdx = -1;
+  replaceMode = false;
+  rarityBoostLevel = 0;
+  rarityUpgradeUsed = false;
+  if (canReroll) {
+    shopSelectionCount += 1;
+    rollOfferings(currentLuckCache);
+  }
+  return canReroll;
 }
 
 // ── Purchase logic ───────────────────────────────────────────────────────────────
@@ -298,6 +354,10 @@ function getOfferingCardRect(offeringIdx) {
 function setOfferingCardFading(offeringIdx, isFading) {
   const card = document.querySelector(`.shop-card[data-offering-idx="${offeringIdx}"]`);
   if (!card) return;
+  if (isFading) {
+    card.classList.remove("shop-card--enter");
+    card.style.removeProperty("--shop-enter-delay");
+  }
   card.classList.toggle("shop-card--fading", !!isFading);
 }
 
@@ -434,6 +494,48 @@ function animateTargetPulse(targetEl) {
   return anim.finished.catch(() => undefined);
 }
 
+function animateGoldSpend(cost) {
+  const valueEl = document.getElementById("shopGoldValue");
+  if (!valueEl) return Promise.resolve();
+  const costValue = Math.max(0, Math.floor(cost || 0));
+  if (costValue <= 0) return Promise.resolve();
+
+  const start = Math.max(0, Math.floor(currentGoldCache || 0));
+  const end = Math.max(0, start - costValue);
+  if (start === end) return Promise.resolve();
+
+  const goldWrap = valueEl.closest(".shop-head__gold");
+  if (goldWrap) {
+    goldWrap.classList.remove("shop-head__gold--spend");
+    void goldWrap.offsetWidth;
+    goldWrap.classList.add("shop-head__gold--spend");
+
+    const spentEl = document.createElement("span");
+    spentEl.className = "shop-head__gold-spent";
+    spentEl.textContent = `-${start - end}`;
+    goldWrap.appendChild(spentEl);
+    setTimeout(() => spentEl.remove(), 420);
+    setTimeout(() => goldWrap.classList.remove("shop-head__gold--spend"), 380);
+  }
+
+  const duration = 360;
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - t0) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const value = Math.round(start + (end - start) * eased);
+      valueEl.textContent = String(value);
+      if (p < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        resolve();
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
 async function animateEquipmentToSlot(offering, sourceRect, targetEl, fallbackPoint = null) {
   const point = fallbackPoint || getShopFallbackTarget();
   await animatePurchaseFlight(offering, sourceRect, point);
@@ -444,7 +546,7 @@ async function tryPurchase(offeringIdx) {
   if (purchaseAnimating) return;
   const offering = currentOfferings[offeringIdx];
   if (!offering) return;
-  const cost = SHOP_SELECTION_COST;
+  const cost = getSelectionCost();
   const sourceRect = getOfferingCardRect(offeringIdx);
 
   if (offering.good.type === "item") {
@@ -463,21 +565,21 @@ async function tryPurchase(offeringIdx) {
       } else {
         await animatePurchaseFlipToElement(offering, sourceRect, itemTarget, getShopItemTargetPoint());
       }
-      // Items: free pick, then paid transition to next set
-      selectedOfferingIdx = -1;
-      selectedSlotIdx = -1;
-      replaceMode = false;
-      rarityBoostLevel = 0;
-      rollOfferings(currentLuckCache);
+      const canReroll = currentGoldCache >= cost;
+      if (canReroll) await animateGoldSpend(cost);
+      // Items: pick is always free; only reroll to next set costs gold
+      applyPostSelectionReroll(canReroll);
+      const chargedCost = canReroll ? cost : 0;
 
       document.dispatchEvent(new CustomEvent("shop:purchase-item", {
         detail: {
           effect: offering.good.effect,
-          cost,
+          cost: chargedCost,
           rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
           rarity: offering.rarity,
         },
       }));
+      if (!canReroll) closeShop();
     } finally {
       setOfferingCardFading(offeringIdx, false);
       purchaseAnimating = false;
@@ -492,18 +594,17 @@ async function tryPurchase(offeringIdx) {
     try {
       const equipTarget = getShopEquipmentTargetElement(equippedParts.length);
       await animateEquipmentToSlot(offering, sourceRect, equipTarget, getShopEquipmentTargetPoint(equippedParts.length));
+      const canReroll = currentGoldCache >= cost;
+      if (canReroll) await animateGoldSpend(cost);
       // Free slot available — always place there, never auto-merge
       equippedParts.push({ id: offering.good.id, rarity: offering.rarity });
-      selectedOfferingIdx = -1;
-      selectedSlotIdx = -1;
-      replaceMode = false;
-      rarityBoostLevel = 0;
-      rollOfferings(currentLuckCache);
+      applyPostSelectionReroll(canReroll);
+      const chargedCost = canReroll ? cost : 0;
 
       document.dispatchEvent(new CustomEvent("shop:purchase-equipment", {
         detail: {
           effectId: offering.good.id,
-          cost,
+          cost: chargedCost,
           rarity: offering.rarity,
           rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
           isMerge: false,
@@ -512,6 +613,7 @@ async function tryPurchase(offeringIdx) {
         },
       }));
       recalcTagSynergies();
+      if (!canReroll) closeShop();
     } finally {
       setOfferingCardFading(offeringIdx, false);
       purchaseAnimating = false;
@@ -528,20 +630,19 @@ async function tryPurchase(offeringIdx) {
     try {
       const mergeTarget = getShopEquipmentTargetElement(existingIdx);
       await animateEquipmentToSlot(offering, sourceRect, mergeTarget, getShopEquipmentTargetPoint(existingIdx));
+      const canReroll = currentGoldCache >= cost;
+      if (canReroll) await animateGoldSpend(cost);
       // No free slot — merge with existing same item+rarity
       const oldRarity = equippedParts[existingIdx].rarity;
       const newRarity = oldRarity + 1;
       equippedParts[existingIdx].rarity = newRarity;
-      selectedOfferingIdx = -1;
-      selectedSlotIdx = -1;
-      replaceMode = false;
-      rarityBoostLevel = 0;
-      rollOfferings(currentLuckCache);
+      applyPostSelectionReroll(canReroll);
+      const chargedCost = canReroll ? cost : 0;
 
       document.dispatchEvent(new CustomEvent("shop:purchase-equipment", {
         detail: {
           effectId: offering.good.id,
-          cost,
+          cost: chargedCost,
           rarity: newRarity,
           rarityMultiplier: RARITY_EFFECT_MULT[newRarity],
           isMerge: true,
@@ -550,6 +651,7 @@ async function tryPurchase(offeringIdx) {
         },
       }));
       recalcTagSynergies();
+      if (!canReroll) closeShop();
     } finally {
       setOfferingCardFading(offeringIdx, false);
       purchaseAnimating = false;
@@ -566,7 +668,7 @@ async function doReplace(slotIdx) {
   if (purchaseAnimating) return;
   const offering = currentOfferings[selectedOfferingIdx];
   if (!offering || slotIdx < 0 || slotIdx >= equippedParts.length) return;
-  const cost = SHOP_SELECTION_COST;
+  const cost = getSelectionCost();
   const old = equippedParts[slotIdx];
   const sourceRect = getOfferingCardRect(selectedOfferingIdx);
   const purchaseIdx = selectedOfferingIdx;
@@ -576,11 +678,10 @@ async function doReplace(slotIdx) {
   try {
     const replaceTarget = getShopEquipmentTargetElement(slotIdx);
     await animateEquipmentToSlot(offering, sourceRect, replaceTarget, getShopEquipmentTargetPoint(slotIdx));
-    selectedOfferingIdx = -1;
-    selectedSlotIdx = -1;
-    replaceMode = false;
-    rarityBoostLevel = 0;
-    rollOfferings(currentLuckCache);
+    const canReroll = currentGoldCache >= cost;
+    if (canReroll) await animateGoldSpend(cost);
+    applyPostSelectionReroll(canReroll);
+    const chargedCost = canReroll ? cost : 0;
 
     if (old) {
       document.dispatchEvent(new CustomEvent("shop:recycle", {
@@ -599,7 +700,7 @@ async function doReplace(slotIdx) {
     document.dispatchEvent(new CustomEvent("shop:purchase-equipment", {
       detail: {
         effectId: offering.good.id,
-        cost,
+        cost: chargedCost,
         rarity: offering.rarity,
         rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
         isMerge: false,
@@ -609,6 +710,7 @@ async function doReplace(slotIdx) {
     }));
 
     recalcTagSynergies();
+    if (!canReroll) closeShop();
   } finally {
     setOfferingCardFading(purchaseIdx, false);
     purchaseAnimating = false;
@@ -976,6 +1078,17 @@ function renderOfferings() {
   const container = document.getElementById("shopOfferings");
   if (!container) return;
   container.innerHTML = "";
+  const currentSignature = currentOfferings
+    .map((offering) => {
+      if (!offering || !offering.good) return "null";
+      return `${offering.good.id}:${offering.rarity}`;
+    })
+    .join("|");
+  const animateReveal = !suppressNextOfferingsEnterAnimation && currentSignature !== lastRenderedOfferingsSignature;
+  lastRenderedOfferingsSignature = currentSignature;
+  suppressNextOfferingsEnterAnimation = false;
+  const stagedAnimClass = nextOfferingsAnimationClass;
+  nextOfferingsAnimationClass = "";
 
   if (!hasShopContent()) {
     const empty = document.createElement("div");
@@ -1012,6 +1125,12 @@ function renderOfferings() {
 
     card.className = cls;
     card.dataset.offeringIdx = i;
+    if (stagedAnimClass) {
+      card.classList.add(stagedAnimClass);
+    } else if (animateReveal) {
+      card.classList.add("shop-card--enter");
+      card.style.setProperty("--shop-enter-delay", `${Math.min(280, i * 40)}ms`);
+    }
 
     const typeLabel = isEquip ? "⛏" : "✧";
     const mergeLabel = isMerge ? `<div class="shop-card__merge">${t("shop.merge_label")}</div>` : "";
@@ -1132,7 +1251,9 @@ function renderRerollButton() {
     offering && offering.rarity < (offering.good.maxRarity ?? RARITY.LEGENDARY)
   );
   btn.textContent = t("shop.rarity_up_btn", { cost });
-  btn.className = "shop-reroll" + (canAfford ? "" : " shop-reroll--poor");
+  btn.className = "shop-reroll"
+    + (canAfford ? "" : " shop-reroll--poor")
+    + (rarityUpgradeUsed ? " shop-reroll--used" : "");
   btn.disabled = !canAfford || !hasUpgradeable || rarityUpgradeUsed;
 }
 
@@ -1151,8 +1272,7 @@ function bindEvents() {
     if (purchaseAnimating) return;
     // Rarity upgrade
     if (e.target.closest("#shopReroll")) {
-      doRarityUpgrade();
-      renderShop(currentGoldCache);
+      void doRarityUpgrade();
       return;
     }
 
@@ -1224,25 +1344,49 @@ function bindEvents() {
 
 }
 
-function doRarityUpgrade() {
+async function doRarityUpgrade() {
   const cost = getRarityUpgradeCost();
-  if (currentGoldCache < cost || rarityUpgradeUsed) return;
+  if (currentGoldCache < cost || rarityUpgradeUsed || purchaseAnimating) return;
 
-  let changed = false;
-  for (const offering of currentOfferings) {
-    if (!offering) continue;
-    const nextRarity = clampRarityForGood(offering.good, offering.rarity + 1);
-    if (nextRarity !== offering.rarity) {
-      offering.rarity = nextRarity;
-      changed = true;
-    }
-  }
-  if (!changed) return;
+  const upgradeable = currentOfferings
+    .map((offering, idx) => ({ offering, idx }))
+    .filter(({ offering }) => offering && offering.rarity < (offering.good.maxRarity ?? RARITY.LEGENDARY));
+  if (upgradeable.length === 0) return;
+
+  purchaseAnimating = true;
   rarityUpgradeUsed = true;
+  renderRerollButton();
+
+  const firstPhaseMs = 190;
+  const secondPhaseMs = 200;
+  for (const { idx } of upgradeable) {
+    const card = document.querySelector(`.shop-card[data-offering-idx="${idx}"]`);
+    if (!card) continue;
+    card.classList.remove("shop-card--enter");
+    card.style.removeProperty("--shop-enter-delay");
+    card.classList.remove("shop-card--rarity-bump-up");
+    void card.offsetWidth;
+    card.classList.add("shop-card--rarity-bump-up");
+  }
+
+  await wait(firstPhaseMs);
+
+  for (const { offering } of upgradeable) {
+    const nextRarity = clampRarityForGood(offering.good, offering.rarity + 1);
+    offering.rarity = nextRarity;
+  }
+  suppressNextOfferingsEnterAnimation = true;
+  nextOfferingsAnimationClass = "shop-card--rarity-settle";
+  renderOfferings();
+  renderRerollButton();
+
+  await wait(secondPhaseMs);
+  await animateGoldSpend(cost);
 
   document.dispatchEvent(new CustomEvent("shop:rarity-upgrade", {
     detail: { cost },
   }));
+  purchaseAnimating = false;
 }
 
 function doSlotMerge(slotIdxA, slotIdxB) {
