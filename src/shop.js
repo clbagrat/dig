@@ -82,6 +82,12 @@ export function openShop(currentGold, depthLevel, luck = 0, stats = null, defaul
   overlay.hidden = false;
   overlay.style.cssText =
     "position:absolute;inset:0;z-index:9998;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;";
+  const panel = overlay.querySelector(".shop-panel");
+  if (panel) {
+    panel.classList.remove("shop-panel--enter", "shop-panel--exit");
+    void panel.offsetWidth;
+    panel.classList.add("shop-panel--enter");
+  }
   renderShop(currentGold, stats);
 }
 
@@ -93,9 +99,23 @@ export function closeShop() {
   selectedSlotIdx = -1;
   replaceMode = false;
   lastRenderedOfferingsSignature = "";
-  overlay.hidden = true;
-  overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
-  onCloseCallback?.();
+  overlay.style.pointerEvents = "none";
+
+  const panel = overlay.querySelector(".shop-panel");
+  const finish = () => {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+    onCloseCallback?.();
+  };
+
+  if (panel) {
+    panel.classList.remove("shop-panel--enter");
+    void panel.offsetWidth;
+    panel.classList.add("shop-panel--exit");
+    panel.addEventListener("animationend", finish, { once: true });
+  } else {
+    finish();
+  }
 }
 
 export function renderShop(currentGold, stats = null, defaultStats = null) {
@@ -272,7 +292,11 @@ function rollOfferings(luck) {
 
     let pick = null;
     if (categoryCandidates.length > 0) {
-      pick = categoryCandidates[Math.floor(Math.random() * categoryCandidates.length)];
+      const freeSlotBonus = hasFreeSlot() ? 3 : 1;
+      const weightedCandidates = categoryCandidates.flatMap((good) =>
+        good.type === "equipment" ? Array(freeSlotBonus).fill(good) : [good]
+      );
+      pick = weightedCandidates[Math.floor(Math.random() * weightedCandidates.length)];
     } else {
       const categoryFallback = ALL_GOODS.filter((good) =>
         good.category === categoryId &&
@@ -536,6 +560,33 @@ function animateGoldSpend(cost) {
   });
 }
 
+// Collapses the purchased card out while gold animation is running (concurrent).
+function animatePurchasedCardCollapse(offeringIdx) {
+  const card = document.querySelector(`.shop-card[data-offering-idx="${offeringIdx}"]`);
+  if (!card) return Promise.resolve();
+  card.classList.remove("shop-card--fading");
+  void card.offsetWidth;
+  card.classList.add("shop-card--collapse");
+  return new Promise((resolve) => {
+    card.addEventListener("animationend", resolve, { once: true });
+    setTimeout(resolve, 200); // safety timeout
+  });
+}
+
+// Sweeps remaining (non-purchased, non-sold) offering cards upward before re-render.
+function animateOfferingsExit() {
+  const cards = document.querySelectorAll(
+    "#shopOfferings .shop-card:not(.shop-card--fading):not(.shop-card--collapse):not(.shop-card--sold)"
+  );
+  cards.forEach((card) => {
+    card.classList.remove("shop-card--enter");
+    card.style.removeProperty("--shop-enter-delay");
+    void card.offsetWidth;
+    card.classList.add("shop-card--sweep-out");
+  });
+  return wait(110);
+}
+
 async function animateEquipmentToSlot(offering, sourceRect, targetEl, fallbackPoint = null) {
   const point = fallbackPoint || getShopFallbackTarget();
   await animatePurchaseFlight(offering, sourceRect, point);
@@ -566,7 +617,10 @@ async function tryPurchase(offeringIdx) {
         await animatePurchaseFlipToElement(offering, sourceRect, itemTarget, getShopItemTargetPoint());
       }
       const canReroll = currentGoldCache >= cost;
+      const collapsePromise = canReroll ? animatePurchasedCardCollapse(offeringIdx) : null;
       if (canReroll) await animateGoldSpend(cost);
+      if (collapsePromise) await collapsePromise;
+      if (canReroll) await animateOfferingsExit();
       // Items: pick is always free; only reroll to next set costs gold
       applyPostSelectionReroll(canReroll);
       const chargedCost = canReroll ? cost : 0;
@@ -595,7 +649,10 @@ async function tryPurchase(offeringIdx) {
       const equipTarget = getShopEquipmentTargetElement(equippedParts.length);
       await animateEquipmentToSlot(offering, sourceRect, equipTarget, getShopEquipmentTargetPoint(equippedParts.length));
       const canReroll = currentGoldCache >= cost;
+      const collapsePromise = canReroll ? animatePurchasedCardCollapse(offeringIdx) : null;
       if (canReroll) await animateGoldSpend(cost);
+      if (collapsePromise) await collapsePromise;
+      if (canReroll) await animateOfferingsExit();
       // Free slot available — always place there, never auto-merge
       equippedParts.push({ id: offering.good.id, rarity: offering.rarity });
       applyPostSelectionReroll(canReroll);
@@ -631,7 +688,10 @@ async function tryPurchase(offeringIdx) {
       const mergeTarget = getShopEquipmentTargetElement(existingIdx);
       await animateEquipmentToSlot(offering, sourceRect, mergeTarget, getShopEquipmentTargetPoint(existingIdx));
       const canReroll = currentGoldCache >= cost;
+      const collapsePromise = canReroll ? animatePurchasedCardCollapse(offeringIdx) : null;
       if (canReroll) await animateGoldSpend(cost);
+      if (collapsePromise) await collapsePromise;
+      if (canReroll) await animateOfferingsExit();
       // No free slot — merge with existing same item+rarity
       const oldRarity = equippedParts[existingIdx].rarity;
       const newRarity = oldRarity + 1;
@@ -679,7 +739,10 @@ async function doReplace(slotIdx) {
     const replaceTarget = getShopEquipmentTargetElement(slotIdx);
     await animateEquipmentToSlot(offering, sourceRect, replaceTarget, getShopEquipmentTargetPoint(slotIdx));
     const canReroll = currentGoldCache >= cost;
+    const collapsePromise = canReroll ? animatePurchasedCardCollapse(purchaseIdx) : null;
     if (canReroll) await animateGoldSpend(cost);
+    if (collapsePromise) await collapsePromise;
+    if (canReroll) await animateOfferingsExit();
     applyPostSelectionReroll(canReroll);
     const chargedCost = canReroll ? cost : 0;
 

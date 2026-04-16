@@ -233,7 +233,6 @@ const WORM_DAMAGE = 50;
 const WORM_BLOCK_DAMAGE_RATIO = 0.5;
 const WORM_BODY_LENGTH = 8;
 const WORM_DUST_DURATION = 0.6;
-const CONTOUR_ENEMY_SPAWN_CHANCE_PER_TILE = 0.006;
 const CONTOUR_ENEMY_MIN_PATH_LENGTH = 4;
 const CONTOUR_ENEMY_SPEED = 2.0;
 const CONTOUR_ENEMY_TURN_DELAY = 0.38;
@@ -248,6 +247,7 @@ const CONTOUR_ENEMY_DAMAGE = 22;
 const CONTOUR_ENEMY_EXTRA_HEAT = 14;
 const CONTOUR_ENEMY_STUN_DURATION = 0.7;
 const COLLAPSE_BUDGET_INITIAL = 600;
+const CONTOUR_ENEMY_BUDGET_INITIAL = 500;
 const COLLAPSE_WARNING_DURATION = 2.4;
 const COLLAPSE_DAMAGE = 25;
 const COLLAPSE_MIN_TILES = 3;
@@ -544,7 +544,7 @@ const state = {
   menuOpen: false,
   manualModalOpen: false,
   shopModalOpen: false,
-  beaconActivationAnim: null, // { beacon, startTs, pendingAction }
+  beaconActivationAnim: null, // { beacon, startTs, pendingAction, artifactFlightCount, artifactFlightFromX, artifactFlightFromY }
   debugPerkMenuOpen: false,
   debugPerkSelection: "",
   generationEditorText: "",
@@ -2472,6 +2472,7 @@ function setupField(seedOverride = null) {
   state.collapseWarnings.length = 0;
   state.pendingCollapseCount = 0;
   state.collapseBudget = COLLAPSE_BUDGET_INITIAL;
+  state.contourEnemyBudget = CONTOUR_ENEMY_BUDGET_INITIAL;
   state.hudBarFx.hp = { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 };
   state.hudBarFx.fuel = { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 };
   state.hudBarFx.heat = { ratio: 0, ghostRatio: 0, pulse: 0, deltaDir: 0, intensity: 0 };
@@ -2811,6 +2812,16 @@ function spendCollapseBudget(amount) {
   }
 }
 
+function spendContourEnemyBudget(hardness, pathLength) {
+  if (state.contourEnemy) return;
+  if (pathLength < CONTOUR_ENEMY_MIN_PATH_LENGTH) return;
+  state.contourEnemyBudget -= hardness * (1 + 0.1 * pathLength);
+  if (state.contourEnemyBudget <= 0) {
+    state.contourEnemyBudget = CONTOUR_ENEMY_BUDGET_INITIAL;
+    spawnContourEnemy();
+  }
+}
+
 function isCollapseCandidateCell(x, y) {
   if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) {
     return false;
@@ -2932,6 +2943,10 @@ function resolveNextCollapseCell(warning) {
   const cell = warning.cells[warning.resolveIndex];
   warning.resolveIndex += 1;
   const key = `${cell.x},${cell.y}`;
+  const enemy = state.contourEnemy;
+  if (enemy && key === `${enemy.x},${enemy.y}`) {
+    hitContourEnemy(enemy.hp + 1);
+  }
   if (!warning.heroDamaged && key === `${state.drill.x},${state.drill.y}`) {
     warning.heroDamaged = true;
     applyHazardDamage(COLLAPSE_DAMAGE);
@@ -3483,7 +3498,7 @@ function collectPerkZone(zone) {
   showPerkToast(state.perkText);
 
   if (zone.perkType === 4) {
-    explodeAt(Math.round(zone.x), Math.round(zone.y), BASE_DRILL_DAMAGE, 3, { skipRadiusBonus: true });
+    explodeAt(Math.round(zone.x), Math.round(zone.y), getStrikeDamage(), 3, { skipRadiusBonus: true });
     return;
   }
 
@@ -8268,17 +8283,40 @@ function contourEnemyPickNext(enemy) {
   }
 
   if (enemy.mode === 'pathing') {
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    let best = null, bestDist = Infinity;
-    for (const [ddx, ddy] of dirs) {
-      const nx = enemy.x + ddx, ny = enemy.y + ddy;
-      if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
-      if (nx === hx && ny === hy) continue;
-      if (!state.tunnelMask[cellIndex(nx, ny)]) continue;
-      const d = Math.abs(nx - hx) + Math.abs(ny - hy);
-      if (d < bestDist) { bestDist = d; best = { x: nx, y: ny }; }
+    // BFS through tunnels toward hero
+    const startKey = `${enemy.x},${enemy.y}`;
+    const goalKey = `${hx},${hy}`;
+    const visited = new Map([[startKey, null]]);
+    const queue = [{ x: enemy.x, y: enemy.y }];
+    let found = false;
+    const dirs4 = [[1,0],[-1,0],[0,1],[0,-1]];
+    outer: for (let qi = 0; qi < queue.length; qi++) {
+      const cur = queue[qi];
+      for (const [ddx, ddy] of dirs4) {
+        const nx = cur.x + ddx, ny = cur.y + ddy;
+        if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
+        const nk = `${nx},${ny}`;
+        if (visited.has(nk)) continue;
+        if (!state.tunnelMask[cellIndex(nx, ny)] && !(nx === hx && ny === hy)) continue;
+        visited.set(nk, `${cur.x},${cur.y}`);
+        if (nx === hx && ny === hy) { found = true; break outer; }
+        queue.push({ x: nx, y: ny });
+      }
     }
-    if (best) { nextX = best.x; nextY = best.y; }
+    if (found) {
+      // Trace back to find first step from enemy
+      let cur = goalKey;
+      let prev = visited.get(cur);
+      while (prev && prev !== startKey) { cur = prev; prev = visited.get(cur); }
+      if (prev === startKey) {
+        const [sx, sy] = cur.split(',').map(Number);
+        nextX = sx; nextY = sy;
+      }
+    } else {
+      // No tunnel path to hero — destroy enemy
+      state.contourEnemy = null;
+      return;
+    }
   }
 
   if (nextX >= 0) {
@@ -8364,7 +8402,7 @@ function triggerHazardEffect(hazardType, x, y, options = {}) {
         radius: 1.25,
       });
     } else {
-      explodeAt(x, y, Math.max(1, BASE_DRILL_DAMAGE * 0.3), 1.25, { cause: "explosion", skipRadiusBonus: true });
+      explodeAt(x, y, Math.max(1, getStrikeDamage() * 0.3), 1.25, { cause: "explosion", skipRadiusBonus: true });
     }
   }
 }
@@ -8499,11 +8537,7 @@ function breakCell(x, y, index, options = {}) {
     return;
   }
   spendCollapseBudget(hardness);
-  if (!state.contourEnemy && state.pathTiles.length >= CONTOUR_ENEMY_MIN_PATH_LENGTH) {
-    const depthMult = Math.pow(2, (state.currentDepthLevel || 1) - 1);
-    const chance = (state.pathTiles.length - 1) * CONTOUR_ENEMY_SPAWN_CHANCE_PER_TILE * depthMult;
-    if (Math.random() < chance) spawnContourEnemy();
-  }
+  spendContourEnemyBudget(hardness, state.pathTiles.length);
   const hazardType = state.hazardMask[index];
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
   const baseGold = state.goldOreMask[index] ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier) : 0;
@@ -9474,7 +9508,14 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         : { type: "shop", beaconY: beacon.y };
       showPerkToast(t("toast.beacon_activated"));
       addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
-      state.beaconActivationAnim = { beacon, startTs: beacon.activationAnimStart, pendingAction };
+      state.beaconActivationAnim = {
+        beacon,
+        startTs: beacon.activationAnimStart,
+        pendingAction,
+        artifactFlightCount: artifactRemaining,
+        artifactFlightFromX: state.drill.renderX,
+        artifactFlightFromY: state.drill.renderY,
+      };
     }
   }
 
@@ -11783,6 +11824,50 @@ function renderOneBeaconRadar(camera, beacon) {
   ctx.save();
   ctx.globalAlpha = visAlpha;
 
+  // Artifact transfer flight during beacon activation.
+  const activationAnim = state.beaconActivationAnim;
+  const canRenderArtifactFlight =
+    activationAnim &&
+    activationAnim.beacon === beacon &&
+    (activationAnim.artifactFlightCount || 0) > 0 &&
+    animT < 1;
+  if (canRenderArtifactFlight) {
+    const fromX = (activationAnim.artifactFlightFromX + 0.5) * TILE_SIZE - camera.x;
+    const fromY = (activationAnim.artifactFlightFromY + 0.5) * TILE_SIZE - camera.y;
+    const flightT = clamp(animT / 0.55, 0, 1);
+    const flightEase = 1 - Math.pow(1 - flightT, 3);
+    const prevEase = 1 - Math.pow(1 - Math.max(0, flightT - 0.07), 3);
+    const lift = Math.sin(flightT * Math.PI) * 18;
+    const prevLift = Math.sin(Math.max(0, flightT - 0.07) * Math.PI) * 18;
+    const prevX = fromX + (midX - fromX) * prevEase;
+    const prevY = fromY + (midY - fromY) * prevEase - prevLift;
+    const artX = fromX + (midX - fromX) * flightEase;
+    const artY = fromY + (midY - fromY) * flightEase - lift;
+    const shimmer = 0.6 + (Math.sin((state.lastTs || 0) * 0.02) * 0.5 + 0.5) * 0.4;
+
+    ctx.strokeStyle = `rgba(212, 156, 255, ${0.35 * (0.35 + flightT * 0.65)})`;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(prevX, prevY);
+    ctx.lineTo(artX, artY);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(230, 190, 255, ${0.8 * shimmer})`;
+    ctx.beginPath();
+    ctx.moveTo(artX, artY - 7);
+    ctx.lineTo(artX + 5, artY);
+    ctx.lineTo(artX, artY + 7);
+    ctx.lineTo(artX - 5, artY);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(255, 235, 255, ${0.65 * shimmer})`;
+    ctx.beginPath();
+    ctx.arc(artX, artY, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // --- Phase 1: Ring (0% - 40%) ---
   const ringT = Math.min(1, animT / 0.4);
   const ringEase = 1 - Math.pow(1 - ringT, 3);
@@ -13358,10 +13443,12 @@ function renderHud() {
   ctx.textBaseline = "top";
   const fpsText = `FPS ${Math.round(state.fps || 0)}`;
   const collapseText = `COL ${Math.round(state.collapseBudget || 0)}`;
+  const enemyText = `ENM ${Math.round(state.contourEnemyBudget || 0)}`;
   const fpsX = state.width - 14;
   const fpsY = detailTop + 52;
   ctx.fillText(fpsText, fpsX, fpsY);
   ctx.fillText(collapseText, fpsX, fpsY + 12);
+  ctx.fillText(enemyText, fpsX, fpsY + 24);
   state.syncSoundToggleButton?.();
 
   // FPS sparkline graph
