@@ -132,11 +132,11 @@ export const ALL_EQUIPMENT = [
     type: "equipment",
     name: "Адреналин",
     icon: "💉",
-    desc: "+30% скорость бура при HP ≤ 1.",
+    desc: "+10/20/30/40% скорость бура при HP < 50.",
     category: "выживание",
     tags: ["выживание"],
-    minRarity: 2,
-    effect: { stat: "adrenalineLevel", effectByRarity: [null, null, 1, 1, 2] },
+    minRarity: 1,
+    effect: { stat: "adrenalineLevel", effectByRarity: [null, 10, 20, 30, 40] },
   },
   {
     id: "ore_injector",
@@ -537,11 +537,10 @@ export const ALL_ITEMS = [
     icon: "🪡",
     category: "basic",
     tags: ["basic"],
-    minRarity: 2,
-    maxRarity: 2,
+    minRarity: 1,
     effect: [
-      { stat: "weakSpotPierce", effectByRarity: [null, null, 1] },
-      { stat: "weakSpotMult", effectByRarity: [null, null, -0.3] },
+      { stat: "weakSpotPierce", effectByRarity: [null, 1, 1, 2, 3] },
+      { stat: "weakSpotMult", effectByRarity: [null, -0.30, -0.20, -0.20, -0.10] },
     ],
   },
   {
@@ -1188,12 +1187,11 @@ export const ALL_ITEMS = [
     desc: "+4% шанс бреши. +0.5 урон по бреши. Пробитие.",
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
-    minRarity: 2,
-    unique: true,
+    minRarity: 3,
     effect: [
-      { stat: "weakSpotChance",  effectByRarity: [null, null, 0.04, 0.07, 0.12] },
-      { stat: "weakSpotMult",    effectByRarity: [null, null, 0.5,  0.8,  1.2 ] },
-      { stat: "weakSpotPierce",  effectByRarity: [null, null, 1,    1,    1   ] },
+      { stat: "weakSpotChance",  effectByRarity: [null, null, null, 0.04, 0.07] },
+      { stat: "weakSpotMult",    effectByRarity: [null, null, null, 0.5,  0.8 ] },
+      { stat: "weakSpotPierce",  effectByRarity: [null, null, null, 1,    1   ] },
     ],
   },
   {
@@ -1408,7 +1406,7 @@ const SIMPLE_STAT_DESCRIPTORS = {
   loopSpawnBonusChance: value => t("desc.loopSpawnBonusChance", { val: formatUnsignedPercent(value, 100) }),
   crystalGoldGain: value => t("desc.crystalGoldGain", { val: formatSignedDescriptionNumber(value) }),
   crystalXpGain: value => t("desc.crystalXpGain", { val: formatSignedDescriptionNumber(value) }),
-  adrenalineLevel: value => t("desc.adrenalineLevel", { val: value * 30 }),
+  adrenalineLevel: value => t("desc.adrenalineLevel", { val: value }),
   insuranceLevel: value => t("desc.insuranceLevel", { pct: [0, 30, 50, 70, 90][Math.min(4, Math.max(0, value))] || 0 }),
   fuelConverterLevel: value => t("desc.fuelConverterLevel", { sec: 2 + value }),
   stunDetonatorLevel: value => t("desc.stunDetonatorLevel", { val: value }),
@@ -1423,7 +1421,7 @@ const SIMPLE_STAT_DESCRIPTORS = {
   levelCatalystLevel: () => t("desc.levelCatalystLevel"),
   stunReservoirLevel: value => t("desc.stunReservoirLevel", { val: formatSignedDescriptionNumber(value * 40) }),
   stunAfterburnerLevel: value => t("desc.stunAfterburnerLevel", { val: value * 2 }),
-  weakSpotPierce: () => t("desc.weakSpotPierce"),
+  weakSpotPierce: value => t("desc.weakSpotPierce", { val: formatDescriptionNumber(value) }),
 };
 
 const SPECIAL_DESCRIPTION_BUILDERS = {

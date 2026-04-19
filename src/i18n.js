@@ -571,7 +571,7 @@ const TRANSLATIONS = {
     "desc.loopSpawnBonusChance": "Closed contour has {val}% chance to spawn a bonus inside",
     "desc.crystalGoldGain": "Picking up crystal gives {val} gold",
     "desc.crystalXpGain": "Picking up crystal gives {val} XP",
-    "desc.adrenalineLevel": "At HP ≤ 1: +{val}% drill speed",
+    "desc.adrenalineLevel": "At HP < 50: +{val}% drill speed",
     "desc.insuranceLevel": "On hit: saves {pct}% of unsafe gold",
     "desc.fuelConverterLevel": "Overfilling fuel gives boost for {sec} sec",
     "desc.stunDetonatorLevel": "On stun: explosion around drill",
@@ -586,7 +586,7 @@ const TRANSLATIONS = {
     "desc.levelCatalystLevel": "Leveling up instantly completes current recipe",
     "desc.stunReservoirLevel": "On stun: {val} fuel",
     "desc.stunAfterburnerLevel": "After stun: boost activates; duration = x{val} of stun time",
-    "desc.weakSpotPierce": "Breach pierce-through",
+    "desc.weakSpotPierce": "Breach pierce-through: {val}",
 
     // ── Special item descriptions ─────────────────────────────────────────────
     "desc.special.thermo_drill": "Damage {flat} + {scale}% of drill power + {heat} per 10 heat{total}.",
@@ -1226,7 +1226,7 @@ const TRANSLATIONS = {
     "desc.loopSpawnBonusChance": "Замкнутый контур с шансом {val}% создаёт бонус внутри",
     "desc.crystalGoldGain": "Подбор кристалла даёт {val} золота",
     "desc.crystalXpGain": "Подбор кристалла даёт {val} XP",
-    "desc.adrenalineLevel": "При HP ≤ 1: +{val}% к скорости бура",
+    "desc.adrenalineLevel": "При HP < 50: +{val}% к скорости бура",
     "desc.insuranceLevel": "При уроне сохраняет {pct}% небезопасного золота",
     "desc.fuelConverterLevel": "Пополнение сверх макс. топлива даёт форсаж на {sec} сек",
     "desc.stunDetonatorLevel": "При оглушении: взрыв вокруг бура",
@@ -1241,7 +1241,7 @@ const TRANSLATIONS = {
     "desc.levelCatalystLevel": "Повышение уровня мгновенно завершает текущий рецепт",
     "desc.stunReservoirLevel": "При оглушении: {val} топлива",
     "desc.stunAfterburnerLevel": "После оглушения включается форсаж; длительность = x{val} от времени стана",
-    "desc.weakSpotPierce": "Пробитие бреши насквозь",
+    "desc.weakSpotPierce": "Пробитие бреши насквозь: {val}",
 
     // ── Special item descriptions ─────────────────────────────────────────────
     "desc.special.thermo_drill": "Урон {flat} + {scale}% от силы бура + {heat} за каждые 10 нагрева{total}.",

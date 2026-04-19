@@ -82,7 +82,7 @@ const CRYO_ROCKET_DAMAGE = 28;
 const SHARD_DRILL_BLAST_RADIUS = 1.0;
 
 const ITEM_INSPECT_STAT_META = new Proxy({
-  adrenalineLevel:           { key: "stat.adrenalineLevel",           mode: "level" },
+  adrenalineLevel:           { key: "stat.adrenalineLevel",           mode: "percent" },
   armor:                     { key: "stat.armor",                     mode: "armor" },
   artifactRadarMode:         { key: "stat.artifactRadarMode",         mode: "toggle" },
   beaconCatalystLevel:       { key: "stat.beaconCatalystLevel",       mode: "level" },
@@ -7338,8 +7338,8 @@ function getFragileDrillSpeedBonus() {
 }
 
 function getAdrenalineSpeedBonus() {
-  if (!state.adrenalineLevel || state.hp > 1) return 0;
-  return state.adrenalineLevel * 30;
+  if (!state.adrenalineLevel || state.hp >= 50) return 0;
+  return state.adrenalineLevel;
 }
 
 function getBasicDrillDamageBonus() {

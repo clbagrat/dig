@@ -3,1649 +3,1138 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Items Editor</title>
+<title>Items Preview</title>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
 :root {
-  --bg:     #0f0b09;
-  --bg2:    #1a1410;
-  --bg3:    #241c16;
-  --bg4:    #2d2018;
-  --acc:    #d79f49;
-  --acc2:   #f0c060;
-  --text:   #f1dfb6;
-  --muted:  #8a7055;
-  --border: rgba(215,159,73,0.18);
-  --danger: #c04848;
-  --r:      8px;
-  --r1: #aaa; --r2: #4488ff; --r3: #aa44ff; --r4: #ff4444;
-  /* aliases for shop.js CSS */
+  --bg: #0f0b09;
+  --bg2: #17110d;
+  --bg3: #241910;
+  --bg4: #2f1f13;
+  --text: #f2dfb7;
+  --muted: #967557;
+  --acc: #d79f49;
+  --acc2: #f0c060;
   --accent: #d79f49;
-  --accent-strong: #8f4d1d;
-  --panel-border: rgba(215,159,73,0.28);
-  --shadow: rgba(0,0,0,0.34);
+  --border: rgba(215,159,73,0.2);
+  --r1: #aaa;
+  --r2: #4488ff;
+  --r3: #aa44ff;
+  --r4: #ff4444;
 }
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; -webkit-tap-highlight-color: transparent; }
-
-/* ── Header ── */
-.hdr {
-  position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px;
-  background: var(--bg2); border-bottom: 1px solid var(--border);
+html, body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(circle at 20% -10%, #2a1c11 0%, var(--bg) 48%);
+  color: var(--text);
+  font: 14px/1.4 "Trebuchet MS", "Segoe UI", sans-serif;
 }
-.hdr-title { flex: 1; font-size: 15px; font-weight: 700; color: var(--acc); }
-.unsaved { font-size: 11px; color: var(--acc); opacity: .7; }
-.hdr-btn { padding: 7px 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 12px; cursor: pointer; white-space: nowrap; }
-.hdr-btn.primary { border-color: var(--acc); color: var(--acc); }
-
-/* ── Tabs ── */
-.tabs-wrap { background: var(--bg2); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
-.tabs-wrap::-webkit-scrollbar { display: none; }
-.tabs { display: flex; gap: 2px; padding: 6px 8px; min-width: max-content; }
-.tab {
-  padding: 7px 13px; border-radius: 20px; font-size: 13px; font-weight: 600;
-  cursor: pointer; white-space: nowrap; border: 1.5px solid transparent;
-  color: var(--muted); transition: all .15s;
-}
-.tab.active { background: var(--bg4); border-color: var(--acc); color: var(--acc); }
-
-/* ── Filters ── */
-.filters {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: 8px 12px; background: var(--bg2); border-bottom: 1px solid var(--border);
-}
-.filter-input {
-  flex: 1; min-width: 140px;
-  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
-  border-radius: 6px; padding: 6px 10px; font-size: 13px;
-}
-.filter-input:focus { outline: none; border-color: var(--acc); }
-.filter-select {
-  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
-  border-radius: 6px; padding: 6px 8px; font-size: 12px; -webkit-appearance: none;
-}
-.filter-select:focus { outline: none; border-color: var(--acc); }
-.items-count { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
-
-/* ── Item list ── */
-.items-list { padding: 10px 10px 120px; display: flex; flex-direction: column; gap: 6px; }
-.item-card {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px; border-radius: var(--r);
-  background: var(--bg3); border: 1.5px solid var(--border);
-  cursor: pointer; transition: all .15s; user-select: none;
-}
-.item-card:active, .item-card.sel { background: var(--bg4); border-color: var(--acc); }
-.item-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
-.item-info { flex: 1; min-width: 0; }
-.item-name { font-weight: 700; font-size: 14px; }
-.item-desc { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
-.item-rarity { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.06); }
-.item-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(215,159,73,0.1); color: var(--acc); }
-.btn-add-item {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 13px; border-radius: var(--r);
-  border: 1.5px dashed var(--border); background: none;
-  color: var(--muted); font-size: 13px; cursor: pointer;
-  width: 100%; transition: all .15s;
-}
-.btn-add-item:active { color: var(--acc); border-color: var(--acc); }
-
-/* ── Bottom sheet ── */
-.sheet-overlay {
-  position: fixed; inset: 0; z-index: 100;
-  background: rgba(0,0,0,.55);
-  opacity: 0; pointer-events: none; transition: opacity .2s;
-}
-.sheet-overlay.open { opacity: 1; pointer-events: auto; }
-.sheet {
-  position: fixed; inset: 0; z-index: 101;
-  background: var(--bg2); border-top: 1px solid var(--border);
-  transform: translateY(100%); transition: transform .25s cubic-bezier(.32,0,.67,0);
-  display: flex; flex-direction: column;
-}
-.sheet.open { transform: translateY(0); transition: transform .25s cubic-bezier(.33,1,.68,1); }
-.sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 2px; flex-shrink: 0; display: none; }
-.sheet-head { display: flex; align-items: center; gap: 8px; padding: 6px 14px 10px; flex-shrink: 0; }
-.sheet-head-title { flex: 1; font-weight: 700; font-size: 15px; }
-.sheet-close { width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg3); color: var(--muted); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.sheet-del { padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(192,72,72,.35); background: none; color: var(--danger); font-size: 12px; cursor: pointer; }
-.sheet-body { flex: 1; overflow-y: auto; padding: 0 14px 24px; display: flex; flex-direction: column; gap: 12px; }
-
-/* ── Form fields ── */
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field label { font-size: 12px; color: var(--muted); font-weight: 600; }
-.field input, .field textarea, .field select {
-  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
-  border-radius: 6px; padding: 9px 11px; font-size: 14px; font-family: inherit;
-  width: 100%; transition: border-color .15s; -webkit-appearance: none;
-}
-.field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--acc); }
-.field textarea { min-height: 60px; resize: vertical; }
-.field input.icon-f { font-size: 20px; text-align: center; max-width: 70px; }
-.field-row { display: flex; gap: 8px; }
-.field-row .field { flex: 1; }
-.preview-card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg3);
-  padding: 10px 12px;
+.app {
+  min-height: 100%;
   display: flex;
   flex-direction: column;
+}
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(18, 12, 8, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+}
+.hdr__title { font-size: 16px; font-weight: 700; color: var(--acc2); }
+.hdr__sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.controls {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr auto auto;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(22, 14, 10, 0.9);
+}
+.search, .select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg3);
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+}
+.search:focus, .select:focus { outline: none; border-color: var(--acc); }
+.rarity-switch {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.rarity-btn {
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rarity-btn.active { color: var(--acc2); border-color: var(--acc); background: var(--bg4); }
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+  flex: 1;
+}
+.sidebar, .panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(36,25,16,0.95), rgba(24,16,11,0.95));
+  min-height: 0;
+}
+.item-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+}
+.item-row {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  color: inherit;
+  text-align: left;
+  padding: 8px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 24px minmax(0,1fr);
   gap: 8px;
 }
-.preview-card__head {
+.item-row:hover { background: rgba(255,255,255,0.03); }
+.item-row.active { border-color: var(--acc); background: rgba(215,159,73,0.08); }
+.item-row__icon { font-size: 18px; line-height: 1; text-align: center; }
+.item-row__name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-row__meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-row__meta .uniq {
+  margin-left: 6px;
+  color: var(--acc2);
+  font-weight: 700;
+}
+.panel {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0,1fr);
+  gap: 12px;
+}
+.preview-stack { display: flex; flex-direction: column; gap: 10px; }
+.block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(20,13,8,0.88);
+  padding: 10px;
+}
+.block__title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.block .rarity-switch { margin-bottom: 8px; }
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 240px;
+  padding: 14px 12px 12px;
+  border: 1.5px solid rgba(215, 159, 73, 0.18);
+  border-radius: 14px;
+  background: rgba(22, 11, 5, 0.7);
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s, transform 0.1s, opacity 0.2s ease;
+  position: relative;
+}
+.shop-card--rarity-1 { border-color: rgba(170, 170, 170, 0.35); }
+.shop-card--rarity-2 { border-color: rgba(68, 136, 255, 0.55); }
+.shop-card--rarity-3 { border-color: rgba(170, 68, 255, 0.55); }
+.shop-card--rarity-4 { border-color: rgba(255, 68, 68, 0.65); }
+.shop-card__type {
+  font-size: 11px;
+  opacity: 0.6;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+}
+.shop-card__icon {
+  font-size: 28px;
+  line-height: 1;
+  height: 30px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
 }
-.preview-card__icon {
-  width: 28px;
-  text-align: center;
-  font-size: 20px;
-  line-height: 1;
-}
-.preview-card__name {
-  font-size: 14px;
+.shop-card__name {
+  font-size: 16px;
   font-weight: 700;
   color: var(--text);
-}
-.preview-card__meta {
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  min-height: 36px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  justify-content: flex-start;
 }
-.preview-card__desc {
+.shop-card__category {
+  font-size: 11px;
+  color: var(--text-dim, #888);
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+.shop-card__desc {
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.35;
+  min-height: 66px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+.shop-card__cost {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.chip {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+}
+.desc {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
   white-space: pre-line;
+  color: #e9d6ad;
 }
-.preview-card__hint {
-  font-size: 11px;
+.hint { margin-top: 8px; font-size: 11px; color: var(--muted); }
+.scale-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.scale-table th, .scale-table td {
+  padding: 6px 7px;
+  border-bottom: 1px solid rgba(215,159,73,0.12);
+  text-align: center;
+}
+.scale-table th:first-child, .scale-table td:first-child { text-align: left; }
+.scale-table tr.active td { background: rgba(215,159,73,0.09); }
+.legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.legend span { padding: 2px 6px; border: 1px solid var(--border); border-radius: 999px; }
+.empty { color: var(--muted); font-size: 12px; }
+.r1 { color: var(--r1); }
+.r2 { color: var(--r2); }
+.r3 { color: var(--r3); }
+.r4 { color: var(--r4); }
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+.tab-btn {
+  border: 1px solid var(--border);
+  background: var(--bg3);
   color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  cursor: pointer;
 }
-.tags-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.tag-chip { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 12px; background: rgba(215,159,73,0.12); border: 1px solid rgba(215,159,73,0.3); color: var(--acc); font-size: 12px; }
-.tag-chip button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
-.tag-chip button:hover { color: var(--danger); }
-.tag-add-row { display: flex; gap: 6px; }
-.tag-add-row input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
-.tag-add-row input:focus { outline: none; border-color: var(--acc); }
-.tag-add-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg4); color: var(--acc); font-size: 13px; cursor: pointer; white-space: nowrap; }
-.sep { height: 1px; background: var(--border); }
-
-/* ── Rarity colors ── */
-.r1 { color: var(--r1); } .r2 { color: var(--r2); } .r3 { color: var(--r3); } .r4 { color: var(--r4); }
-
-/* ── Todo cards ── */
-.todo-section { padding: 10px 10px 4px; }
-.todo-section-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 0 4px 6px; }
-.todo-card {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 10px 14px; border-radius: var(--r);
-  background: var(--bg3); border: 1.5px solid var(--border);
-  margin-bottom: 6px; cursor: pointer; transition: all .15s; user-select: none;
+.tab-btn.active {
+  color: var(--acc2);
+  border-color: var(--acc);
+  background: var(--bg4);
 }
-.todo-card:active, .todo-card.sel { background: var(--bg4); border-color: var(--acc); }
-.todo-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; padding-top: 1px; }
-.todo-info { flex: 1; min-width: 0; }
-.todo-name { font-weight: 700; font-size: 14px; }
-.todo-concept { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
-.todo-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
-.todo-stat { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(68,136,255,0.12); color: #4488ff; }
-.todo-cat  { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(215,159,73,0.1); color: var(--acc); }
-.todo-diff { font-size: 10px; padding: 1px 7px; border-radius: 8px; font-weight: 700; }
-.todo-progress { font-size: 11px; color: var(--muted); white-space: nowrap; margin-top: 2px; }
-.todo-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 4px; }
-.todo-header-stat { font-size: 12px; color: var(--muted); }
-.todo-header-stat b { color: var(--acc); }
-
-/* ── Category panel ── */
-.cat-panel { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-.cat-panel[hidden] { display: none !important; }
-.cat-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.cat-chip { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 8px; background: var(--bg3); border: 1px solid var(--border); font-size: 12px; }
-.cat-chip button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
-.cat-chip button:hover { color: var(--danger); }
-.cat-add-row { display: flex; gap: 6px; }
-.cat-add-row input { background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
-.cat-add-row input:focus { outline: none; border-color: var(--acc); }
-.cat-add-row .icon-in { width: 48px; text-align: center; }
-.cat-add-row .name-in { flex: 1; }
-.btn-cat-add { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg4); color: var(--acc); font-size: 13px; cursor: pointer; white-space: nowrap; }
-.btn-cat-toggle { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }
-.btn-cat-toggle.active { border-color: var(--acc); color: var(--acc); }
-
-/* ── Stat guide ── */
-.guide-panel { background: var(--bg2); border-bottom: 1px solid var(--border); }
-.guide-panel summary {
-  list-style: none; cursor: pointer; padding: 10px 12px; color: var(--muted);
-  font-size: 12px; font-weight: 700; user-select: none;
+.stats-wrap {
+  padding: 12px;
 }
-.guide-panel summary::-webkit-details-marker { display: none; }
-.guide-panel[open] summary { color: var(--acc); }
-.guide-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px; padding: 0 12px 12px;
+.stats-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(36,25,16,0.95), rgba(24,16,11,0.95));
+  padding: 10px;
 }
-.guide-group-title {
-  grid-column: 1 / -1;
-  font-size: 11px; font-weight: 700; color: var(--acc);
-  text-transform: uppercase; letter-spacing: .06em;
-  padding: 8px 2px 2px; border-bottom: 1px solid var(--border);
-}
-.guide-card {
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
-  padding: 8px 10px;
-}
-.guide-stat { font-size: 12px; font-weight: 700; color: var(--acc2); }
-.guide-name { font-size: 12px; color: var(--text); margin-top: 2px; }
-.guide-desc { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
-.guide-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-.guide-count {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 10px; padding: 2px 7px; border-radius: 999px;
-  border: 1px solid var(--border); background: rgba(255,255,255,0.04);
-}
-.guide-count.pos { color: #7edc8a; border-color: rgba(126,220,138,0.25); background: rgba(126,220,138,0.08); }
-.guide-count.neg { color: #ff8e7d; border-color: rgba(255,142,125,0.25); background: rgba(255,142,125,0.08); }
-.guide-dots { display: inline-flex; align-items: center; gap: 3px; min-height: 10px; }
-.guide-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.9; }
-
-/* ── Todo stat editor ── */
-.todo-stat-group-title {
-  grid-column: 1 / -1;
-  font-size: 11px; font-weight: 700; color: var(--acc);
-  text-transform: uppercase; letter-spacing: .06em;
-  padding: 8px 2px 2px; border-bottom: 1px solid var(--border);
-}
-.todo-stat-summary { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
-.todo-stat-chip {
-  font-size: 10px; padding: 2px 7px; border-radius: 999px;
-  border: 1px solid var(--border); background: rgba(255,255,255,0.04);
-}
-.todo-stat-chip.pos { color: #7edc8a; border-color: rgba(126,220,138,0.25); background: rgba(126,220,138,0.08); }
-.todo-stat-chip.neg { color: #ff8e7d; border-color: rgba(255,142,125,0.25); background: rgba(255,142,125,0.08); }
-.todo-stat-list {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.stats-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 8px;
 }
-.todo-stat-row {
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(20,13,8,0.88);
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
 }
-.todo-stat-title { font-size: 12px; font-weight: 700; color: var(--acc2); }
-.todo-stat-key { font-size: 12px; color: var(--text); margin-top: 2px; }
-.todo-stat-desc { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
-.todo-stat-controls { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 8px; }
-.todo-stat-btn, .todo-stat-value {
-  min-width: 34px; height: 30px; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--bg4); color: var(--text); font-size: 14px;
+.stat-card:hover { border-color: var(--acc); background: rgba(215,159,73,0.07); }
+.stat-card--static { cursor: default; }
+.stat-card--static:hover { border-color: var(--border); background: rgba(20,13,8,0.88); }
+.stat-card__name { font-size: 13px; font-weight: 700; color: var(--text); }
+.stat-card__id { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.stat-card__desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.35; min-height: 32px; }
+.stat-card__counts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.count-chip {
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px;
 }
-.todo-stat-btn { cursor: pointer; }
-.todo-stat-btn:hover { border-color: var(--acc); color: var(--acc); }
-.todo-stat-value {
-  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
-}
-.todo-stat-value.pos { color: #7edc8a; }
-.todo-stat-value.neg { color: #ff8e7d; }
-.todo-stat-dots { display: inline-flex; align-items: center; gap: 3px; min-height: 10px; }
-.todo-stat-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.9; }
-
-/* ══════════════════════════════════════════════
-   Shop CSS (extracted from styles.css)
-   ══════════════════════════════════════════════ */
-#shopModal { position: fixed !important; }
-.shop-modal {
-  position: fixed; inset: 0; z-index: 9998;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(6,3,1,.75); backdrop-filter: blur(6px);
-  padding: 40px 24px;
-}
-.shop-modal[hidden] { display: none; }
-.shop-stack { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
-.shop-panel { width: 100%; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(215,159,73,.2); border-radius: 18px; background: rgba(14,7,3,.97); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
-.shop-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid rgba(215,159,73,.14); background: rgba(20,10,5,.8); flex-shrink: 0; }
-.shop-head__title { flex: 1; font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.shop-head__gold { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid rgba(215,159,73,.25); border-radius: 8px; background: rgba(30,14,4,.6); font-size: 13px; font-weight: 700; color: var(--accent); }
-.shop-head__gold-icon { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #d79f49; border: 1.5px solid #f0c060; vertical-align: middle; margin-bottom: 1px; }
-.shop-reroll { padding: 5px 10px; border: 1px solid rgba(215,159,73,.3); border-radius: 8px; background: rgba(30,14,4,.5); color: var(--accent); font: inherit; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: transform .1s, opacity .1s; }
-.shop-reroll:active { transform: scale(.95); }
-.shop-reroll--poor { color: var(--muted); opacity: .45; border-color: rgba(215,159,73,.15); }
-.shop-close { width: 28px; height: 28px; border: 1px solid rgba(215,159,73,.2); border-radius: 8px; background: rgba(30,14,4,.5); color: var(--muted); font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.shop-close:active { transform: scale(.93); }
-.shop-stats { display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 0 2px; flex-shrink: 0; }
-.shop-stats[hidden] { display: none; }
-.shop-stats__item { display: inline-flex; align-items: baseline; gap: 4px; padding: 3px 6px; border: 1px solid rgba(215,159,73,.16); border-radius: 999px; background: rgba(20,10,5,.72); }
-.shop-stats__label { font-size: 8px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
-.shop-stats__value { font-size: 10px; font-weight: 700; color: var(--accent); }
-.stat-tooltip { position: fixed; z-index: 9999; padding: 4px 8px; background: rgba(20,10,5,.92); border: 1px solid rgba(215,159,73,.35); border-radius: 6px; font-size: 10px; color: var(--accent); white-space: nowrap; pointer-events: none; }
-.stat-tooltip[hidden] { display: none; }
-.shop-offerings { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 14px 12px; flex-shrink: 0; overflow-y: auto; }
-.shop-empty { grid-column: 1/-1; padding: 16px 14px; border: 1px solid rgba(215,159,73,.18); border-radius: 12px; background: rgba(22,11,5,.7); text-align: center; }
-.shop-empty__title { font-size: 13px; font-weight: 700; color: var(--text); }
-.shop-empty__text { margin-top: 6px; font-size: 11px; line-height: 1.4; color: var(--muted); }
-.shop-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px 8px; border: 1.5px solid rgba(215,159,73,.18); border-radius: 12px; background: rgba(22,11,5,.7); cursor: pointer; text-align: center; transition: border-color .12s, background .12s, transform .1s; position: relative; }
-.shop-card:active { transform: scale(.95); }
-.shop-card--sold { opacity: .25; cursor: default; pointer-events: none; }
-.shop-card__sold { font-size: 10px; color: var(--muted); padding: 18px 0; }
-.shop-card--rarity-1 { border-color: rgba(170,170,170,.35); }
-.shop-card--rarity-2 { border-color: rgba(68,136,255,.55); }
-.shop-card--rarity-3 { border-color: rgba(170,68,255,.55); }
-.shop-card--rarity-4 { border-color: rgba(255,68,68,.65); }
-.shop-card--selected { box-shadow: 0 0 0 2px rgba(215,159,73,.3), 0 0 14px rgba(215,159,73,.12); }
-.shop-card--selected.shop-card--rarity-2 { box-shadow: 0 0 0 2px rgba(68,136,255,.3), 0 0 14px rgba(68,136,255,.12); }
-.shop-card--selected.shop-card--rarity-3 { box-shadow: 0 0 0 2px rgba(170,68,255,.3), 0 0 14px rgba(170,68,255,.12); }
-.shop-card--selected.shop-card--rarity-4 { box-shadow: 0 0 0 2px rgba(255,68,68,.3), 0 0 14px rgba(255,68,68,.12); }
-.shop-card--merge { background: rgba(68,136,255,.08); }
-.shop-card--poor { opacity: .5; }
-.shop-card--locked { outline: 1px dashed rgba(215,159,73,.5); }
-.shop-card__type { font-size: 10px; opacity: .5; position: absolute; top: 4px; right: 6px; }
-.shop-card__icon { font-size: 20px; line-height: 1; height: 24px; display: flex; align-items: center; justify-content: center; }
-.shop-card__name { font-size: 9px; font-weight: 700; color: var(--text); letter-spacing: .02em; line-height: 1.2; min-height: 20px; display: flex; align-items: center; justify-content: center; }
-.shop-card__category { font-size: 7px; color: #888; letter-spacing: .03em; opacity: .75; }
-.shop-card__merge { font-size: 8px; font-weight: 700; color: #4488ff; letter-spacing: .03em; }
-.shop-card__cost { font-size: 10px; font-weight: 700; color: var(--accent); white-space: nowrap; }
-.shop-card__cost--poor { color: var(--muted); opacity: .55; }
-.shop-detail { flex-shrink: 0; border-top: 1px solid rgba(215,159,73,.18); background: rgba(18,9,4,.95); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-.shop-detail[hidden] { display: none; }
-.shop-detail__row { display: flex; align-items: flex-start; gap: 12px; }
-.shop-detail__icon { font-size: 28px; line-height: 1; width: 36px; text-align: center; flex-shrink: 0; padding-top: 2px; }
-.shop-detail__info { flex: 1; min-width: 0; }
-.shop-detail__name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.shop-detail__desc { font-size: 12px; color: var(--muted); line-height: 1.5; white-space: pre-line; }
-.shop-detail__tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-.shop-tag { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: rgba(215,159,73,.1); border: 1px solid rgba(215,159,73,.2); color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
-.shop-detail__footer { display: flex; flex-direction: column; gap: 8px; }
-.shop-detail__actions { display: flex; gap: 8px; }
-.shop-detail__rarity { flex: 1; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
-.shop-detail__buy { flex: 1; padding: 8px 16px; border-radius: 10px; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: transform .1s, opacity .1s; }
-.shop-detail__buy--ok { background: rgba(215,159,73,.18); border-color: rgba(215,159,73,.5); color: var(--accent); }
-.shop-detail__buy--ok:active { transform: scale(.96); }
-.shop-detail__buy--merge { background: rgba(68,136,255,.15); border-color: rgba(68,136,255,.5); color: #4488ff; }
-.shop-detail__buy--merge:active { transform: scale(.96); }
-.shop-detail__buy--replace { background: rgba(255,170,68,.12); border-color: rgba(255,170,68,.35); color: #ffaa44; }
-.shop-detail__buy--poor { background: transparent; border-color: rgba(215,159,73,.2); color: var(--muted); opacity: .5; }
-.shop-detail__sell { flex-shrink: 0; padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(255,100,100,.35); background: rgba(255,100,100,.1); color: #ff8888; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.shop-detail__sell:active { transform: scale(.96); }
-.shop-detail__lock { flex-shrink: 0; padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(215,159,73,.3); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }
-.shop-detail__lock--active { border-color: rgba(215,159,73,.6); color: var(--accent); background: rgba(215,159,73,.1); }
-.shop-detail__lock:active { transform: scale(.96); }
-.shop-slots { display: flex; gap: 6px; padding: 10px 14px 14px; border-top: 1px solid rgba(215,159,73,.12); flex-shrink: 0; }
-.shop-slot { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid rgba(215,159,73,.15); background: rgba(22,11,5,.5); display: flex; align-items: center; justify-content: center; position: relative; transition: border-color .12s, box-shadow .12s; cursor: pointer; }
-.shop-slot--empty { opacity: .35; }
-.shop-slot__empty { font-size: 16px; color: var(--muted); opacity: .4; }
-.shop-slot--filled { background: rgba(30,15,6,.8); }
-.shop-slot--rarity-1 { border-color: rgba(170,170,170,.35); }
-.shop-slot--rarity-2 { border-color: rgba(68,136,255,.5); }
-.shop-slot--rarity-3 { border-color: rgba(170,68,255,.5); }
-.shop-slot--rarity-4 { border-color: rgba(255,68,68,.6); }
-.shop-slot--replaceable { animation: slot-pulse .8s ease-in-out infinite; }
-.shop-slot--selected { outline: 2px solid rgba(68,170,255,.8); }
-.shop-slot--merge-target { animation: slot-merge-pulse .8s ease-in-out infinite; }
-.shop-slot__icon { font-size: 18px; line-height: 1; }
-.shop-slot__rarity { position: absolute; bottom: -2px; right: -2px; font-size: 8px; line-height: 1; }
-@keyframes slot-merge-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(68,255,170,0)} 50%{box-shadow:0 0 0 3px rgba(68,255,170,.5)} }
-@keyframes slot-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,170,68,0)} 50%{box-shadow:0 0 0 3px rgba(255,170,68,.3)} }
-
-/* ── Simulator ── */
-#sim-panel { padding: 16px 12px; display: flex; flex-direction: column; gap: 12px; }
-.sim-status {
-  display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px;
-  padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
-}
-.sim-status b { color: var(--acc2); }
-.sim-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.sim-row label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
-.sim-row input[type=number] {
-  width: 80px; background: var(--bg3); border: 1px solid var(--border);
-  color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px;
-}
-.sim-row input[type=number]:focus { outline: none; border-color: var(--acc); }
-.sim-btn {
-  padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--bg3); color: var(--text); font-size: 13px; cursor: pointer; white-space: nowrap;
-}
-.sim-btn:active { opacity: .75; }
-.sim-btn--primary { border-color: var(--acc); color: var(--acc); font-weight: 700; }
-.sim-btn--danger  { border-color: var(--danger); color: var(--danger); background: none; }
-.sim-artifact-panel {
-  padding: 12px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.sim-artifact-title { font-size: 12px; color: var(--muted); font-weight: 600; }
-.sim-artifact-choices { display: flex; gap: 8px; flex-wrap: wrap; }
-.sim-artifact-choice {
-  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--bg4); color: var(--text); font-size: 13px; cursor: pointer;
-  display: flex; align-items: center; gap: 6px;
-}
-.sim-artifact-choice:active { border-color: var(--acc); color: var(--acc); }
-
-/* ── Toast ── */
-#toast {
-  position: fixed; bottom: 24px; left: 50%; z-index: 200;
-  transform: translateX(-50%) translateY(8px);
-  background: var(--bg4); border: 1px solid var(--acc); color: var(--acc);
-  padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 600;
-  opacity: 0; pointer-events: none; transition: all .2s;
-}
-#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* ── Desktop ── */
-@media (min-width: 700px) {
-  .sheet-head { padding-top: 12px; }
+.count-chip.pos { color: #7edc8a; border-color: rgba(126,220,138,0.35); background: rgba(126,220,138,0.08); }
+.count-chip.neg { color: #ff8e7d; border-color: rgba(255,142,125,0.35); background: rgba(255,142,125,0.08); }
+@media (max-width: 980px) {
+  .controls { grid-template-columns: 1fr; }
+  .rarity-switch { justify-content: flex-start; }
+  .layout { grid-template-columns: 1fr; }
+  .item-list { max-height: 260px; }
+  .panel { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
+<div class="app">
+  <header class="hdr">
+    <div id="ui-title" class="hdr__title">⛏ Item Card Preview</div>
+    <div id="ui-sub" class="hdr__sub">Preview-only mode. Final descriptions use all stats = 10.</div>
+  </header>
+  <section class="tabs">
+    <button id="tab-cards" class="tab-btn active" type="button">Cards</button>
+    <button id="tab-stats" class="tab-btn" type="button">Stats</button>
+  </section>
 
-<div class="hdr">
-  <span class="hdr-title">⛏ Items Editor</span>
-  <span class="unsaved" id="unsaved" hidden>●</span>
-  <button class="hdr-btn" id="btn-copy">📋 Копировать</button>
-  <button class="hdr-btn primary" id="btn-save">💾 Сохранить</button>
+  <section class="controls">
+    <input id="search" class="search" placeholder="">
+    <select id="filter" class="select">
+    </select>
+    <select id="artifact-type" class="select"></select>
+    <select id="stat-filter" class="select"></select>
+    <select id="lang" class="select" style="max-width:96px">
+      <option value="en">EN</option>
+      <option value="ru">RU</option>
+    </select>
+    <button id="reset-filters" class="tab-btn" type="button">Reset</button>
+  </section>
+
+  <main id="cards-layout" class="layout">
+    <aside class="sidebar">
+      <ul id="item-list" class="item-list"></ul>
+    </aside>
+    <section class="panel">
+      <div class="preview-stack">
+        <div class="block">
+          <div id="ui-block-shop" class="block__title">Shop Card</div>
+          <div id="rarity-switch" class="rarity-switch"></div>
+          <div id="shop-card"></div>
+        </div>
+        <div class="block">
+          <div id="ui-block-deps" class="block__title">Scaling Dependencies</div>
+          <div id="dependencies" class="legend"></div>
+        </div>
+      </div>
+      <div class="preview-stack">
+        <div class="block">
+          <div id="ui-block-scale" class="block__title">Rarity Scaling</div>
+          <div id="scale"></div>
+        </div>
+        <div class="block">
+          <div id="ui-block-affected" class="block__title">Affected Stats</div>
+          <div id="item-stats" class="stats-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <section id="stats-layout" class="stats-wrap" hidden>
+    <div class="stats-panel">
+      <div id="stats-list" class="stats-list"></div>
+    </div>
+  </section>
 </div>
-
-<div class="tabs-wrap">
-  <div class="tabs" id="tabs">
-    <div class="tab active" data-tab="equipment">⛏ Части корпуса</div>
-    <div class="tab" data-tab="items">✧ Предметы</div>
-    <div class="tab" data-tab="todo">📋 Роадмап</div>
-    <div class="tab" data-tab="simulator">🏪 Симулятор</div>
-  </div>
-</div>
-
-<div class="filters">
-  <input class="filter-input" id="search" placeholder="Поиск...">
-  <select class="filter-select" id="filter-cat">
-    <option value="">Все категории</option>
-  </select>
-  <button class="btn-cat-toggle" id="btn-cat-toggle">⚙</button>
-  <select class="filter-select" id="filter-rarity">
-    <option value="">Все редкости</option>
-    <option value="1">Обычный</option>
-    <option value="2">Необычный</option>
-    <option value="3">Редкий</option>
-    <option value="4">Легендарный</option>
-  </select>
-  <span class="items-count" id="items-count"></span>
-</div>
-<div class="cat-panel" id="cat-panel" hidden>
-  <div class="cat-list" id="cat-list"></div>
-  <div class="cat-add-row">
-    <input class="icon-in" id="cat-icon" placeholder="🔧" maxlength="4">
-    <input class="name-in" id="cat-name" placeholder="Название категории">
-    <button class="btn-cat-add" id="btn-cat-add">Добавить</button>
-  </div>
-</div>
-<details class="guide-panel" id="stat-guide">
-  <summary>Памятка статов</summary>
-  <div class="guide-grid" id="guide-grid"></div>
-</details>
-
-<div id="items-list" class="items-list"></div>
-
-<div id="sim-panel" hidden>
-  <div class="sim-status">
-    <span>Магазин <b id="sim-level-disp">0</b></span>
-    <span>🪙 <b id="sim-gold-disp">0</b></span>
-    <span>★ Удача <b id="sim-luck-disp">0</b></span>
-    <span>↓ Глубина <b id="sim-depth-disp">1</b></span>
-  </div>
-  <div class="sim-row">
-    <span style="font-size:12px;color:var(--muted)">🪙</span>
-    <button class="sim-btn" data-gold="5">+5</button>
-    <button class="sim-btn" data-gold="10">+10</button>
-    <button class="sim-btn" data-gold="20">+20</button>
-    <button class="sim-btn" data-gold="50">+50</button>
-  </div>
-  <div class="sim-row">
-    <button class="sim-btn" id="btn-sim-add-luck">+1 удача</button>
-    <button class="sim-btn" id="btn-sim-add-depth">+1 глубина</button>
-    <button class="sim-btn" id="btn-sim-artifact">Артефакт</button>
-    <button class="sim-btn sim-btn--primary" id="btn-sim-open">Открыть магазин (ур. <span id="sim-next-level">1</span>)</button>
-  </div>
-  <button class="sim-btn sim-btn--danger" id="btn-sim-reset">Сбросить симулятор</button>
-  <div id="sim-artifact-panel" class="sim-artifact-panel" hidden>
-    <div class="sim-artifact-title">Выбери категорию для разблокировки (+1 слот корпуса):</div>
-    <div id="sim-artifact-choices" class="sim-artifact-choices"></div>
-  </div>
-</div>
-
-<div class="sheet-overlay" id="overlay"></div>
-<div class="sheet" id="sheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-head">
-    <span class="sheet-head-title" id="sheet-title">Предмет</span>
-    <button class="sheet-del" id="sheet-del">Удалить</button>
-    <button class="sheet-close" id="sheet-close">✕</button>
-  </div>
-  <div class="sheet-body" id="sheet-body"></div>
-</div>
-
-<div id="toast"></div>
-<div id="shopModal" class="shop-modal" hidden></div>
 
 <script type="module">
 const {
   ALL_EQUIPMENT,
   ALL_ITEMS,
   CATEGORIES,
-  RARITY_EFFECT_MULT,
+  RARITY_NAMES,
   getGoodDescription,
 } = await import(`./src/items-catalog.js?t=${Date.now()}`);
-const { TODO_ITEMS } = await import(`./src/items-todo.js?t=${Date.now()}`);
-const {
-  initShop, openShop, renderShop: renderShopUI, resetShopState,
-  unlockCategory, addSlot, getLockedCategories,
-} = await import(`./src/shop.js?t=${Date.now()}`);
+const { t, setLocale, getLocale } = await import(`./src/i18n.js?t=${Date.now()}`);
 
-// ── State ──────────────────────────────────────────────────────────────────
-const S = {
-  equipment: JSON.parse(JSON.stringify(ALL_EQUIPMENT)),
-  items:     JSON.parse(JSON.stringify(ALL_ITEMS)),
-  todo:      JSON.parse(JSON.stringify(TODO_ITEMS)),
-  categories: JSON.parse(JSON.stringify(CATEGORIES)),
-  tab:       'equipment',  // 'equipment' | 'items' | 'todo'
-  selId:     null,
-  dirty:     false,
-  previewRarity: 1,
+const RARITY_CLASS = { 1: 'r1', 2: 'r2', 3: 'r3', 4: 'r4' };
+const RARITIES = [1, 2, 3, 4];
+const LOWER_IS_BETTER_STATS = new Set([
+  'fuelDrainRate',
+  'heatRate',
+  'idleAutoCloseDelay',
+]);
+const PERCENT_STATS = new Set([
+  'strikeSpeed',
+  'damageBonus',
+  'weakSpotChance',
+  'weakSpotMult',
+  'goldBonus',
+  'miningGoldBonusMultiplier',
+  'xpBonus',
+  'fuelBonus',
+  'bonusFindChance',
+  'speedOfAutoClose',
+  'heatRate',
+  'fuelDrainRate',
+  'loopLengthDamageBonus',
+  'loopSpawnBonusChance',
+  'lowFuelSpeedBonus',
+  'lowFuelDamageBonus',
+  'effectDurationRate',
+  'concentration',
+  'contourResMultiplier',
+  'strikeSpeedPerLevel',
+  'goldBonusPerLevel',
+  'explosionBonus',
+]);
+const UI_TEXT = {
+  en: {
+    title: '⛏ Item Card Preview',
+    sub: 'Preview-only mode. Final descriptions use all stats = 10.',
+    search: 'Search by name, id, description',
+    filterAll: 'All items',
+    filterEquipment: 'Equipment only',
+    filterItems: 'Items only',
+    artifactTypeAll: 'Artifact type: all',
+    statFilterAll: 'Stat: all',
+    resetFilters: 'Reset filters',
+    blockShop: 'Shop Card',
+    blockDeps: 'Scaling Dependencies',
+    blockAffected: 'Affected Stats',
+    blockScale: 'Rarity Scaling',
+    listRarityFrom: 'from',
+    depsNone: 'No stat-based scaling dependencies. Only rarity/base values affect the item.',
+    scaleNone: 'No explicit scaling rows for this item.',
+    noResults: 'No items match current filters.',
+    selectItem: 'Select an item.',
+    hintScale: 'Table uses the same scaling format for effect values and special item formulas.',
+    scaleStat: 'Stat',
+    typeEquipment: 'equipment',
+    typeItem: 'item',
+    tabCards: 'Cards',
+    tabStats: 'Stats',
+    statPositive: 'Positive items',
+    statNegative: 'Negative items',
+    statNoDesc: 'No description yet.',
+    uniqueLabel: 'UNIQUE',
+    itemNoStats: 'This item has no direct stat effects.',
+  },
+  ru: {
+    title: '⛏ Превью карточек предметов',
+    sub: 'Режим только просмотра. Финальные описания считаются при all stats = 10.',
+    search: 'Поиск по названию, id, описанию',
+    filterAll: 'Все предметы',
+    filterEquipment: 'Только части корпуса',
+    filterItems: 'Только предметы',
+    artifactTypeAll: 'Тип артефакта: все',
+    statFilterAll: 'Стата: все',
+    resetFilters: 'Сбросить фильтры',
+    blockShop: 'Карточка магазина',
+    blockDeps: 'Зависимости скейлинга',
+    blockAffected: 'Статы предмета',
+    blockScale: 'Скейлинг по редкости',
+    listRarityFrom: 'от',
+    depsNone: 'Не скейлится от текущих статов. Влияют только редкость и базовые значения предмета.',
+    scaleNone: 'Нет явных рядов скейлинга для этого предмета.',
+    noResults: 'По фильтрам ничего не найдено.',
+    selectItem: 'Выбери предмет.',
+    hintScale: 'Таблица показывает одинаковый формат скейлинга для effect и спец-формул предметов.',
+    scaleStat: 'Стат',
+    typeEquipment: 'часть',
+    typeItem: 'предмет',
+    tabCards: 'Карточки',
+    tabStats: 'Статы',
+    statPositive: 'Положительных предметов',
+    statNegative: 'Отрицательных предметов',
+    statNoDesc: 'Описание пока не добавлено.',
+    uniqueLabel: 'УНИКАЛЬНЫЙ',
+    itemNoStats: 'У этого предмета нет прямых стат-эффектов.',
+  },
 };
 
-const RARITY_NAMES  = { 1: 'Обычный', 2: 'Необычный', 3: 'Редкий', 4: 'Легендарный' };
-const RARITY_COLORS = { 1: '#aaa', 2: '#4488ff', 3: '#aa44ff', 4: '#ff4444' };
-const STAT_GROUPS = [
-  {
-    label: '⛏ Бурение',
-    stats: [
-      { id: 'drillPower',         name: 'Сила бура',               desc: 'Плоский бонус к базовому урону удара.' },
-      { id: 'strikeSpeed',        name: 'Скорость бура',           desc: 'Ускоряет цикл удара бура.' },
-      { id: 'damageBonus',        name: 'Общий бонус урона',       desc: 'Процентный множитель урона ударов и взрывов.' },
-      { id: 'explosionBonus', name: 'Бонус урона взрывов', desc: 'Процентный бонус только для взрывов.' },
-      { id: 'drillPowerPerLevel', name: 'Сила бура за уровень',   desc: 'При каждом новом уровне усиливает базовый урон бура.' },
-      { id: 'strikeSpeedPerLevel',name: 'Скорость бура за уровень',desc: 'При каждом новом уровне ускоряет бур.' },
-    ],
-  },
-  {
-    label: '🌡️ Нагрев',
-    stats: [
-      { id: 'maxHeat',                   name: 'Макс. нагрев',                  desc: 'Поднимает потолок heat до перегрева.' },
-      { id: 'heatRate',                  name: 'Скорость нагрева',              desc: 'Множитель набора heat. Меньше 1 = медленнее греется.' },
-      { id: 'heatDamageBonus',           name: 'Бонус урона от heat',           desc: 'Усиливает урон, который масштабируется от текущего нагрева.' },
-      { id: 'explosionRadiusBonus',  name: 'Радиус взрывов', desc: 'Увеличивает радиус всех взрывов.' },
-    ],
-  },
-  {
-    label: '⛽ Топливо',
-    stats: [
-      { id: 'maxFuel',        name: 'Макс. топливо',      desc: 'Повышает верхний предел топлива.' },
-      { id: 'fuelDrainRate',  name: 'Расход топлива',     desc: 'Множитель расхода топлива. Меньше 1 = экономнее, больше 1 = прожорливее.' },
-      { id: 'fuelBonus',name: 'Бонус топлива',      desc: 'Процентный бонус к каждому получению топлива.' },
-      { id: 'fuelPerLevel',   name: 'Топливо за уровень', desc: 'При каждом новом уровне выдаёт дополнительное топливо.' },
-    ],
-  },
-  {
-    label: '❤️ Выживание',
-    stats: [
-      { id: 'maxHp',       name: 'Макс. HP',             desc: 'Повышает запас здоровья.' },
-      { id: 'armor',       name: 'Броня',                desc: 'Снижает входящий урон от опасностей.' },
-      { id: 'healPerLevel',name: 'Лечение за уровень',   desc: 'При каждом уровне восстанавливает здоровье.' },
-    ],
-  },
-  {
-    label: '🎯 Бреши / Крит',
-    stats: [
-      { id: 'weakSpotChance', name: 'Шанс бреши',        desc: 'Шанс создать weak spot при ударе.' },
-      { id: 'weakSpotMult',   name: 'Множитель weak spot',desc: 'Насколько сильнее урон по бреши.' },
-    ],
-  },
-  {
-    label: '⚡ Контур',
-    stats: [
-      { id: 'maxContour',        name: 'Макс. длина контура',    desc: 'Максимальное количество клеток в контуре. По умолчанию 10.' },
-      { id: 'speedOfAutoClose',  name: 'Скорость автозамыкания', desc: 'Ускоряет автоматическое дорисовывание контура.' },
-      { id: 'idleAutoCloseDelay',name: 'Задержка автозамыкания', desc: 'Сколько секунд бездействия до старта автозамыкания.' },
-      { id: 'loopPerkLevel',     name: 'Уровень контурного трофея', desc: 'Повышает шанс предмета внутри замкнутого контура.' },
-      { id: 'effectDurationRate',name: 'Длительность эффектов',  desc: 'Множитель длительности временных бафов и состояний.' },
-      { id: 'concentration',     name: 'Концентрация',           desc: 'Влияет на длительность некоторых негативных состояний, например стана.' },
-    ],
-  },
-  {
-    label: '💰 Экономика',
-    stats: [
-      { id: 'miningGoldBonusMultiplier', name: 'Бонус золота',       desc: 'Увеличивает золото, добытое из жил и других источников майнинга.' },
-      { id: 'goldBonusPerLevel',         name: 'Золото за уровень',  desc: 'При каждом новом уровне добавляет бонус к добыче золота.' },
-      { id: 'xpBonus',         name: 'Бонус опыта',        desc: 'Увеличивает количество опыта с кристаллов и других pickup-источников.' },
-      { id: 'bonusFindChance',           name: 'Чутьё',              desc: 'Шанс дополнительной находки/награды в системах, где это поддержано.' },
-    ],
-  },
-  {
-    label: '🔭 Разведка',
-    stats: [
-      { id: 'visionRadius',      name: 'Радиус обзора',     desc: 'Увеличивает видимую область вокруг игрока.' },
-      { id: 'luck',              name: 'Удача',             desc: 'Влияет на шансы лучшего лута и других luck-зависимых роллов.' },
-      { id: 'radarCrystalModule',name: 'Радар кристаллов', desc: 'Включает кольцевые подсказки на ближайшие кристаллы.' },
-      { id: 'artifactRadarMode', name: 'Радар артефакта',  desc: 'Маяки показывают направление на ближайший артефакт.' },
-      { id: 'goldRadarMode',     name: 'Радар золота',     desc: 'Маяки показывают направление на крупное золотое скопление.' },
-      { id: 'navigatorMode',     name: 'Навигатор маяков', desc: 'Маяки показывают ближайший неактивированный маяк на той же глубине.' },
-    ],
-  },
+const ALL = [
+  ...ALL_EQUIPMENT.map(item => ({ ...item, __kind: 'equipment' })),
+  ...ALL_ITEMS.map(item => ({ ...item, __kind: 'items' })),
 ];
-const STAT_GUIDE = STAT_GROUPS.flatMap(g => g.stats);
-const ALL_STATS = STAT_GUIDE.map(stat => stat.id);
-const STAT_GUIDE_MAP = new Map(STAT_GUIDE.map(stat => [stat.id, stat]));
-const PREVIEW_STATS_ALL_10 = (() => {
-  const stats = {};
-  for (const key of ALL_STATS) stats[key] = 10;
-  stats.heat = 10;
-  stats.drillPower = 10;
-  stats.explosionPower = 10;
-  stats.luck = 10;
+
+const PREVIEW_STATS = (() => {
+  const stats = {
+    drillPower: 10,
+    explosionPower: 10,
+    heat: 10,
+    luck: 10,
+  };
+  for (const item of ALL) {
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    for (const effect of effects) {
+      if (effect?.stat && stats[effect.stat] == null) stats[effect.stat] = 10;
+    }
+  }
   return stats;
 })();
 
-function normalizeTodoItem(item) {
-  const next = JSON.parse(JSON.stringify(item ?? {}));
-  const statWeights = {};
-  if (next && typeof next.statWeights === 'object' && next.statWeights) {
-    for (const [stat, value] of Object.entries(next.statWeights)) {
-      const numeric = Math.trunc(Number(value) || 0);
-      if (numeric !== 0) statWeights[stat] = numeric;
-    }
-  } else if (Array.isArray(next.stats)) {
-    for (const stat of next.stats) {
-      if (!stat) continue;
-      statWeights[stat] = (statWeights[stat] || 0) + 1;
-    }
-  }
-  next.concept = next.concept ?? '';
-  next.statWeights = statWeights;
-  delete next.stats;
-  return next;
+const S = {
+  search: '',
+  filter: 'all',
+  artifactType: 'all',
+  statFilter: 'all',
+  rarity: 1,
+  tab: 'cards',
+  locale: getLocale() === 'ru' ? 'ru' : 'en',
+  selectedId: ALL[0]?.id ?? null,
+};
+
+const QUERY_KEYS = {
+  tab: 'tab',
+  q: 'q',
+  type: 'type',
+  category: 'category',
+  stat: 'stat',
+  rarity: 'rarity',
+  locale: 'locale',
+  item: 'item',
+};
+
+const el = {
+  search: document.getElementById('search'),
+  filter: document.getElementById('filter'),
+  artifactType: document.getElementById('artifact-type'),
+  statFilter: document.getElementById('stat-filter'),
+  lang: document.getElementById('lang'),
+  controls: document.querySelector('.controls'),
+  cardsLayout: document.getElementById('cards-layout'),
+  statsLayout: document.getElementById('stats-layout'),
+  statsList: document.getElementById('stats-list'),
+  tabCards: document.getElementById('tab-cards'),
+  tabStats: document.getElementById('tab-stats'),
+  resetFilters: document.getElementById('reset-filters'),
+  raritySwitch: document.getElementById('rarity-switch'),
+  list: document.getElementById('item-list'),
+  shopCard: document.getElementById('shop-card'),
+  itemStats: document.getElementById('item-stats'),
+  scale: document.getElementById('scale'),
+  dependencies: document.getElementById('dependencies'),
+  title: document.getElementById('ui-title'),
+  sub: document.getElementById('ui-sub'),
+  blockShop: document.getElementById('ui-block-shop'),
+  blockDeps: document.getElementById('ui-block-deps'),
+  blockAffected: document.getElementById('ui-block-affected'),
+  blockScale: document.getElementById('ui-block-scale'),
+};
+
+function ui(key) {
+  return UI_TEXT[S.locale]?.[key] ?? UI_TEXT.en[key] ?? key;
 }
 
-S.todo = S.todo.map(normalizeTodoItem);
+function parseInitialStateFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get(QUERY_KEYS.tab);
+  if (tab === 'cards' || tab === 'stats') S.tab = tab;
 
-function list() { return S.tab === 'todo' ? null : S[S.tab]; }
-function sel()  {
-  if (S.tab === 'todo') return S.todo.find(i => i.id === S.selId) ?? null;
-  return list().find(i => i.id === S.selId) ?? null;
-}
-function markDirty() { S.dirty = true; document.getElementById('unsaved').hidden = false; }
-function clearDirty() { S.dirty = false; document.getElementById('unsaved').hidden = true; }
+  const q = params.get(QUERY_KEYS.q);
+  if (q != null) S.search = q;
 
-// ── Toast ──────────────────────────────────────────────────────────────────
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 2200);
-}
+  const type = params.get(QUERY_KEYS.type);
+  if (type === 'all' || type === 'equipment' || type === 'items') S.filter = type;
 
-// ── Sheet ──────────────────────────────────────────────────────────────────
-function openSheet() {
-  document.getElementById('overlay').classList.add('open');
-  document.getElementById('sheet').classList.add('open');
-}
-function closeSheet() {
-  document.getElementById('overlay').classList.remove('open');
-  document.getElementById('sheet').classList.remove('open');
-  S.selId = null;
-  document.querySelectorAll('.item-card').forEach(c => c.classList.remove('sel'));
+  const category = params.get(QUERY_KEYS.category);
+  if (category === 'all' || CATEGORIES.some(cat => cat.id === category)) S.artifactType = category;
+
+  const stat = params.get(QUERY_KEYS.stat);
+  if (stat === 'all' || getStatRows().some(row => row.stat === stat)) S.statFilter = stat;
+
+  const rarity = Number(params.get(QUERY_KEYS.rarity));
+  if (Number.isFinite(rarity) && rarity >= 1 && rarity <= 4) S.rarity = rarity;
+
+  const locale = params.get(QUERY_KEYS.locale);
+  if (locale === 'ru' || locale === 'en') S.locale = locale;
+
+  const item = params.get(QUERY_KEYS.item);
+  if (item && ALL.some(entry => entry.id === item)) S.selectedId = item;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function syncQueryFromState() {
+  const params = new URLSearchParams(window.location.search);
+  const setOrDelete = (key, value, def) => {
+    if (value === def || value == null || value === '') params.delete(key);
+    else params.set(key, String(value));
+  };
+
+  setOrDelete(QUERY_KEYS.tab, S.tab, 'cards');
+  setOrDelete(QUERY_KEYS.q, S.search.trim(), '');
+  setOrDelete(QUERY_KEYS.type, S.filter, 'all');
+  setOrDelete(QUERY_KEYS.category, S.artifactType, 'all');
+  setOrDelete(QUERY_KEYS.stat, S.statFilter, 'all');
+  setOrDelete(QUERY_KEYS.rarity, S.rarity, 1);
+  setOrDelete(QUERY_KEYS.locale, S.locale, 'en');
+  setOrDelete(QUERY_KEYS.item, S.selectedId, ALL[0]?.id ?? null);
+
+  const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}${window.location.hash}`;
+  history.replaceState(null, '', next);
 }
 
-function categories() {
-  return S.categories;
+function rarityName(rarity) {
+  return t(`rarity.${rarity}`);
+}
+
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function categoryName(id) {
-  return categories().find(c => c.id === id)?.name ?? id;
+  return CATEGORIES.find(cat => cat.id === id)?.name ?? id;
 }
 
-function slugifyCategoryName(name) {
-  return String(name ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9а-яё]+/gi, '_')
-    .replace(/^_+|_+$/g, '');
+function effectValueByRarity(effect, rarity) {
+  if (!effect) return null;
+  if (Array.isArray(effect.effectByRarity)) {
+    const value = effect.effectByRarity[rarity];
+    return value == null ? null : value;
+  }
+  if (typeof effect.value === 'number') return effect.value;
+  return null;
 }
 
-function isCategoryUsed(id) {
-  return [...S.equipment, ...S.items, ...S.todo].some(item => item.category === id);
+function formatEffectValue(value) {
+  if (value == null) return '—';
+  if (Math.abs(value) < 1 && value !== 0) return `${(value * 100).toFixed(2).replace(/\.00$/, '')}%`;
+  return Number(value).toFixed(2).replace(/\.00$/, '');
 }
 
-// ── Filters ────────────────────────────────────────────────────────────────
-function getFilters() {
-  return {
-    search: document.getElementById('search').value.toLowerCase(),
-    cat:    document.getElementById('filter-cat').value,
-    rarity: document.getElementById('filter-rarity').value,
-  };
+function classifyEffectPolarity(stat, value) {
+  if (!Number.isFinite(Number(value))) return 'neutral';
+  const polarity = LOWER_IS_BETTER_STATS.has(stat) ? -1 : 1;
+  const normalized = Number(value) * polarity;
+  if (normalized > 0) return 'pos';
+  if (normalized < 0) return 'neg';
+  return 'neutral';
 }
 
-function applyFilters(items) {
-  const { search, cat, rarity } = getFilters();
-  return items.filter(item => {
-    if (cat && item.category !== cat) return false;
-    if (rarity && item.minRarity !== +rarity) return false;
-    if (search) {
-      const hay = `${item.name} ${item.desc} ${item.id}`.toLowerCase();
-      if (!hay.includes(search)) return false;
+function formatItemEffectValue(stat, value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  const sign = n > 0 ? '+' : '';
+  if (Math.abs(n) < 1 && n !== 0) {
+    return `${sign}${(n * 100).toFixed(2).replace(/\.00$/, '')}%`;
+  }
+  if (PERCENT_STATS.has(stat)) {
+    return `${sign}${n.toFixed(2).replace(/\.00$/, '')}%`;
+  }
+  return `${sign}${n.toFixed(2).replace(/\.00$/, '')}`;
+}
+
+function formatSignedPercent(value) {
+  const n = Number(value || 0);
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${n.toFixed(2).replace(/\.00$/, '')}%`;
+}
+
+const SPECIAL_SCALE_ROWS = {
+  thermo_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [0, 20, 25, 30] },
+      { label: 'Скейл от drillPower', values: ['0%', '15%', '20%', '25%'] },
+      { label: 'Бонус за каждые 10 heat', values: [0, 1, 2, 3] },
+      { label: 'Итог урон (drill=10, heat=10)', values: [0, 22.5, 29, 35.5] },
+    ];
+  },
+  basic_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 15, 20, 25] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 16.5, 22, 27.5] },
+    ];
+  },
+  tradeoff_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [16, 22, 30, 40] },
+      { label: 'Штраф weakSpotMult', values: ['-0.3', '-0.5', '-0.7', '-1'] },
+    ];
+  },
+  fragile_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 15, 20, 25] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 16.5, 22, 27.5] },
+      { label: 'Скорость при броне', values: ['+10%', '+15%', '+20%', '+30%'] },
+    ];
+  },
+  lucky_pickaxe() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 15, 20, 25] },
+      { label: 'Скейл от drillPower', values: ['10%', '20%', '30%', '40%'] },
+      { label: 'Скейл от luck', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10, luck=10)', values: [12, 18.5, 25, 31.5] },
+      { label: 'Рост ценности жилы', values: [1, 2, 3, 4] },
+    ];
+  },
+  shard_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [8, 12, 16, 20] },
+      { label: 'Шанс бреши', values: ['4%', '6%', '8%', '10%'] },
+      { label: 'Взрыв по бреши (плоский)', values: [20, 30, 45, 60] },
+      { label: 'Скейл взрыва от explosionPower', values: ['10%', '10%', '10%', '10%'] },
+      { label: 'Итог взрыв (explosion=10)', values: [21, 31, 46, 61] },
+    ];
+  },
+  breach_missile() {
+    return [
+      { label: 'Урон ракеты (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон ракеты (drill=10)', values: [11, 11.5, 12, 12.5] },
+      { label: 'Доп. шанс бреши', values: ['0%', '5%', '5%', '5%'] },
+      { label: 'Вторичная ракета (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл вторичной от explosionPower', values: ['30%', '40%', '50%', '60%'] },
+      { label: 'Итог вторичной (explosion=10)', values: [23, 24, 25, 26] },
+      { label: 'Радиус взрыва', values: [1.5, 1.5, 1.5, 1.5] },
+    ];
+  },
+};
+
+function getScaleRows(item) {
+  const rows = [];
+  const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+  for (const effect of effects) {
+    rows.push({
+      label: effect.stat || '—',
+      values: RARITIES.map(rarity => formatEffectValue(effectValueByRarity(effect, rarity))),
+    });
+  }
+  if (SPECIAL_SCALE_ROWS[item.id]) {
+    rows.push(...SPECIAL_SCALE_ROWS[item.id]());
+  }
+  return rows;
+}
+
+function getFilteredItems() {
+  const q = S.search.trim().toLowerCase();
+  const filtered = ALL.filter(item => {
+    if (S.filter !== 'all' && item.__kind !== S.filter) return false;
+    if (S.artifactType !== 'all' && item.category !== S.artifactType) return false;
+    if (S.statFilter !== 'all') {
+      const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+      if (!effects.some(effect => effect?.stat === S.statFilter)) return false;
     }
-    return true;
+    if (!q) return true;
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    const statHay = effects.map(effect => {
+      const stat = effect?.stat || '';
+      const statLabel = stat ? t(`stat.${stat}`) : '';
+      return `${stat} ${statLabel}`;
+    }).join(' ');
+    const hay = `${item.name} ${item.id} ${item.desc} ${categoryName(item.category)} ${statHay}`.toLowerCase();
+    return hay.includes(q);
   });
+  return filtered;
 }
 
-// ── Populate category filter ────────────────────────────────────────────────
-function populateCategoryFilter() {
-  const sel = document.getElementById('filter-cat');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">Все категории</option>' +
-    categories().map(c => `<option value="${c.id}" ${c.id === cur ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
-  if (cur && !categories().some(c => c.id === cur)) sel.value = '';
+function renderUiText() {
+  document.title = ui('title');
+  el.title.textContent = ui('title');
+  el.sub.textContent = ui('sub');
+  el.blockShop.textContent = ui('blockShop');
+  el.blockDeps.textContent = ui('blockDeps');
+  el.blockAffected.textContent = ui('blockAffected');
+  el.blockScale.textContent = ui('blockScale');
+  el.search.placeholder = ui('search');
+
+  const current = S.filter;
+  el.filter.innerHTML = `
+    <option value="all">${ui('filterAll')}</option>
+    <option value="equipment">${ui('filterEquipment')}</option>
+    <option value="items">${ui('filterItems')}</option>
+  `;
+  el.filter.value = current;
+
+  const currentType = S.artifactType;
+  const categoryOptions = CATEGORIES.map(cat =>
+    `<option value="${esc(cat.id)}">${esc(cat.icon)} ${esc(cat.name)}</option>`
+  ).join('');
+  el.artifactType.innerHTML = `
+    <option value="all">${ui('artifactTypeAll')}</option>
+    ${categoryOptions}
+  `;
+  el.artifactType.value = currentType;
+
+  const stats = getStatRows();
+  const currentStat = S.statFilter;
+  el.statFilter.innerHTML = `
+    <option value="all">${ui('statFilterAll')}</option>
+    ${stats.map(row => `<option value="${esc(row.stat)}">${esc(row.label)}</option>`).join('')}
+  `;
+  el.statFilter.value = currentStat;
+  el.lang.value = S.locale;
+  el.resetFilters.textContent = ui('resetFilters');
+  el.tabCards.textContent = ui('tabCards');
+  el.tabStats.textContent = ui('tabStats');
 }
 
-function renderStatGuide() {
-  const roadmapInfluence = getRoadmapInfluenceMap();
-  const dots = count => count > 0
-    ? `<span class="guide-dots">${Array.from({ length: count }, () => '<span class="guide-dot"></span>').join('')}</span>`
-    : '';
-  const container = document.getElementById('guide-grid');
-  container.innerHTML = STAT_GROUPS.map(group => `
-    <div class="guide-group-title">${esc(group.label)}</div>
-    ${group.stats.map(stat => `
-      <div class="guide-card">
-        <div class="guide-stat">${esc(stat.id)}</div>
-        <div class="guide-name">${esc(stat.name)}</div>
-        <div class="guide-desc">${esc(stat.desc)}</div>
-        <div class="guide-meta">
-          ${(roadmapInfluence.get(stat.id)?.pos ?? 0) > 0 ? `<span class="guide-count pos">${dots(roadmapInfluence.get(stat.id)?.pos ?? 0)}</span>` : ''}
-          ${(roadmapInfluence.get(stat.id)?.neg ?? 0) > 0 ? `<span class="guide-count neg">${dots(roadmapInfluence.get(stat.id)?.neg ?? 0)}</span>` : ''}
-        </div>
-      </div>
-    `).join('')}
-  `).join('');
-}
+function getStatRows() {
+  const byStat = new Map();
+  for (const item of ALL) {
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    for (const effect of effects) {
+      const stat = effect?.stat;
+      if (!stat) continue;
+      if (!byStat.has(stat)) byStat.set(stat, { pos: new Set(), neg: new Set() });
+      const bucket = byStat.get(stat);
 
-function getTodoStatEntries(item) {
-  const weights = item?.statWeights ?? {};
-  return Object.entries(weights)
-    .map(([stat, value]) => [stat, Math.trunc(Number(value) || 0)])
-    .filter(([, value]) => value !== 0)
+      let hasPos = false;
+      let hasNeg = false;
+      if (Array.isArray(effect.effectByRarity)) {
+        for (const raw of effect.effectByRarity) {
+          const value = Number(raw);
+          if (!Number.isFinite(value)) continue;
+          const pol = classifyEffectPolarity(stat, value);
+          if (pol === 'pos') hasPos = true;
+          if (pol === 'neg') hasNeg = true;
+        }
+      } else if (typeof effect.value === 'number') {
+        const pol = classifyEffectPolarity(stat, effect.value);
+        if (pol === 'pos') hasPos = true;
+        if (pol === 'neg') hasNeg = true;
+      }
+      if (hasPos) bucket.pos.add(item.id);
+      if (hasNeg) bucket.neg.add(item.id);
+    }
+  }
+
+  return [...byStat.entries()]
+    .map(([stat, counts]) => {
+      const labelRaw = t(`stat.${stat}`);
+      const descRaw = t(`shop.stat.${stat}.tooltip`);
+      const label = labelRaw === `stat.${stat}` ? stat : labelRaw;
+      const desc = descRaw === `shop.stat.${stat}.tooltip` ? ui('statNoDesc') : descRaw;
+      return {
+        stat,
+        label,
+        desc,
+        posCount: counts.pos.size,
+        negCount: counts.neg.size,
+        itemCount: new Set([...counts.pos, ...counts.neg]).size,
+      };
+    })
     .sort((a, b) => {
-      const ai = ALL_STATS.indexOf(a[0]);
-      const bi = ALL_STATS.indexOf(b[0]);
-      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+      if (b.itemCount !== a.itemCount) return b.itemCount - a.itemCount;
+      if (b.posCount !== a.posCount) return b.posCount - a.posCount;
+      return a.label.localeCompare(b.label, S.locale);
     });
 }
 
-function getRoadmapInfluenceMap() {
-  const roadmapInfluence = new Map(STAT_GUIDE.map(stat => [stat.id, { pos: 0, neg: 0 }]));
-  const allReal = [...S.equipment, ...S.items];
-  for (const item of allReal) {
-    if (!item.effect) continue;
-    const effects = Array.isArray(item.effect) ? item.effect : [item.effect];
-    for (const e of effects) {
-      if (!e.stat) continue;
-      const bucket = roadmapInfluence.get(e.stat);
-      if (!bucket) continue;
-      let value = 0;
-      if (e.effectByRarity) {
-        value = e.effectByRarity.find(v => v != null && v !== 0) ?? 0;
-      } else if (typeof e.value === 'number') {
-        value = e.value;
-      }
-      if (value > 0) bucket.pos += 1;
-      if (value < 0) bucket.neg += 1;
-    }
-  }
-  return roadmapInfluence;
-}
-
-function formatAbstractDelta(value) {
-  const n = Math.trunc(Number(value) || 0);
-  return n > 0 ? `+${n}` : `${n}`;
-}
-
-function todoSearchText(item) {
-  const stats = getTodoStatEntries(item)
-    .map(([stat, value]) => `${stat} ${STAT_GUIDE_MAP.get(stat)?.name ?? ''} ${formatAbstractDelta(value)}`)
-    .join(' ');
-  return `${item.name ?? ''} ${item.concept ?? ''} ${stats}`.toLowerCase();
-}
-
-function renderCategoryPanel() {
-  const container = document.getElementById('cat-list');
-  container.innerHTML = categories().map(c => {
-    const used = isCategoryUsed(c.id);
-    const title = used ? 'Категория используется и не может быть удалена' : 'Удалить категорию';
-    const removeBtn = `<button type="button" class="cat-rm" data-cat-id="${esc(c.id)}" title="${title}" ${used ? 'disabled' : ''}>×</button>`;
-    return `<div class="cat-chip">${esc(c.icon)} ${esc(c.name)} <span style="color:var(--muted)">(${esc(c.id)})</span>${removeBtn}</div>`;
-  }).join('');
-
-  container.querySelectorAll('.cat-rm').forEach(btn =>
-    btn.addEventListener('click', () => removeCategory(btn.dataset.catId))
-  );
-}
-
-function refreshCategoriesUi() {
-  populateCategoryFilter();
-  renderCategoryPanel();
-  renderStatGuide();
-  if (S.tab === 'todo') {
-    renderTodo();
-    if (sel()) renderTodoSheetBody();
-  } else {
-    renderList();
-    if (sel()) renderSheetBody();
-  }
-}
-
-function addCategory() {
-  const iconInput = document.getElementById('cat-icon');
-  const nameInput = document.getElementById('cat-name');
-  const icon = iconInput.value.trim() || '✦';
-  const name = nameInput.value.trim();
-  if (!name) {
-    toast('Введите название категории');
-    nameInput.focus();
+function renderStats() {
+  const rows = getStatRows();
+  if (!rows.length) {
+    el.statsList.innerHTML = `<div class="empty">${esc(ui('scaleNone'))}</div>`;
     return;
   }
-
-  const baseId = slugifyCategoryName(name);
-  if (!baseId) {
-    toast('Не удалось собрать id категории');
-    return;
-  }
-  let id = baseId;
-  let idx = 2;
-  while (categories().some(c => c.id === id)) {
-    id = `${baseId}_${idx++}`;
-  }
-
-  categories().push({ id, name, icon });
-  iconInput.value = '';
-  nameInput.value = '';
-  markDirty();
-  refreshCategoriesUi();
-  toast(`Категория "${name}" добавлена`);
-}
-
-function removeCategory(id) {
-  if (!id) return;
-  if (isCategoryUsed(id)) {
-    toast('Сначала уберите категорию с предметов роадмапа и каталога');
-    return;
-  }
-  const idx = categories().findIndex(c => c.id === id);
-  if (idx === -1) return;
-  categories().splice(idx, 1);
-  markDirty();
-  refreshCategoriesUi();
-}
-
-// ── Render list ────────────────────────────────────────────────────────────
-function renderList() {
-  const filtered = applyFilters(list());
-  document.getElementById('items-count').textContent = `${filtered.length} / ${list().length}`;
-
-  const container = document.getElementById('items-list');
-  container.innerHTML = filtered.map(item => {
-    const rColor = RARITY_COLORS[item.minRarity] ?? '#aaa';
-    const rarityLabel = RARITY_NAMES[item.minRarity] ?? item.minRarity;
-    const tags = item.tags ? item.tags.map(t => `<span class="item-tag">${esc(t)}</span>`).join('') : '';
-    const effectLabel = item.effect ? `<span class="item-tag">${esc(item.effect.stat)} +${item.effect.value}</span>` : '';
-    return `
-      <div class="item-card ${S.selId === item.id ? 'sel' : ''}" data-id="${esc(item.id)}">
-        <div class="item-icon">${esc(item.icon)}</div>
-        <div class="item-info">
-          <div class="item-name">${esc(item.name)}</div>
-          <div class="item-desc">${esc(item.desc)}</div>
-          <div class="item-meta">
-            <span class="item-rarity" style="color:${rColor}">${rarityLabel}</span>
-            <span class="item-tag">${esc(categoryName(item.category))}</span>
-            ${tags}${effectLabel}
-          </div>
-        </div>
+  el.statsList.innerHTML = rows.map(row => `
+    <article class="stat-card" data-stat="${esc(row.stat)}">
+      <div class="stat-card__name">${esc(row.label)}</div>
+      <div class="stat-card__id">${esc(row.stat)}</div>
+      <div class="stat-card__desc">${esc(row.desc)}</div>
+      <div class="stat-card__counts">
+        <span class="count-chip pos">+ ${esc(ui('statPositive'))}: ${row.posCount}</span>
+        <span class="count-chip neg">− ${esc(ui('statNegative'))}: ${row.negCount}</span>
       </div>
+    </article>
+  `).join('');
+  el.statsList.querySelectorAll('[data-stat]').forEach(node => {
+    node.addEventListener('click', () => {
+      S.statFilter = node.dataset.stat || 'all';
+      S.tab = 'cards';
+      render();
+    });
+  });
+}
+
+function renderTabState() {
+  const cards = S.tab === 'cards';
+  el.controls.hidden = !cards;
+  el.cardsLayout.hidden = !cards;
+  el.statsLayout.hidden = cards;
+  el.tabCards.classList.toggle('active', cards);
+  el.tabStats.classList.toggle('active', !cards);
+}
+
+function getSelectedItem(items) {
+  let found = items.find(item => item.id === S.selectedId);
+  if (!found) {
+    found = items[0] ?? null;
+    S.selectedId = found?.id ?? null;
+  }
+  return found;
+}
+
+function renderRaritySwitch() {
+  el.raritySwitch.innerHTML = [1,2,3,4].map(rarity => `
+    <button class="rarity-btn ${S.rarity === rarity ? 'active' : ''}" data-rarity="${rarity}">
+      ${rarityName(rarity)}
+    </button>
+  `).join('');
+  el.raritySwitch.querySelectorAll('[data-rarity]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S.rarity = Number(btn.dataset.rarity);
+      render();
+    });
+  });
+}
+
+function renderList(items, selectedItem) {
+  el.list.innerHTML = items.map(item => `
+    <li>
+      <button class="item-row ${selectedItem?.id === item.id ? 'active' : ''}" data-id="${esc(item.id)}">
+        <span class="item-row__icon">${esc(item.icon || '✦')}</span>
+        <span>
+          <div class="item-row__name">${esc(item.name)}</div>
+          <div class="item-row__meta ${RARITY_CLASS[item.minRarity] || 'r1'}">
+            ${esc(categoryName(item.category))} · ${ui('listRarityFrom')} ${rarityName(item.minRarity)}
+            ${item.unique ? `<span class="uniq">• ${esc(ui('uniqueLabel'))}</span>` : ''}
+          </div>
+        </span>
+      </button>
+    </li>
+  `).join('');
+
+  el.list.querySelectorAll('[data-id]').forEach(node => {
+    node.addEventListener('click', () => {
+      S.selectedId = node.dataset.id;
+      render();
+    });
+  });
+}
+
+function renderShopCard(item) {
+  const isEquip = item.type === 'equipment';
+  let cls = 'shop-card';
+  cls += ` shop-card--rarity-${S.rarity}`;
+  if (isEquip) cls += ' shop-card--equipment';
+  else cls += ' shop-card--item';
+
+  const typeLabel = isEquip ? '⛏' : '✧';
+  const mergeLabel = item.unique ? `<div class="shop-card__merge">${esc(ui('uniqueLabel'))}</div>` : '';
+  const catDef = item.category ? CATEGORIES.find(c => c.id === item.category) : null;
+  const catLabel = catDef ? `<div class="shop-card__category">${catDef.icon} ${catDef.name}</div>` : '';
+  const desc = getGoodDescription(item, S.rarity, PREVIEW_STATS);
+
+  el.shopCard.innerHTML = `
+    <div class="${cls}">
+      <div class="shop-card__type">${typeLabel}</div>
+      <div class="shop-card__icon">${esc(item.icon || '✦')}</div>
+      <div class="shop-card__name">${esc(item.name)}</div>
+      ${catLabel}
+      <div class="shop-card__desc">${(desc || '').replace(/\n/g, '<br>')}</div>
+      ${mergeLabel}
+      <div class="shop-card__cost">${RARITY_NAMES[S.rarity]}</div>
+    </div>
+  `;
+}
+
+function renderDependencies(item) {
+  const uniq = getScalingDependencies(item);
+  if (uniq.length === 0) {
+    el.dependencies.innerHTML = `<div class="empty">${esc(ui('depsNone'))}</div>`;
+    return;
+  }
+  el.dependencies.innerHTML = uniq.map(stat => `<span>${esc(stat)}</span>`).join('');
+}
+
+function renderItemAffectedStats(item) {
+  const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+  if (!effects.length) {
+    el.itemStats.innerHTML = `<div class="empty">${esc(ui('itemNoStats'))}</div>`;
+    return;
+  }
+
+  const statsMap = new Map(getStatRows().map(row => [row.stat, row]));
+  const uniqStats = [...new Set(effects.map(effect => effect?.stat).filter(Boolean))];
+
+  el.itemStats.innerHTML = uniqStats.map(stat => {
+    const row = statsMap.get(stat);
+    const labelRaw = t(`stat.${stat}`);
+    const descRaw = t(`shop.stat.${stat}.tooltip`);
+    const label = row?.label ?? (labelRaw === `stat.${stat}` ? stat : labelRaw);
+    const desc = row?.desc ?? (descRaw === `shop.stat.${stat}.tooltip` ? ui('statNoDesc') : descRaw);
+    const posCount = row?.posCount ?? 0;
+    const negCount = row?.negCount ?? 0;
+    return `
+      <article class="stat-card" data-stat="${esc(stat)}">
+        <div class="stat-card__name">${esc(label)}</div>
+        <div class="stat-card__id">${esc(stat)}</div>
+        <div class="stat-card__desc">${esc(desc)}</div>
+        <div class="stat-card__counts">
+          <span class="count-chip pos">+ ${esc(ui('statPositive'))}: ${posCount}</span>
+          <span class="count-chip neg">− ${esc(ui('statNegative'))}: ${negCount}</span>
+        </div>
+      </article>
     `;
-  }).join('') + `<button class="btn-add-item" id="btn-add-item">＋ Добавить</button>`;
-
-  container.querySelectorAll('.item-card').forEach(el =>
-    el.addEventListener('click', () => {
-      S.selId = el.dataset.id;
-      renderList();
-      renderSheetBody();
-      openSheet();
-    })
-  );
-  document.getElementById('btn-add-item').onclick = addItem;
-}
-
-function renderSheetPreviewCard(item) {
-  const rarity = Math.max(1, Math.min(4, Number(S.previewRarity) || 1));
-  const rarityName = RARITY_NAMES[rarity] ?? `R${rarity}`;
-  const rarityColor = RARITY_COLORS[rarity] ?? '#aaa';
-  const category = categoryName(item.category);
-  const desc = getGoodDescription(item, rarity, PREVIEW_STATS_ALL_10) || item.desc || '';
-  const card = document.getElementById('preview-card');
-  if (!card) return;
-  card.innerHTML = `
-    <div class="preview-card__head">
-      <div class="preview-card__icon">${esc(item.icon || '✦')}</div>
-      <div style="min-width:0;flex:1">
-        <div class="preview-card__name">${esc(item.name || 'Новый')}</div>
-        <div class="preview-card__meta">
-          <span class="item-rarity" style="color:${rarityColor}">${esc(rarityName)}</span>
-          <span class="item-tag">${esc(category)}</span>
-        </div>
-      </div>
-    </div>
-    <div class="preview-card__desc">${esc(desc)}</div>
-    <div class="preview-card__hint">Превью считает, что все статы = 10.</div>
-  `;
-}
-
-// ── Sheet body ─────────────────────────────────────────────────────────────
-function renderSheetBody() {
-  const item = sel();
-  if (!item) return;
-
-  document.getElementById('sheet-title').textContent = item.name || 'Предмет';
-
-  const isEquip = item.type === 'equipment';
-  const catOpts = categories().map(c =>
-    `<option value="${c.id}" ${c.id === item.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
-  ).join('');
-
-  const rarityOpts = [1,2,3,4].map(r =>
-    `<option value="${r}" ${item.minRarity === r ? 'selected' : ''}>${RARITY_NAMES[r]}</option>`
-  ).join('');
-  const previewRarityOpts = [1,2,3,4].map(r =>
-    `<option value="${r}" ${Number(S.previewRarity) === r ? 'selected' : ''}>${RARITY_NAMES[r]}</option>`
-  ).join('');
-
-  const statOpts = ALL_STATS.map(s =>
-    `<option value="${s}" ${item.effect?.stat === s ? 'selected' : ''}>${s}</option>`
-  ).join('');
-
-  const tagsHtml = isEquip
-    ? `<div class="field">
-        <label>Теги (синергии)</label>
-        <div class="tags-wrap" id="tags-wrap">
-          ${(item.tags ?? []).map((t, i) =>
-            `<div class="tag-chip">${esc(t)}<button data-ti="${i}" class="tag-rm">×</button></div>`
-          ).join('')}
-        </div>
-        <div class="tag-add-row" style="margin-top:6px">
-          <input id="tag-input" placeholder="Новый тег...">
-          <button class="tag-add-btn" id="tag-add">Добавить</button>
-        </div>
-      </div>`
-    : '';
-
-  const effectHtml = !isEquip
-    ? `<div class="sep"></div>
-       <div class="field-row">
-         <div class="field">
-           <label>Стат эффекта</label>
-           <select id="e-stat">${statOpts}</select>
-         </div>
-         <div class="field">
-           <label>Базовое значение</label>
-           <input id="e-val" type="number" step="0.01" value="${item.effect?.value ?? 0}">
-         </div>
-       </div>`
-    : '';
-
-  document.getElementById('sheet-body').innerHTML = `
-    <div class="field-row">
-      <div class="field" style="flex:0 0 auto">
-        <label>Иконка</label>
-        <input id="n-icon" class="icon-f" value="${esc(item.icon)}">
-      </div>
-      <div class="field">
-        <label>Название</label>
-        <input id="n-name" value="${esc(item.name)}">
-      </div>
-    </div>
-    <div class="field">
-      <label>id (технический)</label>
-      <input id="n-id" value="${esc(item.id)}">
-    </div>
-    <div class="field">
-      <label>Описание</label>
-      <textarea id="n-desc">${esc(item.desc)}</textarea>
-    </div>
-    <div class="sep"></div>
-    <div class="field-row">
-      <div class="field">
-        <label>Превью редкости</label>
-        <select id="preview-rarity">${previewRarityOpts}</select>
-      </div>
-    </div>
-    <div class="preview-card" id="preview-card"></div>
-    <div class="sep"></div>
-    <div class="field-row">
-      <div class="field">
-        <label>Категория (пул)</label>
-        <select id="n-cat">${catOpts}</select>
-      </div>
-      <div class="field">
-        <label>Мин. редкость</label>
-        <select id="n-rarity">${rarityOpts}</select>
-      </div>
-    </div>
-    ${tagsHtml}
-    ${effectHtml}
-  `;
-
-  // bindings
-  const live   = (id, fn) => document.getElementById(id)?.addEventListener('input',  e => { fn(e.target.value); markDirty(); });
-  const change = (id, fn) => document.getElementById(id)?.addEventListener('change', e => { fn(e.target.value); markDirty(); });
-
-  live('n-name', v => { item.name = v; document.getElementById('sheet-title').textContent = v || 'Предмет'; renderList(); renderSheetPreviewCard(item); });
-  live('n-icon', v => { item.icon = v; renderList(); renderSheetPreviewCard(item); });
-  live('n-desc', v => { item.desc = v; renderList(); renderSheetPreviewCard(item); });
-  document.getElementById('preview-rarity')?.addEventListener('change', e => {
-    S.previewRarity = Number(e.target.value) || 1;
-    renderSheetPreviewCard(item);
-  });
-
-  change('n-id', v => {
-    item.id = v;
-    S.selId = v;
-    renderList();
-    renderSheetPreviewCard(item);
-  });
-
-  change('n-cat',    v => { item.category  = v; renderList(); renderSheetPreviewCard(item); });
-  change('n-rarity', v => { item.minRarity = +v; renderList(); renderSheetPreviewCard(item); });
-
-  // Tags
-  if (isEquip) {
-    document.querySelectorAll('.tag-rm').forEach(btn =>
-      btn.addEventListener('click', () => {
-        item.tags.splice(+btn.dataset.ti, 1);
-        markDirty();
-        renderList();
-        renderSheetBody();
-      })
-    );
-    document.getElementById('tag-add')?.addEventListener('click', () => {
-      const input = document.getElementById('tag-input');
-      const val = input.value.trim();
-      if (val && !item.tags.includes(val)) {
-        item.tags.push(val);
-        markDirty();
-        renderList();
-        renderSheetBody();
-      }
-      input.value = '';
-    });
-    document.getElementById('tag-input')?.addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('tag-add').click();
-    });
-  }
-
-  // Effect
-  if (!isEquip) {
-    if (!item.effect) item.effect = { stat: 'luck', value: 1 };
-    change('e-stat', v => { item.effect.stat = v; renderList(); renderSheetPreviewCard(item); });
-    live('e-val',    v => { item.effect.value = parseFloat(v) || 0; renderList(); renderSheetPreviewCard(item); });
-  }
-
-  renderSheetPreviewCard(item);
-}
-
-// ── Actions ────────────────────────────────────────────────────────────────
-function addItem() {
-  const type = S.tab === 'equipment' ? 'equipment' : 'item';
-  const id   = `${type}_${Date.now()}`;
-  const base = {
-    id,
-    type,
-    name:      'Новый',
-    icon:      '✦',
-    desc:      'Описание',
-    category:  categories()[0]?.id ?? 'basic',
-    minRarity: 1,
-  };
-  if (type === 'equipment') base.tags = [];
-  else base.effect = { stat: 'luck', value: 1 };
-
-  list().push(base);
-  S.selId = id;
-  markDirty();
-  renderList();
-  renderSheetBody();
-  openSheet();
-}
-
-function delItem() {
-  if (!S.selId || !confirm('Удалить?')) return;
-  if (S.tab === 'todo') {
-    const idx = S.todo.findIndex(i => i.id === S.selId);
-    if (idx !== -1) S.todo.splice(idx, 1);
-    S.selId = null;
-    markDirty();
-    closeSheet();
-    renderTodo();
-    return;
-  }
-  const arr = list();
-  const idx = arr.findIndex(i => i.id === S.selId);
-  if (idx !== -1) arr.splice(idx, 1);
-  S.selId = null;
-  markDirty();
-  closeSheet();
-  renderList();
-}
-
-// ── Serialize ──────────────────────────────────────────────────────────────
-function serializeItem(item) {
-  const isEquip = item.type === 'equipment';
-  const lines = [];
-  lines.push(`  {`);
-  lines.push(`    id: ${JSON.stringify(item.id)},`);
-  lines.push(`    type: ${JSON.stringify(item.type)},`);
-  lines.push(`    name: ${JSON.stringify(item.name)},`);
-  lines.push(`    icon: ${JSON.stringify(item.icon)},`);
-  lines.push(`    desc: ${JSON.stringify(item.desc)},`);
-  lines.push(`    category: ${JSON.stringify(item.category)},`);
-  if (isEquip) lines.push(`    tags: ${JSON.stringify(item.tags ?? [])},`);
-  lines.push(`    minRarity: ${item.minRarity},`);
-  if (!isEquip && item.effect) lines.push(`    effect: { stat: ${JSON.stringify(item.effect.stat)}, value: ${item.effect.value} },`);
-  lines.push(`  },`);
-  return lines.join('\n');
-}
-
-function serialize() {
-  const categoriesText = categories()
-    .map(c => `  { id: ${JSON.stringify(c.id)}, name: ${JSON.stringify(c.name)}, icon: ${JSON.stringify(c.icon)} },`)
-    .join('\n');
-  const eq = S.equipment.map(serializeItem).join('\n');
-  const it = S.items.map(serializeItem).join('\n');
-  return `export const RARITY = {
-  COMMON: 1,
-  UNCOMMON: 2,
-  RARE: 3,
-  LEGENDARY: 4,
-};
-
-export const RARITY_NAMES = {
-  1: "Обычный",
-  2: "Необычный",
-  3: "Редкий",
-  4: "Легендарный",
-};
-
-export const RARITY_COLORS = {
-  1: "#aaa",
-  2: "#4488ff",
-  3: "#aa44ff",
-  4: "#ff4444",
-};
-
-export const RARITY_EFFECT_MULT = {
-  1: 1,
-  2: 1.5,
-  3: 2,
-  4: 3,
-};
-
-export const CATEGORIES = [
-${categoriesText}
-];
-
-export const INITIAL_CATEGORIES = ["basic", "economy"];
-export const TAG_SYNERGIES = {};
-
-// ── Equipment (части корпуса) ───────────────────────────────────────────────────
-
-export const ALL_EQUIPMENT = [
-${eq}
-];
-
-// ── Items (предметы) ────────────────────────────────────────────────────────────
-
-export const ALL_ITEMS = [
-${it}
-];
-
-export const ALL_GOODS = [...ALL_EQUIPMENT, ...ALL_ITEMS];
-`;
-}
-
-// ── Save ───────────────────────────────────────────────────────────────────
-let fileHandle = null;
-async function saveFile() {
-  try {
-    if (!fileHandle) fileHandle = await window.showSaveFilePicker({
-      suggestedName: 'items-catalog.js',
-      startIn: 'documents',
-      types: [{ description: 'JavaScript', accept: { 'text/javascript': ['.js'] } }],
-    });
-    const w = await fileHandle.createWritable();
-    await w.write(serialize());
-    await w.close();
-    clearDirty();
-    toast('Сохранено!');
-  } catch(e) {
-    if (e.name !== 'AbortError') { fileHandle = null; toast('Ошибка сохранения'); }
-  }
-}
-
-// ── Todo ───────────────────────────────────────────────────────────────────
-function renderTodo() {
-  renderStatGuide();
-  const search = document.getElementById('search').value.toLowerCase();
-  const catFilter = document.getElementById('filter-cat').value;
-
-  const existing = new Set([...S.equipment, ...S.items].map(i => i.id));
-  const done = S.todo.filter(i => existing.has(i.id));
-  const todo = S.todo.filter(i => !existing.has(i.id));
-
-  function matchFilters(item) {
-    if (catFilter && item.category !== catFilter) return false;
-    if (search && !todoSearchText(item).includes(search)) return false;
-    return true;
-  }
-
-  const visibleTodo = todo.filter(matchFilters);
-  const visibleDone = done.filter(matchFilters);
-  const catName = id => categories().find(c => c.id === id)?.name ?? id;
-
-  function card(item, isDone) {
-    const selClass = S.selId === item.id ? 'sel' : '';
-    const statsHtml = getTodoStatEntries(item).map(([stat, value]) => {
-      const cls = value > 0 ? 'pos' : 'neg';
-      const label = STAT_GUIDE_MAP.get(stat)?.name ?? stat;
-      return `<span class="todo-stat-chip ${cls}">${esc(label)} ${esc(formatAbstractDelta(value))}</span>`;
-    }).join('');
-    return `
-      <div class="todo-card ${selClass}" data-todo-id="${esc(item.id)}" style="${isDone ? 'opacity:.45' : ''}">
-        <div class="todo-icon">${esc(item.icon || '✦')}</div>
-        <div class="todo-info">
-          <div class="todo-name">${esc(item.name || 'Новый')}</div>
-          <div class="todo-meta"><span class="todo-cat">${esc(catName(item.category))}</span></div>
-          ${item.concept ? `<div class="todo-concept" style="margin-top:4px">${esc(item.concept)}</div>` : ''}
-          ${statsHtml ? `<div class="todo-stat-summary">${statsHtml}</div>` : ''}
-        </div>
-      </div>`;
-  }
-
-  document.getElementById('items-count').textContent = `${done.length}/${S.todo.length} готово`;
-  const container = document.getElementById('items-list');
-  container.innerHTML = `
-    <div class="todo-header">
-      <span class="todo-header-stat">Осталось: <b>${todo.length}</b> предметов</span>
-      <button class="hdr-btn" id="btn-todo-export">📤 Экспорт JSON</button>
-    </div>
-    ${visibleTodo.length ? `<div class="todo-section"><div class="todo-section-title">К реализации</div>${visibleTodo.map(i => card(i, false)).join('')}</div>` : ''}
-    ${visibleDone.length ? `<div class="todo-section"><div class="todo-section-title">Готово</div>${visibleDone.map(i => card(i, true)).join('')}</div>` : ''}
-    <div style="padding:10px">
-      <button class="btn-add-item" id="btn-add-todo">＋ Добавить в роадмап</button>
-    </div>
-  `;
-
-  container.querySelectorAll('.todo-card').forEach(el =>
-    el.addEventListener('click', () => {
-      S.selId = el.dataset.todoId;
-      renderTodo();
-      renderTodoSheetBody();
-      openSheet();
-    })
-  );
-
-  document.getElementById('btn-add-todo').onclick = addTodoItem;
-  document.getElementById('btn-todo-export').onclick = exportTodoJson;
-}
-
-function exportTodoJson() {
-  const text = JSON.stringify(S.todo, null, 2);
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => toast('JSON скопирован!')).catch(() => copyFallback(text));
-  } else {
-    copyFallback(text);
-  }
-}
-
-function addTodoItem() {
-  const id = `todo_${Date.now()}`;
-  S.todo.push(normalizeTodoItem({
-    id,
-    icon: '✦',
-    name: 'Новый',
-    category: categories()[0]?.id ?? 'basic',
-    statWeights: {},
-    concept: '',
-  }));
-  S.selId = id;
-  markDirty();
-  renderTodo();
-  renderTodoSheetBody();
-  openSheet();
-}
-
-function renderTodoSheetBody() {
-  const item = sel();
-  if (!item) return;
-  document.getElementById('sheet-title').textContent = item.name || 'Элемент роадмапа';
-  const roadmapInfluence = getRoadmapInfluenceMap();
-  const guideDots = count => count > 0
-    ? `<span class="guide-dots">${Array.from({ length: count }, () => '<span class="guide-dot"></span>').join('')}</span>`
-    : '';
-
-  const catOpts = categories().map(c =>
-    `<option value="${c.id}" ${c.id === item.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
-  ).join('');
-  const statRows = STAT_GROUPS.map(group => {
-    const rows = group.stats.map(stat => {
-      const value = Math.trunc(Number(item.statWeights?.[stat.id]) || 0);
-      const valueClass = value > 0 ? 'pos' : value < 0 ? 'neg' : '';
-      const dots = value !== 0
-        ? `<span class="todo-stat-dots">${Array.from({ length: Math.abs(value) }, () => '<span class="todo-stat-dot"></span>').join('')}</span>`
-        : '';
-      const popularity = roadmapInfluence.get(stat.id) ?? { pos: 0, neg: 0 };
-      return `
-        <div class="todo-stat-row">
-          <div class="todo-stat-title">${esc(stat.id)}</div>
-          <div class="todo-stat-key">${esc(stat.name)}</div>
-          <div class="todo-stat-desc">${esc(stat.desc)}</div>
-          <div class="guide-meta">
-            ${popularity.pos > 0 ? `<span class="guide-count pos">${guideDots(popularity.pos)}</span>` : ''}
-            ${popularity.neg > 0 ? `<span class="guide-count neg">${guideDots(popularity.neg)}</span>` : ''}
-          </div>
-          <div class="todo-stat-controls">
-            <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="-1">−</button>
-            <div class="todo-stat-value ${valueClass}">${dots}${dots ? '&nbsp;' : ''}${esc(formatAbstractDelta(value))}</div>
-            <button type="button" class="todo-stat-btn" data-stat="${esc(stat.id)}" data-delta="1">+</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-    return `<div class="todo-stat-group-title">${esc(group.label)}</div>${rows}`;
   }).join('');
 
-  document.getElementById('sheet-body').innerHTML = `
-    <div class="field-row">
-      <div class="field" style="flex:0 0 auto">
-        <label>Иконка</label>
-        <input id="t-icon" class="icon-f" value="${esc(item.icon)}">
-      </div>
-      <div class="field">
-        <label>Название</label>
-        <input id="t-name" value="${esc(item.name)}">
-      </div>
-    </div>
-    <div class="field">
-      <label>id (технический)</label>
-      <input id="t-id" value="${esc(item.id)}">
-    </div>
-    <div class="field">
-      <label>Концепт (необязательно)</label>
-      <textarea id="t-concept" placeholder="Короткая идея или пояснение...">${esc(item.concept)}</textarea>
-    </div>
-    <div class="sep"></div>
-    <div class="field">
-      <label>Категория</label>
-      <select id="t-cat">${catOpts}</select>
-    </div>
-    <div class="field">
-      <label>Влияние на статы</label>
-      <div class="todo-stat-list">${statRows}</div>
-    </div>
+  el.itemStats.querySelectorAll('[data-stat]').forEach(node => {
+    node.addEventListener('click', () => {
+      S.statFilter = node.dataset.stat || 'all';
+      render();
+    });
+  });
+}
+
+function getScalingDependencies(item) {
+  const deps = new Set();
+  for (let rarity = 1; rarity <= 4; rarity += 1) {
+    const statsProbe = new Proxy({}, {
+      get(_target, prop) {
+        if (typeof prop === 'string') deps.add(prop);
+        return 10;
+      },
+    });
+    try {
+      getGoodDescription(item, rarity, statsProbe);
+    } catch {}
+  }
+  return [...deps].sort((a, b) => a.localeCompare(b));
+}
+
+function renderScale(item) {
+  const rows = getScaleRows(item);
+  if (!rows.length) {
+    el.scale.innerHTML = `<div class="empty">${esc(ui('scaleNone'))}</div>`;
+    return;
+  }
+
+  const rowsHtml = rows.map(row => `
+    <tr>
+      <td>${esc(row.label)}</td>
+      <td>${esc(row.values[0])}</td>
+      <td>${esc(row.values[1])}</td>
+      <td>${esc(row.values[2])}</td>
+      <td>${esc(row.values[3])}</td>
+    </tr>
+  `).join('');
+
+  el.scale.innerHTML = `
+    <table class="scale-table">
+      <thead>
+        <tr>
+          <th>${esc(ui('scaleStat'))}</th>
+          <th class="r1">${esc(rarityName(1))}</th>
+          <th class="r2">${esc(rarityName(2))}</th>
+          <th class="r3">${esc(rarityName(3))}</th>
+          <th class="r4">${esc(rarityName(4))}</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="hint" style="margin-top:8px">${esc(ui('hintScale'))}</div>
   `;
-
-  const live   = (id, fn) => document.getElementById(id)?.addEventListener('input',  e => { fn(e.target.value); markDirty(); });
-  const change = (id, fn) => document.getElementById(id)?.addEventListener('change', e => { fn(e.target.value); markDirty(); });
-
-  live('t-name',    v => { item.name = v; document.getElementById('sheet-title').textContent = v || 'Элемент роадмапа'; renderTodo(); });
-  live('t-icon',    v => { item.icon = v; renderTodo(); });
-  live('t-concept', v => { item.concept = v; renderTodo(); });
-  change('t-id',    v => { item.id = v; S.selId = v; renderTodo(); });
-  change('t-cat',   v => { item.category = v; renderTodo(); });
-  document.querySelectorAll('.todo-stat-btn').forEach(btn =>
-    btn.addEventListener('click', () => {
-      const stat = btn.dataset.stat;
-      const delta = Math.trunc(Number(btn.dataset.delta) || 0);
-      if (!stat || !delta) return;
-      if (!item.statWeights) item.statWeights = {};
-      const next = Math.trunc(Number(item.statWeights[stat]) || 0) + delta;
-      if (next === 0) delete item.statWeights[stat];
-      else item.statWeights[stat] = next;
-      markDirty();
-      renderTodo();
-      renderTodoSheetBody();
-    })
-  );
 }
 
-// ── Tabs ───────────────────────────────────────────────────────────────────
-function switchTab(tab) {
-  S.tab   = tab;
-  S.selId = null;
-  closeSheet();
-  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
-  const isSimulator = tab === 'simulator';
-  document.querySelector('.filters').hidden       = isSimulator;
-  document.getElementById('items-list').hidden    = isSimulator;
-  document.getElementById('sim-panel').hidden     = !isSimulator;
-  if (isSimulator) {
-    // Hide cat-panel and stat-guide when entering simulator
-    document.getElementById('cat-panel').hidden  = true;
-    document.getElementById('btn-cat-toggle').classList.remove('active');
-    document.getElementById('stat-guide').removeAttribute('open');
-    renderSimPanel();
-  } else if (tab === 'todo') renderTodo();
-  else renderList();
-}
-
-// ── Static bindings ────────────────────────────────────────────────────────
-document.getElementById('btn-copy').onclick = () => {
-  const text = serialize();
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => toast('Скопировано!')).catch(() => copyFallback(text));
-  } else {
-    copyFallback(text);
-  }
-};
-
-function copyFallback(text) {
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
-  document.body.appendChild(ta);
-  ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
-  try { document.execCommand('copy'); toast('Скопировано!'); }
-  catch { toast('Не удалось скопировать'); }
-  document.body.removeChild(ta);
-}
-
-document.getElementById('btn-save').onclick     = saveFile;
-document.getElementById('overlay').onclick      = closeSheet;
-document.getElementById('sheet-close').onclick  = closeSheet;
-document.getElementById('sheet-del').onclick    = delItem;
-document.getElementById('btn-cat-toggle').onclick = () => {
-  const panel = document.getElementById('cat-panel');
-  const open = panel.hidden;
-  panel.hidden = !open;
-  document.getElementById('btn-cat-toggle').classList.toggle('active', open);
-  if (open) renderCategoryPanel();
-};
-document.getElementById('btn-cat-add').onclick = addCategory;
-['cat-icon', 'cat-name'].forEach(id =>
-  document.getElementById(id).addEventListener('keydown', e => {
-    if (e.key === 'Enter') addCategory();
-  })
-);
-
-document.getElementById('tabs').addEventListener('click', e => {
-  const tab = e.target.closest('[data-tab]');
-  if (tab) switchTab(tab.dataset.tab);
-});
-
-['search', 'filter-cat', 'filter-rarity'].forEach(id =>
-  document.getElementById(id).addEventListener('input', () => {
-    if (S.tab === 'todo') renderTodo();
-    else if (S.tab !== 'simulator') renderList();
-  })
-);
-
-// ── Simulator ──────────────────────────────────────────────────────────────
-const sim = { gold: 0, luck: 0, nextLevel: 1, depthLevel: 1, stats: {} };
-
-// Apply effect deltas to sim.stats.
-// oldRarity: if set, subtracts old rarity value first (for merges/replaces).
-// sign: +1 for add, -1 for remove (recycle).
-function simApplyEffects(effect, rarity, sign, oldRarity = 0) {
-  if (!effect) return;
-  const effects = Array.isArray(effect) ? effect : [effect];
-  for (const e of effects) {
-    if (!e?.stat) continue;
-    let newVal = 0, oldVal = 0;
-    if (e.effectByRarity) {
-      newVal = e.effectByRarity[rarity]    ?? 0;
-      oldVal = e.effectByRarity[oldRarity] ?? 0;
-    } else {
-      const v = e.value ?? 0;
-      newVal = v * (RARITY_EFFECT_MULT[rarity]    ?? 1);
-      oldVal = v * (RARITY_EFFECT_MULT[oldRarity] ?? 0);
-    }
-    sim.stats[e.stat] = (sim.stats[e.stat] ?? 0) + sign * (newVal - oldVal);
-  }
-}
-
-function renderSimPanel() {
-  document.getElementById('sim-gold-disp').textContent  = Math.floor(sim.gold);
-  document.getElementById('sim-luck-disp').textContent  = sim.luck;
-  document.getElementById('sim-level-disp').textContent = sim.nextLevel - 1;
-  document.getElementById('sim-next-level').textContent = sim.nextLevel;
-  document.getElementById('sim-depth-disp').textContent = sim.depthLevel;
-}
-
-function simGiveArtifact() {
-  const locked = getLockedCategories();
-  if (locked.length === 0) {
-    addSlot();
-    renderSimPanel();
-    toast('Все категории разблокированы — выдан дополнительный слот');
+function render() {
+  renderUiText();
+  renderTabState();
+  if (S.tab === 'stats') {
+    renderStats();
+    syncQueryFromState();
     return;
   }
-  if (locked.length === 1) {
-    unlockCategory(locked[0].id);
-    addSlot();
-    renderSimPanel();
-    toast(`Разблокировано: ${locked[0].icon} ${locked[0].name} (+1 слот)`);
+  renderRaritySwitch();
+  const items = getFilteredItems();
+  const selected = getSelectedItem(items);
+
+  if (!selected) {
+    el.list.innerHTML = `<li class="empty">${esc(ui('noResults'))}</li>`;
+    el.shopCard.innerHTML = `<div class="empty">${esc(ui('selectItem'))}</div>`;
+    el.itemStats.innerHTML = `<div class="empty">${esc(ui('selectItem'))}</div>`;
+    el.scale.innerHTML = `<div class="empty">${esc(ui('selectItem'))}</div>`;
+    el.dependencies.innerHTML = '';
     return;
   }
-  const shuffled = locked.slice().sort(() => Math.random() - 0.5);
-  const choices  = shuffled.slice(0, 2);
-  const panel    = document.getElementById('sim-artifact-panel');
-  const container = document.getElementById('sim-artifact-choices');
-  container.innerHTML = choices.map(c =>
-    `<button class="sim-artifact-choice" data-cat-id="${c.id}">${c.icon} ${c.name}</button>`
-  ).join('');
-  container.querySelectorAll('.sim-artifact-choice').forEach(btn =>
-    btn.addEventListener('click', () => {
-      unlockCategory(btn.dataset.catId);
-      addSlot();
-      panel.hidden = true;
-      renderSimPanel();
-      toast(`Разблокировано: ${btn.textContent.trim()} (+1 слот)`);
-    })
-  );
-  panel.hidden = false;
+
+  renderList(items, selected);
+  renderShopCard(selected);
+  renderDependencies(selected);
+  renderItemAffectedStats(selected);
+  renderScale(selected);
+  syncQueryFromState();
 }
 
-// Track gold + stats changes from shop events
-document.addEventListener('shop:purchase-item', e => {
-  sim.gold -= e.detail.cost;
-  simApplyEffects(e.detail.effect, e.detail.rarity, 1);
-  renderShopUI(sim.gold, sim.stats);
-  renderSimPanel();
+el.search.addEventListener('input', () => {
+  S.search = el.search.value;
+  render();
 });
-document.addEventListener('shop:purchase-equipment', e => {
-  sim.gold -= e.detail.cost;
-  const equip = ALL_EQUIPMENT.find(eq => eq.id === e.detail.effectId);
-  if (equip?.effect) simApplyEffects(equip.effect, e.detail.rarity, 1, e.detail.oldRarity);
-  renderShopUI(sim.gold, sim.stats);
-  renderSimPanel();
+el.filter.addEventListener('change', () => {
+  S.filter = el.filter.value;
+  render();
 });
-document.addEventListener('shop:recycle', e => {
-  sim.gold += e.detail.refund;
-  const equip = ALL_EQUIPMENT.find(eq => eq.id === e.detail.effectId);
-  if (equip?.effect) simApplyEffects(equip.effect, e.detail.rarity, -1);
-  renderShopUI(sim.gold, sim.stats);
-  renderSimPanel();
+el.artifactType.addEventListener('change', () => {
+  S.artifactType = el.artifactType.value;
+  render();
 });
-document.addEventListener('shop:reroll', e => {
-  sim.gold -= e.detail.cost;
-  renderShopUI(sim.gold, sim.stats);
-  renderSimPanel();
+el.statFilter.addEventListener('change', () => {
+  S.statFilter = el.statFilter.value;
+  render();
 });
-document.addEventListener('shop:synergies-changed', e => {
-  for (const { bonuses } of (e.detail.removed ?? [])) {
-    for (const b of bonuses) sim.stats[b.stat] = (sim.stats[b.stat] ?? 0) - (b.value ?? 0);
-  }
-  for (const { bonuses } of (e.detail.added ?? [])) {
-    for (const b of bonuses) sim.stats[b.stat] = (sim.stats[b.stat] ?? 0) + (b.value ?? 0);
-  }
-  renderShopUI(sim.gold, sim.stats);
+el.lang.addEventListener('change', () => {
+  const next = el.lang.value === 'ru' ? 'ru' : 'en';
+  S.locale = next;
+  setLocale(next);
+  render();
 });
-
-// Init shop module (builds DOM into #shopModal, binds events)
-initShop({ onClose: () => renderSimPanel() });
-
-document.querySelectorAll('[data-gold]').forEach(btn =>
-  btn.addEventListener('click', () => {
-    sim.gold += +btn.dataset.gold;
-    renderSimPanel();
-  })
-);
-document.getElementById('btn-sim-add-luck').addEventListener('click', () => {
-  sim.luck += 1;
-  renderSimPanel();
+el.tabCards.addEventListener('click', () => {
+  S.tab = 'cards';
+  render();
 });
-document.getElementById('btn-sim-add-depth').addEventListener('click', () => {
-  sim.depthLevel = Math.min(8, sim.depthLevel + 1);
-  renderSimPanel();
+el.tabStats.addEventListener('click', () => {
+  S.tab = 'stats';
+  render();
 });
-document.getElementById('btn-sim-open').addEventListener('click', () => {
-  openShop(sim.gold, sim.depthLevel, sim.luck, sim.stats);
-  sim.nextLevel++;
-  renderSimPanel();
+el.resetFilters.addEventListener('click', () => {
+  S.search = '';
+  S.filter = 'all';
+  S.artifactType = 'all';
+  S.statFilter = 'all';
+  S.rarity = 1;
+  el.search.value = '';
+  render();
 });
-document.getElementById('btn-sim-artifact').addEventListener('click', simGiveArtifact);
-document.getElementById('btn-sim-reset').addEventListener('click', () => {
-  resetShopState();
-  sim.gold = 0;
-  sim.luck = 0;
-  sim.nextLevel = 1;
-  sim.depthLevel = 1;
-  sim.stats = {};
-  document.getElementById('sim-artifact-panel').hidden = true;
-  renderSimPanel();
-  toast('Симулятор сброшен');
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  const next = S.rarity + (event.key === 'ArrowRight' ? 1 : -1);
+  if (next < 1 || next > 4) return;
+  S.rarity = next;
+  render();
 });
 
-// ── Boot ───────────────────────────────────────────────────────────────────
-populateCategoryFilter();
-renderCategoryPanel();
-renderStatGuide();
-renderList();
+parseInitialStateFromQuery();
+setLocale(S.locale);
+el.search.value = S.search;
+render();
 </script>
 </body>
 </html>
