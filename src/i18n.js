@@ -318,7 +318,7 @@ const TRANSLATIONS = {
     "perk.tile.armor.name": "Armor",
     "perk.tile.armor.desc": "+1 armor against external hazards",
     "perk.tile.boost.name": "Boost",
-    "perk.tile.boost.desc": "+3 sec drill boost",
+    "perk.tile.boost.desc": "+8 sec drill boost",
 
     // ── Gold perk names ──────────────────────────────────────────────────────
     "perk.gold.contour_charge.name": "Contour Charge",
@@ -595,6 +595,7 @@ const TRANSLATIONS = {
     "desc.special.fragile_drill": "Damage {flat} + {scale}% of drill power{total}.\n{speed}% drill speed while armor is active.",
     "desc.special.lucky_pickaxe": "Damage {flat} + {scale}% of drill power + {luck}% of luck{total}.\nOn gold vein hit: vein value grows by {ore}.",
     "desc.special.shard_drill": "Damage {flat}{total} + {chance}% breach chance.\nOn breach hit: explosion for {explosion} +{expScale}%{explosionTotal} damage.",
+    "desc.special.breach_missile": "Damage +{flat} + {drillScale}% of drill power{totalDamage}. +{chance}% breach chance.\nOn breach hit: rocket for {rocket} +{expScale}% explosion power{rocketTotal}, radius {radius}.",
 
     // ── Special item desc parts ──────────────────────────────────────────────
     "item.afterburner.hp_penalty": "−1 max HP (min 1)",
@@ -972,7 +973,7 @@ const TRANSLATIONS = {
     "perk.tile.armor.name": "Броня",
     "perk.tile.armor.desc": "+1 брони против внешней опасности",
     "perk.tile.boost.name": "Форсаж",
-    "perk.tile.boost.desc": "+3 сек форсажа бура",
+    "perk.tile.boost.desc": "+8 сек форсажа бура",
 
     // ── Gold perk names ──────────────────────────────────────────────────────
     "perk.gold.contour_charge.name": "Контурный заряд",
@@ -1249,6 +1250,7 @@ const TRANSLATIONS = {
     "desc.special.fragile_drill": "Урон {flat} + {scale}% от силы бура{total}.\n{speed}% к скорости бура, пока есть броня.",
     "desc.special.lucky_pickaxe": "Урон {flat} + {scale}% от силы бура + {luck}% от удачи{total}.\nПри ударе по золотой жиле её ценность растёт на {ore}.",
     "desc.special.shard_drill": "Урон {flat}{total} + {chance}% к шансу бреши.\nПри попадании в брешь: взрыв на {explosion} +{expScale}%{explosionTotal} урона.",
+    "desc.special.breach_missile": "Урон +{flat} + {drillScale}% от силы бура{totalDamage}. +{chance}% к шансу бреши.\nПри попадании в брешь: ракета на {rocket} +{expScale}% от силы взрыва{rocketTotal}, радиус {radius}.",
 
     // ── Special item desc parts ──────────────────────────────────────────────
     "item.afterburner.hp_penalty": "−1 макс. HP (не ниже 1)",

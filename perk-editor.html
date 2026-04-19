@@ -85,7 +85,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .item-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
 .item-rarity { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.06); }
 .item-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(215,159,73,0.1); color: var(--acc); }
-.item-cost { font-size: 11px; color: var(--acc); margin-left: auto; flex-shrink: 0; }
 .btn-add-item {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 13px; border-radius: var(--r);
@@ -129,6 +128,47 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .field input.icon-f { font-size: 20px; text-align: center; max-width: 70px; }
 .field-row { display: flex; gap: 8px; }
 .field-row .field { flex: 1; }
+.preview-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg3);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.preview-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preview-card__icon {
+  width: 28px;
+  text-align: center;
+  font-size: 20px;
+  line-height: 1;
+}
+.preview-card__name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.preview-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.preview-card__desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.preview-card__hint {
+  font-size: 11px;
+  color: var(--muted);
+}
 .tags-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .tag-chip { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 12px; background: rgba(215,159,73,0.12); border: 1px solid rgba(215,159,73,0.3); color: var(--acc); font-size: 12px; }
 .tag-chip button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
@@ -492,7 +532,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <div id="shopModal" class="shop-modal" hidden></div>
 
 <script type="module">
-const { ALL_EQUIPMENT, ALL_ITEMS, CATEGORIES, RARITY_EFFECT_MULT } = await import(`./src/items-catalog.js?t=${Date.now()}`);
+const {
+  ALL_EQUIPMENT,
+  ALL_ITEMS,
+  CATEGORIES,
+  RARITY_EFFECT_MULT,
+  getGoodDescription,
+} = await import(`./src/items-catalog.js?t=${Date.now()}`);
 const { TODO_ITEMS } = await import(`./src/items-todo.js?t=${Date.now()}`);
 const {
   initShop, openShop, renderShop: renderShopUI, resetShopState,
@@ -508,6 +554,7 @@ const S = {
   tab:       'equipment',  // 'equipment' | 'items' | 'todo'
   selId:     null,
   dirty:     false,
+  previewRarity: 1,
 };
 
 const RARITY_NAMES  = { 1: 'Обычный', 2: 'Необычный', 3: 'Редкий', 4: 'Легендарный' };
@@ -519,7 +566,7 @@ const STAT_GROUPS = [
       { id: 'drillPower',         name: 'Сила бура',               desc: 'Плоский бонус к базовому урону удара.' },
       { id: 'strikeSpeed',        name: 'Скорость бура',           desc: 'Ускоряет цикл удара бура.' },
       { id: 'damageBonus',        name: 'Общий бонус урона',       desc: 'Процентный множитель урона ударов и взрывов.' },
-      { id: 'explosionDamageMultiplier', name: 'Множитель урона взрывов', desc: 'Дополнительный множитель только для взрывов. 1 = базово, 2 = x2.' },
+      { id: 'explosionBonus', name: 'Бонус урона взрывов', desc: 'Процентный бонус только для взрывов.' },
       { id: 'drillPowerPerLevel', name: 'Сила бура за уровень',   desc: 'При каждом новом уровне усиливает базовый урон бура.' },
       { id: 'strikeSpeedPerLevel',name: 'Скорость бура за уровень',desc: 'При каждом новом уровне ускоряет бур.' },
     ],
@@ -530,8 +577,7 @@ const STAT_GROUPS = [
       { id: 'maxHeat',                   name: 'Макс. нагрев',                  desc: 'Поднимает потолок heat до перегрева.' },
       { id: 'heatRate',                  name: 'Скорость нагрева',              desc: 'Множитель набора heat. Меньше 1 = медленнее греется.' },
       { id: 'heatDamageBonus',           name: 'Бонус урона от heat',           desc: 'Усиливает урон, который масштабируется от текущего нагрева.' },
-      { id: 'heatExplosionDamageBonus',  name: 'Бонус урона взрыва перегрева',  desc: 'Спецстата для перегревных/heat-взрывов.' },
-      { id: 'heatExplosionRadiusBonus',  name: 'Бонус радиуса взрыва перегрева',desc: 'Спецстата для радиуса heat-взрывов.' },
+      { id: 'explosionRadiusBonus',  name: 'Радиус взрывов', desc: 'Увеличивает радиус всех взрывов.' },
     ],
   },
   {
@@ -539,7 +585,7 @@ const STAT_GROUPS = [
     stats: [
       { id: 'maxFuel',        name: 'Макс. топливо',      desc: 'Повышает верхний предел топлива.' },
       { id: 'fuelDrainRate',  name: 'Расход топлива',     desc: 'Множитель расхода топлива. Меньше 1 = экономнее, больше 1 = прожорливее.' },
-      { id: 'fuelPickupBonus',name: 'Бонус топлива',      desc: 'Плоский бонус к каждому получению топлива.' },
+      { id: 'fuelBonus',name: 'Бонус топлива',      desc: 'Процентный бонус к каждому получению топлива.' },
       { id: 'fuelPerLevel',   name: 'Топливо за уровень', desc: 'При каждом новом уровне выдаёт дополнительное топливо.' },
     ],
   },
@@ -561,10 +607,9 @@ const STAT_GROUPS = [
   {
     label: '⚡ Контур',
     stats: [
-      { id: 'maxLoopLength',     name: 'Макс. длина контура',    desc: 'Максимальное количество клеток в контуре. По умолчанию 10.' },
+      { id: 'maxContour',        name: 'Макс. длина контура',    desc: 'Максимальное количество клеток в контуре. По умолчанию 10.' },
       { id: 'speedOfAutoClose',  name: 'Скорость автозамыкания', desc: 'Ускоряет автоматическое дорисовывание контура.' },
       { id: 'idleAutoCloseDelay',name: 'Задержка автозамыкания', desc: 'Сколько секунд бездействия до старта автозамыкания.' },
-      { id: 'loopChargeLevel',   name: 'Уровень контурного заряда', desc: 'Усиливает баф после замкнутого контура.' },
       { id: 'loopPerkLevel',     name: 'Уровень контурного трофея', desc: 'Повышает шанс предмета внутри замкнутого контура.' },
       { id: 'effectDurationRate',name: 'Длительность эффектов',  desc: 'Множитель длительности временных бафов и состояний.' },
       { id: 'concentration',     name: 'Концентрация',           desc: 'Влияет на длительность некоторых негативных состояний, например стана.' },
@@ -575,7 +620,7 @@ const STAT_GROUPS = [
     stats: [
       { id: 'miningGoldBonusMultiplier', name: 'Бонус золота',       desc: 'Увеличивает золото, добытое из жил и других источников майнинга.' },
       { id: 'goldBonusPerLevel',         name: 'Золото за уровень',  desc: 'При каждом новом уровне добавляет бонус к добыче золота.' },
-      { id: 'xpBonusMultiplier',         name: 'Бонус опыта',        desc: 'Увеличивает количество опыта с кристаллов и других pickup-источников.' },
+      { id: 'xpBonus',         name: 'Бонус опыта',        desc: 'Увеличивает количество опыта с кристаллов и других pickup-источников.' },
       { id: 'bonusFindChance',           name: 'Чутьё',              desc: 'Шанс дополнительной находки/награды в системах, где это поддержано.' },
     ],
   },
@@ -594,6 +639,15 @@ const STAT_GROUPS = [
 const STAT_GUIDE = STAT_GROUPS.flatMap(g => g.stats);
 const ALL_STATS = STAT_GUIDE.map(stat => stat.id);
 const STAT_GUIDE_MAP = new Map(STAT_GUIDE.map(stat => [stat.id, stat]));
+const PREVIEW_STATS_ALL_10 = (() => {
+  const stats = {};
+  for (const key of ALL_STATS) stats[key] = 10;
+  stats.heat = 10;
+  stats.drillPower = 10;
+  stats.explosionPower = 10;
+  stats.luck = 10;
+  return stats;
+})();
 
 function normalizeTodoItem(item) {
   const next = JSON.parse(JSON.stringify(item ?? {}));
@@ -864,7 +918,6 @@ function renderList() {
             ${tags}${effectLabel}
           </div>
         </div>
-        <div class="item-cost">${item.baseCost} ●</div>
       </div>
     `;
   }).join('') + `<button class="btn-add-item" id="btn-add-item">＋ Добавить</button>`;
@@ -878,6 +931,30 @@ function renderList() {
     })
   );
   document.getElementById('btn-add-item').onclick = addItem;
+}
+
+function renderSheetPreviewCard(item) {
+  const rarity = Math.max(1, Math.min(4, Number(S.previewRarity) || 1));
+  const rarityName = RARITY_NAMES[rarity] ?? `R${rarity}`;
+  const rarityColor = RARITY_COLORS[rarity] ?? '#aaa';
+  const category = categoryName(item.category);
+  const desc = getGoodDescription(item, rarity, PREVIEW_STATS_ALL_10) || item.desc || '';
+  const card = document.getElementById('preview-card');
+  if (!card) return;
+  card.innerHTML = `
+    <div class="preview-card__head">
+      <div class="preview-card__icon">${esc(item.icon || '✦')}</div>
+      <div style="min-width:0;flex:1">
+        <div class="preview-card__name">${esc(item.name || 'Новый')}</div>
+        <div class="preview-card__meta">
+          <span class="item-rarity" style="color:${rarityColor}">${esc(rarityName)}</span>
+          <span class="item-tag">${esc(category)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="preview-card__desc">${esc(desc)}</div>
+    <div class="preview-card__hint">Превью считает, что все статы = 10.</div>
+  `;
 }
 
 // ── Sheet body ─────────────────────────────────────────────────────────────
@@ -894,6 +971,9 @@ function renderSheetBody() {
 
   const rarityOpts = [1,2,3,4].map(r =>
     `<option value="${r}" ${item.minRarity === r ? 'selected' : ''}>${RARITY_NAMES[r]}</option>`
+  ).join('');
+  const previewRarityOpts = [1,2,3,4].map(r =>
+    `<option value="${r}" ${Number(S.previewRarity) === r ? 'selected' : ''}>${RARITY_NAMES[r]}</option>`
   ).join('');
 
   const statOpts = ALL_STATS.map(s =>
@@ -951,16 +1031,20 @@ function renderSheetBody() {
     <div class="sep"></div>
     <div class="field-row">
       <div class="field">
+        <label>Превью редкости</label>
+        <select id="preview-rarity">${previewRarityOpts}</select>
+      </div>
+    </div>
+    <div class="preview-card" id="preview-card"></div>
+    <div class="sep"></div>
+    <div class="field-row">
+      <div class="field">
         <label>Категория (пул)</label>
         <select id="n-cat">${catOpts}</select>
       </div>
       <div class="field">
         <label>Мин. редкость</label>
         <select id="n-rarity">${rarityOpts}</select>
-      </div>
-      <div class="field">
-        <label>Цена (Common)</label>
-        <input id="n-cost" type="number" min="1" value="${item.baseCost}">
       </div>
     </div>
     ${tagsHtml}
@@ -971,19 +1055,23 @@ function renderSheetBody() {
   const live   = (id, fn) => document.getElementById(id)?.addEventListener('input',  e => { fn(e.target.value); markDirty(); });
   const change = (id, fn) => document.getElementById(id)?.addEventListener('change', e => { fn(e.target.value); markDirty(); });
 
-  live('n-name', v => { item.name = v; document.getElementById('sheet-title').textContent = v || 'Предмет'; renderList(); });
-  live('n-icon', v => { item.icon = v; renderList(); });
-  live('n-desc', v => { item.desc = v; renderList(); });
+  live('n-name', v => { item.name = v; document.getElementById('sheet-title').textContent = v || 'Предмет'; renderList(); renderSheetPreviewCard(item); });
+  live('n-icon', v => { item.icon = v; renderList(); renderSheetPreviewCard(item); });
+  live('n-desc', v => { item.desc = v; renderList(); renderSheetPreviewCard(item); });
+  document.getElementById('preview-rarity')?.addEventListener('change', e => {
+    S.previewRarity = Number(e.target.value) || 1;
+    renderSheetPreviewCard(item);
+  });
 
   change('n-id', v => {
     item.id = v;
     S.selId = v;
     renderList();
+    renderSheetPreviewCard(item);
   });
 
-  change('n-cat',    v => { item.category  = v; renderList(); });
-  change('n-rarity', v => { item.minRarity = +v; renderList(); });
-  change('n-cost',   v => { item.baseCost  = Math.max(1, +v || 1); renderList(); });
+  change('n-cat',    v => { item.category  = v; renderList(); renderSheetPreviewCard(item); });
+  change('n-rarity', v => { item.minRarity = +v; renderList(); renderSheetPreviewCard(item); });
 
   // Tags
   if (isEquip) {
@@ -1014,9 +1102,11 @@ function renderSheetBody() {
   // Effect
   if (!isEquip) {
     if (!item.effect) item.effect = { stat: 'luck', value: 1 };
-    change('e-stat', v => { item.effect.stat = v; renderList(); });
-    live('e-val',    v => { item.effect.value = parseFloat(v) || 0; renderList(); });
+    change('e-stat', v => { item.effect.stat = v; renderList(); renderSheetPreviewCard(item); });
+    live('e-val',    v => { item.effect.value = parseFloat(v) || 0; renderList(); renderSheetPreviewCard(item); });
   }
+
+  renderSheetPreviewCard(item);
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────
@@ -1031,7 +1121,6 @@ function addItem() {
     desc:      'Описание',
     category:  categories()[0]?.id ?? 'basic',
     minRarity: 1,
-    baseCost:  30,
   };
   if (type === 'equipment') base.tags = [];
   else base.effect = { stat: 'luck', value: 1 };
@@ -1077,7 +1166,6 @@ function serializeItem(item) {
   lines.push(`    category: ${JSON.stringify(item.category)},`);
   if (isEquip) lines.push(`    tags: ${JSON.stringify(item.tags ?? [])},`);
   lines.push(`    minRarity: ${item.minRarity},`);
-  lines.push(`    baseCost: ${item.baseCost},`);
   if (!isEquip && item.effect) lines.push(`    effect: { stat: ${JSON.stringify(item.effect.stat)}, value: ${item.effect.value} },`);
   lines.push(`  },`);
   return lines.join('\n');
@@ -1115,13 +1203,6 @@ export const RARITY_EFFECT_MULT = {
   2: 1.5,
   3: 2,
   4: 3,
-};
-
-export const RARITY_COST_MULT = {
-  1: 1,
-  2: 1.8,
-  3: 3,
-  4: 5,
 };
 
 export const CATEGORIES = [

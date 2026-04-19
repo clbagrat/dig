@@ -74,8 +74,8 @@ const STEAM_DAMAGE = 25;
 const STEAM_RANGE = 99;
 const EXPLOSION_BREAK_DAMAGE = 9999;
 const ROCKET_ARMED_DURATION = 1.0;
-const BREACH_MISSILE_DAMAGE = 80;
-const BREACH_MISSILE_RADIUS = 1.2;
+const BREACH_MISSILE_DAMAGE = 20;
+const BREACH_MISSILE_RADIUS = 1.5;
 const FUEL_ROCKET_DAMAGE = 45;
 const FUEL_ROCKET_RADIUS = 1.5;
 const CRYO_ROCKET_DAMAGE = 28;
@@ -3551,7 +3551,7 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
       state.perkText = t("perk.tile.armor.name");
       break;
     case 8:
-      activateDrillOverdrive(3, "");
+      activateDrillOverdrive(8, "");
       state.perkText = t("perk.tile.boost.name");
       break;
     default:
@@ -6697,8 +6697,8 @@ function activateDrillOverdrive(duration, toastText = "") {
     return 0;
   }
   playSound("drill_overdrive");
-  state.overhealDrillTimer = Math.max(state.overhealDrillTimer, actualDuration);
-  state.overdriveDisplayDuration = Math.max(state.overdriveDisplayDuration, actualDuration);
+  state.overhealDrillTimer += actualDuration;
+  state.overdriveDisplayDuration += actualDuration;
   if (toastText) {
     showPerkToast(toastText);
   }
@@ -7299,6 +7299,7 @@ function getStrikeDamage() {
     getFragileDrillDamageBonus() +
     getLuckyPickaxeDamageBonus() +
     getShardDrillDamageBonus() +
+    getBreachMissileDamageBonus() +
     getThermoDrillDamageBonus();
   return damage * (1 + state.damageBonus / 100) * lowFuelDamageBoost;
 }
@@ -7385,6 +7386,16 @@ function getShardDrillExplosionDamage() {
   const flat = sumEquipmentTierValues("shard_drill", [0, 20, 30, 45, 60]);
   const scale = sumEquipmentTierValues("shard_drill", [0, 10, 10, 10, 10]);
   return flat + state.explosionPower * (scale / 100);
+}
+
+function getBreachMissileDamageBonus() {
+  const flat = sumEquipmentTierValues("breach_missile", [0, 10, 10, 10, 10]);
+  const scale = sumEquipmentTierValues("breach_missile", [0, 10, 15, 20, 25]);
+  return flat + state.drillPower * (scale / 100);
+}
+
+function getBreachMissileExplosionScaleForTier(tier) {
+  return [0, 0.3, 0.4, 0.5, 0.6][tier] || 0.3;
 }
 
 function getLuckyPickaxeOreGain() {
@@ -8412,8 +8423,15 @@ function damageCell(x, y, damage, options = {}) {
     if (state.weakSpotFuelGain > 0) {
       addFuel(state.weakSpotFuelGain);
     }
-    for (let ri = 0; ri < state.breachMissileLevel; ri += 1) {
-      fireRocket(x, y, BREACH_MISSILE_DAMAGE, BREACH_MISSILE_RADIUS, 1 + Math.floor(Math.random() * 3));
+    for (const tier of getEquipmentTiers("breach_missile")) {
+      fireRocket(
+        x,
+        y,
+        BREACH_MISSILE_DAMAGE,
+        BREACH_MISSILE_RADIUS,
+        1 + Math.floor(Math.random() * 3),
+        { explosionPowerScale: getBreachMissileExplosionScaleForTier(tier) },
+      );
     }
     const shardBlastDamage = getShardDrillExplosionDamage();
     if (shardBlastDamage > 0) {
@@ -8482,7 +8500,7 @@ function damageCell(x, y, damage, options = {}) {
   }
 
   const actualDamage = spikeExplosion ? state.health[index] : Math.min(state.health[index], damage);
-  spawnDamageNumberEffect(x, y, actualDamage);
+  spawnDamageNumberEffect(x, y, damage);
   state.health[index] -= spikeExplosion ? actualDamage : damage;
   if (state.health[index] > 0) {
     continuePierce();
@@ -8636,10 +8654,15 @@ function breakCell(x, y, index, options = {}) {
 
 const EXPLOSION_WAVE_DELAY = 0.05;
 
+function getScaledExplosionDamage(baseDamage, options = {}) {
+  const explosionPowerScale = Number.isFinite(options.explosionPowerScale) ? options.explosionPowerScale : 1;
+  return (baseDamage + state.explosionPower * explosionPowerScale) * (1 + state.explosionBonus / 100);
+}
+
 function explodeAt(x, y, damage, radius = 2, options = {}) {
   const scaledRadius = radius + (options.skipRadiusBonus ? 0 : (state.explosionRadiusBonus || 0));
   spawnExplosionEffect(x, y, scaledRadius);
-  const scaledDamage = (damage + state.explosionPower) * (1 + state.explosionBonus / 100);
+  const scaledDamage = getScaledExplosionDamage(damage, options);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(scaledRadius);
   let affectedCellCount = 0;
@@ -8695,16 +8718,17 @@ function detonateRocketEffect(effect) {
   if (effect.payload.kind === "radiusBomb") {
     const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
     if (distToPlayer <= effect.payload.radius) {
-      const scaledDamage = (effect.payload.damage + state.explosionPower) * (1 + state.explosionBonus / 100);
+      const scaledDamage = getScaledExplosionDamage(effect.payload.damage, effect.payload);
       addHeatOnStrike(Math.round(scaledDamage * 0.3));
     }
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
       guaranteedBreak: false,
+      explosionPowerScale: effect.payload.explosionPowerScale,
     });
   }
 }
 
-function fireRocket(originX, originY, baseDamage, baseRadius, distance) {
+function fireRocket(originX, originY, baseDamage, baseRadius, distance, options = {}) {
   const directions = [
     { x: 1, y: 0 },
     { x: -1, y: 0 },
@@ -8722,6 +8746,7 @@ function fireRocket(originX, originY, baseDamage, baseRadius, distance) {
     kind: "radiusBomb",
     damage: baseDamage,
     radius: baseRadius,
+    explosionPowerScale: options.explosionPowerScale,
   });
 }
 

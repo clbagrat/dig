@@ -25,13 +25,6 @@ export const RARITY_EFFECT_MULT = {
   4: 3,
 };
 
-export const RARITY_COST_MULT = {
-  1: 1,
-  2: 1.8,
-  3: 3,
-  4: 5,
-};
-
 const CATEGORY_DEFS = [
   { id: "basic",        icon: "D"  },
   { id: "economy",      icon: "●"  },
@@ -63,7 +56,6 @@ export const ALL_EQUIPMENT = [
     category: "heat",
     tags: ["heat"],
     minRarity: 2,
-    baseCost: 40,
   },
   {
     id: "basic_drill",
@@ -74,7 +66,6 @@ export const ALL_EQUIPMENT = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 30,
   },
   {
     id: "tradeoff_drill",
@@ -85,7 +76,6 @@ export const ALL_EQUIPMENT = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "weakSpotMult", effectByRarity: [null, -0.3, -0.5, -0.7, -1.0] },
     ],
@@ -99,7 +89,6 @@ export const ALL_EQUIPMENT = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 1,
-    baseCost: 35,
   },
   {
     id: "lucky_pickaxe",
@@ -110,7 +99,6 @@ export const ALL_EQUIPMENT = [
     category: "economy",
     tags: ["economy"],
     minRarity: 1,
-    baseCost: 30,
   },
   {
     id: "shard_drill",
@@ -121,7 +109,6 @@ export const ALL_EQUIPMENT = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "shardDrillLevel", effectByRarity: [null, 1, 2, 3, 4] },
       { stat: "weakSpotChance", effectByRarity: [null, 0.04, 0.06, 0.08, 0.10] },
@@ -138,7 +125,6 @@ export const ALL_EQUIPMENT = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
-    baseCost: 50,
     effect: { stat: "fuelConverterLevel", effectByRarity: [null, null, 1, 2, 3] },
   },
   {
@@ -150,7 +136,6 @@ export const ALL_EQUIPMENT = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
-    baseCost: 45,
     effect: { stat: "adrenalineLevel", effectByRarity: [null, null, 1, 1, 2] },
   },
   {
@@ -162,7 +147,6 @@ export const ALL_EQUIPMENT = [
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
     minRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "weakSpotFuelGain", effectByRarity: [null, null, 15, 25, 40] },
       { stat: "strikeSpeed",      effectByRarity: [null, null, -5, -5, -5] },
@@ -179,7 +163,6 @@ export const ALL_EQUIPMENT = [
     category: "контур",
     tags: ["контур", "урон"],
     minRarity: 2,
-    baseCost: 55,
     effect: [
       { stat: "loopLengthDamageBonus", effectByRarity: [null, null, 1, 2, 3] },
     ],
@@ -195,7 +178,6 @@ export const ALL_EQUIPMENT = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
-    baseCost: 50,
     effect: [
       { stat: "stunDetonatorLevel", effectByRarity: [null, null, 1, 1, 2] },
       { stat: "armor",              effectByRarity: [null, null, -25, -50, -50] },
@@ -208,14 +190,13 @@ export const ALL_EQUIPMENT = [
     type: "equipment",
     name: "Бреш-ракета",
     icon: "🎯",
-    desc: "При попадании в брешь запускает ракету. +5% шанс бреши.",
+    desc: "Даёт +10 урона и +10/15/20/25% от drillPower (по редкости). +5% шанс бреши. При попадании в брешь запускает ракету: 20 + 30/40/50/60% от explosionPower (по редкости), радиус 1.5.",
     category: "ракеты",
     tags: ["ракеты"],
     minRarity: 2,
-    baseCost: 50,
     effect: [
       { stat: "breachMissileLevel", effectByRarity: [null, null, 1, 1, 1] },
-      { stat: "weakSpotChance",     effectByRarity: [null, null, 0.05, 0.08, 0.12] },
+      { stat: "weakSpotChance",     effectByRarity: [null, null, 0.05, 0.05, 0.05] },
     ],
   },
   {
@@ -227,7 +208,6 @@ export const ALL_EQUIPMENT = [
     category: "ракеты",
     tags: ["ракеты"],
     minRarity: 2,
-    baseCost: 50,
     effect: [
       { stat: "cryoRocketCount", effectByRarity: [null, null, 1, 1, 1] },
       { stat: "heatRate",        effectByRarity: [null, null, -0.15, -0.20, -0.28] },
@@ -242,7 +222,6 @@ export const ALL_EQUIPMENT = [
     category: "ракеты",
     tags: ["ракеты"],
     minRarity: 2,
-    baseCost: 50,
     effect: [
       { stat: "fuelRocketLevel", effectByRarity: [null, null, 1, 1, 1] },
       { stat: "fuelDrainRate",   effectByRarity: [null, null, 0.10, 0.15, 0.20] },
@@ -260,7 +239,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "drillPower",   effectByRarity: [null, 8, 10, 12, 15] },
       { stat: "strikeSpeed",  effectByRarity: [null, -10, -10, -10, -10] },
@@ -274,7 +252,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "maxHp", effectByRarity: [null, 25, 40, 60, 90] },
       { stat: "speedOfAutoClose", effectByRarity: [null, -10, -10, -10, -10] },
@@ -288,7 +265,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "maxFuel", effectByRarity: [null, 60, 90, 130, 180] },
       { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
@@ -302,7 +278,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "fuelDrainRate", effectByRarity: [null, -0.10, -0.15, -0.20, -0.28] },
       { stat: "drillPower", effectByRarity: [null, -1, -1, -2, -3] },
@@ -316,7 +291,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 45,
     effect: [
       { stat: "fuelStarvationResistance", effectByRarity: [null, 15, 25, 40, 60] },
       { stat: "lowFuelDamageBonus", effectByRarity: [null, 0.10, 0.15, 0.22, 0.30] },
@@ -331,7 +305,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "contourResMultiplier", effectByRarity: [null, 0.10, 0.15, 0.20, 0.28] },
       { stat: "heatRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
@@ -345,7 +318,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "maxHeat", effectByRarity: [null, 10, 15, 25, 40] },
       { stat: "concentration", effectByRarity: [null, -10, -10, -10, -10] },
@@ -359,7 +331,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "heatRate", effectByRarity: [null, -0.10, -0.15, -0.22, -0.30] },
       { stat: "explosionPower", effectByRarity: [null, -10, -10, -10, -10] },
@@ -373,7 +344,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "strikeSpeed", effectByRarity: [null, 8, 12, 18, 26] },
       { stat: "maxHeat", effectByRarity: [null, -10, -10, -10, -10] },
@@ -387,7 +357,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "drillPower", effectByRarity: [null, 2, 3, 5, 8] },
       { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
@@ -401,7 +370,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "weakSpotChance", effectByRarity: [null, 0.03, 0.05, 0.07, 0.10] },
       { stat: "strikeSpeed", effectByRarity: [null, -5, -5, -5, -5] },
@@ -415,7 +383,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "weakSpotMult", effectByRarity: [null, 0.3, 0.45, 0.65, 0.9] },
       { stat: "drillPower", effectByRarity: [null, -1, -1, -2, -3] },
@@ -429,7 +396,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: { stat: "luck", effectByRarity: [null, 2, 3, 5, 8] },
   },
   {
@@ -440,7 +406,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "concentration", effectByRarity: [null, 10, 15, 20, 30] },
       { stat: "maxHeat", effectByRarity: [null, -10, -10, -10, -10] },
@@ -454,7 +419,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "effectDurationRate", effectByRarity: [null, 0.10, 0.15, 0.22, 0.30] },
       { stat: "concentration", effectByRarity: [null, -10, -10, -10, -10] },
@@ -468,7 +432,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "goldBonus", effectByRarity: [null, 0.05, 0.08, 0.12, 0.18] },
       { stat: "contourResMultiplier", effectByRarity: [null, -0.10, -0.10, -0.10, -0.10] },
@@ -482,7 +445,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "xpBonus", effectByRarity: [null, 0.08, 0.12, 0.18, 0.26] },
       { stat: "luck", effectByRarity: [null, -2, -3, -4, -6] },
@@ -496,7 +458,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 2,
-    baseCost: 40,
     effect: [
       { stat: "fuelBonus", effectByRarity: [null, null, 0.05, 0.10, 0.15] },
       { stat: "maxFuel", effectByRarity: [null, null, -10, -10, -10] },
@@ -510,7 +471,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "speedOfAutoClose", effectByRarity: [null, 5, 8, 12, 18] },
       { stat: "concentration", effectByRarity: [null, -10, -10, -10, -10] },
@@ -524,7 +484,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "maxContour", effectByRarity: [null, 1, 2, 3, 4] },
       { stat: "speedOfAutoClose", effectByRarity: [null, -5, -5, -5, -5] },
@@ -538,7 +497,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "damageBonus", effectByRarity: [null, 8, 12, 18, 25] },
       { stat: "explosionPower", effectByRarity: [null, -10, -10, -10, -10] },
@@ -552,7 +510,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "explosionPower", effectByRarity: [null, 10, 15, 22, 30] },
       { stat: "drillPower", effectByRarity: [null, -1, -1, -2, -3] },
@@ -566,7 +523,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 3,
-    baseCost: 35,
     effect: [
       { stat: "explosionRadiusBonus", effectByRarity: [null, null, null, 0.5, 1.0] },
       { stat: "goldBonus", effectByRarity: [null, null, null, -0.07, -0.07] },
@@ -583,7 +539,6 @@ export const ALL_ITEMS = [
     tags: ["basic"],
     minRarity: 2,
     maxRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "weakSpotPierce", effectByRarity: [null, null, 1] },
       { stat: "weakSpotMult", effectByRarity: [null, null, -0.3] },
@@ -597,7 +552,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 2,
-    baseCost: 40,
     effect: [
       { stat: "weakSpotFuelGain", effectByRarity: [null, null, 8, 12, 18] },
       { stat: "weakSpotChance", effectByRarity: [null, null, -0.02, -0.02, -0.02] },
@@ -611,7 +565,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "lowFuelSpeedBonus", effectByRarity: [null, 0.10, 0.15, 0.22, 0.30] },
       { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
@@ -625,7 +578,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 2,
-    baseCost: 40,
     effect: [
       { stat: "loopLengthDamageBonus", effectByRarity: [null, null, 1, 2, 3] },
       { stat: "drillPower", effectByRarity: [null, null, -1, -1, -1] },
@@ -639,7 +591,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 40,
     effect: { stat: "drillPowerPerLevel", effectByRarity: [null, 5, 7, 10, 12] },
   },
   {
@@ -650,7 +601,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 40,
     effect: { stat: "strikeSpeedPerLevel", effectByRarity: [null, 3, 5, 7, 10] },
   },
   {
@@ -662,7 +612,6 @@ export const ALL_ITEMS = [
     tags: ["basic"],
     minRarity: 1,
     maxRarity: 1,
-    baseCost: 40,
     effect: { stat: "healPerLevel", effectByRarity: [null, 50] },
   },
   {
@@ -673,7 +622,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 40,
     effect: { stat: "goldBonusPerLevel", effectByRarity: [null, 0.03, 0.05, 0.07, 0.10] },
   },
   {
@@ -685,7 +633,6 @@ export const ALL_ITEMS = [
     category: "контур",
     tags: ["контур"],
     minRarity: 1,
-    baseCost: 30,
     effect: {
       stat: "speedOfAutoClose",
       effectByRarity: [null, 3, 5, 8, 10],
@@ -700,7 +647,6 @@ export const ALL_ITEMS = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 1,
-    baseCost: 50,
     effect: { stat: "maxHp", value: 25 },
   },
   {
@@ -718,7 +664,6 @@ export const ALL_ITEMS = [
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
-    baseCost: 60,
     effect: [
       { stat: "strikeSpeed", effectByRarity: [null, 15, 22, 30, 40] },
       { stat: "maxHp",       effectByRarity: [null, -25, -25, -25, -25] },
@@ -734,7 +679,6 @@ export const ALL_ITEMS = [
     tags: ["навигация"],
     minRarity: 3,
     maxRarity: 3,
-    baseCost: 54,
     unique: true,
     effect: { stat: "artifactRadarMode", value: 1 },
   },
@@ -747,7 +691,6 @@ export const ALL_ITEMS = [
     category: "economy",
     tags: ["economy"],
     minRarity: 1,
-    baseCost: 35,
     effect: { stat: "miningGoldBonusMultiplier", effectByRarity: [null, 0.1, 0.15, 0.2, 0.3] },
   },
   {
@@ -760,7 +703,6 @@ export const ALL_ITEMS = [
     tags: ["навигация"],
     minRarity: 2,
     maxRarity: 2,
-    baseCost: 45,
     unique: true,
     effect: { stat: "goldRadarMode", value: 1 },
   },
@@ -773,7 +715,6 @@ export const ALL_ITEMS = [
     category: "навигация",
     tags: ["навигация"],
     minRarity: 1,
-    baseCost: 50,
     unique: true,
     maxRarity: 1,
     effect: { stat: "navigatorMode", value: 1 },
@@ -787,7 +728,6 @@ export const ALL_ITEMS = [
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
-    baseCost: 30,
     effect: {
       stat: "strikeSpeed",
       effectByRarity: [null, 5, 8, 10, 13],
@@ -802,7 +742,6 @@ export const ALL_ITEMS = [
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
     minRarity: 1,
-    baseCost: 35,
     effect: {
       stat: "weakSpotChance",
       effectByRarity: [null, 0.03, 0.05, 0.08, 0.10],
@@ -819,7 +758,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 40,
     effect: {
       stat: "drillPowerPerLevel",
       effectByRarity: [null, 2, 4, 6, 8],
@@ -834,7 +772,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 40,
     effect: {
       stat: "explosionPowerPerLevel",
       effectByRarity: [null, 2, 4, 6, 8],
@@ -849,7 +786,6 @@ export const ALL_ITEMS = [
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
-    baseCost: 35,
     effect: {
       stat: "fuelPerLevel",
       effectByRarity: [null, 50, 75, 100, 150],
@@ -864,7 +800,6 @@ export const ALL_ITEMS = [
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
-    baseCost: 35,
     effect: {
       stat: "strikeSpeedPerLevel",
       effectByRarity: [null, 2, 3, 4, 6],
@@ -879,7 +814,6 @@ export const ALL_ITEMS = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 1,
-    baseCost: 50,
     effect: {
       stat: "healPerLevel",
       effectByRarity: [null, 25, 25, 50, 75],
@@ -894,7 +828,6 @@ export const ALL_ITEMS = [
     category: "economy",
     tags: ["economy"],
     minRarity: 1,
-    baseCost: 35,
     effect: {
       stat: "goldBonusPerLevel",
       effectByRarity: [null, 0.02, 0.03, 0.04, 0.06],
@@ -910,7 +843,6 @@ export const ALL_ITEMS = [
     category: "heat",
     tags: ["heat"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "heatRate", effectByRarity: [null, -0.20, -0.28, -0.38, -0.50] },
       { stat: "maxHeat",  effectByRarity: [null, -10,   -15,   -20,   -30  ] },
@@ -927,7 +859,6 @@ export const ALL_ITEMS = [
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "drillPower",   effectByRarity: [null, 2,    3,    5,    8   ] },
       { stat: "fuelDrainRate",effectByRarity: [null, 0.15, 0.20, 0.28, 0.38] },
@@ -942,7 +873,6 @@ export const ALL_ITEMS = [
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "fuelDrainRate",effectByRarity: [null, -0.15, -0.22, -0.30, -0.40] },
       { stat: "strikeSpeed",  effectByRarity: [null, -8,    -10,   -12,   -15   ] },
@@ -959,7 +889,6 @@ export const ALL_ITEMS = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "healPerLevel", effectByRarity: [null, null, 25, 50, 75] },
       { stat: "maxHp",        effectByRarity: [null, null, -25, -25, -25] },
@@ -975,7 +904,6 @@ export const ALL_ITEMS = [
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "weakSpotChance", effectByRarity: [null, 0.05, 0.08, 0.12, 0.18] },
       { stat: "drillPower",     effectByRarity: [null, -1,   -1.5, -2,   -3  ] },
@@ -990,7 +918,6 @@ export const ALL_ITEMS = [
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
     minRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "weakSpotMult", effectByRarity: [null, null, 0.4, 0.7, 1.0] },
       { stat: "visionRadius", effectByRarity: [null, null, 1,   1,   2  ] },
@@ -1008,7 +935,6 @@ export const ALL_ITEMS = [
     category: "навигация",
     tags: ["навигация"],
     minRarity: 1,
-    baseCost: 40,
     unique: true,
     maxRarity: 2,
     effect: [
@@ -1026,7 +952,6 @@ export const ALL_ITEMS = [
     category: "навигация",
     tags: ["навигация"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "visionRadius", effectByRarity: [null, 2, 3, 4, 5] },
       { stat: "strikeSpeed",  effectByRarity: [null, -8, -10, -12, -15] },
@@ -1043,7 +968,6 @@ export const ALL_ITEMS = [
     category: "economy",
     tags: ["economy"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "xpBonus",         effectByRarity: [null, 0.08, 0.12, 0.18, 0.28] },
       { stat: "miningGoldBonusMultiplier",  effectByRarity: [null, -0.08, -0.10, -0.14, -0.20] },
@@ -1058,7 +982,6 @@ export const ALL_ITEMS = [
     category: "economy",
     tags: ["economy"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "bonusFindChance", effectByRarity: [null, 0.15, 0.22, 0.32, 0.45] },
       { stat: "armor",           effectByRarity: [null, -25,  -25,  -50,  -50  ] },
@@ -1073,7 +996,6 @@ export const ALL_ITEMS = [
     category: "алхимия",
     tags: ["алхимия"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "xpBonus",        effectByRarity: [null, 0.10, 0.15, 0.22, 0.32] },
       { stat: "miningGoldBonusMultiplier", effectByRarity: [null, -0.08, -0.10, -0.14, -0.20] },
@@ -1090,7 +1012,6 @@ export const ALL_ITEMS = [
     category: "ракеты",
     tags: ["ракеты"],
     minRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "explosionBonus", effectByRarity: [null, null, 0.30, 0.50, 0.80] },
       { stat: "heatRate",                  effectByRarity: [null, null, 0.10, 0.15, 0.20] },
@@ -1105,7 +1026,6 @@ export const ALL_ITEMS = [
     category: "ракеты",
     tags: ["ракеты"],
     minRarity: 2,
-    baseCost: 50,
     effect: [
       { stat: "explosionRadiusBonus",  effectByRarity: [null, null, 1.0, 1.5, 2.0] },
       { stat: "explosionBonus", effectByRarity: [null, null, 0.20, 0.35, 0.50] },
@@ -1121,7 +1041,6 @@ export const ALL_ITEMS = [
     category: "ракеты",
     tags: ["ракеты"],
     minRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "damageBonus",               effectByRarity: [null, null, 15,   22,   30  ] },
       { stat: "explosionRadiusBonus",  effectByRarity: [null, null, -0.5, -0.8, -1.0] },
@@ -1138,7 +1057,6 @@ export const ALL_ITEMS = [
     category: "heat",
     tags: ["heat"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "explosionBonus", effectByRarity: [null, 25, 50, 75, 100] },
       { stat: "explosionRadiusBonus", effectByRarity: [null, 0.5,  1.0,  1.5,  2.0 ] },
@@ -1154,7 +1072,6 @@ export const ALL_ITEMS = [
     category: "heat",
     tags: ["heat"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "heatRate",      effectByRarity: [null, -0.15, -0.20, -0.30, -0.40] },
       { stat: "concentration", effectByRarity: [null, -10, -15, -20, -30] },
@@ -1169,7 +1086,6 @@ export const ALL_ITEMS = [
     category: "maintenance",
     tags: ["maintenance"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "strikeSpeed",  effectByRarity: [null, 20, 28, 38, 50] },
       { stat: "fuelDrainRate",effectByRarity: [null, 0.15, 0.20, 0.25, 0.30] },
@@ -1184,7 +1100,6 @@ export const ALL_ITEMS = [
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
-    baseCost: 35,
     effect: { stat: "visionRadius", effectByRarity: [null, 1, 2, 3, 4] },
   },
   {
@@ -1196,7 +1111,6 @@ export const ALL_ITEMS = [
     category: "economy",
     tags: ["economy"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "luck",             effectByRarity: [null, 2,     3,     5,     8    ] },
       { stat: "xpBonus",effectByRarity: [null, -0.03, -0.05, -0.07, -0.10] },
@@ -1211,7 +1125,6 @@ export const ALL_ITEMS = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
-    baseCost: 50,
     effect: { stat: "insuranceLevel", effectByRarity: [null, null, 1, 2, 3] },
   },
   {
@@ -1223,7 +1136,6 @@ export const ALL_ITEMS = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "maxFuel",      effectByRarity: [null,  80,  120,  180,  250] },
       { stat: "fuelDrainRate",effectByRarity: [null, 0.10, 0.15, 0.20, 0.30] },
@@ -1238,7 +1150,6 @@ export const ALL_ITEMS = [
     category: "heat",
     tags: ["heat"],
     minRarity: 1,
-    baseCost: 35,
     effect: { stat: "maxHeat", effectByRarity: [null, 15, 25, 40, 60] },
   },
   {
@@ -1250,7 +1161,6 @@ export const ALL_ITEMS = [
     category: "economy",
     tags: ["economy"],
     minRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "miningGoldBonusMultiplier", effectByRarity: [null, null, 0.10, 0.18, 0.28] },
       { stat: "bonusFindChance",           effectByRarity: [null, null, -0.10, -0.15, -0.20] },
@@ -1265,7 +1175,6 @@ export const ALL_ITEMS = [
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "weakSpotChance", effectByRarity: [null, 0.05, 0.08, 0.12, 0.18] },
       { stat: "weakSpotMult",   effectByRarity: [null, 0.3,  0.5,  0.8,  1.2 ] },
@@ -1280,7 +1189,6 @@ export const ALL_ITEMS = [
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
     minRarity: 2,
-    baseCost: 50,
     unique: true,
     effect: [
       { stat: "weakSpotChance",  effectByRarity: [null, null, 0.04, 0.07, 0.12] },
@@ -1297,7 +1205,6 @@ export const ALL_ITEMS = [
     category: "контур",
     tags: ["контур"],
     minRarity: 1,
-    baseCost: 30,
     effect: { stat: "speedOfAutoClose", effectByRarity: [null, 5, 8, 12, 18] },
   },
   {
@@ -1309,7 +1216,6 @@ export const ALL_ITEMS = [
     category: "контур",
     tags: ["контур"],
     minRarity: 1,
-    baseCost: 35,
     effect: { stat: "maxContour", effectByRarity: [null, 3, 5, 8, 12] },
   },
   {
@@ -1321,7 +1227,6 @@ export const ALL_ITEMS = [
     category: "контур",
     tags: ["контур"],
     minRarity: 2,
-    baseCost: 50,
     effect: [
       { stat: "loopSpawnBonusChance", effectByRarity: [null, null, 0.30, 0.50, 0.75] },
       { stat: "maxContour",           effectByRarity: [null, null, -3,   -3,   -3   ] },
@@ -1338,7 +1243,6 @@ export const ALL_ITEMS = [
     tags: ["алхимия"],
     minRarity: 3,
     maxRarity: 3,
-    baseCost: 60,
     unique: true,
     effect: { stat: "beaconCatalystLevel", value: 1 },
   },
@@ -1351,7 +1255,6 @@ export const ALL_ITEMS = [
     category: "алхимия",
     tags: ["алхимия"],
     minRarity: 1,
-    baseCost: 40,
     effect: [
       { stat: "crystalGoldGain",          effectByRarity: [null, 15, 25, 40, 60] },
       { stat: "xpBonus",        effectByRarity: [null, -0.08, -0.10, -0.14, -0.20] },
@@ -1366,7 +1269,6 @@ export const ALL_ITEMS = [
     category: "алхимия",
     tags: ["алхимия"],
     minRarity: 1,
-    baseCost: 35,
     effect: [
       { stat: "crystalXpGain", effectByRarity: [null, 50, 80, 120, 180] },
       { stat: "luck",          effectByRarity: [null, -2, -3, -4, -6] },
@@ -1382,7 +1284,6 @@ export const ALL_ITEMS = [
     tags: ["алхимия"],
     minRarity: 3,
     maxRarity: 3,
-    baseCost: 60,
     unique: true,
     effect: { stat: "levelCatalystLevel", value: 1 },
   },
@@ -1397,7 +1298,6 @@ export const ALL_ITEMS = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
-    baseCost: 45,
     effect: [
       { stat: "stunReservoirLevel", effectByRarity: [null, null, 1, 2, 3] },
       { stat: "maxFuel",            effectByRarity: [null, null, -50, -60, -80] },
@@ -1412,7 +1312,6 @@ export const ALL_ITEMS = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
-    baseCost: 50,
     effect: { stat: "stunAfterburnerLevel", effectByRarity: [null, null, 1, 1, 2] },
   },
 ];
@@ -1589,6 +1488,31 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       ? ` [${formatDescriptionNumber(explosionDamage + stats.explosionPower * (explosionScale / 100))}]`
       : "";
     return t("desc.special.shard_drill", { flat: flatDamage, total: totalText, chance: formatDescriptionNumber(weakSpotChance * 100), explosion: formatDescriptionNumber(explosionDamage), expScale: explosionScale, explosionTotal });
+  },
+  breach_missile(rarity, stats = null) {
+    const flatDamage = getEffectValue({ effectByRarity: [0, 10, 10, 10, 10] }, rarity);
+    const drillScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const weakSpotChance = getEffectValue({ effectByRarity: [0, 0, 0.05, 0.05, 0.05] }, rarity);
+    const rocketDamage = 20;
+    const rocketExplosionScale = getEffectValue({ effectByRarity: [0, 30, 40, 50, 60] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const totalDamage = hasDrillPower
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (drillScale / 100))}]`
+      : "";
+    const rocketTotal = hasExplosionPower
+      ? ` [${formatDescriptionNumber(rocketDamage + stats.explosionPower * (rocketExplosionScale / 100))}]`
+      : "";
+    return t("desc.special.breach_missile", {
+      flat: formatDescriptionNumber(flatDamage),
+      drillScale: formatDescriptionNumber(drillScale),
+      totalDamage,
+      chance: formatDescriptionNumber(weakSpotChance * 100),
+      rocket: formatDescriptionNumber(rocketDamage),
+      expScale: formatDescriptionNumber(rocketExplosionScale),
+      rocketTotal,
+      radius: "1.5",
+    });
   },
 };
 
