@@ -268,6 +268,12 @@ html, body {
 .stats-wrap {
   padding: 12px;
 }
+.stats-controls {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr auto;
+  gap: 8px;
+  padding: 0 0 10px;
+}
 .stats-panel {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -364,6 +370,12 @@ html, body {
     </section>
   </main>
   <section id="stats-layout" class="stats-wrap" hidden>
+    <div id="stats-controls" class="stats-controls">
+      <input id="stats-search" class="search" placeholder="">
+      <select id="stats-type" class="select"></select>
+      <select id="stats-category" class="select"></select>
+      <button id="stats-reset-filters" class="tab-btn" type="button">Reset</button>
+    </div>
     <div class="stats-panel">
       <div id="stats-list" class="stats-list"></div>
     </div>
@@ -442,6 +454,12 @@ const UI_TEXT = {
     statNoDesc: 'No description yet.',
     uniqueLabel: 'UNIQUE',
     itemNoStats: 'This item has no direct stat effects.',
+    statsSearch: 'Filter by item name/id/description',
+    statsTypeAll: 'Stats: all items',
+    statsTypeEquipment: 'Stats: equipment only',
+    statsTypeItems: 'Stats: items only',
+    statsCategoryAll: 'Stats category: all',
+    statsResetFilters: 'Reset stats filters',
   },
   ru: {
     title: '⛏ Превью карточек предметов',
@@ -473,6 +491,12 @@ const UI_TEXT = {
     statNoDesc: 'Описание пока не добавлено.',
     uniqueLabel: 'УНИКАЛЬНЫЙ',
     itemNoStats: 'У этого предмета нет прямых стат-эффектов.',
+    statsSearch: 'Фильтр по названию/id/описанию предмета',
+    statsTypeAll: 'Статы: все предметы',
+    statsTypeEquipment: 'Статы: только части корпуса',
+    statsTypeItems: 'Статы: только предметы',
+    statsCategoryAll: 'Категория статов: все',
+    statsResetFilters: 'Сбросить фильтры статов',
   },
 };
 
@@ -502,6 +526,9 @@ const S = {
   filter: 'all',
   artifactType: 'all',
   statFilter: 'all',
+  statsSearch: '',
+  statsType: 'all',
+  statsCategory: 'all',
   rarity: 1,
   tab: 'cards',
   locale: getLocale() === 'ru' ? 'ru' : 'en',
@@ -514,6 +541,9 @@ const QUERY_KEYS = {
   type: 'type',
   category: 'category',
   stat: 'stat',
+  sq: 'sq',
+  stype: 'stype',
+  scategory: 'scategory',
   rarity: 'rarity',
   locale: 'locale',
   item: 'item',
@@ -528,6 +558,11 @@ const el = {
   controls: document.querySelector('.controls'),
   cardsLayout: document.getElementById('cards-layout'),
   statsLayout: document.getElementById('stats-layout'),
+  statsControls: document.getElementById('stats-controls'),
+  statsSearch: document.getElementById('stats-search'),
+  statsType: document.getElementById('stats-type'),
+  statsCategory: document.getElementById('stats-category'),
+  statsResetFilters: document.getElementById('stats-reset-filters'),
   statsList: document.getElementById('stats-list'),
   tabCards: document.getElementById('tab-cards'),
   tabStats: document.getElementById('tab-stats'),
@@ -567,6 +602,15 @@ function parseInitialStateFromQuery() {
   const stat = params.get(QUERY_KEYS.stat);
   if (stat === 'all' || getStatRows().some(row => row.stat === stat)) S.statFilter = stat;
 
+  const sq = params.get(QUERY_KEYS.sq);
+  if (sq != null) S.statsSearch = sq;
+
+  const stype = params.get(QUERY_KEYS.stype);
+  if (stype === 'all' || stype === 'equipment' || stype === 'items') S.statsType = stype;
+
+  const scategory = params.get(QUERY_KEYS.scategory);
+  if (scategory === 'all' || CATEGORIES.some(cat => cat.id === scategory)) S.statsCategory = scategory;
+
   const rarity = Number(params.get(QUERY_KEYS.rarity));
   if (Number.isFinite(rarity) && rarity >= 1 && rarity <= 4) S.rarity = rarity;
 
@@ -589,6 +633,9 @@ function syncQueryFromState() {
   setOrDelete(QUERY_KEYS.type, S.filter, 'all');
   setOrDelete(QUERY_KEYS.category, S.artifactType, 'all');
   setOrDelete(QUERY_KEYS.stat, S.statFilter, 'all');
+  setOrDelete(QUERY_KEYS.sq, S.statsSearch.trim(), '');
+  setOrDelete(QUERY_KEYS.stype, S.statsType, 'all');
+  setOrDelete(QUERY_KEYS.scategory, S.statsCategory, 'all');
   setOrDelete(QUERY_KEYS.rarity, S.rarity, 1);
   setOrDelete(QUERY_KEYS.locale, S.locale, 'en');
   setOrDelete(QUERY_KEYS.item, S.selectedId, ALL[0]?.id ?? null);
@@ -795,11 +842,26 @@ function renderUiText() {
   el.resetFilters.textContent = ui('resetFilters');
   el.tabCards.textContent = ui('tabCards');
   el.tabStats.textContent = ui('tabStats');
+
+  el.statsSearch.placeholder = ui('statsSearch');
+  el.statsSearch.value = S.statsSearch;
+  el.statsType.innerHTML = `
+    <option value="all">${ui('statsTypeAll')}</option>
+    <option value="equipment">${ui('statsTypeEquipment')}</option>
+    <option value="items">${ui('statsTypeItems')}</option>
+  `;
+  el.statsType.value = S.statsType;
+  el.statsCategory.innerHTML = `
+    <option value="all">${ui('statsCategoryAll')}</option>
+    ${categoryOptions}
+  `;
+  el.statsCategory.value = S.statsCategory;
+  el.statsResetFilters.textContent = ui('statsResetFilters');
 }
 
-function getStatRows() {
+function getStatRows(sourceItems = ALL) {
   const byStat = new Map();
-  for (const item of ALL) {
+  for (const item of sourceItems) {
     const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
     for (const effect of effects) {
       const stat = effect?.stat;
@@ -850,7 +912,8 @@ function getStatRows() {
 }
 
 function renderStats() {
-  const rows = getStatRows();
+  const items = getItemsForStatsFilters();
+  const rows = getStatRows(items);
   if (!rows.length) {
     el.statsList.innerHTML = `<div class="empty">${esc(ui('scaleNone'))}</div>`;
     return;
@@ -880,8 +943,26 @@ function renderTabState() {
   el.controls.hidden = !cards;
   el.cardsLayout.hidden = !cards;
   el.statsLayout.hidden = cards;
+  el.statsControls.hidden = cards;
   el.tabCards.classList.toggle('active', cards);
   el.tabStats.classList.toggle('active', !cards);
+}
+
+function getItemsForStatsFilters() {
+  const q = S.statsSearch.trim().toLowerCase();
+  return ALL.filter(item => {
+    if (S.statsType !== 'all' && item.__kind !== S.statsType) return false;
+    if (S.statsCategory !== 'all' && item.category !== S.statsCategory) return false;
+    if (!q) return true;
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    const statHay = effects.map(effect => {
+      const stat = effect?.stat || '';
+      const statLabel = stat ? t(`stat.${stat}`) : '';
+      return `${stat} ${statLabel}`;
+    }).join(' ');
+    const hay = `${item.name} ${item.id} ${item.desc} ${categoryName(item.category)} ${statHay}`.toLowerCase();
+    return hay.includes(q);
+  });
 }
 
 function getSelectedItem(items) {
@@ -1100,6 +1181,25 @@ el.statFilter.addEventListener('change', () => {
   S.statFilter = el.statFilter.value;
   render();
 });
+el.statsSearch.addEventListener('input', () => {
+  S.statsSearch = el.statsSearch.value;
+  if (S.tab === 'stats') render();
+});
+el.statsType.addEventListener('change', () => {
+  S.statsType = el.statsType.value;
+  if (S.tab === 'stats') render();
+});
+el.statsCategory.addEventListener('change', () => {
+  S.statsCategory = el.statsCategory.value;
+  if (S.tab === 'stats') render();
+});
+el.statsResetFilters.addEventListener('click', () => {
+  S.statsSearch = '';
+  S.statsType = 'all';
+  S.statsCategory = 'all';
+  el.statsSearch.value = '';
+  if (S.tab === 'stats') render();
+});
 el.lang.addEventListener('change', () => {
   const next = el.lang.value === 'ru' ? 'ru' : 'en';
   S.locale = next;
@@ -1119,6 +1219,9 @@ el.resetFilters.addEventListener('click', () => {
   S.filter = 'all';
   S.artifactType = 'all';
   S.statFilter = 'all';
+  S.statsSearch = '';
+  S.statsType = 'all';
+  S.statsCategory = 'all';
   S.rarity = 1;
   el.search.value = '';
   render();
@@ -1134,6 +1237,7 @@ window.addEventListener('keydown', (event) => {
 parseInitialStateFromQuery();
 setLocale(S.locale);
 el.search.value = S.search;
+el.statsSearch.value = S.statsSearch;
 render();
 </script>
 </body>
