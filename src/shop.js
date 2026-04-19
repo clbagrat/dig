@@ -40,7 +40,7 @@ let currentStatsCache = null;
 let defaultStatsCache = null;
 let onCloseCallback = null;
 let selectedOfferingIdx = -1;
-let selectedSlotIdx = -1;    // slot selected for manual merge
+let selectedSlotIdx = -1;
 let replaceMode = false;     // true when choosing slot to replace
 let prevTagCounts = {};      // previous tag counts for synergy delta
 let purchaseAnimating = false;
@@ -362,7 +362,6 @@ function applyPostSelectionReroll(canReroll) {
 function canMerge(offering) {
   if (offering.good.type !== "equipment") return false;
   if (offering.rarity >= RARITY.LEGENDARY) return false;
-  if (hasFreeSlot()) return false; // free slot available — no merge needed
   return equippedParts.some(p => p.id === offering.good.id && p.rarity === offering.rarity);
 }
 
@@ -641,43 +640,7 @@ async function tryPurchase(offeringIdx) {
     return;
   }
 
-  // Equipment
-  if (hasFreeSlot()) {
-    purchaseAnimating = true;
-    setOfferingCardFading(offeringIdx, true);
-    try {
-      const equipTarget = getShopEquipmentTargetElement(equippedParts.length);
-      await animateEquipmentToSlot(offering, sourceRect, equipTarget, getShopEquipmentTargetPoint(equippedParts.length));
-      const canReroll = currentGoldCache >= cost;
-      const collapsePromise = canReroll ? animatePurchasedCardCollapse(offeringIdx) : null;
-      if (canReroll) await animateGoldSpend(cost);
-      if (collapsePromise) await collapsePromise;
-      if (canReroll) await animateOfferingsExit();
-      // Free slot available — always place there, never auto-merge
-      equippedParts.push({ id: offering.good.id, rarity: offering.rarity });
-      applyPostSelectionReroll(canReroll);
-      const chargedCost = canReroll ? cost : 0;
-
-      document.dispatchEvent(new CustomEvent("shop:purchase-equipment", {
-        detail: {
-          effectId: offering.good.id,
-          cost: chargedCost,
-          rarity: offering.rarity,
-          rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
-          isMerge: false,
-          oldRarity: 0,
-          oldRarityMultiplier: 0,
-        },
-      }));
-      recalcTagSynergies();
-      if (!canReroll) closeShop();
-    } finally {
-      setOfferingCardFading(offeringIdx, false);
-      purchaseAnimating = false;
-    }
-    return;
-  }
-
+  // Equipment: auto-merge always has priority if possible.
   if (canMerge(offering)) {
     const existingIdx = equippedParts.findIndex(
       p => p.id === offering.good.id && p.rarity === offering.rarity
@@ -692,7 +655,6 @@ async function tryPurchase(offeringIdx) {
       if (canReroll) await animateGoldSpend(cost);
       if (collapsePromise) await collapsePromise;
       if (canReroll) await animateOfferingsExit();
-      // No free slot — merge with existing same item+rarity
       const oldRarity = equippedParts[existingIdx].rarity;
       const newRarity = oldRarity + 1;
       equippedParts[existingIdx].rarity = newRarity;
@@ -708,6 +670,41 @@ async function tryPurchase(offeringIdx) {
           isMerge: true,
           oldRarity,
           oldRarityMultiplier: RARITY_EFFECT_MULT[oldRarity],
+        },
+      }));
+      recalcTagSynergies();
+      if (!canReroll) closeShop();
+    } finally {
+      setOfferingCardFading(offeringIdx, false);
+      purchaseAnimating = false;
+    }
+    return;
+  }
+
+  if (hasFreeSlot()) {
+    purchaseAnimating = true;
+    setOfferingCardFading(offeringIdx, true);
+    try {
+      const equipTarget = getShopEquipmentTargetElement(equippedParts.length);
+      await animateEquipmentToSlot(offering, sourceRect, equipTarget, getShopEquipmentTargetPoint(equippedParts.length));
+      const canReroll = currentGoldCache >= cost;
+      const collapsePromise = canReroll ? animatePurchasedCardCollapse(offeringIdx) : null;
+      if (canReroll) await animateGoldSpend(cost);
+      if (collapsePromise) await collapsePromise;
+      if (canReroll) await animateOfferingsExit();
+      equippedParts.push({ id: offering.good.id, rarity: offering.rarity });
+      applyPostSelectionReroll(canReroll);
+      const chargedCost = canReroll ? cost : 0;
+
+      document.dispatchEvent(new CustomEvent("shop:purchase-equipment", {
+        detail: {
+          effectId: offering.good.id,
+          cost: chargedCost,
+          rarity: offering.rarity,
+          rarityMultiplier: RARITY_EFFECT_MULT[offering.rarity],
+          isMerge: false,
+          oldRarity: 0,
+          oldRarityMultiplier: 0,
         },
       }));
       recalcTagSynergies();
@@ -935,12 +932,12 @@ const STAT_DEFS = [
   { key: "visionRadius",              get label() { return t("shop.stat.visionRadius.label"); },              get shortLabel() { return t("shop.stat.visionRadius.short"); },              format: null },
   { key: "luck",                      get label() { return t("shop.stat.luck.label"); },                      get shortLabel() { return t("shop.stat.luck.short"); },                      format: null },
   { key: "weakSpotChance",            get label() { return t("shop.stat.weakSpotChance.label"); },            get shortLabel() { return t("shop.stat.weakSpotChance.short"); },            format: "percent" },
-  { key: "weakSpotMult",              get label() { return t("shop.stat.weakSpotMult.label"); },              get shortLabel() { return t("shop.stat.weakSpotMult.short"); },              format: "multiplier" },
-  { key: "fuelStarvationResistance",  get label() { return t("shop.stat.fuelStarvationResistance.label"); },  get shortLabel() { return t("shop.stat.fuelStarvationResistance.short"); },  format: "percent" },
+  { key: "weakSpotMult",              get label() { return t("shop.stat.weakSpotMult.label"); },              get shortLabel() { return t("shop.stat.weakSpotMult.short"); },              format: "percent" },
+  { key: "fuelStarvationResistance",  get label() { return t("shop.stat.fuelStarvationResistance.label"); },  get shortLabel() { return t("shop.stat.fuelStarvationResistance.short"); },  format: "rawpercent" },
   { key: "goldBonus",                 get label() { return t("shop.stat.goldBonus.label"); },                  get shortLabel() { return t("shop.stat.goldBonus.short"); },                  format: "percent" },
   { key: "fuelBonus",                 get label() { return t("shop.stat.fuelBonus.label"); },                  get shortLabel() { return t("shop.stat.fuelBonus.short"); },                  format: "percent" },
   { key: "explosionPower",            get label() { return t("shop.stat.explosionPower.label"); },             get shortLabel() { return t("shop.stat.explosionPower.short"); },             format: "fixed1" },
-  { key: "explosionBonus",            get label() { return t("shop.stat.explosionBonus.label"); },             get shortLabel() { return t("shop.stat.explosionBonus.short"); },             format: "percent" },
+  { key: "explosionBonus",            get label() { return t("shop.stat.explosionBonus.label"); },             get shortLabel() { return t("shop.stat.explosionBonus.short"); },             format: "rawpercent" },
   { key: "lowFuelDamageBonus",        get label() { return t("shop.stat.lowFuelDamageBonus.label"); },         get shortLabel() { return t("shop.stat.lowFuelDamageBonus.short"); },         format: "percent" },
   { key: "goldBonusPerLevel",         get label() { return t("shop.stat.goldBonusPerLevel.label"); },          get shortLabel() { return t("shop.stat.goldBonusPerLevel.short"); },          format: "percent" },
   { key: "miningGoldBonusMultiplier", get label() { return t("shop.stat.miningGoldBonusMultiplier.label"); }, get shortLabel() { return t("shop.stat.miningGoldBonusMultiplier.short"); }, format: "percent" },
@@ -1245,15 +1242,8 @@ function renderSlots() {
 
     if (part) {
       const def = ALL_EQUIPMENT.find(e => e.id === part.id);
-      const isMergeTarget = selectedSlotIdx >= 0 && selectedSlotIdx !== i &&
-        equippedParts[selectedSlotIdx] &&
-        equippedParts[selectedSlotIdx].id === part.id &&
-        equippedParts[selectedSlotIdx].rarity === part.rarity &&
-        part.rarity < RARITY.LEGENDARY;
       slot.className = `shop-slot shop-slot--filled shop-slot--rarity-${part.rarity}`;
       if (replaceMode) slot.className += " shop-slot--replaceable";
-      if (selectedSlotIdx === i) slot.className += " shop-slot--selected";
-      if (isMergeTarget) slot.className += " shop-slot--merge-target";
       slot.dataset.slotIdx = i;
       slot.innerHTML = `
         <span class="shop-slot__icon">${def ? def.icon : "?"}</span>
@@ -1361,24 +1351,9 @@ function bindEvents() {
       return;
     }
 
-    // Slot click (manual merge mode)
+    // Slot click: show equipment tooltip.
     const anySlot = e.target.closest(".shop-slot--filled[data-slot-idx]");
     if (anySlot && !replaceMode) {
-      const slotIdx = Number(anySlot.dataset.slotIdx);
-      if (selectedSlotIdx >= 0 && selectedSlotIdx !== slotIdx) {
-        // Check if this is a valid merge target
-        const a = equippedParts[selectedSlotIdx];
-        const b = equippedParts[slotIdx];
-        if (a && b && a.id === b.id && a.rarity === b.rarity && a.rarity < RARITY.LEGENDARY) {
-          doSlotMerge(selectedSlotIdx, slotIdx);
-          return;
-        }
-      }
-      // Keep slot selection state for optional merge logic, but do not force re-render:
-      // it would immediately rebuild DOM and break tooltip placement on mobile.
-      selectedSlotIdx = slotIdx;
-      selectedOfferingIdx = -1;
-      replaceMode = false;
       const entry = buildShopTooltipEntry(anySlot);
       if (entry) {
         e.stopPropagation();
@@ -1464,32 +1439,4 @@ async function doRarityUpgrade() {
     detail: { cost },
   }));
   purchaseAnimating = false;
-}
-
-function doSlotMerge(slotIdxA, slotIdxB) {
-  const a = equippedParts[slotIdxA];
-  const b = equippedParts[slotIdxB];
-  if (!a || !b || a.id !== b.id || a.rarity !== b.rarity || a.rarity >= RARITY.LEGENDARY) return;
-
-  const oldRarity = a.rarity;
-  const newRarity = oldRarity + 1;
-
-  // Upgrade slot A, remove slot B
-  equippedParts[slotIdxA] = { id: a.id, rarity: newRarity };
-  equippedParts.splice(slotIdxB, 1);
-
-  document.dispatchEvent(new CustomEvent("shop:purchase-equipment", {
-    detail: {
-      effectId: a.id,
-      cost: 0,
-      rarity: newRarity,
-      rarityMultiplier: RARITY_EFFECT_MULT[newRarity],
-      isMerge: true,
-      oldRarity,
-      oldRarityMultiplier: RARITY_EFFECT_MULT[oldRarity],
-    },
-  }));
-
-  recalcTagSynergies();
-  selectedSlotIdx = -1;
 }

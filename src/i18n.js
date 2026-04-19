@@ -265,7 +265,7 @@ const TRANSLATIONS = {
     "shop.stat.weakSpotChance.label": "Breach Chance",
     "shop.stat.weakSpotChance.short": "BRH%",
     "shop.stat.weakSpotMult.label": "Breach Damage",
-    "shop.stat.weakSpotMult.short": "xBRH",
+    "shop.stat.weakSpotMult.short": "BRH%",
     "shop.stat.fuelStarvationResistance.label": "Fuel Starvation Res.",
     "shop.stat.fuelStarvationResistance.short": "FSR%",
     "shop.stat.goldBonus.label": "Gold Bonus",
@@ -354,6 +354,7 @@ const TRANSLATIONS = {
 
     // ── Level reward pool labels ─────────────────────────────────────────────
     "reward.drillPower": "Drill Power",
+    "reward.explosionPower": "Explosion Power",
     "reward.strikeSpeed": "Drill Speed",
     "reward.damageBonus": "Damage Bonus",
     "reward.goldBonus": "Gold",
@@ -913,9 +914,9 @@ const TRANSLATIONS = {
     "shop.stat.luck.label": "Удача",
     "shop.stat.luck.short": "УДЧ",
     "shop.stat.weakSpotChance.label": "Шанс нахождения бреши",
-    "shop.stat.weakSpotChance.short": "Брешь%",
+    "shop.stat.weakSpotChance.short": "БрешьШанс%",
     "shop.stat.weakSpotMult.label": "Урон по бреши",
-    "shop.stat.weakSpotMult.short": "хБрешь",
+    "shop.stat.weakSpotMult.short": "БрешьУрон%",
     "shop.stat.fuelStarvationResistance.label": "Сопр. голоданию",
     "shop.stat.fuelStarvationResistance.short": "СГЛ%",
     "shop.stat.goldBonus.label": "Бонус золота",
@@ -1004,6 +1005,7 @@ const TRANSLATIONS = {
 
     // ── Level reward pool labels ─────────────────────────────────────────────
     "reward.drillPower": "Сила бура",
+    "reward.explosionPower": "Сила взрыва",
     "reward.strikeSpeed": "Скорость бура",
     "reward.damageBonus": "Бонус урона",
     "reward.goldBonus": "Золото",

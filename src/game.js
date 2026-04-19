@@ -92,32 +92,26 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   contourResMultiplier:      { key: "stat.contourResMultiplier",      mode: "percent" },
   cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
   crystalGoldGain:           { key: "stat.crystalGoldGain",           mode: "integer" },
-  crystalRewardRerolls:      { key: "stat.crystalRewardRerolls",      mode: "level" },
   crystalXpGain:             { key: "stat.crystalXpGain",             mode: "integer" },
   damageBonus:               { key: "stat.damageBonus",               mode: "percent" },
   drillPower:                { key: "stat.drillPower",                mode: "fixed1" },
   drillPowerPerLevel:        { key: "stat.drillPowerPerLevel",        mode: "fixed1" },
   effectDurationRate:        { key: "stat.effectDurationRate",        mode: "multiplier" },
-  explosionDamage:           { key: "stat.explosionDamage",           mode: "rawpercent" },
-  explosionDamageMultiplier: { key: "stat.explosionDamageMultiplier", mode: "percent" },
-  firstStrikeLevel:          { key: "stat.firstStrikeLevel",          mode: "level" },
+  explosionPower:            { key: "stat.explosionPower",            mode: "fixed1" },
+  explosionBonus:            { key: "stat.explosionBonus",            mode: "rawpercent" },
   fuelConverterLevel:        { key: "stat.fuelConverterLevel",        mode: "level" },
   fuelDrainRate:             { key: "stat.fuelDrainRate",             mode: "multiplier" },
-  fuelToHpRate:              { key: "stat.fuelToHpRate",              mode: "percent" },
+  fuelStarvationResistance:  { key: "stat.fuelStarvationResistance",  mode: "rawpercent" },
   fuelPerLevel:              { key: "stat.fuelPerLevel",              mode: "integer" },
   fuelRocketLevel:           { key: "stat.fuelRocketLevel",           mode: "level" },
   goldBonus:                 { key: "stat.goldBonus",                 mode: "percent" },
   goldBonusPerLevel:         { key: "stat.goldBonusPerLevel",         mode: "integer" },
   goldRadarMode:             { key: "stat.goldRadarMode",             mode: "toggle" },
   healPerLevel:              { key: "stat.healPerLevel",              mode: "hp" },
-  heatExplosionDamageBonus:  { key: "stat.heatExplosionDamageBonus",  mode: "integer" },
-  heatExplosionRadiusBonus:  { key: "stat.heatExplosionRadiusBonus",  mode: "fixed1" },
   heatRate:                  { key: "stat.heatRate",                  mode: "multiplier" },
   insuranceLevel:            { key: "stat.insuranceLevel",            mode: "level" },
   levelCatalystLevel:        { key: "stat.levelCatalystLevel",        mode: "level" },
-  loopChargeLevel:           { key: "stat.loopChargeLevel",           mode: "level" },
   loopLengthDamageBonus:     { key: "stat.loopLengthDamageBonus",     mode: "rawpercent" },
-  loopLengthFuelBonus:       { key: "stat.loopLengthFuelBonus",       mode: "fixed1" },
   loopSpawnBonusChance:      { key: "stat.loopSpawnBonusChance",      mode: "percent" },
   lowFuelSpeedBonus:         { key: "stat.lowFuelSpeedBonus",         mode: "percent" },
   lowFuelDamageBonus:        { key: "stat.lowFuelDamageBonus",        mode: "percent" },
@@ -126,11 +120,9 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   maxHeat:                   { key: "stat.maxHeat",                   mode: "integer" },
   maxHp:                     { key: "stat.maxHp",                     mode: "hp" },
   maxContour:                { key: "stat.maxContour",                mode: "integer" },
-  maxLoopLength:             { key: "stat.maxLoopLength",             mode: "integer" },
   miningGoldBonusMultiplier: { key: "stat.miningGoldBonusMultiplier", mode: "percent" },
   navigatorMode:             { key: "stat.navigatorMode",             mode: "toggle" },
   radarCrystalModule:        { key: "stat.radarCrystalModule",        mode: "toggle" },
-  shopPriceDiscount:         { key: "stat.shopPriceDiscount",         mode: "percent" },
   shardDrillLevel:           { key: "stat.shardDrillLevel",           mode: "level" },
   speedOfAutoClose:          { key: "stat.speedOfAutoClose",          mode: "rawpercent" },
   strikeSpeed:               { key: "stat.strikeSpeed",               mode: "rawpercent" },
@@ -143,7 +135,7 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   weakSpotFuelGain:          { key: "stat.weakSpotFuelGain",          mode: "integer" },
   weakSpotMult:              { key: "stat.weakSpotMult",              mode: "percent" },
   weakSpotPierce:            { key: "stat.weakSpotPierce",            mode: "integer" },
-  xpBonusMultiplier:         { key: "stat.xpBonusMultiplier",        mode: "percent" },
+  xpBonus:         { key: "stat.xpBonus",        mode: "percent" },
 }, {
   get(target, prop) {
     const entry = target[prop];
@@ -165,32 +157,30 @@ const DEBUG_CORE_STATS = [
   { key: "maxHp",                label: "maxHp",                 step: 1,    fmt: v => Math.round(v) },
   { key: "maxFuel",              label: "maxFuel",               step: 50,   fmt: v => Math.round(v) },
   { key: "fuelDrainRate",        label: "fuelDrainRate",         step: 0.1,  fmt: v => v.toFixed(1) },
-  { key: "fuelToHpRate",         label: "fuelToHpRate",          step: 0.1,  fmt: v => v.toFixed(1) },
+  { key: "fuelStarvationResistance", label: "fuelStarvationResistance", step: 5, fmt: v => Math.round(v) },
   { key: "contourResMultiplier", label: "contourResMultiplier",  step: 0.05, fmt: v => v.toFixed(2) },
   { key: "maxHeat",              label: "maxHeat",               step: 10,   fmt: v => Math.round(v) },
   { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
   { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
   { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
   { key: "weakSpotChance",       label: "Breach%",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: "weakSpotMult",         label: "xBreach",               step: 0.5,  fmt: v => `x${v.toFixed(1)}` },
+  { key: "weakSpotMult",         label: "Breach%",               step: 0.5,  fmt: v => `${Math.round(v * 100)}%` },
   { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
   { key: "visionRadius",         label: "visionRadius",          step: 1,    fmt: v => Math.round(v) },
   { key: "concentration",        label: "concentration (%)",     step: 5,    fmt: v => Math.round(v) },
   { key: "effectDurationRate",   label: "effectDurationRate",    step: 0.1,  fmt: v => `${Math.round(v * 100)}%` },
   { key: "goldBonus",            label: "goldBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: "xpBonusMultiplier",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: "xpBonus",    label: "xpBonus",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "fuelBonus",            label: "fuelBonus",             step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "speedOfAutoClose",     label: "speedOfAutoClose (%)",  step: 10,   fmt: v => Math.round(v) },
   { key: "maxContour",           label: "maxContour",            step: 1,    fmt: v => Math.round(v) },
   { key: "damageBonus",          label: "damageBonus (%)",       step: 5,    fmt: v => Math.round(v) },
-  { key: "explosionDamage",      label: "explosionDamage (%)",   step: 5,    fmt: v => Math.round(v) },
+  { key: "explosionPower",       label: "explosionPower",        step: 1,    fmt: v => v.toFixed(1) },
   { key: "explosionRadiusBonus", label: "explosionRadiusBonus",  step: 0.5,  fmt: v => v.toFixed(1) },
   { key: "weakSpotPierce",       label: "weakSpotPierce",        step: 1,    fmt: v => Math.round(v) },
   { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
   { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "lowFuelDamageBonus",   label: "lowFuelDamageBonus",    step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: "shopPriceDiscount",    label: "shopPriceDiscount",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: "contourChargeDamagePerCell", label: "contourChargePerCell", step: 1, fmt: v => Math.round(v) },
   { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
   { key: "loopSpawnBonusChance", label: "loopSpawnBonusChance",  step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "drillPowerPerLevel",   label: "drillPowerPerLevel",    step: 0.5,  fmt: v => v.toFixed(1) },
@@ -263,19 +253,20 @@ const DEBUG_MODE = new URLSearchParams(location.search).has("debug-map");
 // Each entry: { stat, minRarity, values: [C, U, R, L], label, fmt }
 // fmt(value) → display string for the label
 const LEVEL_REWARD_POOL = [
-  { stat: "drillPower",       minRarity: 1, values: [0.3, 0.6, 1.0, 1.5],          get label() { return t("reward.drillPower"); },       fmt: v => `+${v}` },
+  { stat: "drillPower",       minRarity: 1, values: [2, 5, 9, 14],                  get label() { return t("reward.drillPower"); },       fmt: v => `+${v}` },
+  { stat: "explosionPower",   minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.explosionPower"); },   fmt: v => `+${v}` },
   { stat: "strikeSpeed",      minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.strikeSpeed"); },      fmt: v => `+${v}%` },
   { stat: "damageBonus",      minRarity: 1, values: [0.03, 0.05, 0.08, 0.10],       get label() { return t("reward.damageBonus"); },      fmt: v => `+${Math.round(v*100)}%` },
   { stat: "goldBonus",        minRarity: 1, values: [0.03, 0.06, 0.10, 0.15],       get label() { return t("reward.goldBonus"); },        fmt: v => `+${Math.round(v*100)}%` },
   { stat: "maxFuel",          minRarity: 1, values: [10, 20, 30, 40],               get label() { return t("reward.maxFuel"); },          fmt: v => `+${v}` },
   { stat: "weakSpotChance",   minRarity: 1, values: [0.03, 0.05, 0.07, 0.11],       get label() { return t("reward.weakSpotChance"); },   fmt: v => `+${Math.round(v*100)}%` },
-  { stat: "weakSpotMult",     minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],           get label() { return t("reward.weakSpotMult"); },     fmt: v => `+${v}` },
+  { stat: "weakSpotMult",     minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],           get label() { return t("reward.weakSpotMult"); },     fmt: v => `+${Math.round(v * 100)}%` },
   { stat: "luck",             minRarity: 1, values: [3, 5, 7, 11],                  get label() { return t("reward.luck"); },             fmt: v => `+${v}` },
-  { stat: "speedOfAutoClose", minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.speedOfAutoClose"); }, fmt: v => `+${v}%` },
+  { stat: "speedOfAutoClose", minRarity: 2, values: [null, 10, 15, 20],             get label() { return t("reward.speedOfAutoClose"); }, fmt: v => `+${v}%` },
   { stat: "fuelBonus",        minRarity: 2, values: [null, 0.05, 0.10, 0.15, 0.20], get label() { return t("reward.fuelBonus"); },        fmt: v => `+${Math.round(v*100)}%` },
   { stat: "maxHeat",          minRarity: 2, values: [null, 5, 10, 15],              get label() { return t("reward.maxHeat"); },          fmt: v => `+${v}` },
   { stat: "maxHp",            minRarity: 3, values: [null, null, 25, 50],           get label() { return t("reward.maxHp"); },            fmt: v => `+${v}` },
-  { stat: "xpBonusMultiplier",minRarity: 1, values: [0.03, 0.06, 0.10, 0.15],       get label() { return t("reward.xpBonusMultiplier"); },fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "xpBonus",minRarity: 1, values: [0.03, 0.06, 0.10, 0.15],       get label() { return t("reward.xpBonus"); },fmt: v => `+${Math.round(v*100)}%` },
   { stat: "effectDurationRate",minRarity: 2, values: [null, 0.10, 0.18, 0.28],      get label() { return t("reward.effectDurationRate"); },fmt: v => `+${Math.round(v*100)}%` },
   { stat: "bonusFindChance",  minRarity: 2, values: [null, 0.10, 0.20, 0.35],       get label() { return t("reward.bonusFindChance"); },  fmt: v => `+${Math.round(v*100)}%` },
 ];
@@ -495,7 +486,7 @@ const state = {
   effectDurationRate: 1,
   concentration: 0,
   fuelDrainRate: 1,
-  fuelToHpRate: 0.7,
+  fuelStarvationResistance: 0,
   armor: 0,
   stunDetonatorLevel: 0,
   stunReservoirLevel: 0,
@@ -507,7 +498,6 @@ const state = {
   cryoRocketCount: 0,
   beaconCatalystLevel: 0,
   levelCatalystLevel: 0,
-  crystalRewardRerolls: 0,
   crystalGoldGain: 0,
   crystalXpGain: 0,
   depth: 0,
@@ -623,8 +613,7 @@ const state = {
   strikeSpeed: 0,
   drillPower: BASE_DRILL_DAMAGE,
   goldBonus: 0,
-  shopPriceDiscount: 0,
-  xpBonusMultiplier: 0,
+  xpBonus: 0,
   fuelBonus: 0,
   overflowBomb: false,
   fuelEventDepth: 0,
@@ -644,15 +633,9 @@ const state = {
   weakSpotMult: 2,
   weakSpotPierce: 0,
   adrenalineLevel: 0,
-  firstStrikeLevel: 0,
-  firstStrikeTimer: 0,
   weakSpotFuelGain: 0,
   insuranceLevel: 0,
   fuelConverterLevel: 0,
-  contourChargeDamagePerCell: 0,
-  loopChargeTimer: 0,
-  loopChargeDuration: 0,
-  contourChargeDrillPowerBonus: 0,
   contourLengthDamageLevel: 0,
   loopLengthDamageBonus: 0,
   loopSpawnBonusChance: 0,
@@ -672,7 +655,8 @@ const state = {
   idleAutoCloseTriggered: false,
   speedOfAutoClose: 0,
   damageBonus: 0,
-  explosionDamage: 0,
+  explosionPower: 0,
+  explosionBonus: 0,
   explosionRadiusBonus: 0,
   bonusFindChance: 0,
   autoClosePreview: null,
@@ -2403,7 +2387,7 @@ function setupField(seedOverride = null) {
   state.effectDurationRate = 1;
   state.concentration = 0;
   state.fuelDrainRate = 1;
-  state.fuelToHpRate = 0.7;
+  state.fuelStarvationResistance = 0;
   state.armor = 0;
   state.stunDetonatorLevel = 0;
   state.stunReservoirLevel = 0;
@@ -2415,7 +2399,6 @@ function setupField(seedOverride = null) {
   state.cryoRocketCount = 0;
   state.beaconCatalystLevel = 0;
   state.levelCatalystLevel = 0;
-  state.crystalRewardRerolls = 0;
   state.crystalGoldGain = 0;
   state.crystalXpGain = 0;
   state.gold = 0;
@@ -2481,8 +2464,7 @@ function setupField(seedOverride = null) {
   state.strikeSpeed = 0;
   state.drillPower = BASE_DRILL_DAMAGE;
   state.goldBonus = 0;
-  state.shopPriceDiscount = 0;
-  state.xpBonusMultiplier = 0;
+  state.xpBonus = 0;
   state.fuelBonus = 0;
   state.overflowBomb = false;
   state.fuelEventDepth = 0;
@@ -2502,16 +2484,10 @@ function setupField(seedOverride = null) {
   state.weakSpotMult = 2;
   state.weakSpotPierce = 0;
   state.adrenalineLevel = 0;
-  state.firstStrikeLevel = 0;
-  state.firstStrikeTimer = 0;
   state.weakSpotFuelGain = 0;
   state.insuranceLevel = 0;
   state.fuelConverterLevel = 0;
   state.weakSpotMask.fill(0);
-  state.contourChargeDamagePerCell = 0;
-  state.loopChargeTimer = 0;
-  state.loopChargeDuration = 0;
-  state.contourChargeDrillPowerBonus = 0;
   state.contourLengthDamageLevel = 0;
   state.loopLengthDamageBonus = 0;
   state.loopSpawnBonusChance = 0;
@@ -2531,7 +2507,8 @@ function setupField(seedOverride = null) {
   state.idleAutoCloseTriggered = false;
   state.speedOfAutoClose = 0;
   state.damageBonus = 0;
-  state.explosionDamage = 0;
+  state.explosionPower = 0;
+  state.explosionBonus = 0;
   state.explosionRadiusBonus = 0;
   state.bonusFindChance = 0;
   state.autoClosePreview = null;
@@ -3282,7 +3259,7 @@ function rollCrystalItemRarity() {
 }
 
 function pickCrystalRewardItem() {
-  const picks = 1 + Math.max(0, state.crystalRewardRerolls || 0);
+  const picks = 1;
   let best = null;
   for (let pick = 0; pick < picks; pick++) {
     for (let attempt = 0; attempt < 40; attempt++) {
@@ -3589,8 +3566,6 @@ function applyGoldPerk(perkType) {
     case 4:
       break;
     case 5:
-      state.contourChargeDamagePerCell += 0.05;
-      state.perkText = t("perk.gold.contour_charge.name");
       break;
     case 6:
       state.lowFuelSpeedBonus += 0.35;
@@ -3743,10 +3718,6 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       state.tankBoostLevel = Math.min(3, (state.tankBoostLevel || 0) + 1);
       showPerkToast(t("toast.reinforced_tank"));
       break;
-    case "contour_charge":
-      state.contourChargeDamagePerCell += 0.05 * m;
-      showPerkToast(t("toast.contour_charge"));
-      break;
     case "contour_trophy":
       state.loopPerkLevel = Math.min(2, (state.loopPerkLevel || 0) + 1);
       showPerkToast(t("toast.contour_trophy"));
@@ -3841,7 +3812,6 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "speed": state.strikeSpeed -= 20 * m; break;
     case "spike_boost": state.spikeOverdriveLevel = Math.max(0, (state.spikeOverdriveLevel || 0) - 1); break;
     case "tank_boost": state.tankBoostLevel = Math.max(0, (state.tankBoostLevel || 0) - 1); break;
-    case "contour_charge": state.contourChargeDamagePerCell = Math.max(0, (state.contourChargeDamagePerCell || 0) - 0.05 * m); break;
     case "contour_trophy": state.loopPerkLevel = Math.max(0, (state.loopPerkLevel || 0) - 1); break;
     case "auto_contour": break;
     case "contour_resonance": state.contourLengthDamageLevel = Math.max(0, (state.contourLengthDamageLevel || 0) - 1); break;
@@ -3885,19 +3855,18 @@ function getShopStatsSnapshot() {
     effectDurationRate: state.effectDurationRate,
     concentration: state.concentration,
     fuelDrainRate: state.fuelDrainRate,
-    fuelToHpRate: state.fuelToHpRate,
+    fuelStarvationResistance: state.fuelStarvationResistance,
     goldBonus: state.goldBonus,
-    shopPriceDiscount: state.shopPriceDiscount,
     fuelBonus: state.fuelBonus,
     goldBonusPerLevel: state.goldBonusPerLevel,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
-    explosionDamage: state.explosionDamage,
+    explosionPower: state.explosionPower,
+    explosionBonus: state.explosionBonus,
     lowFuelDamageBonus: state.lowFuelDamageBonus,
     weakSpotChance: state.weakSpotChance,
     weakSpotMult: state.weakSpotMult,
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier || 0,
-    fuelPickupBonus: state.fuelPickupBonus || 0,
   };
 }
 
@@ -3914,23 +3883,21 @@ function getShopDefaultStatsSnapshot() {
     effectDurationRate: 1,
     concentration: 0,
     fuelDrainRate: 1,
-    fuelToHpRate: 0,
+    fuelStarvationResistance: 0,
     goldBonus: 0,
-    shopPriceDiscount: 0,
     fuelBonus: 0,
     speedOfAutoClose: 0,
     damageBonus: 0,
-    explosionDamage: 0,
+    explosionPower: 0,
+    explosionBonus: 0,
     lowFuelDamageBonus: 0,
     weakSpotChance: 0,
     weakSpotMult: 2,
     miningGoldBonusMultiplier: 0,
-    fuelPickupBonus: 0,
   };
 }
 
 function normalizeItemEffectStat(stat) {
-  if (stat === "maxLoopLength") return "maxContour";
   return stat;
 }
 
@@ -4366,10 +4333,12 @@ function getSpecialInspectEffectLines(good, rarity) {
       const flatDamage = [0, 8, 12, 16, 20][rarity] || 0;
       const weakSpotChance = [0, 0.04, 0.06, 0.08, 0.10][rarity] || 0;
       const explosionDamage = [0, 20, 30, 45, 60][rarity] || 0;
+      const explosionScale = 10;
+      const totalExplosion = explosionDamage + state.explosionPower * (explosionScale / 100);
       return [
         { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
         { label: t("inspect.breach_chance"), value: `+${Math.round(weakSpotChance * 100)}%` },
-        { label: t("inspect.breach_explosion"), value: `+${explosionDamage}` },
+        { label: t("inspect.breach_explosion"), value: `+${explosionDamage} +${explosionScale}% [${formatPerkNumber(totalExplosion)}]` },
         { label: t("inspect.explosion_radius"), value: formatPerkNumber(SHARD_DRILL_BLAST_RADIUS, 1) },
       ];
     }
@@ -6297,17 +6266,9 @@ function update(dt) {
   } else {
     state.heatCooldownTime = 0;
   }
-  state.loopChargeTimer = Math.max(0, state.loopChargeTimer - dt);
-  if (state.firstStrikeTimer > 0) state.firstStrikeTimer = Math.max(0, state.firstStrikeTimer - dt);
   if (state.pathTailFade > 0) {
     state.pathTailFade = Math.max(0, state.pathTailFade - dt * 8);
     if (state.pathTailFade === 0) state.pathTailGhost = null;
-  }
-  if (state.loopChargeTimer === 0) {
-    if (state.contourChargeDrillPowerBonus > 0) {
-      state.drillPower = Math.max(0, state.drillPower - state.contourChargeDrillPowerBonus);
-      state.contourChargeDrillPowerBonus = 0;
-    }
   }
   for (let i = state.activeToasts.length - 1; i >= 0; i--) {
     state.activeToasts[i].time -= dt;
@@ -6940,7 +6901,7 @@ function getGoldPerkNextLevel(perkType) {
     case 4:
       return 0;
     case 5:
-      return Math.round(state.contourChargeDamagePerCell / 0.05) + 1;
+      return 1;
     case 6:
       return Math.round(state.lowFuelSpeedBonus / 0.35) + 1;
     case 7:
@@ -7072,11 +7033,9 @@ function getGoldPerkPreview(perkType) {
       };
     }
     case 5: {
-      const currentBonus = state.contourChargeDamagePerCell || 0;
-      const nextBonus = currentBonus + 0.05;
       return {
-        effect: t("preview.contour_charge.effect", { dur: formatPerkNumber(getScaledEffectDuration(3)) }),
-        compare: t("preview.contour_charge.compare", { current: formatPerkPercent(currentBonus), next: formatPerkPercent(nextBonus) }),
+        effect: "—",
+        compare: "—",
       };
     }
     case 6: {
@@ -7302,7 +7261,6 @@ function getStrikeDamage() {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01) + contourLength * (state.loopLengthDamageBonus || 0) * 0.01;
-  const firstStrikeBoost = (state.firstStrikeTimer > 0 && state.firstStrikeLevel > 0) ? 1 + state.firstStrikeLevel * 0.4 : 1;
   const lowFuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelDamageBoost = 1 + lowFuelFactor * (state.lowFuelDamageBonus || 0);
   let damage =
@@ -7313,7 +7271,7 @@ function getStrikeDamage() {
     getLuckyPickaxeDamageBonus() +
     getShardDrillDamageBonus() +
     getThermoDrillDamageBonus();
-  return damage * (1 + state.damageBonus / 100) * firstStrikeBoost * lowFuelDamageBoost;
+  return damage * (1 + state.damageBonus / 100) * lowFuelDamageBoost;
 }
 
 function getEquipmentTiers(effectId) {
@@ -7395,7 +7353,9 @@ function getShardDrillDamageBonus() {
 }
 
 function getShardDrillExplosionDamage() {
-  return sumEquipmentTierValues("shard_drill", [0, 20, 30, 45, 60]);
+  const flat = sumEquipmentTierValues("shard_drill", [0, 20, 30, 45, 60]);
+  const scale = sumEquipmentTierValues("shard_drill", [0, 10, 10, 10, 10]);
+  return flat + state.explosionPower * (scale / 100);
 }
 
 function getLuckyPickaxeOreGain() {
@@ -7403,7 +7363,7 @@ function getLuckyPickaxeOreGain() {
 }
 
 function getXpNeededForLevel(level) {
-  return Math.round(40 * XP_INFLATION * 1.3 ** Math.max(0, level - 1));
+  return Math.round(40 * XP_INFLATION * 1.15 ** Math.max(0, level - 1));
 }
 
 function applyGoldBonus(amount) {
@@ -7429,7 +7389,7 @@ function scaleExperienceGain(amount) {
   if (amount <= 0) {
     return 0;
   }
-  const multiplier = Math.max(0, 1 + (state.xpBonusMultiplier || 0));
+  const multiplier = Math.max(0, 1 + (state.xpBonus || 0));
   const total = amount * multiplier + (state.xpBonusRemainder || 0);
   const whole = Math.max(0, Math.floor(total + 1e-9));
   state.xpBonusRemainder = Math.max(0, total - whole);
@@ -7757,7 +7717,7 @@ function drainFuel(amount, options = {}) {
     return;
   }
   const fromFuel = state.fuel;
-  const fromHp = (amount - fromFuel) * Math.max(0, state.fuelToHpRate);
+  const fromHp = (amount - fromFuel) * 0.7 * Math.max(0, 1 - state.fuelStarvationResistance / 100);
   state.fuel = 0;
   if (fromFuel > 0) {
     state.lastFuelHudChangeKind = hudKind;
@@ -8650,7 +8610,7 @@ const EXPLOSION_WAVE_DELAY = 0.05;
 function explodeAt(x, y, damage, radius = 2, options = {}) {
   const scaledRadius = radius + (options.skipRadiusBonus ? 0 : (state.explosionRadiusBonus || 0));
   spawnExplosionEffect(x, y, scaledRadius);
-  const scaledDamage = damage * (1 + state.damageBonus / 100) * (1 + state.explosionDamage / 100);
+  const scaledDamage = (damage + state.explosionPower) * (1 + state.explosionBonus / 100);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(scaledRadius);
   let affectedCellCount = 0;
@@ -8706,7 +8666,7 @@ function detonateRocketEffect(effect) {
   if (effect.payload.kind === "radiusBomb") {
     const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
     if (distToPlayer <= effect.payload.radius) {
-      const scaledDamage = effect.payload.damage * (1 + state.damageBonus / 100) * (1 + state.explosionDamage / 100);
+      const scaledDamage = (effect.payload.damage + state.explosionPower) * (1 + state.explosionBonus / 100);
       addHeatOnStrike(Math.round(scaledDamage * 0.3));
     }
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
@@ -9453,7 +9413,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
     }
   }
 
-  activateLoopCharge(brokenCellCount);
   maybeSpawnLoopPerk(interiorCells, brokenCellCount);
   spawnLoopFieldEffect(loopPath, affectedCells);
 
@@ -9486,9 +9445,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
       playSound("beacon_activate");
       beacon.activationAnimStart = state.lastTs || performance.now();
       state.pendingBeaconWireActivation = beacon;
-      if (state.firstStrikeLevel > 0) {
-        state.firstStrikeTimer = getScaledEffectDuration(6 * state.firstStrikeLevel);
-      }
       if (state.beaconCatalystLevel > 0 && state.crystalRecipe.length > 0 && state.crystalProgress < state.crystalRecipe.length) {
         const firstType = state.crystalRecipe[0];
         const completedRecipe = [...state.crystalRecipe];
@@ -9520,20 +9476,6 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   }
 
   return true;
-}
-
-function activateLoopCharge(cellCount) {
-  if (state.contourChargeDamagePerCell <= 0 || cellCount <= 0) {
-    return;
-  }
-  if (state.contourChargeDrillPowerBonus > 0) {
-    state.drillPower = Math.max(0, state.drillPower - state.contourChargeDrillPowerBonus);
-  }
-  state.loopChargeDuration = getScaledEffectDuration(3);
-  state.loopChargeTimer = state.loopChargeDuration;
-  state.contourChargeDrillPowerBonus = cellCount * state.contourChargeDamagePerCell;
-  state.drillPower += state.contourChargeDrillPowerBonus;
-  showPerkToast(t("toast.contour_charge_power", { val: formatPerkNumber(state.contourChargeDrillPowerBonus) }));
 }
 
 function getLoopPerkBlockHardness(x, y) {
@@ -10913,7 +10855,6 @@ function render() {
     renderStunStatus(camera);
     renderHeatWarningStatus(camera);
     renderLowFuelStatus(camera);
-    renderLoopChargeStatus(camera);
     renderVisionMask(camera);
   }
   ctx.restore();
@@ -13180,38 +13121,6 @@ function renderLowFuelStatus(camera) {
   ctx.restore();
 }
 
-function renderLoopChargeStatus(camera) {
-  if (state.loopChargeTimer <= 0 || state.contourChargeDrillPowerBonus <= 0) {
-    return;
-  }
-
-  const ctx = state.ctx;
-  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.renderY * TILE_SIZE - camera.y + 31;
-  const width = 76;
-  const ratio = clamp(state.loopChargeTimer / Math.max(1, state.loopChargeDuration || 3), 0, 1);
-  const text = `+${formatPerkNumber(state.contourChargeDrillPowerBonus)} drill`;
-
-  ctx.save();
-  ctx.font = `700 11px ${HUD_FONT}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.fillStyle = "#a9f5ff";
-  ctx.fillText(text, x, y - 6);
-  ctx.fillStyle = "rgba(18, 16, 24, 0.8)";
-  ctx.strokeStyle = "rgba(109, 235, 255, 0.38)";
-  ctx.lineWidth = 1.2;
-  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
-  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
-  ctx.fill();
-  ctx.fillStyle = "#6defff";
-  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
-  ctx.fill();
-  ctx.restore();
-}
 
 function renderActiveToast(camera) {
   if (state.activeToasts.length === 0) return;

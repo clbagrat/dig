@@ -171,21 +171,6 @@ export const ALL_EQUIPMENT = [
 
   // ── Контур ────────────────────────────────────────────────────────────────────
   {
-    id: "contour_charge",
-    type: "equipment",
-    name: "Контурный заряд",
-    icon: "🔋",
-    desc: "+1 уровень контурного заряда. +10% длительность эффектов.",
-    category: "контур",
-    tags: ["контур"],
-    minRarity: 2,
-    baseCost: 50,
-    effect: [
-      { stat: "loopChargeLevel",    effectByRarity: [null, null, 1, 1, 2] },
-      { stat: "effectDurationRate", effectByRarity: [null, null, 0.10, 0.18, 0.28] },
-    ],
-  },
-  {
     id: "loop_pressure",
     type: "equipment",
     name: "Контурное давление",
@@ -197,20 +182,6 @@ export const ALL_EQUIPMENT = [
     baseCost: 55,
     effect: [
       { stat: "loopLengthDamageBonus", effectByRarity: [null, null, 1, 2, 3] },
-    ],
-  },
-  {
-    id: "loop_conduit",
-    type: "equipment",
-    name: "Топливный контур",
-    icon: "🌊",
-    desc: "Каждая клетка контура даёт +0.5 топлива при поднятии.",
-    category: "контур",
-    tags: ["контур", "топливо"],
-    minRarity: 1,
-    baseCost: 40,
-    effect: [
-      { stat: "loopLengthFuelBonus", effectByRarity: [null, 0.5, 0.8, 1.2, 2.0] },
     ],
   },
 
@@ -347,7 +318,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 45,
     effect: [
-      { stat: "fuelToHpRate", effectByRarity: [null, -0.15, -0.25, -0.40, -0.60] },
+      { stat: "fuelStarvationResistance", effectByRarity: [null, 15, 25, 40, 60] },
       { stat: "lowFuelDamageBonus", effectByRarity: [null, 0.10, 0.15, 0.22, 0.30] },
       { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
     ],
@@ -391,7 +362,7 @@ export const ALL_ITEMS = [
     baseCost: 35,
     effect: [
       { stat: "heatRate", effectByRarity: [null, -0.10, -0.15, -0.22, -0.30] },
-      { stat: "explosionDamage", effectByRarity: [null, -10, -10, -10, -10] },
+      { stat: "explosionPower", effectByRarity: [null, -10, -10, -10, -10] },
     ],
   },
   {
@@ -513,7 +484,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 35,
     effect: [
-      { stat: "xpBonusMultiplier", effectByRarity: [null, 0.08, 0.12, 0.18, 0.26] },
+      { stat: "xpBonus", effectByRarity: [null, 0.08, 0.12, 0.18, 0.26] },
       { stat: "luck", effectByRarity: [null, -2, -3, -4, -6] },
     ],
   },
@@ -570,7 +541,7 @@ export const ALL_ITEMS = [
     baseCost: 35,
     effect: [
       { stat: "damageBonus", effectByRarity: [null, 8, 12, 18, 25] },
-      { stat: "explosionDamage", effectByRarity: [null, -10, -10, -10, -10] },
+      { stat: "explosionPower", effectByRarity: [null, -10, -10, -10, -10] },
     ],
   },
   {
@@ -583,7 +554,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 35,
     effect: [
-      { stat: "explosionDamage", effectByRarity: [null, 10, 15, 22, 30] },
+      { stat: "explosionPower", effectByRarity: [null, 10, 15, 22, 30] },
       { stat: "drillPower", effectByRarity: [null, -1, -1, -2, -3] },
     ],
   },
@@ -599,7 +570,7 @@ export const ALL_ITEMS = [
     effect: [
       { stat: "explosionRadiusBonus", effectByRarity: [null, null, null, 0.5, 1.0] },
       { stat: "goldBonus", effectByRarity: [null, null, null, -0.07, -0.07] },
-      { stat: "xpBonusMultiplier", effectByRarity: [null, null, null, -0.07, -0.07] },
+      { stat: "xpBonus", effectByRarity: [null, null, null, -0.07, -0.07] },
       { stat: "fuelBonus", effectByRarity: [null, null, null, -0.07, -0.07] },
     ],
   },
@@ -1059,7 +1030,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 35,
     effect: [
-      { stat: "xpBonusMultiplier",         effectByRarity: [null, 0.08, 0.12, 0.18, 0.28] },
+      { stat: "xpBonus",         effectByRarity: [null, 0.08, 0.12, 0.18, 0.28] },
       { stat: "miningGoldBonusMultiplier",  effectByRarity: [null, -0.08, -0.10, -0.14, -0.20] },
     ],
   },
@@ -1089,7 +1060,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 35,
     effect: [
-      { stat: "xpBonusMultiplier",        effectByRarity: [null, 0.10, 0.15, 0.22, 0.32] },
+      { stat: "xpBonus",        effectByRarity: [null, 0.10, 0.15, 0.22, 0.32] },
       { stat: "miningGoldBonusMultiplier", effectByRarity: [null, -0.08, -0.10, -0.14, -0.20] },
     ],
   },
@@ -1106,7 +1077,7 @@ export const ALL_ITEMS = [
     minRarity: 2,
     baseCost: 45,
     effect: [
-      { stat: "explosionDamageMultiplier", effectByRarity: [null, null, 0.30, 0.50, 0.80] },
+      { stat: "explosionBonus", effectByRarity: [null, null, 0.30, 0.50, 0.80] },
       { stat: "heatRate",                  effectByRarity: [null, null, 0.10, 0.15, 0.20] },
     ],
   },
@@ -1121,8 +1092,8 @@ export const ALL_ITEMS = [
     minRarity: 2,
     baseCost: 50,
     effect: [
-      { stat: "heatExplosionRadiusBonus",  effectByRarity: [null, null, 1.0, 1.5, 2.0] },
-      { stat: "explosionDamageMultiplier", effectByRarity: [null, null, 0.20, 0.35, 0.50] },
+      { stat: "explosionRadiusBonus",  effectByRarity: [null, null, 1.0, 1.5, 2.0] },
+      { stat: "explosionBonus", effectByRarity: [null, null, 0.20, 0.35, 0.50] },
       { stat: "damageBonus",               effectByRarity: [null, null, -10, -12, -15] },
     ],
   },
@@ -1138,7 +1109,7 @@ export const ALL_ITEMS = [
     baseCost: 45,
     effect: [
       { stat: "damageBonus",               effectByRarity: [null, null, 15,   22,   30  ] },
-      { stat: "heatExplosionRadiusBonus",  effectByRarity: [null, null, -0.5, -0.8, -1.0] },
+      { stat: "explosionRadiusBonus",  effectByRarity: [null, null, -0.5, -0.8, -1.0] },
       { stat: "fuelDrainRate",             effectByRarity: [null, null, 0.10, 0.15, 0.20] },
     ],
   },
@@ -1154,8 +1125,8 @@ export const ALL_ITEMS = [
     minRarity: 1,
     baseCost: 40,
     effect: [
-      { stat: "heatExplosionDamageBonus", effectByRarity: [null, 0.25, 0.50, 0.75, 1.00] },
-      { stat: "heatExplosionRadiusBonus", effectByRarity: [null, 0.5,  1.0,  1.5,  2.0 ] },
+      { stat: "explosionBonus", effectByRarity: [null, 25, 50, 75, 100] },
+      { stat: "explosionRadiusBonus", effectByRarity: [null, 0.5,  1.0,  1.5,  2.0 ] },
       { stat: "concentration",            effectByRarity: [null, -10, -15, -20, -30] },
     ],
   },
@@ -1173,18 +1144,6 @@ export const ALL_ITEMS = [
       { stat: "heatRate",      effectByRarity: [null, -0.15, -0.20, -0.30, -0.40] },
       { stat: "concentration", effectByRarity: [null, -10, -15, -20, -30] },
     ],
-  },
-  {
-    id: "first_strike",
-    type: "item",
-    name: "Инициатор",
-    icon: "⚔️",
-    desc: "+40% урон бура 6 сек после активации маяка.",
-    category: "maintenance",
-    tags: ["maintenance"],
-    minRarity: 2,
-    baseCost: 45,
-    effect: { stat: "firstStrikeLevel", effectByRarity: [null, null, 1, 1, 2] },
   },
   {
     id: "boosted_feed",
@@ -1225,7 +1184,7 @@ export const ALL_ITEMS = [
     baseCost: 35,
     effect: [
       { stat: "luck",             effectByRarity: [null, 2,     3,     5,     8    ] },
-      { stat: "xpBonusMultiplier",effectByRarity: [null, -0.03, -0.05, -0.07, -0.10] },
+      { stat: "xpBonus",effectByRarity: [null, -0.03, -0.05, -0.07, -0.10] },
     ],
   },
   {
@@ -1369,21 +1328,6 @@ export const ALL_ITEMS = [
     effect: { stat: "beaconCatalystLevel", value: 1 },
   },
   {
-    id: "recipe_reroller",
-    type: "item",
-    name: "Реролл рецепта",
-    icon: "🎲",
-    desc: "+1 попытка при выборе награды за рецепт. −5% опыт.",
-    category: "алхимия",
-    tags: ["алхимия"],
-    minRarity: 2,
-    baseCost: 45,
-    effect: [
-      { stat: "crystalRewardRerolls", effectByRarity: [null, null, 1, 2, 3] },
-      { stat: "xpBonusMultiplier",    effectByRarity: [null, null, -0.05, -0.08, -0.12] },
-    ],
-  },
-  {
     id: "crystal_gold",
     type: "item",
     name: "Золотой кристалл",
@@ -1395,7 +1339,7 @@ export const ALL_ITEMS = [
     baseCost: 40,
     effect: [
       { stat: "crystalGoldGain",          effectByRarity: [null, 15, 25, 40, 60] },
-      { stat: "xpBonusMultiplier",        effectByRarity: [null, -0.08, -0.10, -0.14, -0.20] },
+      { stat: "xpBonus",        effectByRarity: [null, -0.08, -0.10, -0.14, -0.20] },
     ],
   },
   {
@@ -1455,22 +1399,6 @@ export const ALL_ITEMS = [
     minRarity: 2,
     baseCost: 50,
     effect: { stat: "stunAfterburnerLevel", effectByRarity: [null, null, 1, 1, 2] },
-  },
-
-  {
-    id: "black_market",
-    type: "item",
-    name: "Чёрный рынок",
-    icon: "🏴",
-    desc: "−10% к стоимости предметов в магазине.",
-    category: "economy",
-    tags: ["economy"],
-    minRarity: 1,
-    baseCost: 45,
-    effect: {
-      stat: "shopPriceDiscount",
-      effectByRarity: [null, 0.10, 0.15, 0.20, 0.30],
-    },
   },
 ];
 
@@ -1535,25 +1463,24 @@ const SIMPLE_STAT_DESCRIPTORS = {
   luck: value => t("desc.luck", { val: formatSignedDescriptionNumber(value) }),
   armor: value => t("desc.armor", { val: formatSignedDescriptionNumber(value) }),
   weakSpotChance: value => t("desc.weakSpotChance", { val: formatSignedPercent(value, 100) }),
-  weakSpotMult: value => t("desc.weakSpotMult", { val: formatSignedDescriptionNumber(value) }),
+  weakSpotMult: value => t("desc.weakSpotMult", { val: formatSignedPercent(value, 100) }),
   damageBonus: value => t("desc.damageBonus", { val: formatSignedPercent(value) }),
   heatRate: value => t("desc.heatRate", { val: formatSignedPercent(value, 100) }),
   effectDurationRate: value => t("desc.effectDurationRate", { val: formatSignedPercent(value, 100) }),
   concentration: value => t("desc.concentration", { val: formatSignedPercent(value, 1) }),
   fuelDrainRate: value => t("desc.fuelDrainRate", { val: formatSignedPercent(value, 100) }),
-  fuelToHpRate: value => t("desc.fuelToHpRate", { val: formatSignedPercent(value, 100) }),
+  fuelStarvationResistance: value => t("desc.fuelStarvationResistance", { val: formatSignedPercent(value) }),
   contourResMultiplier: value => t("desc.contourResMultiplier", { val: formatSignedPercent(value, 100) }),
   goldBonus: value => t("desc.goldBonus", { val: formatSignedPercent(value, 100) }),
   miningGoldBonusMultiplier: value => t("desc.miningGoldBonusMultiplier", { val: formatSignedPercent(value, 100) }),
-  xpBonusMultiplier: value => t("desc.xpBonusMultiplier", { val: formatSignedPercent(value, 100) }),
+  xpBonus: value => t("desc.xpBonus", { val: formatSignedPercent(value, 100) }),
   fuelBonus: value => t("desc.fuelBonus", { val: formatSignedPercent(value, 100) }),
   bonusFindChance: value => t("desc.bonusFindChance", { val: formatSignedPercent(value, 100) }),
   speedOfAutoClose: value => t("desc.speedOfAutoClose", { val: formatSignedPercent(value) }),
   maxContour: value => t("desc.maxContour", { val: formatSignedDescriptionNumber(value) }),
-  explosionDamageMultiplier: value => t("desc.explosionDamageMultiplier", { val: formatSignedPercent(value, 100) }),
-  explosionDamage: value => t("desc.explosionDamage", { val: formatSignedPercent(value) }),
-  heatExplosionRadiusBonus: value => t("desc.heatExplosionRadiusBonus", { val: formatSignedDescriptionNumber(value) }),
-  shopPriceDiscount: value => t("desc.shopPriceDiscount", { val: formatSignedPercent(value, 100) }),
+  explosionBonus: value => t("desc.explosionBonus", { val: formatSignedPercent(value) }),
+  explosionRadiusBonus: value => t("desc.explosionRadiusBonus", { val: formatSignedDescriptionNumber(value) }),
+  explosionPower: value => t("desc.explosionPower", { val: formatSignedDescriptionNumber(value) }),
   weakSpotFuelGain: value => t("desc.weakSpotFuelGain", { val: formatSignedDescriptionNumber(value) }),
   lowFuelSpeedBonus: value => t("desc.lowFuelSpeedBonus", { val: formatSignedPercent(value, 100) }),
   lowFuelDamageBonus: value => t("desc.lowFuelDamageBonus", { val: formatSignedPercent(value, 100) }),
@@ -1563,18 +1490,12 @@ const SIMPLE_STAT_DESCRIPTORS = {
   healPerLevel: value => t("desc.healPerLevel", { val: formatSignedDescriptionNumber(value) }),
   goldBonusPerLevel: value => t("desc.goldBonusPerLevel", { val: formatSignedPercent(value, 100) }),
   loopLengthDamageBonus: value => t("desc.loopLengthDamageBonus", { val: formatSignedPercent(value) }),
-  loopLengthFuelBonus: value => t("desc.loopLengthFuelBonus", { val: formatSignedDescriptionNumber(value) }),
-  maxLoopLength: value => t("desc.maxLoopLength", { val: formatSignedDescriptionNumber(value) }),
   loopSpawnBonusChance: value => t("desc.loopSpawnBonusChance", { val: formatUnsignedPercent(value, 100) }),
-  heatExplosionDamageBonus: value => t("desc.heatExplosionDamageBonus", { val: formatSignedPercent(value, 100) }),
-  crystalRewardRerolls: value => t("desc.crystalRewardRerolls", { val: formatSignedDescriptionNumber(value) }),
   crystalGoldGain: value => t("desc.crystalGoldGain", { val: formatSignedDescriptionNumber(value) }),
   crystalXpGain: value => t("desc.crystalXpGain", { val: formatSignedDescriptionNumber(value) }),
   adrenalineLevel: value => t("desc.adrenalineLevel", { val: value * 30 }),
-  firstStrikeLevel: value => t("desc.firstStrikeLevel", { val: value * 40, dur: value * 6 }),
   insuranceLevel: value => t("desc.insuranceLevel", { pct: [0, 30, 50, 70, 90][Math.min(4, Math.max(0, value))] || 0 }),
   fuelConverterLevel: value => t("desc.fuelConverterLevel", { sec: 2 + value }),
-  loopChargeLevel: value => t("desc.loopChargeLevel", { val: formatSignedDescriptionNumber(value) }),
   stunDetonatorLevel: value => t("desc.stunDetonatorLevel", { val: value }),
   breachMissileLevel: value => t("desc.breachMissileLevel", { val: formatDescriptionNumber(value) }),
   cryoRocketCount: value => t("desc.cryoRocketCount", { val: formatDescriptionNumber(value) }),
@@ -1645,8 +1566,13 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
     const flatDamage = getEffectValue({ effectByRarity: [0, 8, 12, 16, 20] }, rarity);
     const weakSpotChance = getEffectValue({ effectByRarity: [0, 0.04, 0.06, 0.08, 0.10] }, rarity);
     const explosionDamage = getEffectValue({ effectByRarity: [0, 20, 30, 45, 60] }, rarity);
+    const explosionScale = 10;
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
     const totalText = Number.isFinite(stats?.drillPower) ? ` [${formatDescriptionNumber(flatDamage)}]` : "";
-    return t("desc.special.shard_drill", { flat: flatDamage, total: totalText, chance: formatDescriptionNumber(weakSpotChance * 100), explosion: formatDescriptionNumber(explosionDamage) });
+    const explosionTotal = hasExplosionPower
+      ? ` [${formatDescriptionNumber(explosionDamage + stats.explosionPower * (explosionScale / 100))}]`
+      : "";
+    return t("desc.special.shard_drill", { flat: flatDamage, total: totalText, chance: formatDescriptionNumber(weakSpotChance * 100), explosion: formatDescriptionNumber(explosionDamage), expScale: explosionScale, explosionTotal });
   },
 };
 
