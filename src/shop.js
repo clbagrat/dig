@@ -899,15 +899,14 @@ function getDefaultStatValue(key) {
     luck: 0,
     weakSpotChance: 0,
     weakSpotMult: 2,
-    fuelToHpRate: 0,
+    fuelStarvationResistance: 0,
     goldBonus: 0,
-    shopPriceDiscount: 0,
     fuelBonus: 0,
-    explosionDamage: 0,
+    explosionPower: 0,
+    explosionBonus: 0,
     lowFuelDamageBonus: 0,
     goldBonusPerLevel: 0,
     miningGoldBonusMultiplier: 0,
-    fuelPickupBonus: 0,
     speedOfAutoClose: 0,
   };
   if (defaultStatsCache && Number.isFinite(defaultStatsCache[key])) {
@@ -937,15 +936,14 @@ const STAT_DEFS = [
   { key: "luck",                      get label() { return t("shop.stat.luck.label"); },                      get shortLabel() { return t("shop.stat.luck.short"); },                      format: null },
   { key: "weakSpotChance",            get label() { return t("shop.stat.weakSpotChance.label"); },            get shortLabel() { return t("shop.stat.weakSpotChance.short"); },            format: "percent" },
   { key: "weakSpotMult",              get label() { return t("shop.stat.weakSpotMult.label"); },              get shortLabel() { return t("shop.stat.weakSpotMult.short"); },              format: "multiplier" },
-  { key: "fuelToHpRate",              get label() { return t("shop.stat.fuelToHpRate.label"); },               get shortLabel() { return t("shop.stat.fuelToHpRate.short"); },               format: "percent" },
+  { key: "fuelStarvationResistance",  get label() { return t("shop.stat.fuelStarvationResistance.label"); },  get shortLabel() { return t("shop.stat.fuelStarvationResistance.short"); },  format: "percent" },
   { key: "goldBonus",                 get label() { return t("shop.stat.goldBonus.label"); },                  get shortLabel() { return t("shop.stat.goldBonus.short"); },                  format: "percent" },
-  { key: "shopPriceDiscount",         get label() { return t("shop.stat.shopPriceDiscount.label"); },          get shortLabel() { return t("shop.stat.shopPriceDiscount.short"); },          format: "percent" },
   { key: "fuelBonus",                 get label() { return t("shop.stat.fuelBonus.label"); },                  get shortLabel() { return t("shop.stat.fuelBonus.short"); },                  format: "percent" },
-  { key: "explosionDamage",           get label() { return t("shop.stat.explosionDamage.label"); },            get shortLabel() { return t("shop.stat.explosionDamage.short"); },            format: "rawpercent" },
+  { key: "explosionPower",            get label() { return t("shop.stat.explosionPower.label"); },             get shortLabel() { return t("shop.stat.explosionPower.short"); },             format: "fixed1" },
+  { key: "explosionBonus",            get label() { return t("shop.stat.explosionBonus.label"); },             get shortLabel() { return t("shop.stat.explosionBonus.short"); },             format: "percent" },
   { key: "lowFuelDamageBonus",        get label() { return t("shop.stat.lowFuelDamageBonus.label"); },         get shortLabel() { return t("shop.stat.lowFuelDamageBonus.short"); },         format: "percent" },
   { key: "goldBonusPerLevel",         get label() { return t("shop.stat.goldBonusPerLevel.label"); },          get shortLabel() { return t("shop.stat.goldBonusPerLevel.short"); },          format: "percent" },
   { key: "miningGoldBonusMultiplier", get label() { return t("shop.stat.miningGoldBonusMultiplier.label"); }, get shortLabel() { return t("shop.stat.miningGoldBonusMultiplier.short"); }, format: "percent" },
-  { key: "fuelPickupBonus",           get label() { return t("shop.stat.fuelPickupBonus.label"); },           get shortLabel() { return t("shop.stat.fuelPickupBonus.short"); },           format: "percent" },
   { key: "speedOfAutoClose",          get label() { return t("shop.stat.speedOfAutoClose.label"); },          get shortLabel() { return t("shop.stat.speedOfAutoClose.short"); },          format: "rawpercent" },
 ];
 
@@ -971,7 +969,7 @@ function renderStats(short = false) {
   const canAnimateDiff = !!previousRenderedStats;
   container.hidden = false;
   container.innerHTML = visibleDefs.map((def) => `
-    <div class="shop-stats__item${getStatBumpClass(def.key, stats[def.key], canAnimateDiff)}" data-full-label="${def.label}">
+    <div class="shop-stats__item${getStatBumpClass(def.key, stats[def.key], canAnimateDiff)}" data-full-label="${def.label}" data-stat-key="${def.key}">
       <span class="shop-stats__label">${short ? def.shortLabel : def.label}</span>
       <span class="shop-stats__value">${formatStatValue(stats[def.key], def.format)}</span>
     </div>
@@ -980,7 +978,10 @@ function renderStats(short = false) {
   container.querySelectorAll(".shop-stats__item").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      showStatTooltip(el, el.dataset.fullLabel);
+      const statKey = el.dataset.statKey || "";
+      const title = el.dataset.fullLabel || "";
+      const description = getShopStatTooltipDescription(statKey);
+      showStatTooltip(el, title, description);
     });
   });
 
@@ -1002,7 +1003,16 @@ let _statTooltipHideHandler = null;
 let _shopItemTooltipEl = null;
 let _shopItemTooltipHideHandler = null;
 
-function showStatTooltip(anchor, text) {
+function getShopStatTooltipDescription(statKey) {
+  if (!statKey) {
+    return "";
+  }
+  const key = `shop.stat.${statKey}.tooltip`;
+  const translated = t(key);
+  return translated === key ? "" : translated;
+}
+
+function showStatTooltip(anchor, title, description = "") {
   if (!_statTooltipEl) {
     _statTooltipEl = document.createElement("div");
     _statTooltipEl.className = "stat-tooltip";
@@ -1014,7 +1024,7 @@ function showStatTooltip(anchor, text) {
     _statTooltipHideHandler = null;
   }
 
-  _statTooltipEl.textContent = text;
+  _statTooltipEl.textContent = description ? `${title}\n${description}` : title;
   _statTooltipEl.hidden = false;
 
   const rect = anchor.getBoundingClientRect();
@@ -1022,7 +1032,11 @@ function showStatTooltip(anchor, text) {
   let left = rect.left + rect.width / 2 - ttW / 2;
   left = Math.max(4, Math.min(left, window.innerWidth - ttW - 4));
   _statTooltipEl.style.left = left + "px";
-  _statTooltipEl.style.top = (rect.top - _statTooltipEl.offsetHeight - 6) + "px";
+  let top = rect.top - _statTooltipEl.offsetHeight - 6;
+  if (top < 4) {
+    top = Math.min(window.innerHeight - _statTooltipEl.offsetHeight - 4, rect.bottom + 6);
+  }
+  _statTooltipEl.style.top = top + "px";
 
   _statTooltipHideHandler = () => {
     _statTooltipEl.hidden = true;
