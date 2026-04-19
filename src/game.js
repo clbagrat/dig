@@ -96,6 +96,7 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   damageBonus:               { key: "stat.damageBonus",               mode: "percent" },
   drillPower:                { key: "stat.drillPower",                mode: "fixed1" },
   drillPowerPerLevel:        { key: "stat.drillPowerPerLevel",        mode: "fixed1" },
+  explosionPowerPerLevel:    { key: "stat.explosionPowerPerLevel",    mode: "fixed1" },
   effectDurationRate:        { key: "stat.effectDurationRate",        mode: "multiplier" },
   explosionPower:            { key: "stat.explosionPower",            mode: "fixed1" },
   explosionBonus:            { key: "stat.explosionBonus",            mode: "rawpercent" },
@@ -184,6 +185,7 @@ const DEBUG_CORE_STATS = [
   { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
   { key: "loopSpawnBonusChance", label: "loopSpawnBonusChance",  step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "drillPowerPerLevel",   label: "drillPowerPerLevel",    step: 0.5,  fmt: v => v.toFixed(1) },
+  { key: "explosionPowerPerLevel", label: "explosionPowerPerLevel", step: 0.5, fmt: v => v.toFixed(1) },
   { key: "strikeSpeedPerLevel",  label: "strikeSpeedPerLevel",   step: 1,    fmt: v => Math.round(v) },
   { key: "fuelPerLevel",         label: "fuelPerLevel",          step: 1,    fmt: v => Math.round(v) },
   { key: "healPerLevel",         label: "healPerLevel",          step: 1,    fmt: v => Math.round(v) },
@@ -679,6 +681,7 @@ const state = {
   levelUpPulse: 0,
   levelUpModalDelay: 0,
   drillPowerPerLevel: 0,
+  explosionPowerPerLevel: 0,
   fuelPerLevel: 0,
   strikeSpeedPerLevel: 0,
   healPerLevel: 0,
@@ -1465,6 +1468,7 @@ const GENERATION_QUICK_FIELDS = [
   { label: "Height", source: "height", min: 8, step: 1 },
   { label: "Width", source: "width", min: 6, max: GRID_W - 2, step: 1 },
   { label: "Perk Zone Count", source: "rules.perkZones", min: 0, step: 1 },
+  { label: "Boulder Pocket Groups", source: "rules.boulderPocketGroups", min: 0, step: 1 },
   { label: "Safe Count", source: "rules.safes", min: 0, step: 1 },
   { label: "Worm Nest Count", source: "rules.wormNests", min: 0, step: 1 },
   { label: "Artifact Count", source: "rules.artifacts", min: 0, step: 1 },
@@ -2531,6 +2535,7 @@ function setupField(seedOverride = null) {
   state.levelUpPulse = 0;
   state.levelUpModalDelay = 0;
   state.drillPowerPerLevel = 0;
+  state.explosionPowerPerLevel = 0;
   state.fuelPerLevel = 0;
   state.strikeSpeedPerLevel = 0;
   state.healPerLevel = 0;
@@ -3780,6 +3785,15 @@ function applyShopPerk(effectId, rarityMult, rarity) {
       break;
     case "shard_drill":
       state.shardDrillLevel += 1;
+      {
+        const good = ALL_GOODS.find(g => g.id === effectId);
+        const weakSpotChanceEffect = Array.isArray(good?.effect)
+          ? good.effect.find((entry) => entry?.stat === "weakSpotChance")
+          : null;
+        if (weakSpotChanceEffect) {
+          applyItemEffect(weakSpotChanceEffect, rarityMult, rarity);
+        }
+      }
       showPerkToast(t("item.shard_drill.name"));
       break;
     default: {
@@ -3831,7 +3845,18 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "tradeoff_drill": break;
     case "fragile_drill": break;
     case "lucky_pickaxe": break;
-    case "shard_drill": state.shardDrillLevel = Math.max(0, state.shardDrillLevel - 1); break;
+    case "shard_drill":
+      state.shardDrillLevel = Math.max(0, state.shardDrillLevel - 1);
+      {
+        const good = ALL_GOODS.find(g => g.id === effectId);
+        const weakSpotChanceEffect = Array.isArray(good?.effect)
+          ? good.effect.find((entry) => entry?.stat === "weakSpotChance")
+          : null;
+        if (weakSpotChanceEffect) {
+          reverseItemEffect(weakSpotChanceEffect, rarityMult, rarity);
+        }
+      }
+      break;
     default: {
       const good = ALL_GOODS.find(g => g.id === effectId);
       if (good?.effect) reverseItemEffect(good.effect, rarityMult, rarity);
@@ -3859,6 +3884,7 @@ function getShopStatsSnapshot() {
     goldBonus: state.goldBonus,
     fuelBonus: state.fuelBonus,
     goldBonusPerLevel: state.goldBonusPerLevel,
+    explosionPowerPerLevel: state.explosionPowerPerLevel,
     speedOfAutoClose: state.speedOfAutoClose,
     damageBonus: state.damageBonus,
     explosionPower: state.explosionPower,
@@ -5716,6 +5742,9 @@ function restorePlayerFully() {
 function applyLevelUpItemBonuses() {
   if (state.drillPowerPerLevel > 0) {
     state.drillPower += state.drillPowerPerLevel;
+  }
+  if (state.explosionPowerPerLevel > 0) {
+    state.explosionPower += state.explosionPowerPerLevel;
   }
   if (state.strikeSpeedPerLevel > 0) {
     state.strikeSpeed += state.strikeSpeedPerLevel;

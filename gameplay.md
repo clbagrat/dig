@@ -28,12 +28,19 @@ Loss condition:
 Current map size:
 - `150 x 150` tiles
 
+Depth layout (current default):
+- Level 1: `24 x 17`
+- Level 2: `26 x 26`
+- Level 3: `28 x 40`
+- Level 4: `32 x 52`
+
 Start:
 - the driller starts at the center of the map
 - the start tile is opened immediately
 
 Base:
 - the base initially spawns at exact distance `50` tiles from the start
+- base host level is Level 4 by default
 - the base can become visible when inside vision radius
 - visibility alone does not count as success
 
