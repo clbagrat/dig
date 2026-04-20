@@ -68,16 +68,26 @@ export const ALL_EQUIPMENT = [
     minRarity: 1,
   },
   {
+    id: "blast_drill",
+    type: "equipment",
+    name: "Взрывобур",
+    icon: "💣",
+    desc: "Урон 6 (+30% от explosionPower).",
+    category: "basic",
+    tags: ["basic"],
+    minRarity: 1,
+  },
+  {
     id: "tradeoff_drill",
     type: "equipment",
     name: "Разменный бур",
     icon: "⚔️",
-    desc: "Урон 16. −0.3 урона по бреши.",
+    desc: "Урон 16 (+10% от drillPower). −30% урона по бреши.",
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
     effect: [
-      { stat: "weakSpotMult", effectByRarity: [null, -0.3, -0.5, -0.7, -1.0] },
+      { stat: "weakSpotMult", effectByRarity: [null, -0.3, -0.3, -0.3, -0.3] },
     ],
   },
   {
@@ -279,8 +289,8 @@ export const ALL_ITEMS = [
     tags: ["basic"],
     minRarity: 1,
     effect: [
-      { stat: "fuelDrainRate", effectByRarity: [null, -0.10, -0.15, -0.20, -0.28] },
-      { stat: "drillPower", effectByRarity: [null, -1, -1, -2, -3] },
+      { stat: "fuelDrainRate", effectByRarity: [null, -0.05, -0.10, -0.15, -0.20] },
+      { stat: "strikeSpeed", effectByRarity: [null, -10, -10, -10, -10] },
     ],
   },
   {
@@ -1042,7 +1052,7 @@ export const ALL_ITEMS = [
     minRarity: 2,
     effect: [
       { stat: "damageBonus",               effectByRarity: [null, null, 15,   22,   30  ] },
-      { stat: "explosionRadiusBonus",  effectByRarity: [null, null, -0.5, -0.8, -1.0] },
+      { stat: "explosionRadiusBonus",  effectByRarity: [null, null, -0.5, -0.5, -0.5] },
       { stat: "fuelDrainRate",             effectByRarity: [null, null, 0.10, 0.15, 0.20] },
     ],
   },
@@ -1052,13 +1062,12 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Взрывной конденсор",
     icon: "💥",
-    desc: "При перегреве взрыв сильнее и шире. −10% концентрация.",
+    desc: "При перегреве взрыв сильнее. −10% концентрация.",
     category: "heat",
     tags: ["heat"],
     minRarity: 1,
     effect: [
       { stat: "explosionBonus", effectByRarity: [null, 25, 50, 75, 100] },
-      { stat: "explosionRadiusBonus", effectByRarity: [null, 0.5,  1.0,  1.5,  2.0 ] },
       { stat: "concentration",            effectByRarity: [null, -10, -15, -20, -30] },
     ],
   },
@@ -1447,11 +1456,28 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       : "";
     return t("desc.special.basic_drill", { flat: flatDamage, scale: formatDescriptionNumber(damageScale), total: totalText });
   },
+  blast_drill(rarity, stats = null) {
+    const flatDamage = getEffectValue({ effectByRarity: [0, 6, 10, 14, 18] }, rarity);
+    const explosionScale = getEffectValue({ effectByRarity: [0, 30, 40, 50, 60] }, rarity);
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const totalText = hasExplosionPower
+      ? ` [${formatDescriptionNumber(flatDamage + stats.explosionPower * (explosionScale / 100))}]`
+      : "";
+    return t("desc.special.blast_drill", { flat: flatDamage, scale: formatDescriptionNumber(explosionScale), total: totalText });
+  },
   tradeoff_drill(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 16, 22, 30, 40] }, rarity);
-    const penalty = getEffectValue({ effectByRarity: [0, -0.3, -0.5, -0.7, -1.0] }, rarity);
-    const totalText = Number.isFinite(stats?.drillPower) ? ` [${formatDescriptionNumber(flatDamage)}]` : "";
-    return t("desc.special.tradeoff_drill", { flat: flatDamage, total: totalText, penalty: formatSignedDescriptionNumber(penalty) });
+    const drillScale = 10;
+    const penalty = getEffectValue({ effectByRarity: [0, -0.3, -0.3, -0.3, -0.3] }, rarity);
+    const totalText = Number.isFinite(stats?.drillPower)
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (drillScale / 100))}]`
+      : "";
+    return t("desc.special.tradeoff_drill", {
+      flat: flatDamage,
+      scale: formatDescriptionNumber(drillScale),
+      total: totalText,
+      penalty: formatSignedPercent(penalty, 100),
+    });
   },
   fragile_drill(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);

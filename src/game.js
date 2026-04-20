@@ -148,6 +148,7 @@ const ITEM_INSPECT_STAT_META = new Proxy({
 const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "thermo_drill",
   "basic_drill",
+  "blast_drill",
   "tradeoff_drill",
   "fragile_drill",
   "lucky_pickaxe",
@@ -3534,6 +3535,7 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
         kind: "radiusBomb",
         damage: BASE_DRILL_DAMAGE * 10,
         radius: 2,
+        skipRadiusBonus: true,
       }, { instant: true });
       state.perkText = t("perk.tile.bomb.name");
       break;
@@ -3774,6 +3776,9 @@ function applyShopPerk(effectId, rarityMult, rarity) {
     case "basic_drill":
       showPerkToast(t("item.basic_drill.name"));
       break;
+    case "blast_drill":
+      showPerkToast(t("item.blast_drill.name"));
+      break;
     case "tradeoff_drill":
       showPerkToast(t("item.tradeoff_drill.name"));
       break;
@@ -3842,6 +3847,7 @@ function removeShopPerk(effectId, rarityMult, rarity) {
     case "ore_collector": break;
     case "crystal_catalyst": state.crystalCatalystLevel = Math.max(0, (state.crystalCatalystLevel || 0) - 1); break;
     case "basic_drill": break;
+    case "blast_drill": break;
     case "tradeoff_drill": break;
     case "fragile_drill": break;
     case "lucky_pickaxe": break;
@@ -4306,6 +4312,16 @@ function getSpecialInspectEffectLines(good, rarity) {
       return [
         { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
         { label: t("inspect.drill_scale"), value: `+${damageScale}%` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
+      ];
+    }
+    case "blast_drill": {
+      const flatDamage = [0, 6, 10, 14, 18][rarity] || 0;
+      const explosionScale = [0, 30, 40, 50, 60][rarity] || 0;
+      const totalDamage = flatDamage + state.explosionPower * (explosionScale / 100);
+      return [
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.explosion_scale"), value: `+${explosionScale}%` },
         { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
       ];
     }
@@ -5125,6 +5141,52 @@ function bindUi() {
     });
   }
 
+  const debugTeleportBoulder = document.getElementById("debugTeleportBoulder");
+  if (debugTeleportBoulder) {
+    debugTeleportBoulder.addEventListener("click", () => {
+      let nearest = null;
+      let bestDist = Infinity;
+
+      for (const b of state.boulders) {
+        const d = Math.abs(b.x - state.drill.x) + Math.abs(b.y - state.drill.y);
+        if (d < bestDist) {
+          bestDist = d;
+          nearest = { x: b.x, y: b.y };
+        }
+      }
+
+      for (let y = 1; y < GRID_H - 1; y += 1) {
+        for (let x = 1; x < GRID_W - 1; x += 1) {
+          if (!state.boulderPocketMask[cellIndex(x, y)]) continue;
+          const d = Math.abs(x - state.drill.x) + Math.abs(y - state.drill.y);
+          if (d < bestDist) {
+            bestDist = d;
+            nearest = { x, y };
+          }
+        }
+      }
+
+      if (nearest) {
+        const tx = clamp(nearest.x - 2, 1, GRID_W - 2);
+        const ty = clamp(nearest.y, 1, GRID_H - 2);
+        state.drill.x = tx;
+        state.drill.y = ty;
+        state.drill.renderX = tx;
+        state.drill.renderY = ty;
+        state.visibilityDirty = true;
+        carveTunnel(tx, ty);
+        state.pathTiles.length = 0;
+        state.pathTiles.push({ x: tx, y: ty });
+        rebuildPathIndex();
+        showPerkToast(t("toast.teleport_boulder", { x: nearest.x, y: nearest.y }));
+      } else {
+        showPerkToast(t("toast.no_boulders"));
+      }
+      state.debugPerkMenuOpen = false;
+      syncDebugPerkOverlay();
+    });
+  }
+
   function teleportToNearestZoneOfType(perkType) {
     let nearest = null;
     let bestDist = Infinity;
@@ -5170,21 +5232,6 @@ function bindUi() {
       syncTouchZonesInteractivity();
       playSound("shop_open");
       openShop(state.gold, state.currentDepthLevel, state.luck, getShopStatsSnapshot(), getShopDefaultStatsSnapshot());
-    });
-  }
-
-  const debugUnlockTree = document.getElementById("debugUnlockTree");
-  if (debugUnlockTree) {
-    debugUnlockTree.addEventListener("click", () => {
-      const locked = getLockedCategories();
-      if (locked.length > 0) {
-        const cat = locked[Math.floor(Math.random() * locked.length)];
-        unlockCategory(cat.id);
-        addSlot();
-        showPerkToast(t("toast.category_unlocked", { icon: cat.icon, name: cat.name }));
-      } else {
-        showPerkToast(t("toast.all_categories_unlocked"));
-      }
     });
   }
 
@@ -6260,11 +6307,12 @@ function update(dt) {
   const prevStunTimer = state.stunTimer;
   state.stunTimer = Math.max(0, state.stunTimer - dt);
   if (state.stunTimer === 0) {
-    state.stunDisplayDuration = 0;
     if (prevStunTimer > 0 && state.stunAfterburnerLevel > 0) {
-      const afterDuration = getScaledEffectDuration(prevStunTimer * state.stunAfterburnerLevel * 2);
+      const stunDuration = Math.max(state.stunDisplayDuration || 0, prevStunTimer);
+      const afterDuration = stunDuration * state.stunAfterburnerLevel * 2;
       activateDrillOverdrive(afterDuration, t("toast.afterburner_after_stun"));
     }
+    state.stunDisplayDuration = 0;
   }
   if (!state.struckThisFrame && state.drillIdleFrame) {
     state.heatCooldownTime += dt;
@@ -7295,6 +7343,7 @@ function getStrikeDamage() {
   let damage =
     BASE_DRILL_DAMAGE * contourBoost +
     getBasicDrillDamageBonus() +
+    getBlastDrillDamageBonus() +
     getTradeoffDrillDamageBonus() +
     getFragileDrillDamageBonus() +
     getLuckyPickaxeDamageBonus() +
@@ -7352,8 +7401,24 @@ function getBasicDrillDamageBonus() {
   return total;
 }
 
+function getBlastDrillDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("blast_drill")) {
+    const flat = [0, 6, 10, 14, 18][tier] || 0;
+    const explosionScale = [0, 0.30, 0.40, 0.50, 0.60][tier] || 0;
+    total += flat + state.explosionPower * explosionScale;
+  }
+  return total;
+}
+
 function getTradeoffDrillDamageBonus() {
-  return sumEquipmentTierValues("tradeoff_drill", [0, 16, 22, 30, 40]);
+  let total = 0;
+  for (const tier of getEquipmentTiers("tradeoff_drill")) {
+    const flat = [0, 16, 22, 30, 40][tier] || 0;
+    const damageScale = [0, 0.10, 0.10, 0.10, 0.10][tier] || 0;
+    total += flat + state.drillPower * damageScale;
+  }
+  return total;
 }
 
 function getLuckyPickaxeDamageBonus() {
@@ -7937,8 +8002,8 @@ function startBoulderRoll(x, y, dirX, dirY) {
     delay: BOULDER_DELAY,
     moveTimer: BOULDER_MOVE_INTERVAL,
     brokenBlocks: 0,
+    rollingStarted: false,
   });
-  playSound("boulder_roll");
 }
 
 function updateBoulders(dt) {
@@ -7949,7 +8014,11 @@ function updateBoulders(dt) {
     }
 
     if (boulder.delay > 0) {
-      boulder.delay -= dt;
+      boulder.delay = Math.max(0, boulder.delay - dt);
+      if (boulder.delay === 0 && !boulder.rollingStarted) {
+        boulder.rollingStarted = true;
+        playSound("boulder_roll");
+      }
       continue;
     }
 
@@ -8437,7 +8506,6 @@ function damageCell(x, y, damage, options = {}) {
     if (shardBlastDamage > 0) {
       explodeAt(x, y, shardBlastDamage, SHARD_DRILL_BLAST_RADIUS, {
         guaranteedBreak: false,
-        skipRadiusBonus: true,
       });
     }
   }
@@ -8653,6 +8721,8 @@ function breakCell(x, y, index, options = {}) {
 }
 
 const EXPLOSION_WAVE_DELAY = 0.05;
+const EXPLOSION_FALLOFF_MIN = 0.05;
+const EXPLOSION_STEP_FALLOFF = [1, 0.92, 0.78, 0.6, 0.42];
 
 function getScaledExplosionDamage(baseDamage, options = {}) {
   const explosionPowerScale = Number.isFinite(options.explosionPowerScale) ? options.explosionPowerScale : 1;
@@ -8660,7 +8730,7 @@ function getScaledExplosionDamage(baseDamage, options = {}) {
 }
 
 function explodeAt(x, y, damage, radius = 2, options = {}) {
-  const scaledRadius = radius + (options.skipRadiusBonus ? 0 : (state.explosionRadiusBonus || 0));
+  const scaledRadius = Math.max(1, radius + (options.skipRadiusBonus ? 0 : (state.explosionRadiusBonus || 0)));
   spawnExplosionEffect(x, y, scaledRadius);
   const scaledDamage = getScaledExplosionDamage(damage, options);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
@@ -8674,11 +8744,17 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
       const ty = y + oy;
       if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
       affectedCellCount += 1;
-      const delay = Math.floor(dist) * EXPLOSION_WAVE_DELAY;
+      const step = Math.floor(dist);
+      const baseFalloff = step < EXPLOSION_STEP_FALLOFF.length
+        ? EXPLOSION_STEP_FALLOFF[step]
+        : EXPLOSION_STEP_FALLOFF[EXPLOSION_STEP_FALLOFF.length - 1] * (0.7 ** (step - (EXPLOSION_STEP_FALLOFF.length - 1)));
+      const falloff = Math.max(EXPLOSION_FALLOFF_MIN, baseFalloff);
+      const cellDamage = breakDamage * falloff;
+      const delay = step * EXPLOSION_WAVE_DELAY;
       state.chainExplosions.push({
         kind: "explosionCell",
         x: tx, y: ty,
-        damage: breakDamage,
+        damage: cellDamage,
         triggerGas: options.triggerGas !== false,
         delay,
       });
@@ -8724,6 +8800,7 @@ function detonateRocketEffect(effect) {
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
       guaranteedBreak: false,
       explosionPowerScale: effect.payload.explosionPowerScale,
+      skipRadiusBonus: !!effect.payload.skipRadiusBonus,
     });
   }
 }
@@ -10947,6 +11024,7 @@ function render() {
 
 function renderBoulders(camera) {
   const ctx = state.ctx;
+  const time = (state.lastTs || 0) * 0.02;
   ctx.save();
   for (let i = 0; i < state.boulders.length; i += 1) {
     const boulder = state.boulders[i];
@@ -10954,8 +11032,60 @@ function renderBoulders(camera) {
     // Interpolate position
     const animT = boulder.animTimer > 0 ? 1 - boulder.animTimer / BOULDER_MOVE_INTERVAL : 1;
     const eased = easeOutCubic(animT);
-    const rx = (boulder.prevX + (boulder.x - boulder.prevX) * eased) * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
-    const ry = (boulder.prevY + (boulder.y - boulder.prevY) * eased) * TILE_SIZE - camera.y + TILE_SIZE * 0.54;
+    let rx = (boulder.prevX + (boulder.x - boulder.prevX) * eased) * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
+    let ry = (boulder.prevY + (boulder.y - boulder.prevY) * eased) * TILE_SIZE - camera.y + TILE_SIZE * 0.54;
+
+    if (boulder.delay > 0) {
+      const telegraphPulse = Math.sin(time + i * 0.7) * 0.5 + 0.5;
+      const shakeX = (Math.sin(time * 7 + i * 1.9) * 0.5) * telegraphPulse;
+      const shakeY = (Math.cos(time * 8 + i * 1.3) * 0.5) * telegraphPulse;
+      rx += shakeX;
+      ry += shakeY;
+
+      const path = [{ x: boulder.x, y: boulder.y }];
+      const occupiedByOtherBoulders = new Set();
+      for (let j = 0; j < state.boulders.length; j += 1) {
+        if (j === i) continue;
+        occupiedByOtherBoulders.add(`${state.boulders[j].x},${state.boulders[j].y}`);
+      }
+      let simX = boulder.x;
+      let simY = boulder.y;
+      let simBrokenBlocks = boulder.brokenBlocks || 0;
+      const maxSteps = GRID_W + GRID_H;
+      for (let step = 0; step < maxSteps; step += 1) {
+        const nextX = simX + boulder.dirX;
+        const nextY = simY + boulder.dirY;
+        if (nextX < 1 || nextY < 1 || nextX >= GRID_W - 1 || nextY >= GRID_H - 1) break;
+
+        const nextIndex = cellIndex(nextX, nextY);
+        if (occupiedByOtherBoulders.has(`${nextX},${nextY}`) || state.boulderPocketMask[nextIndex] || state.metalMask[nextIndex]) break;
+
+        path.push({ x: nextX, y: nextY });
+        simX = nextX;
+        simY = nextY;
+
+        if (!state.tunnelMask[nextIndex]) {
+          simBrokenBlocks += 1;
+          if (simBrokenBlocks >= BOULDER_BREAK_LIMIT) break;
+        }
+      }
+
+      const alpha = 0.28 + telegraphPulse * 0.36;
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 140, 140, ${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      for (let p = 0; p < path.length; p += 1) {
+        const px = path[p].x * TILE_SIZE - camera.x + TILE_SIZE * 0.5;
+        const py = path[p].y * TILE_SIZE - camera.y + TILE_SIZE * 0.5;
+        if (p === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     // Squash on landing: near end of anim briefly compress vertically
     const isAnimating = boulder.animTimer > 0;

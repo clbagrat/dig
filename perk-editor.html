@@ -94,6 +94,11 @@ html, body {
   background: linear-gradient(180deg, rgba(36,25,16,0.95), rgba(24,16,11,0.95));
   min-height: 0;
 }
+.sidebar__summary {
+  padding: 10px 10px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 .item-list {
   list-style: none;
   margin: 0;
@@ -343,6 +348,7 @@ html, body {
 
   <main id="cards-layout" class="layout">
     <aside class="sidebar">
+      <div id="list-summary" class="sidebar__summary"></div>
       <ul id="item-list" class="item-list"></ul>
     </aside>
     <section class="panel">
@@ -460,6 +466,8 @@ const UI_TEXT = {
     statsTypeItems: 'Stats: items only',
     statsCategoryAll: 'Stats category: all',
     statsResetFilters: 'Reset stats filters',
+    listEquipmentCount: 'Equipment',
+    listItemCount: 'Items',
   },
   ru: {
     title: '⛏ Превью карточек предметов',
@@ -497,6 +505,8 @@ const UI_TEXT = {
     statsTypeItems: 'Статы: только предметы',
     statsCategoryAll: 'Категория статов: все',
     statsResetFilters: 'Сбросить фильтры статов',
+    listEquipmentCount: 'Части корпуса',
+    listItemCount: 'Предметы',
   },
 };
 
@@ -568,6 +578,7 @@ const el = {
   tabStats: document.getElementById('tab-stats'),
   resetFilters: document.getElementById('reset-filters'),
   raritySwitch: document.getElementById('rarity-switch'),
+  listSummary: document.getElementById('list-summary'),
   list: document.getElementById('item-list'),
   shopCard: document.getElementById('shop-card'),
   itemStats: document.getElementById('item-stats'),
@@ -676,6 +687,19 @@ function formatEffectValue(value) {
   return Number(value).toFixed(2).replace(/\.00$/, '');
 }
 
+function formatScaleValue(stat, value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  const sign = n > 0 ? '+' : '';
+  if (PERCENT_STATS.has(stat)) {
+    if (Math.abs(n) <= 1 && n !== 0) {
+      return `${sign}${(n * 100).toFixed(2).replace(/\.00$/, '')}%`;
+    }
+    return `${sign}${n.toFixed(2).replace(/\.00$/, '')}%`;
+  }
+  return Number(n).toFixed(2).replace(/\.00$/, '');
+}
+
 function classifyEffectPolarity(stat, value) {
   if (!Number.isFinite(Number(value))) return 'neutral';
   const polarity = LOWER_IS_BETTER_STATS.has(stat) ? -1 : 1;
@@ -720,10 +744,19 @@ const SPECIAL_SCALE_ROWS = {
       { label: 'Итог урон (drill=10)', values: [11, 16.5, 22, 27.5] },
     ];
   },
+  blast_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [6, 10, 14, 18] },
+      { label: 'Скейл от explosionPower', values: ['30%', '40%', '50%', '60%'] },
+      { label: 'Итог урон (explosion=10)', values: [9, 14, 19, 24] },
+    ];
+  },
   tradeoff_drill() {
     return [
       { label: 'Урон (плоский)', values: [16, 22, 30, 40] },
-      { label: 'Штраф weakSpotMult', values: ['-0.3', '-0.5', '-0.7', '-1'] },
+      { label: 'Скейл от drillPower', values: ['10%', '10%', '10%', '10%'] },
+      { label: 'Итог урон (drill=10)', values: [17, 23, 31, 41] },
+      { label: 'Штраф weakSpotMult', values: ['-30%', '-30%', '-30%', '-30%'] },
     ];
   },
   fragile_drill() {
@@ -772,7 +805,7 @@ function getScaleRows(item) {
   for (const effect of effects) {
     rows.push({
       label: effect.stat || '—',
-      values: RARITIES.map(rarity => formatEffectValue(effectValueByRarity(effect, rarity))),
+      values: RARITIES.map(rarity => formatScaleValue(effect.stat || '', effectValueByRarity(effect, rarity))),
     });
   }
   if (SPECIAL_SCALE_ROWS[item.id]) {
@@ -1012,6 +1045,12 @@ function renderList(items, selectedItem) {
   });
 }
 
+function renderListSummary(items) {
+  const equipmentCount = items.filter(item => item.__kind === 'equipment').length;
+  const itemCount = items.filter(item => item.__kind === 'items').length;
+  el.listSummary.textContent = `${ui('listEquipmentCount')}: ${equipmentCount} · ${ui('listItemCount')}: ${itemCount}`;
+}
+
 function renderShopCard(item) {
   const isEquip = item.type === 'equipment';
   let cls = 'shop-card';
@@ -1146,6 +1185,7 @@ function render() {
   }
   renderRaritySwitch();
   const items = getFilteredItems();
+  renderListSummary(items);
   const selected = getSelectedItem(items);
 
   if (!selected) {
