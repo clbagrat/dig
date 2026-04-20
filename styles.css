@@ -121,6 +121,8 @@ body {
   inset: 0;
   z-index: 45;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
   justify-content: center;
   background: rgba(12, 6, 4, 0.72);
@@ -175,6 +177,109 @@ body {
   background: var(--panel-border);
   opacity: 0.5;
 }
+
+.menu-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 8px 8px;
+}
+
+.menu-summary--below {
+  width: calc(100vw - 24px);
+  max-height: min(46vh, 360px);
+  overflow: auto;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform-origin: center top;
+}
+
+.menu-summary__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.menu-summary__title {
+  display: none;
+}
+
+.menu-summary__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.menu-summary__item {
+  min-width: 22px;
+  height: 22px;
+  border: 1px solid rgba(220, 169, 93, 0.28);
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 14, 10, 0.82);
+  color: #ffeacb;
+  font: 700 12px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  position: relative;
+  padding: 0 4px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.menu-summary__count {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 10px;
+  height: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 207, 122, 0.52);
+  background: rgba(33, 18, 10, 0.92);
+  color: #ffcf7a;
+  font: 700 8px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+}
+
+.menu-summary__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.menu-summary__stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 120px;
+  border: 1px solid rgba(220, 169, 93, 0.16);
+  border-radius: 7px;
+  background: rgba(25, 14, 10, 0.72);
+  padding: 4px 6px;
+}
+
+.menu-summary__stat-label {
+  color: var(--muted);
+  font: 700 10px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.menu-summary__stat-value {
+  color: #f1dfb6;
+  font: 700 10px/1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.menu-summary__stat-value--pos { color: #8fe28f; }
+.menu-summary__stat-value--neg { color: #ff9b7d; }
 
 .manual-modal {
   position: absolute;

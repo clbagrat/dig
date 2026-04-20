@@ -1036,10 +1036,24 @@ function showStatTooltip(anchor, title, description = "") {
   _statTooltipEl.style.top = top + "px";
 
   _statTooltipHideHandler = () => {
-    _statTooltipEl.hidden = true;
-    _statTooltipHideHandler = null;
+    hideStatTooltip();
   };
   setTimeout(() => document.addEventListener("click", _statTooltipHideHandler, { once: true }), 0);
+}
+
+export function hideStatTooltip() {
+  if (_statTooltipEl) _statTooltipEl.hidden = true;
+  if (_statTooltipHideHandler) {
+    document.removeEventListener("click", _statTooltipHideHandler);
+    _statTooltipHideHandler = null;
+  }
+}
+
+export function showStatTooltipForStat(anchor, statKey, titleOverride = "") {
+  if (!anchor || !statKey) return;
+  const title = titleOverride || t(`shop.stat.${statKey}`);
+  const description = getShopStatTooltipDescription(statKey);
+  showStatTooltip(anchor, title, description);
 }
 
 function buildShopTooltipEntry(target) {
@@ -1097,6 +1111,10 @@ function hideShopItemTooltip() {
   }
 }
 
+export function hideGoodTooltip() {
+  hideShopItemTooltip();
+}
+
 function showShopItemTooltip(entry) {
   if (!entry?.good || !entry.anchor) return;
   if (!_shopItemTooltipEl) {
@@ -1146,6 +1164,16 @@ function showShopItemTooltip(entry) {
     hideShopItemTooltip();
   };
   setTimeout(() => document.addEventListener("click", _shopItemTooltipHideHandler, { once: true }), 0);
+}
+
+export function showGoodTooltip(entry, statsOverride = null) {
+  if (!entry?.good || !entry.anchor) return;
+  const prevStatsCache = currentStatsCache;
+  if (statsOverride && typeof statsOverride === "object") {
+    currentStatsCache = statsOverride;
+  }
+  showShopItemTooltip(entry);
+  currentStatsCache = prevStatsCache;
 }
 
 function renderOfferings() {

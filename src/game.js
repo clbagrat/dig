@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems, replaceOneBaseOfferWithSpecial, setShopRarityGuarantees } from "./shop.js?v=43";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems, replaceOneBaseOfferWithSpecial, setShopRarityGuarantees, showGoodTooltip, hideGoodTooltip, showStatTooltipForStat, hideStatTooltip } from "./shop.js?v=45";
 import { t, setLocale, getLocale } from "./i18n.js";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, ALL_EQUIPMENT, ALL_ITEMS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
@@ -87,7 +87,12 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   artifactRadarMode:         { key: "stat.artifactRadarMode",         mode: "toggle" },
   beaconCatalystLevel:       { key: "stat.beaconCatalystLevel",       mode: "level" },
   bonusFindChance:           { key: "stat.bonusFindChance",           mode: "percent" },
+  breachAfterburnerSeconds:  { key: "stat.breachAfterburnerSeconds",  mode: "fixed1" },
+  breachChainHitsOnTrigger:  { key: "stat.breachChainHitsOnTrigger",  mode: "integer" },
+  breachMissCool:            { key: "stat.breachMissCool",            mode: "fixed1" },
   breachMissileLevel:        { key: "stat.breachMissileLevel",        mode: "level" },
+  breachPresenceChance:      { key: "stat.breachPresenceChance",      mode: "percent" },
+  breachThermostatLevel:     { key: "stat.breachThermostatLevel",     mode: "level" },
   concentration:             { key: "stat.concentration",             mode: "multiplier" },
   contourResMultiplier:      { key: "stat.contourResMultiplier",      mode: "percent" },
   cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
@@ -116,6 +121,9 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   loopSpawnBonusChance:      { key: "stat.loopSpawnBonusChance",      mode: "percent" },
   lowFuelSpeedBonus:         { key: "stat.lowFuelSpeedBonus",         mode: "percent" },
   lowFuelDamageBonus:        { key: "stat.lowFuelDamageBonus",        mode: "percent" },
+  lowFuelWeakSpotChance:     { key: "stat.lowFuelWeakSpotChance",     mode: "percent" },
+  overdriveBreachChance:     { key: "stat.overdriveBreachChance",     mode: "percent" },
+  luckAsWeakSpotChance:      { key: "stat.luckAsWeakSpotChance",      mode: "rawpercent" },
   luck:                      { key: "stat.luck",                      mode: "integer" },
   maxFuel:                   { key: "stat.maxFuel",                   mode: "integer" },
   maxHeat:                   { key: "stat.maxHeat",                   mode: "integer" },
@@ -135,6 +143,7 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   weakSpotChance:            { key: "stat.weakSpotChance",            mode: "percent" },
   weakSpotFuelGain:          { key: "stat.weakSpotFuelGain",          mode: "integer" },
   weakSpotMult:              { key: "stat.weakSpotMult",              mode: "percent" },
+  weakSpotChancePerLevel:    { key: "stat.weakSpotChancePerLevel",    mode: "percent" },
   weakSpotPierce:            { key: "stat.weakSpotPierce",            mode: "integer" },
   xpBonus:         { key: "stat.xpBonus",        mode: "percent" },
 }, {
@@ -635,8 +644,21 @@ const state = {
   weakSpotChance: 0,
   weakSpotMult: 2,
   weakSpotPierce: 0,
+  weakSpotChancePerLevel: 0,
   adrenalineLevel: 0,
   weakSpotFuelGain: 0,
+  breachAfterburnerSeconds: 0,
+  breachChainHitsOnTrigger: 0,
+  breachChainEmpoweredHits: 0,
+  breachPresenceChance: 0,
+  overdriveBreachChance: 0,
+  breachMissCool: 0,
+  lowFuelWeakSpotChance: 0,
+  luckAsWeakSpotChance: 0,
+  breachThermostatLevel: 0,
+  breachThermostatCharge: 0,
+  pendingGuaranteedBreaches: 0,
+  lastStrikeHitWeakSpot: false,
   insuranceLevel: 0,
   fuelConverterLevel: 0,
   contourLengthDamageLevel: 0,
@@ -2488,8 +2510,21 @@ function setupField(seedOverride = null) {
   state.weakSpotChance = 0;
   state.weakSpotMult = 2;
   state.weakSpotPierce = 0;
+  state.weakSpotChancePerLevel = 0;
   state.adrenalineLevel = 0;
   state.weakSpotFuelGain = 0;
+  state.breachAfterburnerSeconds = 0;
+  state.breachChainHitsOnTrigger = 0;
+  state.breachChainEmpoweredHits = 0;
+  state.breachPresenceChance = 0;
+  state.overdriveBreachChance = 0;
+  state.breachMissCool = 0;
+  state.lowFuelWeakSpotChance = 0;
+  state.luckAsWeakSpotChance = 0;
+  state.breachThermostatLevel = 0;
+  state.breachThermostatCharge = 0;
+  state.pendingGuaranteedBreaches = 0;
+  state.lastStrikeHitWeakSpot = false;
   state.insuranceLevel = 0;
   state.fuelConverterLevel = 0;
   state.weakSpotMask.fill(0);
@@ -4440,8 +4475,13 @@ function openItemInspectModal(entry) {
   }
   const items = buildItemInspectEntries();
   const index = items.findIndex((item) => item.key === entry.key);
-  state.itemInspectItems = items;
-  state.itemInspectIndex = index >= 0 ? index : 0;
+  if (index >= 0) {
+    state.itemInspectItems = items;
+    state.itemInspectIndex = index;
+  } else {
+    state.itemInspectItems = [entry];
+    state.itemInspectIndex = 0;
+  }
   state.itemInspectModalOpen = true;
   syncItemInspectModal();
 }
@@ -4612,6 +4652,10 @@ function bindUi() {
   const manualOverlay = document.getElementById("manualModal");
   const manualPanel = manualOverlay?.querySelector(".manual-modal__panel");
   const manualFrame = document.getElementById("manualFrame");
+  const menuSummaryItems = document.getElementById("menuSummaryItems");
+  const menuSummaryStats = document.getElementById("menuSummaryStats");
+  const menuSummaryItemsTitle = document.getElementById("menuSummaryItemsTitle");
+  const menuSummaryStatsTitle = document.getElementById("menuSummaryStatsTitle");
   const itemInspectOverlay = document.getElementById("itemInspectModal");
   const itemInspectPanel = itemInspectOverlay?.querySelector(".item-inspect-modal__panel");
   const debugClose = document.getElementById("debugPerkClose");
@@ -4629,9 +4673,175 @@ function bindUi() {
   bindGenerationDebugControls();
 
   const closeMenu = () => {
+    hideGoodTooltip();
+    hideStatTooltip();
     if (menuPanel) menuPanel.hidden = true;
     state.menuOpen = false;
   };
+
+  const formatMenuStatValue = (value, mode = "number") => {
+    if (!Number.isFinite(value)) return "0";
+    if (mode === "percent") {
+      const rounded = Math.round(value * 100);
+      return `${rounded > 0 ? "+" : ""}${rounded}%`;
+    }
+    if (mode === "rawpercent") {
+      const rounded = Math.round(value);
+      return `${rounded > 0 ? "+" : ""}${rounded}%`;
+    }
+    if (mode === "multiplier") {
+      return `x${value.toFixed(2)}`;
+    }
+    if (mode === "fixed1") {
+      return value % 1 === 0 ? String(Math.round(value)) : value.toFixed(1);
+    }
+    return String(Math.round(value));
+  };
+
+  const syncMenuSummary = () => {
+    if (!menuSummaryItems || !menuSummaryStats) return;
+    if (menuSummaryItemsTitle) menuSummaryItemsTitle.textContent = t("ui.inventory");
+    if (menuSummaryStatsTitle) menuSummaryStatsTitle.textContent = t("ui.stats_hud");
+    const equipped = getEquippedParts();
+    const purchased = getPurchasedItems();
+    const stacks = new Map();
+    for (const part of equipped) {
+      const rarity = part.rarity || RARITY.COMMON;
+      const key = `eq:${part.id}:${rarity}`;
+      const next = stacks.get(key) || { id: part.id, rarity, count: 0, source: "equipment" };
+      next.count += 1;
+      stacks.set(key, next);
+    }
+    for (const item of purchased) {
+      const rarity = item.rarity || RARITY.COMMON;
+      const key = `it:${item.id}:${rarity}`;
+      const next = stacks.get(key) || { id: item.id, rarity, count: 0, source: "item" };
+      next.count += 1;
+      stacks.set(key, next);
+    }
+    const stackList = Array.from(stacks.values())
+      .map((stack) => {
+        const def = stack.source === "equipment"
+          ? ALL_EQUIPMENT.find((entry) => entry.id === stack.id)
+          : ALL_ITEMS.find((entry) => entry.id === stack.id);
+        if (!def) return null;
+        return {
+          id: def.id,
+          icon: def.icon || "?",
+          count: stack.count,
+          rarity: stack.rarity,
+          source: stack.source,
+          sourceLabel: stack.source === "equipment" ? t("ui.equipment") : t("ui.item"),
+        };
+      })
+      .filter(Boolean);
+    if (stackList.length === 0) {
+      menuSummaryItems.innerHTML = `<div class="menu-summary__item">—</div>`;
+    } else {
+      menuSummaryItems.innerHTML = stackList
+        .map(
+          (entry) =>
+            `<button class="menu-summary__item" type="button" data-good-id="${entry.id}" data-good-rarity="${entry.rarity}" data-good-source="${entry.source}" data-source-label="${entry.sourceLabel}">${entry.icon}${entry.count > 1 ? `<span class="menu-summary__count">x${entry.count}</span>` : ""}</button>`,
+        )
+        .join("");
+    }
+
+    const current = getShopStatsSnapshot();
+    const defaults = getShopDefaultStatsSnapshot();
+    const statDefs = [
+      { key: "drillPower", format: "fixed1" },
+      { key: "damageBonus", format: "percent" },
+      { key: "strikeSpeed", format: "rawpercent" },
+      { key: "maxHp", format: null },
+      { key: "maxFuel", format: null },
+      { key: "maxHeat", format: null },
+      { key: "heatRate", format: "multiplier" },
+      { key: "effectDurationRate", format: "multiplier" },
+      { key: "concentration", format: "multiplier" },
+      { key: "fuelDrainRate", format: "multiplier" },
+      { key: "visionRadius", format: null },
+      { key: "luck", format: null },
+      { key: "weakSpotChance", format: "percent" },
+      { key: "weakSpotMult", format: "percent" },
+      { key: "fuelStarvationResistance", format: "rawpercent" },
+      { key: "goldBonus", format: "percent" },
+      { key: "fuelBonus", format: "percent" },
+      { key: "explosionPower", format: "fixed1" },
+      { key: "explosionBonus", format: "rawpercent" },
+      { key: "lowFuelDamageBonus", format: "percent" },
+      { key: "goldBonusPerLevel", format: "percent" },
+      { key: "miningGoldBonusMultiplier", format: "percent" },
+      { key: "speedOfAutoClose", format: "rawpercent" },
+    ];
+    const changedRows = statDefs
+      .map((def) => {
+        const currentValue = Number.isFinite(current[def.key]) ? current[def.key] : 0;
+        const baselineValue = Number.isFinite(defaults[def.key]) ? defaults[def.key] : 0;
+        if (Math.abs(currentValue - baselineValue) <= 1e-6) return null;
+        return {
+          key: def.key,
+          label: t(`shop.stat.${def.key}.short`),
+          value: formatMenuStatValue(currentValue, def.format),
+          delta: currentValue - baselineValue,
+        };
+      })
+      .filter(Boolean);
+    if (changedRows.length === 0) {
+      menuSummaryStats.innerHTML = "";
+    } else {
+      menuSummaryStats.innerHTML = changedRows
+        .map((row) => `<button class="menu-summary__stat" type="button" data-stat-key="${row.key}"><span class="menu-summary__stat-label">${row.label}</span><span class="menu-summary__stat-value ${row.delta >= 0 ? "menu-summary__stat-value--pos" : "menu-summary__stat-value--neg"}">${row.value}</span></button>`)
+        .join("");
+    }
+  };
+  state.syncMenuSummary = syncMenuSummary;
+
+  if (menuSummaryItems) {
+    const handleMenuSummaryItemActivate = (event) => {
+      const hit = event.target instanceof Element ? event.target : null;
+      const target = hit?.closest(".menu-summary__item[data-good-id][data-good-rarity]");
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const goodId = target.dataset.goodId || "";
+      const sourceType = target.dataset.goodSource || "";
+      const rarity = Number(target.dataset.goodRarity) || RARITY.COMMON;
+      const sourceLabel = target.dataset.sourceLabel || t("ui.item");
+      let good = null;
+      if (sourceType === "equipment") {
+        good = ALL_EQUIPMENT.find((entry) => entry.id === goodId) || null;
+      } else if (sourceType === "item") {
+        good = ALL_ITEMS.find((entry) => entry.id === goodId) || null;
+      } else {
+        good = ALL_GOODS.find((entry) => entry.id === goodId) || null;
+      }
+      if (!good) return;
+      showGoodTooltip(
+        {
+          anchor: target,
+          good,
+          rarity,
+          sourceLabel,
+          stackCount: 1,
+        },
+        getShopStatsSnapshot(),
+      );
+    };
+    menuSummaryItems.addEventListener("pointerdown", handleMenuSummaryItemActivate);
+  }
+
+  if (menuSummaryStats) {
+    menuSummaryStats.addEventListener("pointerdown", (event) => {
+      const hit = event.target instanceof Element ? event.target : null;
+      const target = hit?.closest(".menu-summary__stat[data-stat-key]");
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const statKey = target.dataset.statKey || "";
+      if (!statKey) return;
+      showStatTooltipForStat(target, statKey, t(`shop.stat.${statKey}`));
+    });
+  }
 
   const syncLangToggle = () => {
     if (!langToggle) return;
@@ -4650,6 +4860,7 @@ function bindUi() {
 
   syncSoundToggle();
   syncLangToggle();
+  syncMenuSummary();
 
   const syncKeyboardAim = () => {
     const left = keysDown.has("arrowleft") || keysDown.has("a") || keysDown.has("ф");
@@ -4772,12 +4983,16 @@ function bindUi() {
       event.stopPropagation();
       state.menuOpen = !state.menuOpen;
       menuPanel.hidden = !state.menuOpen;
+      if (state.menuOpen) {
+        syncMenuSummary();
+      }
       resetPad();
     });
-    menuPanel.addEventListener("click", (event) => {
-      if (event.target === menuPanel) {
-        closeMenu();
-      }
+    menuPanel.addEventListener("pointerdown", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(".menu-modal__panel")) return;
+      if (target?.closest("#menuSummary")) return;
+      closeMenu();
     });
   }
 
@@ -5805,6 +6020,9 @@ function applyLevelUpItemBonuses() {
   if (state.goldBonusPerLevel > 0) {
     state.goldBonus += state.goldBonusPerLevel;
   }
+  if (state.weakSpotChancePerLevel > 0) {
+    state.weakSpotChance += state.weakSpotChancePerLevel;
+  }
 }
 
 function applyLevelReward(choiceId) {
@@ -6321,6 +6539,15 @@ function update(dt) {
     const prevHeat = state.heat;
     state.heat = Math.max(0, state.heat - HEAT_COOL_RATE * cooldownBoost * speedCoolingBoost * dt);
     const cooledHeat = Math.max(0, prevHeat - state.heat);
+    if (state.breachThermostatLevel > 0 && cooledHeat > 0) {
+      state.breachThermostatCharge += cooledHeat * state.breachThermostatLevel;
+      while (state.breachThermostatCharge >= 20) {
+        if (!spawnWeakSpotNearDrill()) {
+          break;
+        }
+        state.breachThermostatCharge -= 20;
+      }
+    }
     if (state.coolingRocketLevel > 0 && cooledHeat > 0) {
       state.coolingRocketCharge += cooledHeat;
       const coolingRocketThreshold = getCoolingRocketThreshold();
@@ -7334,6 +7561,67 @@ function syncPerkChoiceOverlay() {
   }
 }
 
+function hasActiveWeakSpot() {
+  const mask = state.weakSpotMask;
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i]) return true;
+  }
+  return false;
+}
+
+function isWeakSpotCandidateCell(index) {
+  if (index < 0 || index >= state.health.length) return false;
+  if (state.health[index] <= 0) return false;
+  if (!state.hardness[index]) return false;
+  if (state.tunnelMask[index]) return false;
+  if (state.metalMask[index]) return false;
+  if (state.safeDoorMask[index]) return false;
+  if (state.beaconMask[index] && !isHiddenBeaconCore(index)) return false;
+  return true;
+}
+
+function spawnWeakSpotNearDrill() {
+  if (hasActiveWeakSpot()) return false;
+  let bestDistance = Infinity;
+  const bestCandidates = [];
+  for (let y = 1; y < GRID_H - 1; y += 1) {
+    for (let x = 1; x < GRID_W - 1; x += 1) {
+      const index = cellIndex(x, y);
+      if (!isWeakSpotCandidateCell(index)) continue;
+      const distance = Math.abs(x - state.drill.x) + Math.abs(y - state.drill.y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestCandidates.length = 0;
+        bestCandidates.push(index);
+      } else if (distance === bestDistance) {
+        bestCandidates.push(index);
+      }
+    }
+  }
+  if (bestCandidates.length === 0) return false;
+  const pick = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+  state.weakSpotMask[pick] = state.lastTs || 1;
+  return true;
+}
+
+function getEffectiveWeakSpotChance(hasWeakSpotOnField = false) {
+  void hasWeakSpotOnField;
+  let chance = state.weakSpotChance || 0;
+  if (state.breachPresenceChance) {
+    chance += state.armor > 0 ? state.breachPresenceChance : -state.breachPresenceChance;
+  }
+  if (state.overhealDrillTimer > 0 && state.overdriveBreachChance) {
+    chance += state.overdriveBreachChance;
+  }
+  if (state.lowFuelWeakSpotChance > 0 && state.maxFuel > 0 && state.fuel / state.maxFuel <= 0.25) {
+    chance += state.lowFuelWeakSpotChance;
+  }
+  if (state.luckAsWeakSpotChance) {
+    chance += (state.luck || 0) * (state.luckAsWeakSpotChance / 100);
+  }
+  return clamp(chance, 0, 1);
+}
+
 function getStrikeDamage() {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
@@ -7349,6 +7637,8 @@ function getStrikeDamage() {
     getLuckyPickaxeDamageBonus() +
     getShardDrillDamageBonus() +
     getBreachMissileDamageBonus() +
+    getBreachAfterburnerDamageBonus() +
+    getBreachChainDrillDamageBonus() +
     getThermoDrillDamageBonus();
   return damage * (1 + state.damageBonus / 100) * lowFuelDamageBoost;
 }
@@ -7457,6 +7747,30 @@ function getBreachMissileDamageBonus() {
   const flat = sumEquipmentTierValues("breach_missile", [0, 10, 10, 10, 10]);
   const scale = sumEquipmentTierValues("breach_missile", [0, 10, 15, 20, 25]);
   return flat + state.drillPower * (scale / 100);
+}
+
+function getBreachAfterburnerDamageBonus() {
+  let total = 0;
+  const weakSpotMultPoints = (state.weakSpotMult || 0) * 100;
+  for (const tier of getEquipmentTiers("breach_afterburner")) {
+    const flat = 12;
+    const drillScale = [0, 0.10, 0.12, 0.15, 0.20][tier] || 0;
+    const weakSpotScale = [0, 0.02, 0.04, 0.06, 0.10][tier] || 0;
+    total += flat + state.drillPower * drillScale + weakSpotMultPoints * weakSpotScale;
+  }
+  return total;
+}
+
+function getBreachChainDrillDamageBonus() {
+  let total = 0;
+  const weakSpotChancePoints = (state.weakSpotChance || 0) * 100;
+  for (const tier of getEquipmentTiers("breach_chain_drill")) {
+    const flat = 15;
+    const explosionScale = [0, 0.10, 0.12, 0.15, 0.20][tier] || 0;
+    const weakSpotChanceScale = [0, 0.02, 0.04, 0.06, 0.10][tier] || 0;
+    total += flat + state.explosionPower * explosionScale + weakSpotChancePoints * weakSpotChanceScale;
+  }
+  return total;
 }
 
 function getBreachMissileExplosionScaleForTier(tier) {
@@ -8485,12 +8799,19 @@ function damageCell(x, y, damage, options = {}) {
   const pierceLeft = options.pierceLeft ?? 0;
   let pierceActive = !!options.pierceActive;
   if (options.byDrill && state.weakSpotMask[index]) {
+    state.lastStrikeHitWeakSpot = true;
     damage *= state.weakSpotMult;
     state.weakSpotMask[index] = 0;
     pierceActive = true;
     spawnWeakSpotHitEffect(x, y, options.dirX ?? 0, options.dirY ?? 1);
     if (state.weakSpotFuelGain > 0) {
       addFuel(state.weakSpotFuelGain);
+    }
+    if (state.breachAfterburnerSeconds > 0) {
+      activateDrillOverdrive(state.breachAfterburnerSeconds);
+    }
+    if (state.breachChainHitsOnTrigger > 0) {
+      state.breachChainEmpoweredHits += Math.max(0, Math.round(state.breachChainHitsOnTrigger));
     }
     for (const tier of getEquipmentTiers("breach_missile")) {
       fireRocket(
@@ -9333,9 +9654,7 @@ function updateDrill(dt) {
   if (state.drill.actionCooldown > 0) {
     state.drill.strikePhase += dt * actionRate;
     state.drill.strikeEnergy = Math.min(1, state.drill.strikeEnergy + dt * 9);
-    if (state.overhealDrillTimer <= 0) {
-      drainFuel(DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt);
-    }
+    drainFuel(DRILL_FUEL_DRAIN * Math.max(0, state.fuelDrainRate) * dt);
     moveDrillRenderToward(state.drill.x, state.drill.y, dt);
     return;
   }
@@ -9348,7 +9667,13 @@ function updateDrill(dt) {
 
   state.drill.strikePhase = Math.PI * 0.5;
   state.drill.actionCooldown = actionInterval;
-  const strikeDamage = getStrikeDamage();
+  const hadWeakSpotOnField = hasActiveWeakSpot();
+  state.lastStrikeHitWeakSpot = false;
+  const empoweredStrike = state.breachChainEmpoweredHits > 0;
+  let strikeDamage = getStrikeDamage();
+  if (empoweredStrike) {
+    strikeDamage *= Math.max(1, state.weakSpotMult || 1);
+  }
   const hardness = state.hardness[targetIndex];
   damageCell(targetX, targetY, strikeDamage, {
     moveDrill: true,
@@ -9359,6 +9684,12 @@ function updateDrill(dt) {
     dirY: dy,
     pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)),
   });
+  if (empoweredStrike) {
+    state.breachChainEmpoweredHits = Math.max(0, state.breachChainEmpoweredHits - 1);
+  }
+  if (hadWeakSpotOnField && !state.lastStrikeHitWeakSpot && state.breachMissCool > 0) {
+    state.heat = Math.max(0, state.heat - state.breachMissCool);
+  }
   if (state.contourEnemy && state.contourEnemy.x === targetX && state.contourEnemy.y === targetY) {
     hitContourEnemy(strikeDamage);
   }
@@ -9369,7 +9700,9 @@ function updateDrill(dt) {
   );
 
   state.weakSpotMask.fill(0);
-  if (state.weakSpotChance > 0 && state.health[targetIndex] > 0 && Math.random() < state.weakSpotChance) {
+  const weakSpotChance = getEffectiveWeakSpotChance(hadWeakSpotOnField);
+  const canSpawnWeakSpot = !empoweredStrike && state.health[targetIndex] > 0;
+  if (canSpawnWeakSpot && weakSpotChance > 0 && Math.random() < weakSpotChance) {
     const weakCandidates = [];
     const _wcAdd = (cx, cy) => {
       if (cx < 1 || cy < 1 || cx >= GRID_W - 1 || cy >= GRID_H - 1) return;
@@ -10990,6 +11323,9 @@ function render() {
   }
   ctx.restore();
   if (!state.debugMapActive) renderHud();
+  if (state.menuOpen) {
+    state.syncMenuSummary?.();
+  }
   renderDepthTitle();
 
   if (state.damageFlash > 0) {
@@ -12610,6 +12946,7 @@ function renderSafeDoorTile(x, y, sx, sy) {
     ctx.fill();
     ctx.restore();
   }
+
 }
 
 function renderPerkZoneTile(x, y, sx, sy) {
@@ -13075,6 +13412,33 @@ function renderDrill(camera) {
     ctx.moveTo(kcx, kcy + 8);
     ctx.lineTo(kcx + 2.5, kcy + 8);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  if (state.breachChainEmpoweredHits > 0) {
+    const count = Math.max(0, Math.floor(state.breachChainEmpoweredHits));
+    const badgeX = px + TILE_SIZE * 0.5;
+    const badgeY = py + (state.heldKeyForSafe >= 0 ? -26 : -12);
+    const pulse = Math.sin((state.lastTs || 0) * 0.01) * 0.5 + 0.5;
+    const text = `x${count}`;
+    ctx.save();
+    ctx.font = "bold 10px monospace";
+    const textWidth = Math.ceil(ctx.measureText(text).width);
+    const width = Math.max(26, textWidth + 16);
+    const height = 14;
+    const x = badgeX - width * 0.5;
+    const y = badgeY - height * 0.5;
+    const radius = 7;
+    drawRoundedRectPath(ctx, x, y, width, height, radius);
+    ctx.fillStyle = `rgba(15, 22, 30, ${0.68 + pulse * 0.2})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 210, 120, ${0.65 + pulse * 0.3})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.fillStyle = "#ffd68a";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, badgeX, badgeY + 0.5);
     ctx.restore();
   }
 }
@@ -13981,120 +14345,94 @@ function renderHudCoreStats(x, y, width, title) {
 
 function renderHudPerkColumn(x, y, width, title) {
   const ctx = state.ctx;
-  const perkRows = [];
+  const current = getShopStatsSnapshot();
+  const defaults = getShopDefaultStatsSnapshot();
+  const statDefs = [
+    { key: "drillPower", format: "fixed1" },
+    { key: "damageBonus", format: "percent" },
+    { key: "strikeSpeed", format: "rawpercent" },
+    { key: "maxHp", format: null },
+    { key: "maxFuel", format: null },
+    { key: "maxHeat", format: null },
+    { key: "heatRate", format: "multiplier" },
+    { key: "effectDurationRate", format: "multiplier" },
+    { key: "concentration", format: "multiplier" },
+    { key: "fuelDrainRate", format: "multiplier" },
+    { key: "visionRadius", format: null },
+    { key: "luck", format: null },
+    { key: "weakSpotChance", format: "percent" },
+    { key: "weakSpotMult", format: "percent" },
+    { key: "fuelStarvationResistance", format: "rawpercent" },
+    { key: "goldBonus", format: "percent" },
+    { key: "fuelBonus", format: "percent" },
+    { key: "explosionPower", format: "fixed1" },
+    { key: "explosionBonus", format: "rawpercent" },
+    { key: "lowFuelDamageBonus", format: "percent" },
+    { key: "goldBonusPerLevel", format: "percent" },
+    { key: "miningGoldBonusMultiplier", format: "percent" },
+    { key: "speedOfAutoClose", format: "rawpercent" },
+  ];
 
-  // 1. Equipped parts (equipment slots)
-  const equipped = getEquippedParts();
-  for (let index = 0; index < equipped.length; index += 1) {
-    const part = equipped[index];
-    const def = ALL_EQUIPMENT.find(e => e.id === part.id);
-    if (def) {
-      perkRows.push({
-        icon: def.icon || "?",
-        label: null,
-        isEquipment: true,
-        inspect: {
-          key: `equipment:${index}:${part.id}:${part.rarity || RARITY.COMMON}`,
-          good: def,
-          rarity: part.rarity || RARITY.COMMON,
-          sourceLabel: t("ui.slot", { n: index + 1 }),
-          stackCount: equipped.filter((entry) => entry.id === part.id).length,
-        },
-      });
+  const formatStat = (value, mode = "number") => {
+    if (!Number.isFinite(value)) return "0";
+    if (mode === "percent") {
+      const rounded = Math.round(value * 100);
+      return `${rounded > 0 ? "+" : ""}${rounded}%`;
     }
-  }
-
-  // 2. Purchased items
-  const purchased = getPurchasedItems();
-  for (let index = 0; index < purchased.length; index += 1) {
-    const item = purchased[index];
-    const def = ALL_ITEMS.find(e => e.id === item.id);
-    if (def) {
-      perkRows.push({
-        icon: def.icon || "?",
-        label: null,
-        isItem: true,
-        inspect: {
-          key: `item:${index}:${item.id}:${item.rarity || RARITY.COMMON}`,
-          good: def,
-          rarity: item.rarity || RARITY.COMMON,
-          sourceLabel: t("ui.inventory"),
-          stackCount: purchased.filter((entry) => entry.id === item.id).length,
-        },
-      });
+    if (mode === "rawpercent") {
+      const rounded = Math.round(value);
+      return `${rounded > 0 ? "+" : ""}${rounded}%`;
     }
-  }
+    if (mode === "multiplier") {
+      return `x${value.toFixed(2)}`;
+    }
+    if (mode === "fixed1") {
+      return value % 1 === 0 ? String(Math.round(value)) : value.toFixed(1);
+    }
+    return String(Math.round(value));
+  };
 
-  // 3. Gold perks
-  for (let i = 1; i < GOLD_PERK_TYPES.length; i += 1) {
-    if (i === 21) continue;
-    if (!GOLD_PERK_TYPES[i]) continue;
-    const level = getGoldPerkCurrentLevel(i);
-    if (level <= 0) continue;
-    perkRows.push({
-      perkType: i,
-      icon: GOLD_PERK_TYPES[i].icon || "?",
-      level,
-    });
-  }
+  const changedRows = statDefs
+    .map((def) => {
+      const currentValue = Number.isFinite(current[def.key]) ? current[def.key] : 0;
+      const baselineValue = Number.isFinite(defaults[def.key]) ? defaults[def.key] : 0;
+      if (Math.abs(currentValue - baselineValue) <= 1e-6) return null;
+      return {
+        key: def.key,
+        label: t(`shop.stat.${def.key}.short`),
+        value: formatStat(currentValue, def.format),
+        delta: currentValue - baselineValue,
+      };
+    })
+    .filter(Boolean);
 
-  const iconsPerRow = Math.floor((width + 6) / (25 + 6));
-  const iconSize = 25;
-  const gap = 6;
-  const rowHeight = 29;
-  const startLeft = x + iconSize * 0.5;
+  const chipWidth = 88;
+  const chipHeight = 16;
+  const chipGapX = 4;
+  const chipGapY = 4;
+  const chipsPerRow = Math.max(1, Math.floor((width + chipGapX) / (chipWidth + chipGapX)));
+
+  if (changedRows.length === 0) {
+    return;
+  }
 
   ctx.save();
   ctx.textBaseline = "middle";
-
-  for (let i = 0; i < perkRows.length; i += 1) {
-    const rowIndex = Math.floor(i / iconsPerRow);
-    const colIndex = i % iconsPerRow;
-    const cx = startLeft + colIndex * (iconSize + gap);
-    const cy = y - 8 - rowIndex * rowHeight;
-    const row = perkRows[i];
-    const isEquipment = !!row.isEquipment;
-    const isItem = !!row.isItem;
-    ctx.fillStyle = isEquipment ? "rgba(28, 40, 60, 0.6)" : isItem ? "rgba(28, 50, 28, 0.6)" : "rgba(50, 28, 16, 0.42)";
-    ctx.strokeStyle = isEquipment ? "rgba(100, 160, 255, 0.4)" : isItem ? "rgba(100, 200, 100, 0.4)" : "rgba(215, 159, 73, 0.24)";
-    ctx.lineWidth = 1;
-    drawRoundedRectPath(cx - iconSize * 0.5, cy - iconSize * 0.5, iconSize, iconSize, 7);
-    ctx.fill();
-    ctx.stroke();
-    if (row.inspect) {
-      ctx.strokeStyle = "rgba(255, 240, 214, 0.12)";
-      ctx.lineWidth = 0.8;
-      drawRoundedRectPath(cx - iconSize * 0.5 + 2, cy - iconSize * 0.5 + 2, iconSize - 4, iconSize - 4, 5);
-      ctx.stroke();
-      state.hudInspectableRects.push({
-        ...row.inspect,
-        rect: {
-          x: cx - iconSize * 0.5,
-          y: cy - iconSize * 0.5,
-          width: iconSize,
-          height: iconSize,
-        },
-      });
-    }
-    ctx.fillStyle = "#ffeacb";
-    ctx.font = `700 10px ${HUD_FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(row.icon, cx, cy + 0.5);
-
-    if (row.level >= 2) {
-      const badgeText = String(row.level);
-      const badgeX = cx + iconSize * 0.35;
-      const badgeY = cy - iconSize * 0.35;
-      ctx.fillStyle = "rgba(36, 20, 12, 0.92)";
-      ctx.strokeStyle = "rgba(255, 207, 122, 0.45)";
-      ctx.lineWidth = 1;
-      drawRoundedRectPath(badgeX - 5, badgeY - 5, 10, 10, 5);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#ffcf7a";
-      ctx.font = `700 8px ${HUD_FONT}`;
-      ctx.fillText(badgeText, badgeX, badgeY + 0.5);
-    }
+  for (let i = 0; i < changedRows.length; i += 1) {
+    const rowIndex = Math.floor(i / chipsPerRow);
+    const colIndex = i % chipsPerRow;
+    const chipX = x + colIndex * (chipWidth + chipGapX);
+    const chipY = y - chipHeight - rowIndex * (chipHeight + chipGapY);
+    const row = changedRows[i];
+    drawHudPanel(chipX, chipY, chipWidth, chipHeight);
+    ctx.font = `700 8px ${HUD_FONT}`;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(198, 171, 132, 0.9)";
+    ctx.fillText(row.label, chipX + 8, chipY + chipHeight * 0.5);
+    ctx.font = `700 9px ${HUD_FONT}`;
+    ctx.textAlign = "right";
+    ctx.fillStyle = row.delta >= 0 ? "#8fe28f" : "#ff9b7d";
+    ctx.fillText(row.value, chipX + chipWidth - 8, chipY + chipHeight * 0.5);
   }
   ctx.restore();
 }

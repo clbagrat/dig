@@ -153,12 +153,38 @@ export const ALL_EQUIPMENT = [
     name: "Рудный инжектор",
     icon: "⚗️",
     desc: "Удар по бреши восстанавливает +15 топлива. −5% скорость бура.",
-    category: "поиск_бреши",
-    tags: ["поиск_бреши"],
+    category: "выживание",
+    tags: ["выживание"],
     minRarity: 2,
     effect: [
       { stat: "weakSpotFuelGain", effectByRarity: [null, null, 15, 25, 40] },
       { stat: "strikeSpeed",      effectByRarity: [null, null, -5, -5, -5] },
+    ],
+  },
+  {
+    id: "breach_afterburner",
+    type: "equipment",
+    name: "Разрядный форсаж",
+    icon: "⚡",
+    desc: "При попадании в брешь включает форсаж. Урон зависит от drillPower и weakSpotMult.",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: [
+      { stat: "breachAfterburnerSeconds", effectByRarity: [null, 1, 1, 2, 2] },
+    ],
+  },
+  {
+    id: "breach_chain_drill",
+    type: "equipment",
+    name: "Цепной брешь-бур",
+    icon: "🧷",
+    desc: "После попадания в брешь усиливает следующие удары и запрещает им создавать брешь.",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: [
+      { stat: "breachChainHitsOnTrigger", effectByRarity: [null, 1, 2, 3, 4] },
     ],
   },
 
@@ -768,6 +794,110 @@ export const ALL_ITEMS = [
       stat: "weakSpotChance",
       effectByRarity: [null, 0.03, 0.05, 0.08, 0.10],
     },
+  },
+  {
+    id: "breach_thermostat",
+    type: "item",
+    name: "Поиск бреши",
+    icon: "🌡️",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    unique: true,
+    effect: [
+      { stat: "breachThermostatLevel", effectByRarity: [null, 1, 1, 1, 1] },
+      { stat: "heatRate", effectByRarity: [null, 0.15, 0.15, 0.15, 0.15] },
+    ],
+  },
+  {
+    id: "breach_presence",
+    type: "item",
+    name: "Давление бреши",
+    icon: "👁️",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: { stat: "breachPresenceChance", effectByRarity: [null, 0.04, 0.06, 0.08, 0.12] },
+  },
+  {
+    id: "overdrive_hunter",
+    type: "item",
+    name: "Форсажный охотник",
+    icon: "💨",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: { stat: "overdriveBreachChance", effectByRarity: [null, 0.03, 0.05, 0.07, 0.09] },
+  },
+  {
+    id: "raw_power",
+    type: "item",
+    name: "Raw Power",
+    icon: "🧨",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: [
+      { stat: "weakSpotChance", effectByRarity: [null, -0.08, -0.12, -0.16, -0.20] },
+      { stat: "damageBonus", effectByRarity: [null, 8, 12, 16, 20] },
+    ],
+  },
+  {
+    id: "breach_scope",
+    type: "item",
+    name: "Бреш-оптика",
+    icon: "🎯",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: [
+      { stat: "weakSpotMult", effectByRarity: [null, 0.20, 0.30, 0.45, 0.60] },
+      { stat: "visionRadius", effectByRarity: [null, -1, -1, -1, -1] },
+    ],
+  },
+  {
+    id: "cooling_on_miss",
+    type: "item",
+    name: "Охлаждение при промахе",
+    icon: "🧊",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: { stat: "breachMissCool", effectByRarity: [null, 5, 7, 9, 11] },
+  },
+  {
+    id: "low_fuel_hunter",
+    type: "item",
+    name: "Охотник пустого бака",
+    icon: "🛢️",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: [
+      { stat: "lowFuelWeakSpotChance", effectByRarity: [null, 0.04, 0.06, 0.09, 0.12] },
+      { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
+    ],
+  },
+  {
+    id: "breach_study",
+    type: "item",
+    name: "Исследование бреши",
+    icon: "📐",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: { stat: "weakSpotChancePerLevel", effectByRarity: [null, 0.03, 0.05, 0.07, 0.09] },
+  },
+  {
+    id: "lucky_criticality",
+    type: "item",
+    name: "Счастливая критичность",
+    icon: "🍀",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    unique: true,
+    effect: { stat: "luckAsWeakSpotChance", effectByRarity: [null, 1, 1, 1, 1] },
   },
   // ─── Level-up bonus items ──────────────────────────────────────────────────
   // Each of these grants a bonus every time the player gains a level.
@@ -1444,6 +1574,15 @@ const SIMPLE_STAT_DESCRIPTORS = {
   stunReservoirLevel: value => t("desc.stunReservoirLevel", { val: formatSignedDescriptionNumber(value * 40) }),
   stunAfterburnerLevel: value => t("desc.stunAfterburnerLevel", { val: value * 2 }),
   weakSpotPierce: value => t("desc.weakSpotPierce", { val: formatDescriptionNumber(value) }),
+  breachAfterburnerSeconds: value => t("desc.breachAfterburnerSeconds", { val: formatDescriptionNumber(value) }),
+  breachChainHitsOnTrigger: value => t("desc.breachChainHitsOnTrigger", { val: formatDescriptionNumber(value) }),
+  breachThermostatLevel: () => t("desc.breachThermostatLevel"),
+  breachPresenceChance: value => t("desc.breachPresenceChance", { val: formatSignedPercent(value, 100) }),
+  overdriveBreachChance: value => t("desc.overdriveBreachChance", { val: formatSignedPercent(value, 100) }),
+  breachMissCool: value => t("desc.breachMissCool", { val: formatDescriptionNumber(value) }),
+  lowFuelWeakSpotChance: value => t("desc.lowFuelWeakSpotChance", { val: formatSignedPercent(value, 100) }),
+  weakSpotChancePerLevel: value => t("desc.weakSpotChancePerLevel", { val: formatSignedPercent(value, 100) }),
+  luckAsWeakSpotChance: value => t("desc.luckAsWeakSpotChance", { val: formatDescriptionNumber(value) }),
 };
 
 const SPECIAL_DESCRIPTION_BUILDERS = {
@@ -1549,6 +1688,42 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       expScale: formatDescriptionNumber(rocketExplosionScale),
       rocketTotal,
       radius: "1.5",
+    });
+  },
+  breach_afterburner(rarity, stats = null) {
+    const flatDamage = 12;
+    const drillScale = getEffectValue({ effectByRarity: [0, 10, 12, 15, 20] }, rarity);
+    const weakSpotScale = getEffectValue({ effectByRarity: [0, 2, 4, 6, 10] }, rarity);
+    const seconds = getEffectValue({ effectByRarity: [0, 1, 1, 2, 2] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const hasWeakSpotMult = Number.isFinite(stats?.weakSpotMult);
+    const totalText = hasDrillPower && hasWeakSpotMult
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (drillScale / 100) + (stats.weakSpotMult * 100) * (weakSpotScale / 100))}]`
+      : "";
+    return t("desc.special.breach_afterburner", {
+      flat: formatDescriptionNumber(flatDamage),
+      drillScale: formatDescriptionNumber(drillScale),
+      weakSpotScale: formatDescriptionNumber(weakSpotScale),
+      total: totalText,
+      sec: formatDescriptionNumber(seconds),
+    });
+  },
+  breach_chain_drill(rarity, stats = null) {
+    const flatDamage = 15;
+    const explosionScale = getEffectValue({ effectByRarity: [0, 10, 12, 15, 20] }, rarity);
+    const weakSpotChanceScale = getEffectValue({ effectByRarity: [0, 2, 4, 6, 10] }, rarity);
+    const charges = getEffectValue({ effectByRarity: [0, 1, 2, 3, 4] }, rarity);
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const hasWeakSpotChance = Number.isFinite(stats?.weakSpotChance);
+    const totalText = hasExplosionPower && hasWeakSpotChance
+      ? ` [${formatDescriptionNumber(flatDamage + stats.explosionPower * (explosionScale / 100) + (stats.weakSpotChance * 100) * (weakSpotChanceScale / 100))}]`
+      : "";
+    return t("desc.special.breach_chain_drill", {
+      flat: formatDescriptionNumber(flatDamage),
+      explosionScale: formatDescriptionNumber(explosionScale),
+      weakSpotChanceScale: formatDescriptionNumber(weakSpotChanceScale),
+      total: totalText,
+      hits: formatDescriptionNumber(charges),
     });
   },
 };
