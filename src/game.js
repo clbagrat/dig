@@ -4990,6 +4990,13 @@ function bindUi() {
     });
     menuPanel.addEventListener("pointerdown", (event) => {
       const target = event.target instanceof Element ? event.target : null;
+      const openTooltip = document.querySelector(".shop-item-tooltip:not([hidden]), .stat-tooltip:not([hidden])");
+      if (openTooltip) {
+        if (target?.closest(".shop-item-tooltip, .stat-tooltip")) return;
+        hideGoodTooltip();
+        hideStatTooltip();
+        return;
+      }
       if (target?.closest(".menu-modal__panel")) return;
       if (target?.closest("#menuSummary")) return;
       closeMenu();
