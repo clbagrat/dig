@@ -9057,8 +9057,12 @@ function getScaledExplosionDamage(baseDamage, options = {}) {
   return (baseDamage + state.explosionPower * explosionPowerScale) * (1 + state.explosionBonus / 100);
 }
 
+function getScaledExplosionRadius(baseRadius = 2, options = {}) {
+  return Math.max(1, baseRadius + (options.skipRadiusBonus ? 0 : (state.explosionRadiusBonus || 0)));
+}
+
 function explodeAt(x, y, damage, radius = 2, options = {}) {
-  const scaledRadius = Math.max(1, radius + (options.skipRadiusBonus ? 0 : (state.explosionRadiusBonus || 0)));
+  const scaledRadius = getScaledExplosionRadius(radius, options);
   spawnExplosionEffect(x, y, scaledRadius);
   const scaledDamage = getScaledExplosionDamage(damage, options);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
@@ -9120,8 +9124,9 @@ function detonateRocketEffect(effect) {
   }
   playSound("rocket_detonate");
   if (effect.payload.kind === "radiusBomb") {
+    const blastRadius = getScaledExplosionRadius(effect.payload.radius, effect.payload);
     const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
-    if (distToPlayer <= effect.payload.radius) {
+    if (distToPlayer <= blastRadius) {
       const scaledDamage = getScaledExplosionDamage(effect.payload.damage, effect.payload);
       addHeatOnStrike(Math.round(scaledDamage * 0.3));
     }
@@ -10296,7 +10301,7 @@ function renderEffects(camera) {
       } else {
         // Armed phase: perk-zone style highlight
         const pulse = 0.5 + 0.5 * Math.sin((state.lastTs || 0) * 0.018);
-        const radius = effect.payload?.radius ?? 1;
+        const radius = getScaledExplosionRadius(effect.payload?.radius ?? 1, effect.payload || {});
         const maxOffset = Math.ceil(radius);
         const zoneColor = "#ff5a14";
         const inBlast = (ox, oy) => Math.hypot(ox, oy) <= radius;
