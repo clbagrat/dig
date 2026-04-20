@@ -13394,7 +13394,7 @@ function renderHud() {
   const secondRowTop = top + panelHeight + 8;
   state.hudInspectableRects = [];
 
-  const hpLabel = state.armor > 0 ? `${Math.ceil(state.hp)}/${state.maxHp} • A:${state.armor}` : `${Math.ceil(state.hp)}/${state.maxHp}`;
+  const hpLabel = `${Math.ceil(state.hp)}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
   state.goldHitRect = { x: left, y: top, width: panelWidth, height: panelHeight };
 
@@ -13660,6 +13660,19 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
     ctx.fillStyle = gradient;
     drawRoundedRectPath(trackX, trackY, trackWidth * ratio, trackHeight, 999);
     ctx.fill();
+  }
+
+  if (label === "HP" && state.armor > 0) {
+    const armorRatio = clamp(state.armor / Math.max(1, state.maxHp), 0, 1);
+    const armorWidth = trackWidth * armorRatio;
+    if (armorWidth > 0) {
+      const armorGradient = ctx.createLinearGradient(trackX, trackY, trackX + trackWidth, trackY);
+      armorGradient.addColorStop(0, "rgba(220, 228, 236, 0.45)");
+      armorGradient.addColorStop(1, "rgba(156, 170, 186, 0.45)");
+      ctx.fillStyle = armorGradient;
+      drawRoundedRectPath(trackX, trackY, armorWidth, trackHeight, 999);
+      ctx.fill();
+    }
   }
 
   if (pulse > 0 && ratio > 0) {

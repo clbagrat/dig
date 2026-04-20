@@ -305,14 +305,33 @@ html, body {
 .stat-card__id { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .stat-card__desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.35; min-height: 32px; }
 .stat-card__counts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.count-chip {
-  font-size: 11px;
+.count-dots {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 22px;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 3px 8px;
+  padding: 4px 8px;
 }
-.count-chip.pos { color: #7edc8a; border-color: rgba(126,220,138,0.35); background: rgba(126,220,138,0.08); }
-.count-chip.neg { color: #ff8e7d; border-color: rgba(255,142,125,0.35); background: rgba(255,142,125,0.08); }
+.count-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.count-dots.pos {
+  border-color: rgba(126,220,138,0.35);
+  background: rgba(126,220,138,0.08);
+}
+.count-dots.neg {
+  border-color: rgba(255,142,125,0.35);
+  background: rgba(255,142,125,0.08);
+}
+.count-dots.pos .count-dot { background: #7edc8a; }
+.count-dots.neg .count-dot { background: #ff8e7d; }
 @media (max-width: 980px) {
   .controls { grid-template-columns: 1fr; }
   .rarity-switch { justify-content: flex-start; }
@@ -944,6 +963,17 @@ function getStatRows(sourceItems = ALL) {
     });
 }
 
+function renderCountDots(kind, count) {
+  const safeCount = Math.max(0, Number(count) || 0);
+  const dots = safeCount > 0
+    ? Array.from({ length: safeCount }, () => '<span class="count-dot"></span>').join('')
+    : '';
+  const title = kind === 'pos'
+    ? `${ui('statPositive')}: ${safeCount}`
+    : `${ui('statNegative')}: ${safeCount}`;
+  return `<span class="count-dots ${kind}" title="${esc(title)}" aria-label="${esc(title)}">${dots}</span>`;
+}
+
 function renderStats() {
   const items = getItemsForStatsFilters();
   const rows = getStatRows(items);
@@ -957,8 +987,8 @@ function renderStats() {
       <div class="stat-card__id">${esc(row.stat)}</div>
       <div class="stat-card__desc">${esc(row.desc)}</div>
       <div class="stat-card__counts">
-        <span class="count-chip pos">+ ${esc(ui('statPositive'))}: ${row.posCount}</span>
-        <span class="count-chip neg">− ${esc(ui('statNegative'))}: ${row.negCount}</span>
+        ${renderCountDots('pos', row.posCount)}
+        ${renderCountDots('neg', row.negCount)}
       </div>
     </article>
   `).join('');
@@ -1110,8 +1140,8 @@ function renderItemAffectedStats(item) {
         <div class="stat-card__id">${esc(stat)}</div>
         <div class="stat-card__desc">${esc(desc)}</div>
         <div class="stat-card__counts">
-          <span class="count-chip pos">+ ${esc(ui('statPositive'))}: ${posCount}</span>
-          <span class="count-chip neg">− ${esc(ui('statNegative'))}: ${negCount}</span>
+          ${renderCountDots('pos', posCount)}
+          ${renderCountDots('neg', negCount)}
         </div>
       </article>
     `;

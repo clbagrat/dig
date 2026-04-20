@@ -304,7 +304,7 @@ export const ALL_ITEMS = [
     effect: [
       { stat: "fuelStarvationResistance", effectByRarity: [null, 15, 25, 40, 60] },
       { stat: "lowFuelDamageBonus", effectByRarity: [null, 0.10, 0.15, 0.22, 0.30] },
-      { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
+      { stat: "maxFuel", effectByRarity: [null, -10, -10, -10, -10] },
     ],
   },
   {
