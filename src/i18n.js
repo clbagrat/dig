@@ -27,7 +27,7 @@ const TRANSLATIONS = {
     "category.ракеты": "Rockets",
     "category.контур": "Contour",
     "category.навигация": "Navigation",
-    "category.алхимия": "Alchemy",
+    "category.алхимия": "Alchemy & Navigation",
 
     // ── Equipment names ──────────────────────────────────────────────────────
     "item.thermo_drill.name": "Thermo Drill",
@@ -111,6 +111,7 @@ const TRANSLATIONS = {
     "item.shaped_charge.name": "Shaped Charge",
     "item.explosive_condenser.name": "Explosive Condenser",
     "item.cooling_circuit.name": "Cooling Circuit",
+    "item.volatile_focus.name": "Volatile Focus",
     "item.first_strike.name": "First Strike",
     "item.boosted_feed.name": "Boosted Feed",
     "item.scanner_lens.name": "Scanner Lens",
@@ -688,7 +689,7 @@ const TRANSLATIONS = {
     "category.ракеты": "Ракеты",
     "category.контур": "Контур",
     "category.навигация": "Навигация",
-    "category.алхимия": "Алхимия",
+    "category.алхимия": "Алхимия и навигация",
 
     // ── Equipment names ──────────────────────────────────────────────────────
     "item.thermo_drill.name": "Термобур",
@@ -772,6 +773,7 @@ const TRANSLATIONS = {
     "item.shaped_charge.name": "Кумулятивный заряд",
     "item.explosive_condenser.name": "Взрывной конденсор",
     "item.cooling_circuit.name": "Охлаждающий контур",
+    "item.volatile_focus.name": "Фокусатор взрыва",
     "item.first_strike.name": "Инициатор",
     "item.boosted_feed.name": "Форсированная подача",
     "item.scanner_lens.name": "Линза сканера",
