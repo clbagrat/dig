@@ -26,15 +26,15 @@ export const RARITY_EFFECT_MULT = {
 };
 
 const CATEGORY_DEFS = [
-  { id: "basic",        icon: "D"  },
-  { id: "economy",      icon: "●"  },
-  { id: "maintenance",  icon: "💧" },
-  { id: "heat",         icon: "🔥" },
-  { id: "выживание",    icon: "❤️" },
-  { id: "поиск_бреши",  icon: "🎯" },
-  { id: "ракеты",       icon: "🚀" },
-  { id: "контур",       icon: "⚡" },
-  { id: "алхимия",      icon: "⚗️" },
+  { id: "basic",        icon: "D",  inDevelopment: false },
+  { id: "economy",      icon: "●",  inDevelopment: true },
+  { id: "maintenance",  icon: "💧", inDevelopment: true },
+  { id: "heat",         icon: "🔥", inDevelopment: true },
+  { id: "выживание",    icon: "❤️", inDevelopment: true },
+  { id: "поиск_бреши",  icon: "🎯", inDevelopment: false },
+  { id: "ракеты",       icon: "🚀", inDevelopment: true },
+  { id: "контур",       icon: "⚡", inDevelopment: true },
+  { id: "алхимия",      icon: "⚗️", inDevelopment: false },
 ];
 
 export const CATEGORIES = CATEGORY_DEFS.map(c => ({
@@ -1322,6 +1322,26 @@ export const ALL_ITEMS = [
     ],
   },
   {
+    id: "recipe_stabilizer",
+    type: "item",
+    name: "Рецептурный стабилизатор",
+    icon: "⚗️",
+    desc: "Сбор рецепта отдаляет обвал. Но максимум очков обвала снижается.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+      ];
+    },
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: [
+      { stat: "recipeCollapseDelayPercent", effectByRarity: [null, 10, 20, 30, 40] },
+      { stat: "collapseBudgetMaxScale", effectByRarity: [null, -0.05, -0.05, -0.05, -0.05] },
+    ],
+  },
+  {
     id: "insurance",
     type: "item",
     name: "Страховка",
@@ -1642,6 +1662,7 @@ const SIMPLE_STAT_DESCRIPTORS = {
   concentration: value => t("desc.concentration", { val: formatSignedPercent(value, 1) }),
   fuelDrainRate: value => t("desc.fuelDrainRate", { val: formatSignedPercent(value, 100) }),
   collapseBudgetMaxScale: value => t("desc.collapseBudgetMaxScale", { val: formatSignedPercent(value, 100) }),
+  recipeCollapseDelayPercent: value => t("desc.recipeCollapseDelayPercent", { val: formatSignedPercent(value, 1) }),
   fuelStarvationResistance: value => t("desc.fuelStarvationResistance", { val: formatSignedPercent(value) }),
   contourResMultiplier: value => t("desc.contourResMultiplier", { val: formatSignedPercent(value, 100) }),
   goldBonus: value => t("desc.goldBonus", { val: formatSignedPercent(value, 100) }),

@@ -47,9 +47,10 @@ export const TILE_PERK_TYPES = [
   { name: "Скорость", icon: "S", color: "#9fd7ff" },
   { name: "HP+", icon: "H", color: "#73e58f" },
   { name: "Броня", icon: "A", color: "#b4d7ff" },
+  { name: "Форсаж", icon: "⚡", color: "#ff4444" },
 ];
 
-export const TILE_PERK_WEIGHTS = [0, 3, 0, 0, 4, 0, 2, 2];
+export const TILE_PERK_WEIGHTS = [0, 3, 0, 0, 4, 0, 2, 2, 1];
 
 export const CRYSTAL_TYPES = [
   null,

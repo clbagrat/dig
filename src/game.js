@@ -95,6 +95,7 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   breachThermostatLevel:     { key: "stat.breachThermostatLevel",     mode: "level" },
   concentration:             { key: "stat.concentration",             mode: "multiplier" },
   collapseBudgetMaxScale:    { key: "stat.collapseBudgetMaxScale",    mode: "percent" },
+  recipeCollapseDelayPercent:{ key: "stat.recipeCollapseDelayPercent",mode: "rawpercent" },
   contourResMultiplier:      { key: "stat.contourResMultiplier",      mode: "percent" },
   cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
   crystalGoldGain:           { key: "stat.crystalGoldGain",           mode: "integer" },
@@ -510,6 +511,7 @@ const state = {
   effectDurationRate: 1,
   concentration: 0,
   collapseBudgetMaxScale: 0,
+  recipeCollapseDelayPercent: 0,
   fuelDrainRate: 1,
   fuelStarvationResistance: 0,
   armor: 0,
@@ -2434,6 +2436,7 @@ function setupField(seedOverride = null) {
   state.effectDurationRate = 1;
   state.concentration = 0;
   state.collapseBudgetMaxScale = 0;
+  state.recipeCollapseDelayPercent = 0;
   state.fuelDrainRate = 1;
   state.fuelStarvationResistance = 0;
   state.armor = 0;
@@ -2857,6 +2860,16 @@ function getCollapseBudgetMaxPointsFromScale(scale = 0) {
 
 function getCollapseBudgetMaxPoints() {
   return getCollapseBudgetMaxPointsFromScale(state.collapseBudgetMaxScale || 0);
+}
+
+function delayCollapseByRecipeBonus() {
+  const percent = Number(state.recipeCollapseDelayPercent || 0);
+  if (!Number.isFinite(percent) || percent <= 0) {
+    return;
+  }
+  const maxBudget = getCollapseBudgetMaxPoints();
+  const gain = maxBudget * (percent / 100);
+  state.collapseBudget = clamp((state.collapseBudget || 0) + gain, 0, maxBudget);
 }
 
 function applyCollapseBudgetMaxScaleDelta(delta) {
@@ -3376,6 +3389,7 @@ function pickCrystalRewardItem() {
 
 function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y, options = {}) {
   state.recipesCompletedThisRun = Math.max(0, (state.recipesCompletedThisRun || 0) + 1);
+  delayCollapseByRecipeBonus();
   const offer = pickCrystalRewardItem();
   if (!offer) return;
   const showRecipeAnimation = options.showRecipeAnimation !== false;

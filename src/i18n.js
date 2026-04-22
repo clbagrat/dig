@@ -52,6 +52,7 @@ const TRANSLATIONS = {
     "item.beacon_alchemy_drill.name": "Beacon Retort Drill",
     "item.recipe_alchemy_drill.name": "Formula Retort Drill",
     "item.unstable_reagent.name": "Unstable Reagent",
+    "item.recipe_stabilizer.name": "Recipe Stabilizer",
 
     // ── Item names ───────────────────────────────────────────────────────────
     "item.heavy_drill.name": "Heavy Drill",
@@ -168,6 +169,7 @@ const TRANSLATIONS = {
     "stat.breachThermostatLevel": "Cooling Breach Search",
     "stat.concentration": "Concentration",
     "stat.collapseBudgetMaxScale": "Collapse Capacity",
+    "stat.recipeCollapseDelayPercent": "Recipe Collapse Delay",
     "stat.contourResMultiplier": "Contour Resource",
     "stat.cryoRocketCount": "Cryo Rockets",
     "stat.crystalGoldGain": "Gold per Crystal",
@@ -599,6 +601,7 @@ const TRANSLATIONS = {
     "desc.effectDurationRate": "{val} effect duration",
     "desc.concentration": "{val} concentration",
     "desc.collapseBudgetMaxScale": "{val} collapse capacity",
+    "desc.recipeCollapseDelayPercent": "On recipe complete: +{val} collapse budget",
     "desc.fuelDrainRate": "{val} fuel drain",
     "desc.fuelStarvationResistance": "{val} fuel starvation resistance",
     "desc.contourResMultiplier": "{val} contour resource",
@@ -785,6 +788,7 @@ const TRANSLATIONS = {
     "item.beacon_alchemy_drill.name": "Маячный реторт-бур",
     "item.recipe_alchemy_drill.name": "Рецептурный реторт-бур",
     "item.unstable_reagent.name": "Нестабильный реагент",
+    "item.recipe_stabilizer.name": "Рецептурный стабилизатор",
 
     // ── Item names ───────────────────────────────────────────────────────────
     "item.heavy_drill.name": "Утяжелитель",
@@ -901,6 +905,7 @@ const TRANSLATIONS = {
     "stat.breachThermostatLevel": "Поиск бреши от остывания",
     "stat.concentration": "Концентрация",
     "stat.collapseBudgetMaxScale": "Ёмкость обвала",
+    "stat.recipeCollapseDelayPercent": "Отсрочка обвала за рецепт",
     "stat.contourResMultiplier": "Ресурс контура",
     "stat.cryoRocketCount": "Крио-ракеты",
     "stat.crystalGoldGain": "Золото за кристалл",
@@ -1332,6 +1337,7 @@ const TRANSLATIONS = {
     "desc.effectDurationRate": "{val} к длительности эффектов",
     "desc.concentration": "{val} к концентрации",
     "desc.collapseBudgetMaxScale": "{val} к максимуму очков обвала",
+    "desc.recipeCollapseDelayPercent": "При сборе рецепта: +{val} к бюджету обвала",
     "desc.fuelDrainRate": "{val} к расходу топлива",
     "desc.fuelStarvationResistance": "{val} сопротивления голоданию",
     "desc.contourResMultiplier": "{val} к ресурсу контура",

@@ -183,7 +183,7 @@ export function setShopRarityGuarantees(uncommonCount = 0, rareCount = 0) {
 }
 
 export function getLockedCategories() {
-  return CATEGORIES.filter(c => !unlockedCategories.has(c.id));
+  return CATEGORIES.filter((c) => !unlockedCategories.has(c.id) && !c.inDevelopment);
 }
 
 export function resetShopState() {

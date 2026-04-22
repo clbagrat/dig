@@ -362,6 +362,10 @@ html, body {
       <option value="en">EN</option>
       <option value="ru">RU</option>
     </select>
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input id="exclude-dev" type="checkbox">
+      <span id="exclude-dev-label">Exclude inDevelopment</span>
+    </label>
     <button id="reset-filters" class="tab-btn" type="button">Reset</button>
   </section>
 
@@ -399,6 +403,10 @@ html, body {
       <input id="stats-search" class="search" placeholder="">
       <select id="stats-type" class="select"></select>
       <select id="stats-category" class="select"></select>
+      <label style="display:flex;align-items:center;gap:6px;">
+        <input id="stats-exclude-dev" type="checkbox">
+        <span id="stats-exclude-dev-label">Exclude inDevelopment</span>
+      </label>
       <button id="stats-reset-filters" class="tab-btn" type="button">Reset</button>
     </div>
     <div class="stats-panel">
@@ -436,6 +444,7 @@ const PERCENT_STATS = new Set([
   'bonusFindChance',
   'speedOfAutoClose',
   'collapseBudgetMaxScale',
+  'recipeCollapseDelayPercent',
   'heatRate',
   'fuelDrainRate',
   'loopLengthDamageBonus',
@@ -459,6 +468,7 @@ const UI_TEXT = {
     filterItems: 'Items only',
     artifactTypeAll: 'Artifact type: all',
     statFilterAll: 'Stat: all',
+    excludeDev: 'Exclude inDevelopment',
     resetFilters: 'Reset filters',
     blockShop: 'Shop Card',
     blockDeps: 'Scaling Dependencies',
@@ -485,6 +495,7 @@ const UI_TEXT = {
     statsTypeEquipment: 'Stats: equipment only',
     statsTypeItems: 'Stats: items only',
     statsCategoryAll: 'Stats category: all',
+    statsExcludeDev: 'Exclude inDevelopment',
     statsResetFilters: 'Reset stats filters',
     listEquipmentCount: 'Equipment',
     listItemCount: 'Items',
@@ -498,6 +509,7 @@ const UI_TEXT = {
     filterItems: 'Только предметы',
     artifactTypeAll: 'Тип артефакта: все',
     statFilterAll: 'Стата: все',
+    excludeDev: 'Исключать inDevelopment',
     resetFilters: 'Сбросить фильтры',
     blockShop: 'Карточка магазина',
     blockDeps: 'Зависимости скейлинга',
@@ -524,6 +536,7 @@ const UI_TEXT = {
     statsTypeEquipment: 'Статы: только части корпуса',
     statsTypeItems: 'Статы: только предметы',
     statsCategoryAll: 'Категория статов: все',
+    statsExcludeDev: 'Исключать inDevelopment',
     statsResetFilters: 'Сбросить фильтры статов',
     listEquipmentCount: 'Части корпуса',
     listItemCount: 'Предметы',
@@ -559,6 +572,7 @@ const S = {
   statsSearch: '',
   statsType: 'all',
   statsCategory: 'all',
+  excludeDev: false,
   rarity: 1,
   tab: 'cards',
   locale: getLocale() === 'ru' ? 'ru' : 'en',
@@ -574,6 +588,7 @@ const QUERY_KEYS = {
   sq: 'sq',
   stype: 'stype',
   scategory: 'scategory',
+  nodev: 'nodev',
   rarity: 'rarity',
   locale: 'locale',
   item: 'item',
@@ -592,6 +607,10 @@ const el = {
   statsSearch: document.getElementById('stats-search'),
   statsType: document.getElementById('stats-type'),
   statsCategory: document.getElementById('stats-category'),
+  excludeDev: document.getElementById('exclude-dev'),
+  excludeDevLabel: document.getElementById('exclude-dev-label'),
+  statsExcludeDev: document.getElementById('stats-exclude-dev'),
+  statsExcludeDevLabel: document.getElementById('stats-exclude-dev-label'),
   statsResetFilters: document.getElementById('stats-reset-filters'),
   statsList: document.getElementById('stats-list'),
   tabCards: document.getElementById('tab-cards'),
@@ -642,6 +661,9 @@ function parseInitialStateFromQuery() {
   const scategory = params.get(QUERY_KEYS.scategory);
   if (scategory === 'all' || CATEGORIES.some(cat => cat.id === scategory)) S.statsCategory = scategory;
 
+  const nodev = params.get(QUERY_KEYS.nodev);
+  if (nodev === '1') S.excludeDev = true;
+
   const rarity = Number(params.get(QUERY_KEYS.rarity));
   if (Number.isFinite(rarity) && rarity >= 1 && rarity <= 4) S.rarity = rarity;
 
@@ -667,6 +689,7 @@ function syncQueryFromState() {
   setOrDelete(QUERY_KEYS.sq, S.statsSearch.trim(), '');
   setOrDelete(QUERY_KEYS.stype, S.statsType, 'all');
   setOrDelete(QUERY_KEYS.scategory, S.statsCategory, 'all');
+  setOrDelete(QUERY_KEYS.nodev, S.excludeDev ? 1 : 0, 0);
   setOrDelete(QUERY_KEYS.rarity, S.rarity, 1);
   setOrDelete(QUERY_KEYS.locale, S.locale, 'en');
   setOrDelete(QUERY_KEYS.item, S.selectedId, ALL[0]?.id ?? null);
@@ -689,6 +712,12 @@ function esc(value) {
 
 function categoryName(id) {
   return CATEGORIES.find(cat => cat.id === id)?.name ?? id;
+}
+
+function isEntryInDevelopment(item) {
+  if (item?.inDevelopment) return true;
+  const category = CATEGORIES.find((cat) => cat.id === item?.category);
+  return !!category?.inDevelopment;
 }
 
 function effectValueByRarity(effect, rarity) {
@@ -854,6 +883,7 @@ function getScaleRows(item) {
 function getFilteredItems() {
   const q = S.search.trim().toLowerCase();
   const filtered = ALL.filter(item => {
+    if (S.excludeDev && isEntryInDevelopment(item)) return false;
     if (S.filter !== 'all' && item.__kind !== S.filter) return false;
     if (S.artifactType !== 'all' && item.category !== S.artifactType) return false;
     if (S.statFilter !== 'all') {
@@ -891,8 +921,17 @@ function renderUiText() {
   `;
   el.filter.value = current;
 
+  const categorySource = S.excludeDev
+    ? CATEGORIES.filter((cat) => !cat.inDevelopment)
+    : CATEGORIES;
+  if (S.artifactType !== 'all' && !categorySource.some((cat) => cat.id === S.artifactType)) {
+    S.artifactType = 'all';
+  }
+  if (S.statsCategory !== 'all' && !categorySource.some((cat) => cat.id === S.statsCategory)) {
+    S.statsCategory = 'all';
+  }
   const currentType = S.artifactType;
-  const categoryOptions = CATEGORIES.map(cat =>
+  const categoryOptions = categorySource.map(cat =>
     `<option value="${esc(cat.id)}">${esc(cat.icon)} ${esc(cat.name)}</option>`
   ).join('');
   el.artifactType.innerHTML = `
@@ -909,6 +948,10 @@ function renderUiText() {
   `;
   el.statFilter.value = currentStat;
   el.lang.value = S.locale;
+  if (el.excludeDev) el.excludeDev.checked = !!S.excludeDev;
+  if (el.statsExcludeDev) el.statsExcludeDev.checked = !!S.excludeDev;
+  if (el.excludeDevLabel) el.excludeDevLabel.textContent = ui('excludeDev');
+  if (el.statsExcludeDevLabel) el.statsExcludeDevLabel.textContent = ui('statsExcludeDev');
   el.resetFilters.textContent = ui('resetFilters');
   el.tabCards.textContent = ui('tabCards');
   el.tabStats.textContent = ui('tabStats');
@@ -1032,6 +1075,7 @@ function renderTabState() {
 function getItemsForStatsFilters() {
   const q = S.statsSearch.trim().toLowerCase();
   return ALL.filter(item => {
+    if (S.excludeDev && isEntryInDevelopment(item)) return false;
     if (S.statsType !== 'all' && item.__kind !== S.statsType) return false;
     if (S.statsCategory !== 'all' && item.category !== S.statsCategory) return false;
     if (!q) return true;
@@ -1281,10 +1325,21 @@ el.statsCategory.addEventListener('change', () => {
   S.statsCategory = el.statsCategory.value;
   if (S.tab === 'stats') render();
 });
+el.excludeDev.addEventListener('change', () => {
+  S.excludeDev = !!el.excludeDev.checked;
+  if (el.statsExcludeDev) el.statsExcludeDev.checked = S.excludeDev;
+  render();
+});
+el.statsExcludeDev.addEventListener('change', () => {
+  S.excludeDev = !!el.statsExcludeDev.checked;
+  if (el.excludeDev) el.excludeDev.checked = S.excludeDev;
+  render();
+});
 el.statsResetFilters.addEventListener('click', () => {
   S.statsSearch = '';
   S.statsType = 'all';
   S.statsCategory = 'all';
+  S.excludeDev = false;
   el.statsSearch.value = '';
   if (S.tab === 'stats') render();
 });
@@ -1310,6 +1365,7 @@ el.resetFilters.addEventListener('click', () => {
   S.statsSearch = '';
   S.statsType = 'all';
   S.statsCategory = 'all';
+  S.excludeDev = false;
   S.rarity = 1;
   el.search.value = '';
   render();
