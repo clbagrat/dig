@@ -124,7 +124,6 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   heatRate:                  { key: "stat.heatRate",                  mode: "multiplier" },
   insuranceLevel:            { key: "stat.insuranceLevel",            mode: "level" },
   levelCatalystLevel:        { key: "stat.levelCatalystLevel",        mode: "level" },
-  loopLengthDamageBonus:     { key: "stat.loopLengthDamageBonus",     mode: "rawpercent" },
   loopSpawnBonusChance:      { key: "stat.loopSpawnBonusChance",      mode: "percent" },
   lowFuelSpeedBonus:         { key: "stat.lowFuelSpeedBonus",         mode: "percent" },
   lowFuelDamageBonus:        { key: "stat.lowFuelDamageBonus",        mode: "percent" },
@@ -172,6 +171,10 @@ const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "beacon_alchemy_drill",
   "recipe_alchemy_drill",
   "contour_overload_drill",
+  "contour_line_drill",
+  "contour_resonance_drill",
+  "loop_pressure",
+  "contour_blast_pressure",
 ]);
 
 const DEBUG_CORE_STATS = [
@@ -202,7 +205,6 @@ const DEBUG_CORE_STATS = [
   { key: "weakSpotFuelGain",     label: "weakSpotFuelGain",      step: 1,    fmt: v => Math.round(v) },
   { key: "lowFuelSpeedBonus",    label: "lowFuelSpeedBonus",     step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "lowFuelDamageBonus",   label: "lowFuelDamageBonus",    step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: "loopLengthDamageBonus", label: "loopLengthDmgBonus",   step: 0.1,  fmt: v => v.toFixed(2) },
   { key: "loopSpawnBonusChance", label: "loopSpawnBonusChance",  step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "drillPowerPerLevel",   label: "drillPowerPerLevel",    step: 0.5,  fmt: v => v.toFixed(1) },
   { key: "explosionPowerPerLevel", label: "explosionPowerPerLevel", step: 0.5, fmt: v => v.toFixed(1) },
@@ -274,8 +276,8 @@ const DEBUG_MODE = new URLSearchParams(location.search).has("debug-map");
 // Each entry: { stat, minRarity, values: [C, U, R, L], label, fmt }
 // fmt(value) → display string for the label
 const LEVEL_REWARD_POOL = [
-  { stat: "drillPower",       minRarity: 1, values: [2, 5, 9, 14],                  get label() { return t("reward.drillPower"); },       fmt: v => `+${v}` },
-  { stat: "explosionPower",   minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.explosionPower"); },   fmt: v => `+${v}` },
+  { stat: "drillPower",       minRarity: 1, values: [5, 10, 15, 20],                get label() { return t("reward.drillPower"); },       fmt: v => `+${v}` },
+  { stat: "explosionPower",   minRarity: 1, values: [5, 10, 15, 20],                get label() { return t("reward.explosionPower"); },   fmt: v => `+${v}` },
   { stat: "strikeSpeed",      minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.strikeSpeed"); },      fmt: v => `+${v}%` },
   { stat: "damageBonus",      minRarity: 1, values: [0.03, 0.05, 0.08, 0.10],       get label() { return t("reward.damageBonus"); },      fmt: v => `+${Math.round(v*100)}%` },
   { stat: "goldBonus",        minRarity: 1, values: [0.03, 0.06, 0.10, 0.15],       get label() { return t("reward.goldBonus"); },        fmt: v => `+${Math.round(v*100)}%` },
@@ -283,7 +285,6 @@ const LEVEL_REWARD_POOL = [
   { stat: "weakSpotChance",   minRarity: 1, values: [0.03, 0.05, 0.07, 0.11],       get label() { return t("reward.weakSpotChance"); },   fmt: v => `+${Math.round(v*100)}%` },
   { stat: "weakSpotMult",     minRarity: 1, values: [0.3, 0.4, 0.5, 0.8],           get label() { return t("reward.weakSpotMult"); },     fmt: v => `+${Math.round(v * 100)}%` },
   { stat: "luck",             minRarity: 1, values: [3, 5, 7, 11],                  get label() { return t("reward.luck"); },             fmt: v => `+${v}` },
-  { stat: "speedOfAutoClose", minRarity: 2, values: [null, 10, 15, 20],             get label() { return t("reward.speedOfAutoClose"); }, fmt: v => `+${v}%` },
   { stat: "fuelBonus",        minRarity: 2, values: [null, 0.05, 0.10, 0.15, 0.20], get label() { return t("reward.fuelBonus"); },        fmt: v => `+${Math.round(v*100)}%` },
   { stat: "maxHeat",          minRarity: 2, values: [null, 5, 10, 15],              get label() { return t("reward.maxHeat"); },          fmt: v => `+${v}` },
   { stat: "maxHp",            minRarity: 3, values: [null, null, 25, 50],           get label() { return t("reward.maxHp"); },            fmt: v => `+${v}` },
@@ -685,7 +686,6 @@ const state = {
   insuranceLevel: 0,
   fuelConverterLevel: 0,
   contourLengthDamageLevel: 0,
-  loopLengthDamageBonus: 0,
   loopSpawnBonusChance: 0,
   contourResMultiplier: 1.15,
   loopPerkLevel: 0,
@@ -719,6 +719,13 @@ const state = {
   coolingRocketCharge: 0,
   pathTailFade: 0,
   pathTailGhost: null,
+  contourResonanceFlashTimer: 0,
+  loopPressureTimer: 0,
+  loopPressureDisplayDuration: 0,
+  loopPressureDrillPowerBonus: 0,
+  contourBlastPressureTimer: 0,
+  contourBlastPressureDisplayDuration: 0,
+  contourBlastPressureExplosionBonus: 0,
   contourReturnFuelLevel: 0,
   maxContour: 12,
   contourOverloadBrokenBlocks: 0,
@@ -1515,6 +1522,7 @@ const GENERATION_QUICK_FIELDS = [
   { label: "Height", source: "height", min: 8, step: 1 },
   { label: "Width", source: "width", min: 6, max: GRID_W - 2, step: 1 },
   { label: "Perk Zone Count", source: "rules.perkZones", min: 0, step: 1 },
+  { label: "Dual Perk Zone Count", source: "rules.dualStatPerkZones", min: 0, step: 1 },
   { label: "Boulder Pocket Groups", source: "rules.boulderPocketGroups", min: 0, step: 1 },
   { label: "Safe Count", source: "rules.safes", min: 0, step: 1 },
   { label: "Worm Nest Count", source: "rules.wormNests", min: 0, step: 1 },
@@ -2562,7 +2570,6 @@ function setupField(seedOverride = null) {
   state.fuelConverterLevel = 0;
   state.weakSpotMask.fill(0);
   state.contourLengthDamageLevel = 0;
-  state.loopLengthDamageBonus = 0;
   state.loopSpawnBonusChance = 0;
   state.contourResMultiplier = 1.15;
   state.loopPerkLevel = 0;
@@ -2596,6 +2603,13 @@ function setupField(seedOverride = null) {
   state.coolingRocketCharge = 0;
   state.pathTailFade = 0;
   state.pathTailGhost = null;
+  state.contourResonanceFlashTimer = 0;
+  state.loopPressureTimer = 0;
+  state.loopPressureDisplayDuration = 0;
+  state.loopPressureDrillPowerBonus = 0;
+  state.contourBlastPressureTimer = 0;
+  state.contourBlastPressureDisplayDuration = 0;
+  state.contourBlastPressureExplosionBonus = 0;
   state.contourReturnFuelLevel = 0;
   state.maxContour = 12;
   state.contourOverloadBrokenBlocks = 0;
@@ -2712,13 +2726,45 @@ function setupField(seedOverride = null) {
   state.crystalMask.set(map.crystalMask);
   for (const zone of map.perkZones) {
     const zoneId = state.perkZones.length;
-    state.perkZones.push({
-      x: zone.x, y: zone.y, cells: zone.cells,
-      iconX: zone.iconX, iconY: zone.iconY,
+    const isDualStat = zone?.kind === "dual_stat" && Array.isArray(zone?.sides);
+    const nextZone = {
+      x: zone.x,
+      y: zone.y,
+      cells: Array.isArray(zone.cells) ? zone.cells : [],
+      kind: isDualStat ? "dual_stat" : "standard",
+      rarity: clamp(Math.round(zone.rarity || RARITY.COMMON), RARITY.COMMON, RARITY.LEGENDARY),
+      iconX: zone.iconX,
+      iconY: zone.iconY,
       perkType: zone.perkType,
-      openedCount: 0, openedMask: 0,
-      arming: false, armingTimer: 0, collected: false,
-    });
+      openedCount: 0,
+      openedMask: 0,
+      arming: false,
+      armingTimer: 0,
+      pendingResolve: false,
+      resolving: false,
+      collected: false,
+      sides: null,
+    };
+    if (isDualStat) {
+      const sides = {
+        drill: { iconX: Math.round(zone.x), iconY: Math.round(zone.y), cells: [], openedCount: 0, openedMask: 0, completed: false, collected: false },
+        explosion: { iconX: Math.round(zone.x), iconY: Math.round(zone.y), cells: [], openedCount: 0, openedMask: 0, completed: false, collected: false },
+      };
+      for (const rawSide of zone.sides) {
+        const sideKey = rawSide?.kind === "explosion" ? "explosion" : "drill";
+        sides[sideKey] = {
+          iconX: rawSide.iconX,
+          iconY: rawSide.iconY,
+          cells: Array.isArray(rawSide.cells) ? rawSide.cells : [],
+          openedCount: 0,
+          openedMask: 0,
+          completed: false,
+          collected: false,
+        };
+      }
+      nextZone.sides = sides;
+    }
+    state.perkZones.push(nextZone);
     for (let i = 0; i < zone.cells.length; i += 1) {
       state.perkZoneMask[cellIndex(zone.cells[i].x, zone.cells[i].y)] = zoneId;
     }
@@ -3565,9 +3611,108 @@ function collectPerkTile(x, y, index, perkType, resMultiplier = 1) {
   state.outOfFuel = false;
 }
 
+function getDualPerkZoneSideMeta(sideKey) {
+  if (sideKey === "explosion") {
+    return { icon: "E", color: "#ffad63" };
+  }
+  return { icon: "D", color: "#69b7ff" };
+}
+
+function getDualPerkZoneCellData(zone, x, y) {
+  if (!zone?.sides) {
+    return null;
+  }
+  for (const sideKey of ["drill", "explosion"]) {
+    const side = zone.sides[sideKey];
+    if (!side || !Array.isArray(side.cells)) continue;
+    for (let i = 0; i < side.cells.length; i += 1) {
+      const cell = side.cells[i];
+      if (cell.x === x && cell.y === y) {
+        return { sideKey, side, cellOrder: i };
+      }
+    }
+  }
+  return null;
+}
+
+function getDualPerkZoneDepthLevel(side) {
+  const level = getDepthLevelForCell(side.iconX, side.iconY)?.level || state.currentDepthLevel || 1;
+  return Math.max(1, level);
+}
+
+function applyDualPerkZoneReward(zone, sideKey) {
+  const side = zone?.sides?.[sideKey];
+  if (!side || side.collected) {
+    return;
+  }
+  side.collected = true;
+  const depthLevel = getDualPerkZoneDepthLevel(side);
+  const amount = 5 * depthLevel;
+  if (sideKey === "explosion") {
+    state.explosionPower += amount;
+    state.perkText = t("toast.dual_zone_explosion", { val: amount, depth: depthLevel });
+  } else {
+    state.drillPower += amount;
+    state.perkText = t("toast.dual_zone_drill", { val: amount, depth: depthLevel });
+  }
+  showPerkToast(state.perkText);
+}
+
+function detonateDualPerkZoneSide(zone, sideKey) {
+  const side = zone?.sides?.[sideKey];
+  if (!side || !Array.isArray(side.cells) || side.cells.length === 0) {
+    return;
+  }
+  playSound("explosion");
+  let sumX = 0;
+  let sumY = 0;
+  for (let i = 0; i < side.cells.length; i += 1) {
+    const cell = side.cells[i];
+    sumX += cell.x;
+    sumY += cell.y;
+    const index = cellIndex(cell.x, cell.y);
+    if (!state.tunnelMask[index] && state.hardness[index] > 0) {
+      breakCell(cell.x, cell.y, index, { cause: "explosion" });
+    }
+  }
+  const cx = Math.round(sumX / side.cells.length);
+  const cy = Math.round(sumY / side.cells.length);
+  spawnExplosionEffect(cx, cy, 1);
+}
+
+function revealDualPerkZoneCell(zone, x, y) {
+  if (!zone || zone.collected || zone.resolving) {
+    return;
+  }
+  const hit = getDualPerkZoneCellData(zone, x, y);
+  if (!hit) {
+    return;
+  }
+  const { side, cellOrder } = hit;
+  const bit = 1 << cellOrder;
+  if (side.openedMask & bit) {
+    return;
+  }
+  side.openedMask |= bit;
+  side.openedCount += 1;
+  if (side.openedCount >= side.cells.length) {
+    side.completed = true;
+    zone.pendingResolve = true;
+    zone.arming = true;
+    zone.armingTimer = PERK_ZONE_CHARGE_DELAY;
+  }
+}
+
 function revealPerkZoneCell(zoneId, x, y) {
   const zone = state.perkZones[zoneId];
-  if (!zone || zone.collected || zone.arming) {
+  if (!zone || zone.collected) {
+    return;
+  }
+  if (zone.kind === "dual_stat") {
+    revealDualPerkZoneCell(zone, x, y);
+    return;
+  }
+  if (zone.arming) {
     return;
   }
 
@@ -3617,7 +3762,43 @@ function collectPerkZone(zone) {
 function updatePerkZones(dt) {
   for (let i = 0; i < state.perkZones.length; i += 1) {
     const zone = state.perkZones[i];
-    if (!zone || zone.collected || !zone.arming) {
+    if (!zone || zone.collected) {
+      continue;
+    }
+    if (zone.kind === "dual_stat") {
+      if (!zone.arming || zone.resolving) {
+        continue;
+      }
+      zone.armingTimer = Math.max(0, zone.armingTimer - dt);
+      if (zone.armingTimer === 0) {
+        zone.arming = false;
+        if (!zone.pendingResolve) {
+          continue;
+        }
+        const drillDone = !!zone.sides?.drill?.completed;
+        const explosionDone = !!zone.sides?.explosion?.completed;
+        if (!drillDone && !explosionDone) {
+          zone.pendingResolve = false;
+          continue;
+        }
+        zone.pendingResolve = false;
+        zone.resolving = true;
+        if (drillDone && explosionDone) {
+          applyDualPerkZoneReward(zone, "drill");
+          applyDualPerkZoneReward(zone, "explosion");
+        } else if (drillDone) {
+          applyDualPerkZoneReward(zone, "drill");
+          detonateDualPerkZoneSide(zone, "explosion");
+        } else {
+          applyDualPerkZoneReward(zone, "explosion");
+          detonateDualPerkZoneSide(zone, "drill");
+        }
+        zone.resolving = false;
+        zone.collected = true;
+      }
+      continue;
+    }
+    if (!zone.arming) {
       continue;
     }
     zone.armingTimer = Math.max(0, zone.armingTimer - dt);
@@ -4024,6 +4205,7 @@ function getShopStatsSnapshot() {
     weakSpotMult: state.weakSpotMult,
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier || 0,
     recipesCompletedThisRun: state.recipesCompletedThisRun || 0,
+    contourLength: Math.max(0, state.pathTiles.length - 1),
   };
 }
 
@@ -4054,6 +4236,7 @@ function getShopDefaultStatsSnapshot() {
     weakSpotMult: 2,
     miningGoldBonusMultiplier: 0,
     recipesCompletedThisRun: 0,
+    contourLength: 0,
   };
 }
 
@@ -4555,6 +4738,47 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: t("inspect.contour_overflow_explosion"), value: `+${overflowFlat} +${overflowScale}% [${formatPerkNumber(overflowTotal)}]` },
         { label: t("inspect.explosion_radius"), value: "1" },
         { label: t("inspect.unique_hit_rule"), value: t("inspect.unique_hit_rule_value") },
+      ];
+    }
+    case "contour_line_drill": {
+      const baseFlat = 10;
+      const drillScale = [0, 10, 20, 30, 40][rarity] || 0;
+      const perLength = [0, 1, 2, 3, 4][rarity] || 0;
+      const contourLength = Math.max(0, state.pathTiles.length - 1);
+      const total = baseFlat + state.drillPower * (drillScale / 100) + perLength * contourLength;
+      return [
+        { label: t("inspect.flat_damage"), value: `+${baseFlat}` },
+        { label: t("inspect.drill_scale"), value: `+${drillScale}%` },
+        { label: t("inspect.contour_length_scale"), value: `+${perLength}` },
+        { label: t("inspect.contour_length"), value: `${contourLength}` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(total) },
+      ];
+    }
+    case "contour_resonance_drill": {
+      const flat = 20;
+      const explosionScale = [0, 10, 15, 20, 30][rarity] || 0;
+      const total = flat + state.explosionPower * (explosionScale / 100);
+      return [
+        { label: t("inspect.contour_resonance_blast"), value: `+${flat} +${explosionScale}% [${formatPerkNumber(total)}]` },
+        { label: t("inspect.on_breach_hit"), value: t("inspect.on_breach_hit_value") },
+      ];
+    }
+    case "loop_pressure": {
+      const duration = [0, 4, 4.5, 5, 5.5][rarity] || 0;
+      const perBlock = [0, 3, 4, 5, 6][rarity] || 0;
+      return [
+        { label: t("inspect.duration"), value: `${formatPerkNumber(duration, 1)}s` },
+        { label: t("inspect.drill_power_per_block"), value: `+${perBlock}` },
+        { label: t("inspect.current_bonus"), value: `+${formatPerkNumber(state.loopPressureDrillPowerBonus || 0)}` },
+      ];
+    }
+    case "contour_blast_pressure": {
+      const duration = [0, 5, 6, 7, 8][rarity] || 0;
+      const perBlock = 5;
+      return [
+        { label: t("inspect.duration"), value: `${formatPerkNumber(duration, 1)}s` },
+        { label: t("inspect.explosion_power_per_block"), value: `+${perBlock}` },
+        { label: t("inspect.current_bonus"), value: `+${formatPerkNumber(state.contourBlastPressureExplosionBonus || 0)}` },
       ];
     }
     default:
@@ -5574,6 +5798,37 @@ function bindUi() {
     syncDebugPerkOverlay();
   }
 
+  function teleportToNearestDualStatZone() {
+    let nearest = null;
+    let bestDist = Infinity;
+    for (const z of state.perkZones) {
+      if (z.collected || z.kind !== "dual_stat") continue;
+      const d = Math.abs(Math.round(z.x) - state.drill.x) + Math.abs(Math.round(z.y) - state.drill.y);
+      if (d < bestDist) {
+        bestDist = d;
+        nearest = z;
+      }
+    }
+    if (nearest) {
+      const tx = clamp(Math.round(nearest.x) - 2, 1, GRID_W - 2);
+      const ty = clamp(Math.round(nearest.y), 1, GRID_H - 2);
+      state.drill.x = tx;
+      state.drill.y = ty;
+      state.drill.renderX = tx;
+      state.drill.renderY = ty;
+      state.visibilityDirty = true;
+      carveTunnel(tx, ty);
+      state.pathTiles.length = 0;
+      state.pathTiles.push({ x: tx, y: ty });
+      rebuildPathIndex();
+      showPerkToast(t("toast.zone", { name: "D/E", x: Math.round(nearest.x), y: Math.round(nearest.y) }));
+    } else {
+      showPerkToast(t("toast.no_zones", { name: "D/E" }));
+    }
+    state.debugPerkMenuOpen = false;
+    syncDebugPerkOverlay();
+  }
+
   [
     ["debugZoneBak", 1],
     ["debugZoneBomba", 4],
@@ -5583,6 +5838,10 @@ function bindUi() {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener("click", () => teleportToNearestZoneOfType(perkType));
   });
+  const debugZoneDual = document.getElementById("debugZoneDual");
+  if (debugZoneDual) {
+    debugZoneDual.addEventListener("click", teleportToNearestDualStatZone);
+  }
 
   const debugOpenShop = document.getElementById("debugOpenShop");
   if (debugOpenShop) {
@@ -6270,13 +6529,14 @@ function openNextArtifactChoice() {
   state.artifactChoiceRemaining--;
   state.artifactActivationCount += 1;
   const activation = state.artifactActivationCount;
+  addSlot();
 
   if (activation <= 2) {
     beginArtifactCategoryChoice({ grantSlot: true, replaceBaseSlot: false });
     return;
   }
   if (activation === 3) {
-    beginArtifactCategoryChoice({ grantSlot: false, replaceBaseSlot: true });
+    beginArtifactCategoryChoice({ grantSlot: true, replaceBaseSlot: true });
     return;
   }
   if (activation === 4) {
@@ -6332,9 +6592,6 @@ function beginArtifactCategoryChoice({ grantSlot, replaceBaseSlot }) {
 
 function applyArtifactCategoryChoice(chosen) {
   unlockCategory(chosen.id);
-  if (state.artifactChoiceGrantSlot) {
-    addSlot();
-  }
   if (state.artifactChoiceReplaceBaseSlot) {
     replaceOneBaseOfferWithSpecial();
     showPerkToast(t("toast.artifact_replace_basic_offer"));
@@ -6781,6 +7038,25 @@ function update(dt) {
   if (state.pathTailFade > 0) {
     state.pathTailFade = Math.max(0, state.pathTailFade - dt * 8);
     if (state.pathTailFade === 0) state.pathTailGhost = null;
+  }
+  if (state.loopPressureTimer > 0) {
+    state.loopPressureTimer = Math.max(0, state.loopPressureTimer - dt);
+    if (state.loopPressureTimer === 0 && state.loopPressureDrillPowerBonus > 0) {
+      state.drillPower = Math.max(0, state.drillPower - state.loopPressureDrillPowerBonus);
+      state.loopPressureDrillPowerBonus = 0;
+      state.loopPressureDisplayDuration = 0;
+    }
+  }
+  if (state.contourBlastPressureTimer > 0) {
+    state.contourBlastPressureTimer = Math.max(0, state.contourBlastPressureTimer - dt);
+    if (state.contourBlastPressureTimer === 0 && state.contourBlastPressureExplosionBonus > 0) {
+      state.explosionPower = Math.max(0, state.explosionPower - state.contourBlastPressureExplosionBonus);
+      state.contourBlastPressureExplosionBonus = 0;
+      state.contourBlastPressureDisplayDuration = 0;
+    }
+  }
+  if (state.contourResonanceFlashTimer > 0) {
+    state.contourResonanceFlashTimer = Math.max(0, state.contourResonanceFlashTimer - dt);
   }
   for (let i = state.activeToasts.length - 1; i >= 0; i--) {
     state.activeToasts[i].time -= dt;
@@ -7879,7 +8155,7 @@ function getBeaconAlchemyDrillDamageBonus(targetX, targetY) {
 function getStrikeDamage(targetX = null, targetY = null) {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
-  const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01) + contourLength * (state.loopLengthDamageBonus || 0) * 0.01;
+  const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01);
   const lowFuelFactor = state.maxFuel > 0 ? 1 - state.fuel / state.maxFuel : 0;
   const lowFuelDamageBoost = 1 + lowFuelFactor * (state.lowFuelDamageBonus || 0);
   let damage =
@@ -7896,7 +8172,8 @@ function getStrikeDamage(targetX = null, targetY = null) {
     getThermoDrillDamageBonus() +
     getBeaconAlchemyDrillDamageBonus(targetX, targetY) +
     getRecipeAlchemyDrillDamageBonus() +
-    getContourOverloadDrillDamageBonus();
+    getContourOverloadDrillDamageBonus() +
+    getContourLineDrillDamageBonus();
   return damage * (1 + state.damageBonus / 100) * lowFuelDamageBoost;
 }
 
@@ -7904,6 +8181,12 @@ function getEquipmentTiers(effectId) {
   return getEquippedParts()
     .filter((part) => part.id === effectId)
     .map((part) => clamp(Math.round(part.rarity || RARITY.COMMON), RARITY.COMMON, RARITY.LEGENDARY));
+}
+
+function getItemTiers(effectId) {
+  return getPurchasedItems()
+    .filter((item) => item.id === effectId)
+    .map((item) => clamp(Math.round(item.rarity || RARITY.COMMON), RARITY.COMMON, RARITY.LEGENDARY));
 }
 
 function sumEquipmentTierValues(effectId, values) {
@@ -8005,6 +8288,123 @@ function getContourOverloadExplosionDamage() {
   const flat = sumEquipmentTierValues("contour_overload_drill", [0, 30, 40, 50, 60]);
   const scale = sumEquipmentTierValues("contour_overload_drill", [0, 20, 30, 40, 50]);
   return flat + state.explosionPower * (scale / 100);
+}
+
+function getContourLineDrillDamageBonus() {
+  let total = 0;
+  const contourLength = Math.max(0, state.pathTiles.length - 1);
+  for (const tier of getEquipmentTiers("contour_line_drill")) {
+    const flat = 10;
+    const drillScale = [0, 0.10, 0.20, 0.30, 0.40][tier] || 0;
+    const perLength = [0, 1, 2, 3, 4][tier] || 0;
+    total += flat + state.drillPower * drillScale + perLength * contourLength;
+  }
+  return total;
+}
+
+function getContourResonanceDrillBlastDamage() {
+  let total = 0;
+  for (const tier of getItemTiers("contour_resonance_drill")) {
+    const flat = 20;
+    const explosionScale = [0, 0.10, 0.15, 0.20, 0.30][tier] || 0;
+    total += flat + state.explosionPower * explosionScale;
+  }
+  return total;
+}
+
+function applyLoopPressureBuff(brokenCellCount) {
+  if (brokenCellCount <= 0) return;
+  let bonus = 0;
+  let duration = 0;
+  for (const tier of getEquipmentTiers("loop_pressure")) {
+    const perBlock = [0, 3, 4, 5, 6][tier] || 0;
+    const tierDuration = [0, 4, 4.5, 5, 5.5][tier] || 0;
+    bonus += perBlock * brokenCellCount;
+    duration = Math.max(duration, tierDuration);
+  }
+  if (bonus <= 0 || duration <= 0) return;
+  const actualDuration = getScaledEffectDuration(duration);
+  if (actualDuration <= 0) return;
+
+  if (state.loopPressureDrillPowerBonus > 0) {
+    state.drillPower = Math.max(0, state.drillPower - state.loopPressureDrillPowerBonus);
+  }
+  state.loopPressureDrillPowerBonus = bonus;
+  state.loopPressureTimer = actualDuration;
+  state.loopPressureDisplayDuration = actualDuration;
+  state.drillPower += bonus;
+}
+
+function applyContourBlastPressureBuff(brokenCellCount) {
+  if (brokenCellCount <= 0) return;
+  let bonus = 0;
+  let duration = 0;
+  for (const tier of getItemTiers("contour_blast_pressure")) {
+    const perBlock = 5;
+    const tierDuration = [0, 5, 6, 7, 8][tier] || 0;
+    bonus += perBlock * brokenCellCount;
+    duration = Math.max(duration, tierDuration);
+  }
+  if (bonus <= 0 || duration <= 0) return;
+  const actualDuration = getScaledEffectDuration(duration);
+  if (actualDuration <= 0) return;
+
+  if (state.contourBlastPressureExplosionBonus > 0) {
+    state.explosionPower = Math.max(0, state.explosionPower - state.contourBlastPressureExplosionBonus);
+  }
+  state.contourBlastPressureExplosionBonus = bonus;
+  state.contourBlastPressureTimer = actualDuration;
+  state.contourBlastPressureDisplayDuration = actualDuration;
+  state.explosionPower += bonus;
+}
+
+function applyContourExplosionDamageToEnemy(uniqueTargets, damage) {
+  if (!state.contourEnemy || damage <= 0) return;
+  if (!(uniqueTargets instanceof Set) || uniqueTargets.size === 0) return;
+  const enemyIndex = cellIndex(state.contourEnemy.x, state.contourEnemy.y);
+  if (uniqueTargets.has(enemyIndex)) {
+    hitContourEnemy(damage);
+  }
+}
+
+function triggerContourResonancePulse() {
+  if (state.pathTiles.length === 0) return;
+  const damage = getContourResonanceDrillBlastDamage();
+  if (damage <= 0) return;
+
+  const radius = getScaledExplosionRadius(1);
+  const maxOffset = Math.ceil(radius);
+  const uniqueTargets = new Set();
+
+  playSound("explosion");
+  for (const segment of state.pathTiles) {
+    state.effects.push({
+      kind: "explosion",
+      x: segment.x,
+      y: segment.y,
+      radius,
+      time: EXPLOSION_EFFECT_DURATION,
+      duration: EXPLOSION_EFFECT_DURATION,
+      seed: (segment.x * 7219 + segment.y * 3571 + 31) % 1000,
+    });
+    for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
+      for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
+        if (Math.hypot(ox, oy) > radius) continue;
+        const tx = segment.x + ox;
+        const ty = segment.y + oy;
+        if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
+        uniqueTargets.add(cellIndex(tx, ty));
+      }
+    }
+  }
+
+  applyContourExplosionDamageToEnemy(uniqueTargets, damage);
+  for (const index of uniqueTargets) {
+    const tx = index % GRID_W;
+    const ty = Math.floor(index / GRID_W);
+    damageCell(tx, ty, damage, { cause: "explosion", showActualDamage: true });
+  }
+  state.contourResonanceFlashTimer = Math.max(state.contourResonanceFlashTimer || 0, 0.22);
 }
 
 function getShardDrillDamageBonus() {
@@ -9103,6 +9503,9 @@ function damageCell(x, y, damage, options = {}) {
         guaranteedBreak: false,
       });
     }
+    if (getItemTiers("contour_resonance_drill").length > 0) {
+      triggerContourResonancePulse();
+    }
   }
   const continuePierce = () => {
     if (!pierceActive || pierceLeft <= 0) {
@@ -9163,7 +9566,8 @@ function damageCell(x, y, damage, options = {}) {
   }
 
   const actualDamage = spikeExplosion ? state.health[index] : Math.min(state.health[index], damage);
-  spawnDamageNumberEffect(x, y, damage);
+  const displayedDamage = options.showActualDamage ? actualDamage : damage;
+  spawnDamageNumberEffect(x, y, displayedDamage);
   state.health[index] -= spikeExplosion ? actualDamage : damage;
   if (state.health[index] > 0) {
     continuePierce();
@@ -9707,6 +10111,7 @@ function tryAutoCloseContour() {
         ignoreHazardEffect: true,
         allowHazardChain: true,
         cause: "explosion",
+        showActualDamage: true,
       });
     }
     extendPath(x, y, true);
@@ -9987,7 +10392,7 @@ function updateDrill(dt) {
     const _wcAdd = (cx, cy) => {
       if (cx < 1 || cy < 1 || cx >= GRID_W - 1 || cy >= GRID_H - 1) return;
       const ci = cellIndex(cx, cy);
-      if (state.health[ci] > 0) weakCandidates.push(ci);
+      if (isWeakSpotCandidateCell(ci)) weakCandidates.push(ci);
     };
     _wcAdd(targetX, targetY);
     _wcAdd(state.drill.x - dy, state.drill.y + dx);
@@ -10065,7 +10470,7 @@ function triggerContourOverloadExplosion(pathTiles) {
   if (tiers.length === 0) return false;
   if (!Array.isArray(pathTiles) || pathTiles.length === 0) return false;
 
-  const maxContour = Math.max(1, Math.round(state.maxContour || 1));
+  const maxContour = Math.max(9, Math.round(state.maxContour || 0));
   const brokenBlocks = Math.max(0, state.contourOverloadBrokenBlocks || 0);
   const damageCoef = Math.min(brokenBlocks / maxContour, 1);
   const damage = getContourOverloadExplosionDamage() * damageCoef;
@@ -10096,6 +10501,7 @@ function triggerContourOverloadExplosion(pathTiles) {
     }
   }
 
+  applyContourExplosionDamageToEnemy(uniqueTargets, damage);
   for (const index of uniqueTargets) {
     const tx = index % GRID_W;
     const ty = Math.floor(index / GRID_W);
@@ -10206,6 +10612,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         ignoreHazardEffect: true,
         allowHazardChain: true,
         cause: "explosion",
+        showActualDamage: true,
       })) {
         brokenCellCount += 1;
       }
@@ -10213,6 +10620,8 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   }
 
   maybeSpawnLoopPerk(interiorCells, brokenCellCount);
+  applyLoopPressureBuff(brokenCellCount);
+  applyContourBlastPressureBuff(brokenCellCount);
   spawnLoopFieldEffect(loopPath, affectedCells);
 
   for (const beacon of state.beacons) {
@@ -11514,7 +11923,8 @@ function render() {
       if (!state.tunnelMask[index] && !state.metalMask[index] && state.health[index] < BLOCK_TYPES[state.hardness[index]].hp) {
         const ratio = clamp(state.health[index] / BLOCK_TYPES[state.hardness[index]].hp, 0, 1);
         const crackStage = clamp(Math.ceil((1 - ratio) * 3), 0, 3);
-        if (crackStage > 0) {
+        const crackVisible = state.visibleMask[index] === 1;
+        if (crackStage > 0 && crackVisible) {
           ctx.globalAlpha = 0.3 + (1 - ratio) * 0.5;
           const angle = state.crackAngle[index] || 0;
           const cx = sx + TILE_SIZE * 0.5;
@@ -11650,6 +12060,7 @@ function render() {
     renderSignalStatus(camera);
     renderBeaconRadar(camera);
     renderPickupRadar(camera);
+    renderLoopPressureStatus(camera);
     renderOverdriveStatus(camera);
     renderStunStatus(camera);
     renderHeatWarningStatus(camera);
@@ -11855,9 +12266,13 @@ function renderMovingTiles(camera) {
 function renderPath(camera) {
   const ctx = state.ctx;
   const hasContourOverloadDrill = getEquipmentTiers("contour_overload_drill").length > 0;
-  const contourAtMaxLength = hasContourOverloadDrill && state.pathTiles.length >= Math.max(1, Math.round(state.maxContour || 1));
+  const contourMaxForOverload = Math.max(9, Math.round(state.maxContour || 0));
+  const contourAtMaxLength = hasContourOverloadDrill && state.pathTiles.length >= contourMaxForOverload;
+  const contourResonanceActive = (state.contourResonanceFlashTimer || 0) > 0;
   const pathOuterColor = contourAtMaxLength ? "rgba(155, 30, 30, 0.82)" : "rgba(108, 62, 31, 0.65)";
   const pathInnerColor = contourAtMaxLength ? "rgba(255, 120, 120, 0.72)" : "rgba(219, 171, 99, 0.52)";
+  const activeOuterColor = contourResonanceActive ? "rgba(189, 42, 42, 0.88)" : pathOuterColor;
+  const activeInnerColor = contourResonanceActive ? "rgba(255, 146, 146, 0.82)" : pathInnerColor;
   const liveTail =
     state.pathTiles.length > 0
       ? {
@@ -11906,7 +12321,7 @@ function renderPath(camera) {
   }
 
   // Main path
-  ctx.strokeStyle = pathOuterColor;
+  ctx.strokeStyle = activeOuterColor;
   ctx.beginPath();
   for (let i = 0; i < renderPathLength; i += 1) {
     const tile = state.pathTiles[i];
@@ -11924,7 +12339,7 @@ function renderPath(camera) {
   ctx.stroke();
 
   ctx.lineWidth = 3;
-  ctx.strokeStyle = pathInnerColor;
+  ctx.strokeStyle = activeInnerColor;
   ctx.stroke();
 
   renderAutoClosePreview(camera);
@@ -13299,9 +13714,7 @@ function renderPerkZoneTile(x, y, sx, sy) {
     return;
   }
 
-  const perk = TILE_PERK_TYPES[zone.perkType];
   const ctx = state.ctx;
-  const chargeRatio = zone.arming ? 1 - zone.armingTimer / PERK_ZONE_CHARGE_DELAY : 0;
   const isZoneCell = (tx, ty) => {
     if (tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H) {
       return false;
@@ -13309,6 +13722,60 @@ function renderPerkZoneTile(x, y, sx, sy) {
     return state.perkZoneMask[cellIndex(tx, ty)] === zoneId;
   };
 
+  if (zone.kind === "dual_stat") {
+    const hit = getDualPerkZoneCellData(zone, x, y);
+    if (!hit) {
+      return;
+    }
+    const sideMeta = getDualPerkZoneSideMeta(hit.sideKey);
+    const rarityColor = RARITY_COLORS[zone.rarity || RARITY.COMMON] || sideMeta.color;
+    const chargeRatio = zone.arming ? 1 - zone.armingTimer / PERK_ZONE_CHARGE_DELAY : 0;
+    const pulse = zone.arming
+      ? (0.45 + (Math.sin((state.lastTs || 0) * 0.018) * 0.5 + 0.5) * 0.55)
+      : 1;
+    ctx.save();
+    const fillAlpha = zone.arming
+      ? Math.round((0x20 + chargeRatio * 80 * pulse))
+      : 0x2a;
+    ctx.fillStyle = `${sideMeta.color}${fillAlpha.toString(16).padStart(2, "0")}`;
+    ctx.fillRect(sx + 3, sy + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+    ctx.strokeStyle = `${zone.arming ? rarityColor : sideMeta.color}cc`;
+    ctx.lineWidth = zone.arming ? 2.4 : 2;
+    if (zone.arming) {
+      ctx.shadowColor = rarityColor;
+      ctx.shadowBlur = 7 + pulse * 7;
+    }
+    ctx.beginPath();
+    if (!isZoneCell(x, y - 1)) {
+      ctx.moveTo(sx + 4, sy + 4);
+      ctx.lineTo(sx + TILE_SIZE - 4, sy + 4);
+    }
+    if (!isZoneCell(x + 1, y)) {
+      ctx.moveTo(sx + TILE_SIZE - 4, sy + 4);
+      ctx.lineTo(sx + TILE_SIZE - 4, sy + TILE_SIZE - 4);
+    }
+    if (!isZoneCell(x, y + 1)) {
+      ctx.moveTo(sx + 4, sy + TILE_SIZE - 4);
+      ctx.lineTo(sx + TILE_SIZE - 4, sy + TILE_SIZE - 4);
+    }
+    if (!isZoneCell(x - 1, y)) {
+      ctx.moveTo(sx + 4, sy + 4);
+      ctx.lineTo(sx + 4, sy + TILE_SIZE - 4);
+    }
+    ctx.stroke();
+    if (x === hit.side.iconX && y === hit.side.iconY) {
+      ctx.fillStyle = sideMeta.color;
+      ctx.font = `700 14px ${HUD_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(sideMeta.icon, sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5 + 1);
+    }
+    ctx.restore();
+    return;
+  }
+
+  const perk = TILE_PERK_TYPES[zone.perkType];
+  const chargeRatio = zone.arming ? 1 - zone.armingTimer / PERK_ZONE_CHARGE_DELAY : 0;
   ctx.save();
   if (zone.arming) {
     const pulse = 0.45 + (Math.sin((state.lastTs || 0) * 0.018) * 0.5 + 0.5) * 0.55;
@@ -13929,6 +14396,33 @@ function getNearestRadarCrystals(recipeOnly = false) {
     }
   }
   return nearest;
+}
+
+function renderLoopPressureStatus(camera) {
+  if (state.loopPressureTimer <= 0) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y - 24;
+  const width = 64;
+  const ratio = clamp(state.loopPressureTimer / Math.max(0.1, state.loopPressureDisplayDuration || 0.1), 0, 1);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
+  ctx.strokeStyle = "rgba(122, 198, 255, 0.42)";
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = "#4eb5ff";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
+  ctx.restore();
 }
 
 function renderOverdriveStatus(camera) {
