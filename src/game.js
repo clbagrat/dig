@@ -646,7 +646,7 @@ const state = {
   recipesCompletedThisRun: 0,
   crystalStatusText: "",
   strikeSpeed: 0,
-  drillPower: BASE_DRILL_DAMAGE,
+  drillPower: 0,
   goldBonus: 0,
   xpBonus: 0,
   fuelBonus: 0,
@@ -2522,7 +2522,7 @@ function setupField(seedOverride = null) {
   state.hudBarFx.xp = { ratio: 0, ghostRatio: 0, pulse: 0, deltaDir: 0, intensity: 0 };
   state.lastFuelHudChangeKind = "active";
   state.strikeSpeed = 0;
-  state.drillPower = BASE_DRILL_DAMAGE;
+  state.drillPower = 0;
   state.goldBonus = 0;
   state.xpBonus = 0;
   state.fuelBonus = 0;
@@ -4029,7 +4029,7 @@ function getShopStatsSnapshot() {
 
 function getShopDefaultStatsSnapshot() {
   return {
-    drillPower: BASE_DRILL_DAMAGE,
+    drillPower: 0,
     strikeSpeed: 0,
     maxHp: START_HP,
     maxFuel: START_FUEL,

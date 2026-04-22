@@ -1449,7 +1449,7 @@ export const ALL_ITEMS = [
     category: "контур",
     tags: ["контур"],
     minRarity: 1,
-    effect: { stat: "maxContour", effectByRarity: [null, 3, 5, 8, 12] },
+    effect: { stat: "maxContour", effectByRarity: [null, 1, 2, 3, 4] },
   },
   {
     id: "loop_spawner",
