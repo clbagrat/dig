@@ -1300,6 +1300,28 @@ export const ALL_ITEMS = [
     ],
   },
   {
+    id: "unstable_reagent",
+    type: "item",
+    name: "Нестабильный реагент",
+    icon: "🧪",
+    desc: "Концентрация, расход топлива и максимум очков обвала зависят от редкости.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: [
+      { stat: "concentration", effectByRarity: [null, 5, 7, 10, 13] },
+      { stat: "fuelDrainRate", effectByRarity: [null, -0.05, -0.08, -0.12, -0.16] },
+      { stat: "collapseBudgetMaxScale", effectByRarity: [null, -0.05, -0.07, -0.10, -0.13] },
+    ],
+  },
+  {
     id: "insurance",
     type: "item",
     name: "Страховка",
@@ -1619,6 +1641,7 @@ const SIMPLE_STAT_DESCRIPTORS = {
   effectDurationRate: value => t("desc.effectDurationRate", { val: formatSignedPercent(value, 100) }),
   concentration: value => t("desc.concentration", { val: formatSignedPercent(value, 1) }),
   fuelDrainRate: value => t("desc.fuelDrainRate", { val: formatSignedPercent(value, 100) }),
+  collapseBudgetMaxScale: value => t("desc.collapseBudgetMaxScale", { val: formatSignedPercent(value, 100) }),
   fuelStarvationResistance: value => t("desc.fuelStarvationResistance", { val: formatSignedPercent(value) }),
   contourResMultiplier: value => t("desc.contourResMultiplier", { val: formatSignedPercent(value, 100) }),
   goldBonus: value => t("desc.goldBonus", { val: formatSignedPercent(value, 100) }),

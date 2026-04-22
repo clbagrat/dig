@@ -94,6 +94,7 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   breachPresenceChance:      { key: "stat.breachPresenceChance",      mode: "percent" },
   breachThermostatLevel:     { key: "stat.breachThermostatLevel",     mode: "level" },
   concentration:             { key: "stat.concentration",             mode: "multiplier" },
+  collapseBudgetMaxScale:    { key: "stat.collapseBudgetMaxScale",    mode: "percent" },
   contourResMultiplier:      { key: "stat.contourResMultiplier",      mode: "percent" },
   cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
   crystalGoldGain:           { key: "stat.crystalGoldGain",           mode: "integer" },
@@ -258,7 +259,6 @@ const CONTOUR_ENEMY_STUN_DURATION = 0.7;
 const COLLAPSE_BUDGET_INITIAL = 600;
 const CONTOUR_ENEMY_BUDGET_INITIAL = 500;
 const COLLAPSE_WARNING_DURATION = 2.4;
-const COLLAPSE_DAMAGE = 25;
 const COLLAPSE_MIN_TILES = 3;
 const COLLAPSE_MAX_TILES = 6;
 const COLLAPSE_LAND_INTERVAL = 0.12;
@@ -509,6 +509,7 @@ const state = {
   heatRate: 1,
   effectDurationRate: 1,
   concentration: 0,
+  collapseBudgetMaxScale: 0,
   fuelDrainRate: 1,
   fuelStarvationResistance: 0,
   armor: 0,
@@ -2432,6 +2433,7 @@ function setupField(seedOverride = null) {
   state.heatRate = 1;
   state.effectDurationRate = 1;
   state.concentration = 0;
+  state.collapseBudgetMaxScale = 0;
   state.fuelDrainRate = 1;
   state.fuelStarvationResistance = 0;
   state.armor = 0;
@@ -2507,7 +2509,7 @@ function setupField(seedOverride = null) {
   state.crystalLightRadarTimer = 0;
   state.collapseWarnings.length = 0;
   state.pendingCollapseCount = 0;
-  state.collapseBudget = COLLAPSE_BUDGET_INITIAL;
+  state.collapseBudget = getCollapseBudgetMaxPoints();
   state.contourEnemyBudget = CONTOUR_ENEMY_BUDGET_INITIAL;
   state.hudBarFx.hp = { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 };
   state.hudBarFx.fuel = { ratio: 1, ghostRatio: 1, pulse: 0, deltaDir: 0, intensity: 0 };
@@ -2845,14 +2847,40 @@ function getCollapseHardness(depth = state.depth) {
   return clamp(1 + Math.floor(Math.max(0, depth) / 10), 1, BLOCK_TYPES.length - 1);
 }
 
+function getCollapseDamage(hardness) {
+  return 25 + 0.5 * Math.max(0, hardness || 0);
+}
+
+function getCollapseBudgetMaxPointsFromScale(scale = 0) {
+  return Math.max(1, Math.round(COLLAPSE_BUDGET_INITIAL * (1 + scale)));
+}
+
+function getCollapseBudgetMaxPoints() {
+  return getCollapseBudgetMaxPointsFromScale(state.collapseBudgetMaxScale || 0);
+}
+
+function applyCollapseBudgetMaxScaleDelta(delta) {
+  if (!Number.isFinite(delta) || Math.abs(delta) <= 1e-9) {
+    return;
+  }
+  const oldScale = state.collapseBudgetMaxScale || 0;
+  const oldMax = getCollapseBudgetMaxPointsFromScale(oldScale);
+  const oldCurrent = Number.isFinite(state.collapseBudget) ? state.collapseBudget : oldMax;
+  state.collapseBudgetMaxScale = oldScale + delta;
+  const newMax = getCollapseBudgetMaxPointsFromScale(state.collapseBudgetMaxScale);
+  const ratio = oldMax > 0 ? oldCurrent / oldMax : 1;
+  state.collapseBudget = clamp(ratio * newMax, 0, newMax);
+}
+
 function spendCollapseBudget(amount) {
   if (amount <= 0) {
     return;
   }
+  const maxBudget = getCollapseBudgetMaxPoints();
   state.collapseBudget -= amount;
   while (state.collapseBudget <= 0) {
     state.pendingCollapseCount += 1;
-    state.collapseBudget += COLLAPSE_BUDGET_INITIAL;
+    state.collapseBudget += maxBudget;
   }
 }
 
@@ -2993,7 +3021,7 @@ function resolveNextCollapseCell(warning) {
   }
   if (!warning.heroDamaged && key === `${state.drill.x},${state.drill.y}`) {
     warning.heroDamaged = true;
-    applyHazardDamage(COLLAPSE_DAMAGE);
+    applyHazardDamage(getCollapseDamage(warning.hardness));
     const fallback = findNearestWalkableTileExcluding(state.drill.x, state.drill.y, blockedKeys);
     if (fallback) {
       state.drill.x = fallback.x;
@@ -3962,6 +3990,7 @@ function getShopStatsSnapshot() {
     heat: state.heat,
     effectDurationRate: state.effectDurationRate,
     concentration: state.concentration,
+    collapseBudgetMaxScale: state.collapseBudgetMaxScale || 0,
     fuelDrainRate: state.fuelDrainRate,
     fuelStarvationResistance: state.fuelStarvationResistance,
     goldBonus: state.goldBonus,
@@ -3972,6 +4001,7 @@ function getShopStatsSnapshot() {
     damageBonus: state.damageBonus,
     explosionPower: state.explosionPower,
     explosionBonus: state.explosionBonus,
+    explosionRadiusBonus: state.explosionRadiusBonus,
     lowFuelDamageBonus: state.lowFuelDamageBonus,
     weakSpotChance: state.weakSpotChance,
     weakSpotMult: state.weakSpotMult,
@@ -3992,6 +4022,7 @@ function getShopDefaultStatsSnapshot() {
     heatRate: 1,
     effectDurationRate: 1,
     concentration: 0,
+    collapseBudgetMaxScale: 0,
     fuelDrainRate: 1,
     fuelStarvationResistance: 0,
     goldBonus: 0,
@@ -4000,6 +4031,7 @@ function getShopDefaultStatsSnapshot() {
     damageBonus: 0,
     explosionPower: 0,
     explosionBonus: 0,
+    explosionRadiusBonus: 0,
     lowFuelDamageBonus: 0,
     weakSpotChance: 0,
     weakSpotMult: 2,
@@ -4030,6 +4062,8 @@ function applyItemEffect(effect, rarityMult, rarity) {
       state.navigatorMode = true;
     } else if (stat === "radarCrystalModule") {
       state.radarCrystalModule = true;
+    } else if (stat === "collapseBudgetMaxScale") {
+      applyCollapseBudgetMaxScaleDelta(value);
     } else if (stat === "maxHp" && value < 0) {
       state.maxHp = Math.max(1, state.maxHp + value);
       state.hp = Math.min(state.hp, state.maxHp);
@@ -4052,6 +4086,8 @@ function reverseItemEffect(effect, rarityMult, rarity) {
     if (stat === "maxHp" && value < 0) {
       state.maxHp = Math.max(1, state.maxHp - value);
       state.hp = Math.min(state.hp, state.maxHp);
+    } else if (stat === "collapseBudgetMaxScale") {
+      applyCollapseBudgetMaxScaleDelta(-value);
     } else {
       state[stat] = (state[stat] || 0) - value;
     }
@@ -4819,7 +4855,7 @@ function bindUi() {
     const defaults = getShopDefaultStatsSnapshot();
     const statDefs = [
       { key: "drillPower", format: "fixed1" },
-      { key: "damageBonus", format: "percent" },
+      { key: "damageBonus", format: "rawpercent" },
       { key: "strikeSpeed", format: "rawpercent" },
       { key: "maxHp", format: null },
       { key: "maxFuel", format: null },
@@ -4837,6 +4873,7 @@ function bindUi() {
       { key: "fuelBonus", format: "percent" },
       { key: "explosionPower", format: "fixed1" },
       { key: "explosionBonus", format: "rawpercent" },
+      { key: "explosionRadiusBonus", format: "fixed1" },
       { key: "lowFuelDamageBonus", format: "percent" },
       { key: "goldBonusPerLevel", format: "percent" },
       { key: "miningGoldBonusMultiplier", format: "percent" },
@@ -9084,6 +9121,9 @@ function damageCell(x, y, damage, options = {}) {
     return false;
   }
 
+  if (options.cause === "explosion") {
+    spendCollapseBudget(10);
+  }
   breakCell(x, y, index, options);
   continuePierce();
   return true;
@@ -9248,7 +9288,6 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
   const scaledDamage = getScaledExplosionDamage(damage, options);
   const breakDamage = options.guaranteedBreak === false ? scaledDamage : Math.max(scaledDamage, EXPLOSION_BREAK_DAMAGE);
   const maxOffset = Math.ceil(scaledRadius);
-  let affectedCellCount = 0;
   for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
     for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
       const dist = Math.hypot(ox, oy);
@@ -9256,7 +9295,6 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
       const tx = x + ox;
       const ty = y + oy;
       if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
-      affectedCellCount += 1;
       const step = Math.floor(dist);
       const baseFalloff = step < EXPLOSION_STEP_FALLOFF.length
         ? EXPLOSION_STEP_FALLOFF[step]
@@ -9273,7 +9311,6 @@ function explodeAt(x, y, damage, radius = 2, options = {}) {
       });
     }
   }
-  spendCollapseBudget(affectedCellCount * 10);
 }
 
 function spawnRocketEffect(fromX, fromY, targetX, targetY, payload, { instant = false } = {}) {
@@ -14576,7 +14613,7 @@ function renderHudPerkColumn(x, y, width, title) {
   const defaults = getShopDefaultStatsSnapshot();
   const statDefs = [
     { key: "drillPower", format: "fixed1" },
-    { key: "damageBonus", format: "percent" },
+    { key: "damageBonus", format: "rawpercent" },
     { key: "strikeSpeed", format: "rawpercent" },
     { key: "maxHp", format: null },
     { key: "maxFuel", format: null },
@@ -14594,6 +14631,7 @@ function renderHudPerkColumn(x, y, width, title) {
     { key: "fuelBonus", format: "percent" },
     { key: "explosionPower", format: "fixed1" },
     { key: "explosionBonus", format: "rawpercent" },
+    { key: "explosionRadiusBonus", format: "fixed1" },
     { key: "lowFuelDamageBonus", format: "percent" },
     { key: "goldBonusPerLevel", format: "percent" },
     { key: "miningGoldBonusMultiplier", format: "percent" },

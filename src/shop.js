@@ -227,6 +227,38 @@ export function grantItem(good, rarity) {
   }));
 }
 
+export function grantGood(good, rarity = RARITY.COMMON) {
+  if (!good) {
+    return { ok: false, reason: "invalid-good" };
+  }
+  const clampedRarity = clampRarityForGood(good, rarity);
+  if (good.type === "item") {
+    grantItem(good, clampedRarity);
+    return { ok: true, rarity: clampedRarity, kind: "item" };
+  }
+  if (good.type !== "equipment") {
+    return { ok: false, reason: "unsupported-type" };
+  }
+  if (!hasFreeSlot()) {
+    return { ok: false, reason: "no-slot" };
+  }
+
+  equippedParts.push({ id: good.id, rarity: clampedRarity });
+  document.dispatchEvent(new CustomEvent("shop:purchase-equipment", {
+    detail: {
+      effectId: good.id,
+      cost: 0,
+      rarity: clampedRarity,
+      rarityMultiplier: RARITY_EFFECT_MULT[clampedRarity],
+      isMerge: false,
+      oldRarity: 0,
+      oldRarityMultiplier: 0,
+    },
+  }));
+  recalcTagSynergies();
+  return { ok: true, rarity: clampedRarity, kind: "equipment" };
+}
+
 // ── Rarity rolling ───────────────────────────────────────────────────────────────
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -891,6 +923,7 @@ function getDefaultStatValue(key) {
     heatRate: 1,
     effectDurationRate: 1,
     concentration: 0,
+    collapseBudgetMaxScale: 0,
     fuelDrainRate: 1,
     visionRadius: 5,
     luck: 0,
@@ -901,6 +934,7 @@ function getDefaultStatValue(key) {
     fuelBonus: 0,
     explosionPower: 0,
     explosionBonus: 0,
+    explosionRadiusBonus: 0,
     lowFuelDamageBonus: 0,
     goldBonusPerLevel: 0,
     miningGoldBonusMultiplier: 0,
@@ -920,7 +954,7 @@ function isStatChanged(key, value) {
 
 const STAT_DEFS = [
   { key: "drillPower",                get label() { return t("shop.stat.drillPower.label"); },                get shortLabel() { return t("shop.stat.drillPower.short"); },                format: "fixed1" },
-  { key: "damageBonus",               get label() { return t("shop.stat.damageBonus.label"); },               get shortLabel() { return t("shop.stat.damageBonus.short"); },               format: "percent" },
+  { key: "damageBonus",               get label() { return t("shop.stat.damageBonus.label"); },               get shortLabel() { return t("shop.stat.damageBonus.short"); },               format: "rawpercent" },
   { key: "strikeSpeed",               get label() { return t("shop.stat.strikeSpeed.label"); },               get shortLabel() { return t("shop.stat.strikeSpeed.short"); },               format: "rawpercent" },
   { key: "maxHp",                     get label() { return t("shop.stat.maxHp.label"); },                     get shortLabel() { return t("shop.stat.maxHp.short"); },                     format: null },
   { key: "maxFuel",                   get label() { return t("shop.stat.maxFuel.label"); },                   get shortLabel() { return t("shop.stat.maxFuel.short"); },                   format: null },
@@ -928,6 +962,7 @@ const STAT_DEFS = [
   { key: "heatRate",                  get label() { return t("shop.stat.heatRate.label"); },                  get shortLabel() { return t("shop.stat.heatRate.short"); },                  format: "multiplier" },
   { key: "effectDurationRate",        get label() { return t("shop.stat.effectDurationRate.label"); },        get shortLabel() { return t("shop.stat.effectDurationRate.short"); },        format: "multiplier" },
   { key: "concentration",             get label() { return t("shop.stat.concentration.label"); },             get shortLabel() { return t("shop.stat.concentration.short"); },             format: "multiplier" },
+  { key: "collapseBudgetMaxScale",    get label() { return t("shop.stat.collapseBudgetMaxScale.label"); },    get shortLabel() { return t("shop.stat.collapseBudgetMaxScale.short"); },    format: "percent" },
   { key: "fuelDrainRate",             get label() { return t("shop.stat.fuelDrainRate.label"); },             get shortLabel() { return t("shop.stat.fuelDrainRate.short"); },             format: "multiplier" },
   { key: "visionRadius",              get label() { return t("shop.stat.visionRadius.label"); },              get shortLabel() { return t("shop.stat.visionRadius.short"); },              format: null },
   { key: "luck",                      get label() { return t("shop.stat.luck.label"); },                      get shortLabel() { return t("shop.stat.luck.short"); },                      format: null },
@@ -938,6 +973,7 @@ const STAT_DEFS = [
   { key: "fuelBonus",                 get label() { return t("shop.stat.fuelBonus.label"); },                  get shortLabel() { return t("shop.stat.fuelBonus.short"); },                  format: "percent" },
   { key: "explosionPower",            get label() { return t("shop.stat.explosionPower.label"); },             get shortLabel() { return t("shop.stat.explosionPower.short"); },             format: "fixed1" },
   { key: "explosionBonus",            get label() { return t("shop.stat.explosionBonus.label"); },             get shortLabel() { return t("shop.stat.explosionBonus.short"); },             format: "rawpercent" },
+  { key: "explosionRadiusBonus",      get label() { return t("shop.stat.explosionRadiusBonus.label"); },       get shortLabel() { return t("shop.stat.explosionRadiusBonus.short"); },       format: "fixed1" },
   { key: "lowFuelDamageBonus",        get label() { return t("shop.stat.lowFuelDamageBonus.label"); },         get shortLabel() { return t("shop.stat.lowFuelDamageBonus.short"); },         format: "percent" },
   { key: "goldBonusPerLevel",         get label() { return t("shop.stat.goldBonusPerLevel.label"); },          get shortLabel() { return t("shop.stat.goldBonusPerLevel.short"); },          format: "percent" },
   { key: "miningGoldBonusMultiplier", get label() { return t("shop.stat.miningGoldBonusMultiplier.label"); }, get shortLabel() { return t("shop.stat.miningGoldBonusMultiplier.short"); }, format: "percent" },

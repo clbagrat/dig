@@ -320,6 +320,7 @@ Current available shop content includes:
 - equipment such as `Просто дрель`, `Разменный бур`, `Осколочный бур`, and `Кирка счастливчика`, which remain part of the early shop pool
 - alchemy equipment `Маячный реторт-бур`: `12` base damage; when mining toward a beacon and moving closer to it within radius `10`, adds `20 + 15/20/25/30% drillPower`
 - alchemy equipment `Рецептурный реторт-бур`: `5 + 5/7/9/11` damage per completed crystal recipe this run
+- alchemy item `Нестабильный реагент`: `+5/7/10/13% concentration`, `-5/8/12/16% fuel drain`, and `-5/7/10/13%` to max collapse points
 - a new low-fuel damage stat that can appear on shop items and scales drill damage as the tank empties
 
 ## Overflow / Remote Bomb Rules
