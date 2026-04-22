@@ -168,6 +168,7 @@ const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "lucky_pickaxe",
   "shard_drill",
   "beacon_alchemy_drill",
+  "recipe_alchemy_drill",
 ]);
 
 const DEBUG_CORE_STATS = [
@@ -638,6 +639,7 @@ const state = {
   crystalRecipe: [],
   crystalCollected: [0, 0, 0, 0, 0, 0],
   crystalProgress: 0,
+  recipesCompletedThisRun: 0,
   crystalStatusText: "",
   strikeSpeed: 0,
   drillPower: BASE_DRILL_DAMAGE,
@@ -2465,6 +2467,7 @@ function setupField(seedOverride = null) {
   state.crystalRecipe = [];
   state.crystalCollected = [0, 0, 0, 0, 0, 0];
   state.crystalProgress = 0;
+  state.recipesCompletedThisRun = 0;
   state.crystalStatusText = "";
   state.isChoosingPerk = false;
   state.pendingPerkChoice = false;
@@ -3344,6 +3347,7 @@ function pickCrystalRewardItem() {
 }
 
 function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y, options = {}) {
+  state.recipesCompletedThisRun = Math.max(0, (state.recipesCompletedThisRun || 0) + 1);
   const offer = pickCrystalRewardItem();
   if (!offer) return;
   const showRecipeAnimation = options.showRecipeAnimation !== false;
@@ -3972,6 +3976,7 @@ function getShopStatsSnapshot() {
     weakSpotChance: state.weakSpotChance,
     weakSpotMult: state.weakSpotMult,
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier || 0,
+    recipesCompletedThisRun: state.recipesCompletedThisRun || 0,
   };
 }
 
@@ -3999,6 +4004,7 @@ function getShopDefaultStatsSnapshot() {
     weakSpotChance: 0,
     weakSpotMult: 2,
     miningGoldBonusMultiplier: 0,
+    recipesCompletedThisRun: 0,
   };
 }
 
@@ -4468,6 +4474,18 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: t("inspect.current_damage"), value: formatPerkNumber(baseTotal) },
         { label: t("inspect.beacon_direction_bonus"), value: `+${beaconFlat} +${beaconScale}% [${formatPerkNumber(beaconTotal)}]` },
         { label: t("inspect.beacon_radius"), value: "10" },
+      ];
+    }
+    case "recipe_alchemy_drill": {
+      const baseFlat = 5;
+      const perRecipe = [0, 5, 7, 9, 11][rarity] || 0;
+      const recipes = Math.max(0, Math.round(state.recipesCompletedThisRun || 0));
+      const total = baseFlat + perRecipe * recipes;
+      return [
+        { label: t("inspect.flat_damage"), value: `+${baseFlat}` },
+        { label: t("inspect.recipe_bonus"), value: `+${perRecipe}` },
+        { label: t("inspect.recipes_collected"), value: `${recipes}` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(total) },
       ];
     }
     default:
@@ -7801,7 +7819,8 @@ function getStrikeDamage(targetX = null, targetY = null) {
     getBreachAfterburnerDamageBonus() +
     getBreachChainDrillDamageBonus() +
     getThermoDrillDamageBonus() +
-    getBeaconAlchemyDrillDamageBonus(targetX, targetY);
+    getBeaconAlchemyDrillDamageBonus(targetX, targetY) +
+    getRecipeAlchemyDrillDamageBonus();
   return damage * (1 + state.damageBonus / 100) * lowFuelDamageBoost;
 }
 
@@ -7887,6 +7906,17 @@ function getThermoDrillDamageBonus() {
     const drillScale = [0, 0, 0.15, 0.20, 0.25][tier] || 0;
     const heatBonus = [0, 0, 1, 2, 3][tier] || 0;
     total += flat + state.drillPower * drillScale + Math.floor(state.heat / 10) * heatBonus;
+  }
+  return total;
+}
+
+function getRecipeAlchemyDrillDamageBonus() {
+  let total = 0;
+  const recipes = Math.max(0, Math.round(state.recipesCompletedThisRun || 0));
+  for (const tier of getEquipmentTiers("recipe_alchemy_drill")) {
+    const flat = 5;
+    const perRecipe = [0, 5, 7, 9, 11][tier] || 0;
+    total += flat + perRecipe * recipes;
   }
   return total;
 }

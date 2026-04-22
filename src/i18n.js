@@ -50,6 +50,7 @@ const TRANSLATIONS = {
     "item.breach_afterburner.name": "Breach Afterburner",
     "item.breach_chain_drill.name": "Breach Chain Drill",
     "item.beacon_alchemy_drill.name": "Beacon Retort Drill",
+    "item.recipe_alchemy_drill.name": "Formula Retort Drill",
 
     // ── Item names ───────────────────────────────────────────────────────────
     "item.heavy_drill.name": "Heavy Drill",
@@ -659,6 +660,7 @@ const TRANSLATIONS = {
     "desc.special.breach_afterburner": "Damage {flat} + {drillScale}% of drill power + {weakSpotScale}% of breach damage stat{total}.\nOn breach hit: overdrive for {sec} sec.",
     "desc.special.breach_chain_drill": "Damage {flat} + {explosionScale}% of explosion power + {weakSpotChanceScale}% of breach chance stat{total}.\nOn breach hit: next {hits} strikes are empowered and cannot spawn breach.",
     "desc.special.beacon_alchemy_drill": "Damage {baseFlat}{baseTotal}.\nIf mining toward a beacon within radius {radius}: +{beaconFlat} + {beaconScale}% of drill power{beaconTotal}.",
+    "desc.special.recipe_alchemy_drill": "Damage {baseFlat} + {perRecipe} per recipe completed this run ({recipes}){total}.",
 
     // ── Special item desc parts ──────────────────────────────────────────────
     "item.afterburner.hp_penalty": "−1 max HP (min 1)",
@@ -678,6 +680,8 @@ const TRANSLATIONS = {
     "inspect.explosion_radius": "Explosion Radius",
     "inspect.beacon_direction_bonus": "Toward Beacon Bonus",
     "inspect.beacon_radius": "Beacon Radius",
+    "inspect.recipe_bonus": "Per Recipe Bonus",
+    "inspect.recipes_collected": "Recipes Completed",
 
     // ── Perk preview (getGoldPerkPreview) ────────────────────────────────────
     "preview.removed": "Removed",
@@ -771,6 +775,7 @@ const TRANSLATIONS = {
     "item.breach_afterburner.name": "Разрядный форсаж",
     "item.breach_chain_drill.name": "Цепной брешь-бур",
     "item.beacon_alchemy_drill.name": "Маячный реторт-бур",
+    "item.recipe_alchemy_drill.name": "Рецептурный реторт-бур",
 
     // ── Item names ───────────────────────────────────────────────────────────
     "item.heavy_drill.name": "Утяжелитель",
@@ -1380,6 +1385,7 @@ const TRANSLATIONS = {
     "desc.special.breach_afterburner": "Урон {flat} + {drillScale}% от силы бура + {weakSpotScale}% от статы урона по бреши{total}.\nПри попадании в брешь: форсаж на {sec} сек.",
     "desc.special.breach_chain_drill": "Урон {flat} + {explosionScale}% от силы взрыва + {weakSpotChanceScale}% от статы шанса бреши{total}.\nПри попадании в брешь: следующие {hits} ударов усилены и не создают брешь.",
     "desc.special.beacon_alchemy_drill": "Урон {baseFlat}{baseTotal}.\nЕсли копать в сторону маяка в радиусе {radius}: +{beaconFlat} + {beaconScale}% от силы бура{beaconTotal}.",
+    "desc.special.recipe_alchemy_drill": "Урон {baseFlat} + {perRecipe} за каждый собранный рецепт в этом ране ({recipes}){total}.",
 
     // ── Special item desc parts ──────────────────────────────────────────────
     "item.afterburner.hp_penalty": "−1 макс. HP (не ниже 1)",
@@ -1399,6 +1405,8 @@ const TRANSLATIONS = {
     "inspect.explosion_radius": "Радиус взрыва",
     "inspect.beacon_direction_bonus": "Бонус при движении к маяку",
     "inspect.beacon_radius": "Радиус маяка",
+    "inspect.recipe_bonus": "Бонус за рецепт",
+    "inspect.recipes_collected": "Собрано рецептов",
 
     // ── Perk preview ─────────────────────────────────────────────────────────
     "preview.removed": "Удалён",

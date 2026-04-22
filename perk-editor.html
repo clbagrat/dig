@@ -826,6 +826,13 @@ const SPECIAL_SCALE_ROWS = {
       { label: 'Условие бонуса', values: ['К маяку, R=10', 'К маяку, R=10', 'К маяку, R=10', 'К маяку, R=10'] },
     ];
   },
+  recipe_alchemy_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [5, 5, 5, 5] },
+      { label: 'Бонус за рецепт', values: [5, 7, 9, 11] },
+      { label: 'Итог урон (рецептов=3)', values: [20, 26, 32, 38] },
+    ];
+  },
 };
 
 function getScaleRows(item) {

@@ -197,6 +197,16 @@ export const ALL_EQUIPMENT = [
     tags: ["алхимия"],
     minRarity: 1,
   },
+  {
+    id: "recipe_alchemy_drill",
+    type: "equipment",
+    name: "Рецептурный реторт-бур",
+    icon: "🧪",
+    desc: "Урон 5 + 5/7/9/11 за каждый собранный рецепт в этом ранe.",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+  },
 
   // ── Контур ────────────────────────────────────────────────────────────────────
   {
@@ -1823,6 +1833,18 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       beaconScale: formatDescriptionNumber(beaconScale),
       beaconTotal,
       radius: "10",
+    });
+  },
+  recipe_alchemy_drill(rarity, stats = null) {
+    const baseFlat = 5;
+    const perRecipe = getEffectValue({ effectByRarity: [0, 5, 7, 9, 11] }, rarity);
+    const recipeCount = Math.max(0, Math.round(stats?.recipesCompletedThisRun || 0));
+    const total = ` [${formatDescriptionNumber(baseFlat + perRecipe * recipeCount)}]`;
+    return t("desc.special.recipe_alchemy_drill", {
+      baseFlat: formatDescriptionNumber(baseFlat),
+      perRecipe: formatDescriptionNumber(perRecipe),
+      recipes: formatDescriptionNumber(recipeCount),
+      total,
     });
   },
 };
