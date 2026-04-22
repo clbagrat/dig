@@ -816,6 +816,16 @@ const SPECIAL_SCALE_ROWS = {
       { label: 'Радиус взрыва', values: [1.5, 1.5, 1.5, 1.5] },
     ];
   },
+  beacon_alchemy_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [12, 12, 12, 12] },
+      { label: 'Итог базовый', values: [12, 12, 12, 12] },
+      { label: 'Бонус к маяку (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Бонус к маяку: скейл от drillPower', values: ['15%', '20%', '25%', '30%'] },
+      { label: 'Итог бонус к маяку (drill=10)', values: [21.5, 22, 22.5, 23] },
+      { label: 'Условие бонуса', values: ['К маяку, R=10', 'К маяку, R=10', 'К маяку, R=10', 'К маяку, R=10'] },
+    ];
+  },
 };
 
 function getScaleRows(item) {

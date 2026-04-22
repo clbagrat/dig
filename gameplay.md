@@ -318,6 +318,7 @@ Current available shop content includes:
 - baseline stat items for core build directions such as HP, fuel, heat, contour size, weak spots, explosion scaling, and per-level growth
 - tradeoff items where one stat rises while another falls, mostly concentrated in `Базовое`
 - equipment such as `Просто дрель`, `Разменный бур`, `Осколочный бур`, and `Кирка счастливчика`, which remain part of the early shop pool
+- alchemy equipment `Маячный реторт-бур`: `12` base damage; when mining toward a beacon and moving closer to it within radius `10`, adds `20 + 15/20/25/30% drillPower`
 - a new low-fuel damage stat that can appear on shop items and scales drill damage as the tank empties
 
 ## Overflow / Remote Bomb Rules
@@ -362,6 +363,13 @@ The recipe is generated from crystals that exist on the current depth level.
 Picking up a wrong crystal no longer resets the recipe; instead, the drill is stunned for `1` second.
 
 `Радарный модуль` marks the nearest crystal of each color on the radar ring.
+
+`Alchemy & Navigation` now also includes crystal-color trigger items:
+- red crystal pickup: `+1 drillPower`
+- yellow crystal pickup: `+1 explosionPower`
+- green crystal pickup: heal `+5 HP`
+- light crystal pickup: hero radar for `1 sec`
+- blue crystal pickup: `+1% strikeSpeed`
 
 ## Block Visuals
 

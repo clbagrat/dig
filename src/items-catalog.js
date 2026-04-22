@@ -187,6 +187,16 @@ export const ALL_EQUIPMENT = [
       { stat: "breachChainHitsOnTrigger", effectByRarity: [null, 1, 2, 3, 4] },
     ],
   },
+  {
+    id: "beacon_alchemy_drill",
+    type: "equipment",
+    name: "Маячный реторт-бур",
+    icon: "⚗️",
+    desc: "Урон 12. При копке в сторону маяка в радиусе 10: дополнительно 20 + 15/20/25/30% от drillPower.",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+  },
 
   // ── Контур ────────────────────────────────────────────────────────────────────
   {
@@ -1080,16 +1090,15 @@ export const ALL_ITEMS = [
   {
     id: "crystal_detector",
     type: "item",
-    name: "Детектор кристаллов",
+    name: "Кристальный компас",
     icon: "💎",
-    desc: "Кольцевые подсказки на ближайшие кристаллы. +1 обзор. −2 удача.",
+    desc: "+1/+2/+3/+4 обзора. −2/−3/−4/−6 удачи.",
     category: "алхимия",
     tags: ["алхимия"],
     minRarity: 1,
     unique: true,
     maxRarity: 2,
     effect: [
-      { stat: "radarCrystalModule", value: 1 },
       { stat: "visionRadius",       effectByRarity: [null, 1, 2, 3, 4] },
       { stat: "luck",               effectByRarity: [null, -2, -3, -4, -6] },
     ],
@@ -1267,6 +1276,20 @@ export const ALL_ITEMS = [
     ],
   },
   {
+    id: "gold_gambler",
+    type: "item",
+    name: "Золотой игрок",
+    icon: "🎰",
+    desc: "+2/3/5/8 удачи. −5/8/12/18% к бонусу золота.",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: [
+      { stat: "luck", effectByRarity: [null, 2, 3, 5, 8] },
+      { stat: "goldBonus", effectByRarity: [null, -0.05, -0.08, -0.12, -0.18] },
+    ],
+  },
+  {
     id: "insurance",
     type: "item",
     name: "Страховка",
@@ -1423,6 +1446,61 @@ export const ALL_ITEMS = [
     ],
   },
   {
+    id: "crystal_red_core",
+    type: "item",
+    name: "Красное ядро",
+    icon: "🔴",
+    desc: "При подборе красного кристалла: +1/2/3/4 силы бура (по редкости).",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: { stat: "crystalRedDrillGain", effectByRarity: [null, 1, 2, 3, 4] },
+  },
+  {
+    id: "crystal_yellow_charge",
+    type: "item",
+    name: "Жёлтый заряд",
+    icon: "🟡",
+    desc: "При подборе жёлтого кристалла: +1/2/3/4 силы взрыва (по редкости).",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: { stat: "crystalYellowExplosionGain", effectByRarity: [null, 1, 2, 3, 4] },
+  },
+  {
+    id: "crystal_light_radar",
+    type: "item",
+    name: "Световой радар",
+    icon: "⚪",
+    desc: "При подборе светлого кристалла: радар кристаллов на 1/2/3/4 сек (по редкости).",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: { stat: "crystalLightRadarSeconds", effectByRarity: [null, 1, 2, 3, 4] },
+  },
+  {
+    id: "crystal_green_mender",
+    type: "item",
+    name: "Зелёный регенератор",
+    icon: "🟢",
+    desc: "При подборе зелёного кристалла: лечит на 10/15/20/25 HP (по редкости).",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: { stat: "crystalGreenHealGain", effectByRarity: [null, 10, 15, 20, 25] },
+  },
+  {
+    id: "crystal_blue_rotor",
+    type: "item",
+    name: "Синий ротор",
+    icon: "🔵",
+    desc: "При подборе синего кристалла: +1/2/3/4% скорости бура (по редкости).",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: { stat: "crystalBlueSpeedGain", effectByRarity: [null, 1, 2, 3, 4] },
+  },
+  {
     id: "level_catalyst",
     type: "item",
     name: "Катализатор уровня",
@@ -1555,6 +1633,11 @@ const SIMPLE_STAT_DESCRIPTORS = {
   loopLengthDamageBonus: value => t("desc.loopLengthDamageBonus", { val: formatSignedPercent(value) }),
   loopSpawnBonusChance: value => t("desc.loopSpawnBonusChance", { val: formatUnsignedPercent(value, 100) }),
   crystalGoldGain: value => t("desc.crystalGoldGain", { val: formatSignedDescriptionNumber(value) }),
+  crystalRedDrillGain: value => t("desc.crystalRedDrillGain", { val: formatSignedDescriptionNumber(value) }),
+  crystalYellowExplosionGain: value => t("desc.crystalYellowExplosionGain", { val: formatSignedDescriptionNumber(value) }),
+  crystalLightRadarSeconds: value => t("desc.crystalLightRadarSeconds", { val: formatDescriptionNumber(value) }),
+  crystalGreenHealGain: value => t("desc.crystalGreenHealGain", { val: formatSignedDescriptionNumber(value) }),
+  crystalBlueSpeedGain: value => t("desc.crystalBlueSpeedGain", { val: formatSignedPercent(value) }),
   crystalXpGain: value => t("desc.crystalXpGain", { val: formatSignedDescriptionNumber(value) }),
   adrenalineLevel: value => t("desc.adrenalineLevel", { val: value }),
   insuranceLevel: value => t("desc.insuranceLevel", { pct: [0, 30, 50, 70, 90][Math.min(4, Math.max(0, value))] || 0 }),
@@ -1722,6 +1805,24 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       weakSpotChanceScale: formatDescriptionNumber(weakSpotChanceScale),
       total: totalText,
       hits: formatDescriptionNumber(charges),
+    });
+  },
+  beacon_alchemy_drill(rarity, stats = null) {
+    const baseFlat = 12;
+    const beaconFlat = 20;
+    const beaconScale = getEffectValue({ effectByRarity: [0, 15, 20, 25, 30] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const baseTotal = ` [${formatDescriptionNumber(baseFlat)}]`;
+    const beaconTotal = hasDrillPower
+      ? ` [${formatDescriptionNumber(beaconFlat + stats.drillPower * (beaconScale / 100))}]`
+      : "";
+    return t("desc.special.beacon_alchemy_drill", {
+      baseFlat: formatDescriptionNumber(baseFlat),
+      baseTotal,
+      beaconFlat: formatDescriptionNumber(beaconFlat),
+      beaconScale: formatDescriptionNumber(beaconScale),
+      beaconTotal,
+      radius: "10",
     });
   },
 };

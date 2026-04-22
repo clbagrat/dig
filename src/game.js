@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, getEquippedParts, getPurchasedItems, replaceOneBaseOfferWithSpecial, setShopRarityGuarantees, showGoodTooltip, hideGoodTooltip, showStatTooltipForStat, hideStatTooltip } from "./shop.js?v=45";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, grantGood, getEquippedParts, getPurchasedItems, replaceOneBaseOfferWithSpecial, setShopRarityGuarantees, showGoodTooltip, hideGoodTooltip, showStatTooltipForStat, hideStatTooltip } from "./shop.js?v=46";
 import { t, setLocale, getLocale } from "./i18n.js";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, ALL_EQUIPMENT, ALL_ITEMS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
@@ -97,6 +97,11 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   contourResMultiplier:      { key: "stat.contourResMultiplier",      mode: "percent" },
   cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
   crystalGoldGain:           { key: "stat.crystalGoldGain",           mode: "integer" },
+  crystalRedDrillGain:       { key: "stat.crystalRedDrillGain",       mode: "fixed1" },
+  crystalYellowExplosionGain:{ key: "stat.crystalYellowExplosionGain",mode: "fixed1" },
+  crystalLightRadarSeconds:  { key: "stat.crystalLightRadarSeconds",  mode: "fixed1" },
+  crystalGreenHealGain:      { key: "stat.crystalGreenHealGain",      mode: "hp" },
+  crystalBlueSpeedGain:      { key: "stat.crystalBlueSpeedGain",      mode: "rawpercent" },
   crystalXpGain:             { key: "stat.crystalXpGain",             mode: "integer" },
   damageBonus:               { key: "stat.damageBonus",               mode: "percent" },
   drillPower:                { key: "stat.drillPower",                mode: "fixed1" },
@@ -162,6 +167,7 @@ const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "fragile_drill",
   "lucky_pickaxe",
   "shard_drill",
+  "beacon_alchemy_drill",
 ]);
 
 const DEBUG_CORE_STATS = [
@@ -454,6 +460,11 @@ const CRYSTAL_TYPES = [
   { get name() { return t("crystal.green"); },  color: "#73e58f", glow: "rgba(115,229,143,0.22)" },
   { get name() { return t("crystal.blue"); },   color: "#72b7ff", glow: "rgba(114,183,255,0.22)" },
 ];
+const CRYSTAL_RED = 1;
+const CRYSTAL_YELLOW = 2;
+const CRYSTAL_LIGHT = 3;
+const CRYSTAL_GREEN = 4;
+const CRYSTAL_BLUE = 5;
 const CRYSTAL_REWARD_TILE_PERKS = [0, 3, 1, 2, 6, 5];
 const TILES_PER_CRYSTAL_TILE = 22;
 const CRYSTAL_MIN_DISTANCE = 3;
@@ -512,6 +523,11 @@ const state = {
   levelCatalystLevel: 0,
   crystalGoldGain: 0,
   crystalXpGain: 0,
+  crystalRedDrillGain: 0,
+  crystalYellowExplosionGain: 0,
+  crystalLightRadarSeconds: 0,
+  crystalGreenHealGain: 0,
+  crystalBlueSpeedGain: 0,
   depth: 0,
   gold: 0,
   unsafeGold: 0,
@@ -597,6 +613,7 @@ const state = {
   keyBumpTime: 0,
   keyBumpDir: null,
   pickupRadarTimer: 0,     // seconds remaining for pickup radar pulse
+  crystalLightRadarTimer: 0, // seconds remaining for temporary crystal radar after light crystal
   pickupRadarKind: null,   // "artifact" or "key"
   pickupRadarTargetX: 0,
   pickupRadarTargetY: 0,
@@ -2428,6 +2445,11 @@ function setupField(seedOverride = null) {
   state.levelCatalystLevel = 0;
   state.crystalGoldGain = 0;
   state.crystalXpGain = 0;
+  state.crystalRedDrillGain = 0;
+  state.crystalYellowExplosionGain = 0;
+  state.crystalLightRadarSeconds = 0;
+  state.crystalGreenHealGain = 0;
+  state.crystalBlueSpeedGain = 0;
   state.gold = 0;
   state.unsafeGold = 0;
   state.goldBonusRemainder = 0;
@@ -2479,6 +2501,7 @@ function setupField(seedOverride = null) {
   state.signalPrevY = START_Y;
   state.signalDirX = 0;
   state.signalDirY = -1;
+  state.crystalLightRadarTimer = 0;
   state.collapseWarnings.length = 0;
   state.pendingCollapseCount = 0;
   state.collapseBudget = COLLAPSE_BUDGET_INITIAL;
@@ -3387,6 +3410,21 @@ function collectCrystalTile(x, y, index, crystalType) {
   }
   if (state.crystalXpGain > 0) {
     gainExperience(scaleExperienceGain(state.crystalXpGain));
+  }
+  if (crystalType === CRYSTAL_RED && state.crystalRedDrillGain > 0) {
+    state.drillPower += state.crystalRedDrillGain;
+  }
+  if (crystalType === CRYSTAL_YELLOW && state.crystalYellowExplosionGain > 0) {
+    state.explosionPower += state.crystalYellowExplosionGain;
+  }
+  if (crystalType === CRYSTAL_GREEN && state.crystalGreenHealGain > 0) {
+    healPlayer(state.crystalGreenHealGain);
+  }
+  if (crystalType === CRYSTAL_BLUE && state.crystalBlueSpeedGain > 0) {
+    state.strikeSpeed += state.crystalBlueSpeedGain;
+  }
+  if (crystalType === CRYSTAL_LIGHT && state.crystalLightRadarSeconds > 0) {
+    state.crystalLightRadarTimer = Math.max(state.crystalLightRadarTimer, state.crystalLightRadarSeconds);
   }
   if (state.crystalRecipe.length === 0) {
     playSound("crystal_pickup");
@@ -4417,6 +4455,19 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: t("inspect.breach_chance"), value: `+${Math.round(weakSpotChance * 100)}%` },
         { label: t("inspect.breach_explosion"), value: `+${explosionDamage} +${explosionScale}% [${formatPerkNumber(totalExplosion)}]` },
         { label: t("inspect.explosion_radius"), value: formatPerkNumber(SHARD_DRILL_BLAST_RADIUS, 1) },
+      ];
+    }
+    case "beacon_alchemy_drill": {
+      const baseFlat = 12;
+      const beaconFlat = 20;
+      const beaconScale = [0, 15, 20, 25, 30][rarity] || 0;
+      const baseTotal = baseFlat;
+      const beaconTotal = beaconFlat + state.drillPower * (beaconScale / 100);
+      return [
+        { label: t("inspect.flat_damage"), value: `+${baseFlat}` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(baseTotal) },
+        { label: t("inspect.beacon_direction_bonus"), value: `+${beaconFlat} +${beaconScale}% [${formatPerkNumber(beaconTotal)}]` },
+        { label: t("inspect.beacon_radius"), value: "10" },
       ];
     }
     default:
@@ -5561,6 +5612,7 @@ function isPointInsideRect(x, y, rect) {
 function buildDebugPerkButtons() {
   const tileRoot = document.getElementById("debugTilePerks");
   const instrRoot = document.getElementById("debugInstruments");
+  const goodsRoot = document.getElementById("debugGoods");
   const statsRoot = document.getElementById("debugCoreStats");
   if (!tileRoot) {
     return;
@@ -5586,6 +5638,64 @@ function buildDebugPerkButtons() {
         buildDebugPerkButtons();
       });
       instrRoot.appendChild(button);
+    }
+  }
+
+  if (goodsRoot) {
+    goodsRoot.innerHTML = "";
+    const debugGoods = ALL_GOODS
+      .filter((good) => good.type === "item" || good.type === "equipment")
+      .slice();
+
+    const byName = (a, b) => {
+      const nameCmp = (a.name || "").localeCompare(b.name || "", "ru", { sensitivity: "base" });
+      return nameCmp !== 0 ? nameCmp : a.id.localeCompare(b.id);
+    };
+    const categoryNameById = new Map(CATEGORIES.map((cat) => [cat.id, `${cat.icon} ${cat.name}`]));
+    const grouped = new Map();
+    for (const good of debugGoods) {
+      const key = good.category || "uncategorized";
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(good);
+    }
+
+    const orderedCategoryIds = [
+      ...CATEGORIES.map((cat) => cat.id),
+      ...Array.from(grouped.keys()).filter((id) => !CATEGORIES.some((cat) => cat.id === id)).sort(),
+    ];
+
+    for (const categoryId of orderedCategoryIds) {
+      const goodsInCategory = grouped.get(categoryId);
+      if (!goodsInCategory || goodsInCategory.length === 0) continue;
+
+      goodsInCategory.sort(byName);
+      const heading = document.createElement("div");
+      heading.className = "debug-perk-menu__subhead";
+      heading.textContent = categoryNameById.get(categoryId) || categoryId;
+      goodsRoot.appendChild(heading);
+
+      for (const good of goodsInCategory) {
+        const minRarity = good.minRarity ?? RARITY.COMMON;
+        const isEquipment = good.type === "equipment";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "debug-perk-menu__button";
+        button.innerHTML = `<span class="debug-perk-menu__button-name">${good.icon || "?"} ${good.name}</span><span class="debug-perk-menu__button-meta">${isEquipment ? t("ui.equipment") : t("ui.item")} · ${RARITY_NAMES[minRarity]}</span>`;
+        button.addEventListener("click", () => {
+          const result = grantGood(good, minRarity);
+          if (result.ok) {
+            showPerkToast(`${good.icon || "?"} ${good.name} (${RARITY_NAMES[result.rarity]})`);
+            state.syncMenuSummary?.();
+            return;
+          }
+          if (result.reason === "no-slot") {
+            showPerkToast("Нет свободных слотов экипировки");
+            return;
+          }
+          showPerkToast("Не удалось добавить");
+        });
+        goodsRoot.appendChild(button);
+      }
     }
   }
 
@@ -6438,6 +6548,9 @@ function update(dt) {
 
   if (state.pickupRadarTimer > 0) {
     state.pickupRadarTimer = Math.max(0, state.pickupRadarTimer - dt);
+  }
+  if (state.crystalLightRadarTimer > 0) {
+    state.crystalLightRadarTimer = Math.max(0, state.crystalLightRadarTimer - dt);
   }
 
   pickupExperienceNearPlayer();
@@ -7629,7 +7742,48 @@ function getEffectiveWeakSpotChance(hasWeakSpotOnField = false) {
   return clamp(chance, 0, 1);
 }
 
-function getStrikeDamage() {
+function isMiningTowardNearbyBeacon(targetX, targetY, radius = 10) {
+  if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) {
+    return false;
+  }
+  const radiusSq = radius * radius;
+  const fromX = state.drill.x + 0.5;
+  const fromY = state.drill.y + 0.5;
+  const toX = targetX + 0.5;
+  const toY = targetY + 0.5;
+  for (const beacon of state.beacons) {
+    const bx = beacon.x + 0.5;
+    const by = beacon.y + 0.5;
+    const fromDx = bx - fromX;
+    const fromDy = by - fromY;
+    const fromDistSq = fromDx * fromDx + fromDy * fromDy;
+    if (fromDistSq > radiusSq) continue;
+    const toDx = bx - toX;
+    const toDy = by - toY;
+    const toDistSq = toDx * toDx + toDy * toDy;
+    if (toDistSq < fromDistSq) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getBeaconAlchemyDrillDamageBonus(targetX, targetY) {
+  const towardBeacon = isMiningTowardNearbyBeacon(targetX, targetY, 10);
+  let total = 0;
+  for (const tier of getEquipmentTiers("beacon_alchemy_drill")) {
+    const baseFlat = 12;
+    total += baseFlat;
+    if (towardBeacon) {
+      const beaconFlat = 20;
+      const beaconScale = [0, 0.15, 0.20, 0.25, 0.30][tier] || 0;
+      total += beaconFlat + state.drillPower * beaconScale;
+    }
+  }
+  return total;
+}
+
+function getStrikeDamage(targetX = null, targetY = null) {
   const contourCap = [0, 0.15, 0.3, 0.5, 1][state.contourLengthDamageLevel] || 0;
   const contourLength = Math.max(0, state.pathTiles.length - 1);
   const contourBoost = 1 + Math.min(contourCap, contourLength * 0.01) + contourLength * (state.loopLengthDamageBonus || 0) * 0.01;
@@ -7646,18 +7800,15 @@ function getStrikeDamage() {
     getBreachMissileDamageBonus() +
     getBreachAfterburnerDamageBonus() +
     getBreachChainDrillDamageBonus() +
-    getThermoDrillDamageBonus();
+    getThermoDrillDamageBonus() +
+    getBeaconAlchemyDrillDamageBonus(targetX, targetY);
   return damage * (1 + state.damageBonus / 100) * lowFuelDamageBoost;
 }
 
 function getEquipmentTiers(effectId) {
-  return getEquipmentLevels(effectId).map((rarityMult) => {
-    if (rarityMult >= 3) return 4;
-    if (rarityMult >= 2) return 3;
-    if (rarityMult >= 1.5) return 2;
-    if (rarityMult >= 1) return 1;
-    return 0;
-  }).filter((tier) => tier > 0);
+  return getEquippedParts()
+    .filter((part) => part.id === effectId)
+    .map((part) => clamp(Math.round(part.rarity || RARITY.COMMON), RARITY.COMMON, RARITY.LEGENDARY));
 }
 
 function sumEquipmentTierValues(effectId, values) {
@@ -9682,7 +9833,7 @@ function updateDrill(dt) {
   const hadWeakSpotOnField = hasActiveWeakSpot();
   state.lastStrikeHitWeakSpot = false;
   const empoweredStrike = state.breachChainEmpoweredHits > 0;
-  let strikeDamage = getStrikeDamage();
+  let strikeDamage = getStrikeDamage(targetX, targetY);
   if (empoweredStrike) {
     strikeDamage *= Math.max(1, state.weakSpotMult || 1);
   }
@@ -13456,7 +13607,9 @@ function renderDrill(camera) {
 }
 
 function renderSignalStatus(camera) {
-  if (state.signalMovesLeft <= 0) {
+  const hasSignal = state.signalMovesLeft > 0;
+  const hasCrystalRadar = state.radarCrystalModule || state.crystalLightRadarTimer > 0;
+  if (!hasSignal && !hasCrystalRadar) {
     return;
   }
 
@@ -13465,13 +13618,15 @@ function renderSignalStatus(camera) {
   const y = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
   const radius = 48;
   const barWidth = 44;
-  const angle = Math.atan2(state.signalDirY, state.signalDirX);
+  const angle = hasSignal ? Math.atan2(state.signalDirY, state.signalDirX) : 0;
   const dotX = x + Math.cos(angle) * radius;
   const dotY = y + Math.sin(angle) * radius;
   const pulse = 0.55 + (Math.sin((state.lastTs || 0) * 0.012) * 0.5 + 0.5) * 0.45;
 
   ctx.save();
-  const barRatio = state.signalMovesMax > 0 ? clamp(state.signalMovesLeft / state.signalMovesMax, 0, 1) : 0;
+  const barRatio = hasSignal && state.signalMovesMax > 0
+    ? clamp(state.signalMovesLeft / state.signalMovesMax, 0, 1)
+    : 0;
   ctx.strokeStyle = "rgba(242, 237, 226, 0.54)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -13489,25 +13644,28 @@ function renderSignalStatus(camera) {
   ctx.arc(x, y, 2.4, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(242, 237, 226, 0.22)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(dotX, dotY);
-  ctx.stroke();
+  if (hasSignal) {
+    ctx.strokeStyle = "rgba(242, 237, 226, 0.22)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(dotX, dotY);
+    ctx.stroke();
 
-  ctx.fillStyle = `rgba(255, 250, 241, ${0.18 + pulse * 0.18})`;
-  ctx.beginPath();
-  ctx.arc(dotX, dotY, 5.8 + pulse * 2.6, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = `rgba(255, 250, 241, ${0.18 + pulse * 0.18})`;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 5.8 + pulse * 2.6, 0, Math.PI * 2);
+    ctx.fill();
 
-  ctx.fillStyle = "#fffaf1";
-  ctx.beginPath();
-  ctx.arc(dotX, dotY, 3.2 + pulse * 1.2, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = "#fffaf1";
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 3.2 + pulse * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
-  if (state.radarCrystalModule) {
-    const crystalTargets = getNearestRadarCrystals();
+  if (hasCrystalRadar) {
+    const recipeOnly = state.crystalLightRadarTimer > 0 && !state.radarCrystalModule;
+    const crystalTargets = getNearestRadarCrystals(recipeOnly);
     for (let i = 0; i < crystalTargets.length; i += 1) {
       const crystal = crystalTargets[i];
       const crystalAngle = Math.atan2(crystal.dirY, crystal.dirX);
@@ -13529,20 +13687,47 @@ function renderSignalStatus(camera) {
     }
   }
 
-  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
-  buildRoundedRectPath(ctx, x - barWidth * 0.5, y + radius + 12, barWidth, 4, 3);
-  ctx.fill();
-  if (barRatio > 0) {
-    ctx.fillStyle = "#f2ede2";
-    buildRoundedRectPath(ctx, x - barWidth * 0.5, y + radius + 12, barWidth * barRatio, 4, 3);
+  if (hasSignal) {
+    ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+    buildRoundedRectPath(ctx, x - barWidth * 0.5, y + radius + 12, barWidth, 4, 3);
     ctx.fill();
+    if (barRatio > 0) {
+      ctx.fillStyle = "#f2ede2";
+      buildRoundedRectPath(ctx, x - barWidth * 0.5, y + radius + 12, barWidth * barRatio, 4, 3);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
 
-function getNearestRadarCrystals() {
+function getNeededRecipeCrystalTypes() {
+  if (!Array.isArray(state.crystalRecipe) || state.crystalRecipe.length === 0) {
+    return new Set();
+  }
+  const required = new Map();
+  for (let i = 0; i < state.crystalRecipe.length; i += 1) {
+    const type = state.crystalRecipe[i];
+    required.set(type, (required.get(type) || 0) + 1);
+  }
+  const needed = new Set();
+  for (const [type, count] of required.entries()) {
+    if ((state.crystalCollected[type] || 0) < count) {
+      needed.add(type);
+    }
+  }
+  return needed;
+}
+
+function getNearestRadarCrystals(recipeOnly = false) {
   const nearest = [];
+  const neededRecipeTypes = recipeOnly ? getNeededRecipeCrystalTypes() : null;
+  if (recipeOnly && neededRecipeTypes.size === 0) {
+    return nearest;
+  }
   for (let crystalType = 1; crystalType < CRYSTAL_TYPES.length; crystalType += 1) {
+    if (neededRecipeTypes && !neededRecipeTypes.has(crystalType)) {
+      continue;
+    }
     let best = null;
     for (let y = 1; y < GRID_H - 1; y += 1) {
       for (let x = 1; x < GRID_W - 1; x += 1) {
