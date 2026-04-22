@@ -51,6 +51,7 @@ const TRANSLATIONS = {
     "item.breach_chain_drill.name": "Breach Chain Drill",
     "item.beacon_alchemy_drill.name": "Beacon Retort Drill",
     "item.recipe_alchemy_drill.name": "Formula Retort Drill",
+    "item.contour_overload_drill.name": "Contour Overload Drill",
     "item.unstable_reagent.name": "Unstable Reagent",
     "item.recipe_stabilizer.name": "Recipe Stabilizer",
 
@@ -672,6 +673,7 @@ const TRANSLATIONS = {
     "desc.special.breach_chain_drill": "Damage {flat} + {explosionScale}% of explosion power + {weakSpotChanceScale}% of breach chance stat{total}.\nOn breach hit: next {hits} strikes are empowered and cannot spawn breach.",
     "desc.special.beacon_alchemy_drill": "Damage {baseFlat}{baseTotal}.\nIf mining toward a beacon within radius {radius}: +{beaconFlat} + {beaconScale}% of drill power{beaconTotal}.",
     "desc.special.recipe_alchemy_drill": "Damage {baseFlat} + {perRecipe} per recipe completed this run ({recipes}){total}.",
+    "desc.special.contour_overload_drill": "Damage {baseFlat}{baseTotal}.\nWhen contour exceeds max length: each segment explodes for {overflowFlat} + {overflowScale}% of explosion power{overflowTotal}, radius {radius}. Damage depends on how hard you dig.",
 
     // ── Special item desc parts ──────────────────────────────────────────────
     "item.afterburner.hp_penalty": "−1 max HP (min 1)",
@@ -693,6 +695,9 @@ const TRANSLATIONS = {
     "inspect.beacon_radius": "Beacon Radius",
     "inspect.recipe_bonus": "Per Recipe Bonus",
     "inspect.recipes_collected": "Recipes Completed",
+    "inspect.contour_overflow_explosion": "Contour Overflow Explosion",
+    "inspect.unique_hit_rule": "Hit Rule",
+    "inspect.unique_hit_rule_value": "One hit per block",
 
     // ── Perk preview (getGoldPerkPreview) ────────────────────────────────────
     "preview.removed": "Removed",
@@ -787,6 +792,7 @@ const TRANSLATIONS = {
     "item.breach_chain_drill.name": "Цепной брешь-бур",
     "item.beacon_alchemy_drill.name": "Маячный реторт-бур",
     "item.recipe_alchemy_drill.name": "Рецептурный реторт-бур",
+    "item.contour_overload_drill.name": "Контурный перегруз-бур",
     "item.unstable_reagent.name": "Нестабильный реагент",
     "item.recipe_stabilizer.name": "Рецептурный стабилизатор",
 
@@ -1408,6 +1414,7 @@ const TRANSLATIONS = {
     "desc.special.breach_chain_drill": "Урон {flat} + {explosionScale}% от силы взрыва + {weakSpotChanceScale}% от статы шанса бреши{total}.\nПри попадании в брешь: следующие {hits} ударов усилены и не создают брешь.",
     "desc.special.beacon_alchemy_drill": "Урон {baseFlat}{baseTotal}.\nЕсли копать в сторону маяка в радиусе {radius}: +{beaconFlat} + {beaconScale}% от силы бура{beaconTotal}.",
     "desc.special.recipe_alchemy_drill": "Урон {baseFlat} + {perRecipe} за каждый собранный рецепт в этом ране ({recipes}){total}.",
+    "desc.special.contour_overload_drill": "Урон {baseFlat}{baseTotal}.\nПри превышении длины контура: взрыв от каждого сегмента на {overflowFlat} + {overflowScale}% от силы взрыва{overflowTotal}, радиус {radius}. Один блок может получить урон только один раз.",
 
     // ── Special item desc parts ──────────────────────────────────────────────
     "item.afterburner.hp_penalty": "−1 макс. HP (не ниже 1)",
@@ -1429,6 +1436,9 @@ const TRANSLATIONS = {
     "inspect.beacon_radius": "Радиус маяка",
     "inspect.recipe_bonus": "Бонус за рецепт",
     "inspect.recipes_collected": "Собрано рецептов",
+    "inspect.contour_overflow_explosion": "Взрыв переполнения контура",
+    "inspect.unique_hit_rule": "Правило попадания",
+    "inspect.unique_hit_rule_value": "Не более одного удара по блоку",
 
     // ── Perk preview ─────────────────────────────────────────────────────────
     "preview.removed": "Удалён",

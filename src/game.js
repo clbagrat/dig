@@ -171,6 +171,7 @@ const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "shard_drill",
   "beacon_alchemy_drill",
   "recipe_alchemy_drill",
+  "contour_overload_drill",
 ]);
 
 const DEBUG_CORE_STATS = [
@@ -720,6 +721,7 @@ const state = {
   pathTailGhost: null,
   contourReturnFuelLevel: 0,
   maxContour: 12,
+  contourOverloadBrokenBlocks: 0,
   heatOverloadRocketLevel: 0,
   tankBoostLevel: 0,
   levelUpFlash: 0,
@@ -2596,6 +2598,7 @@ function setupField(seedOverride = null) {
   state.pathTailGhost = null;
   state.contourReturnFuelLevel = 0;
   state.maxContour = 12;
+  state.contourOverloadBrokenBlocks = 0;
   state.heatOverloadRocketLevel = 0;
   state.tankBoostLevel = 0;
   state.levelUpFlash = 0;
@@ -4297,6 +4300,9 @@ function rebuildPathIndex() {
     const tile = state.pathTiles[i];
     state.pathIndexByCell[cellIndex(tile.x, tile.y)] = i;
   }
+  if (state.pathTiles.length <= 1) {
+    state.contourOverloadBrokenBlocks = 0;
+  }
 }
 
 function updateMovementAnimations(dt) {
@@ -4536,6 +4542,19 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: t("inspect.recipe_bonus"), value: `+${perRecipe}` },
         { label: t("inspect.recipes_collected"), value: `${recipes}` },
         { label: t("inspect.current_damage"), value: formatPerkNumber(total) },
+      ];
+    }
+    case "contour_overload_drill": {
+      const baseFlat = [0, 15, 20, 25, 30][rarity] || 0;
+      const overflowFlat = [0, 30, 40, 50, 60][rarity] || 0;
+      const overflowScale = [0, 20, 30, 40, 50][rarity] || 0;
+      const overflowTotal = overflowFlat + state.explosionPower * (overflowScale / 100);
+      return [
+        { label: t("inspect.flat_damage"), value: `+${baseFlat}` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(baseFlat) },
+        { label: t("inspect.contour_overflow_explosion"), value: `+${overflowFlat} +${overflowScale}% [${formatPerkNumber(overflowTotal)}]` },
+        { label: t("inspect.explosion_radius"), value: "1" },
+        { label: t("inspect.unique_hit_rule"), value: t("inspect.unique_hit_rule_value") },
       ];
     }
     default:
@@ -6957,6 +6976,11 @@ function updateChainExplosions(dt) {
       explodeAt(task.x, task.y, task.damage, task.radius, { cause: "explosion", skipRadiusBonus: true });
     } else if (task.kind === "gas") {
       removeGasCell(task.x, task.y);
+      const gasBlastRadius = getScaledExplosionRadius(2, { skipRadiusBonus: true });
+      const distToHero = Math.hypot(task.x - state.drill.x, task.y - state.drill.y);
+      if (distToHero <= gasBlastRadius) {
+        applyHazardDamage(GAS_DAMAGE);
+      }
       explodeAt(task.x, task.y, EXPLOSION_BREAK_DAMAGE, 2, {
         cause: "explosion",
         skipRadiusBonus: true,
@@ -7871,7 +7895,8 @@ function getStrikeDamage(targetX = null, targetY = null) {
     getBreachChainDrillDamageBonus() +
     getThermoDrillDamageBonus() +
     getBeaconAlchemyDrillDamageBonus(targetX, targetY) +
-    getRecipeAlchemyDrillDamageBonus();
+    getRecipeAlchemyDrillDamageBonus() +
+    getContourOverloadDrillDamageBonus();
   return damage * (1 + state.damageBonus / 100) * lowFuelDamageBoost;
 }
 
@@ -7970,6 +7995,16 @@ function getRecipeAlchemyDrillDamageBonus() {
     total += flat + perRecipe * recipes;
   }
   return total;
+}
+
+function getContourOverloadDrillDamageBonus() {
+  return sumEquipmentTierValues("contour_overload_drill", [0, 15, 20, 25, 30]);
+}
+
+function getContourOverloadExplosionDamage() {
+  const flat = sumEquipmentTierValues("contour_overload_drill", [0, 30, 40, 50, 60]);
+  const scale = sumEquipmentTierValues("contour_overload_drill", [0, 20, 30, 40, 50]);
+  return flat + state.explosionPower * (scale / 100);
 }
 
 function getShardDrillDamageBonus() {
@@ -9207,6 +9242,7 @@ function breakCell(x, y, index, options = {}) {
   state.blocksBroken += 1;
   if (options.byDrill) {
     state.drillBrokenBlocks += 1;
+    state.contourOverloadBrokenBlocks = Math.max(0, state.contourOverloadBrokenBlocks || 0) + 1;
   }
   if (hazardType === HAZARD_TYPES.SPIKE && state.spikeOverdriveLevel > 0) {
     const durations = [0, 6, 9, 12];
@@ -10024,6 +10060,50 @@ function tryBeaconContourDeposit(x, y) {
   }
 }
 
+function triggerContourOverloadExplosion(pathTiles) {
+  const tiers = getEquipmentTiers("contour_overload_drill");
+  if (tiers.length === 0) return false;
+  if (!Array.isArray(pathTiles) || pathTiles.length === 0) return false;
+
+  const maxContour = Math.max(1, Math.round(state.maxContour || 1));
+  const brokenBlocks = Math.max(0, state.contourOverloadBrokenBlocks || 0);
+  const damageCoef = Math.min(brokenBlocks / maxContour, 1);
+  const damage = getContourOverloadExplosionDamage() * damageCoef;
+  if (damage <= 0) return false;
+  const radius = getScaledExplosionRadius(1);
+  const maxOffset = Math.ceil(radius);
+  const uniqueTargets = new Set();
+
+  playSound("explosion");
+  for (const segment of pathTiles) {
+    state.effects.push({
+      kind: "explosion",
+      x: segment.x,
+      y: segment.y,
+      radius,
+      time: EXPLOSION_EFFECT_DURATION,
+      duration: EXPLOSION_EFFECT_DURATION,
+      seed: (segment.x * 7219 + segment.y * 3571 + 10) % 1000,
+    });
+    for (let oy = -maxOffset; oy <= maxOffset; oy += 1) {
+      for (let ox = -maxOffset; ox <= maxOffset; ox += 1) {
+        if (Math.hypot(ox, oy) > radius) continue;
+        const tx = segment.x + ox;
+        const ty = segment.y + oy;
+        if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
+        uniqueTargets.add(cellIndex(tx, ty));
+      }
+    }
+  }
+
+  for (const index of uniqueTargets) {
+    const tx = index % GRID_W;
+    const ty = Math.floor(index / GRID_W);
+    damageCell(tx, ty, damage, { cause: "explosion" });
+  }
+  return true;
+}
+
 function extendPath(x, y, ignoreMaxLength = false) {
   const tail = state.pathTiles[state.pathTiles.length - 1];
   if (tail && tail.x === x && tail.y === y) {
@@ -10053,6 +10133,17 @@ function extendPath(x, y, ignoreMaxLength = false) {
   state.depth = Math.max(state.depth, Math.abs(y - START_Y));
   state.pathTiles.push({ x, y });
   if (!ignoreMaxLength && state.pathTiles.length > state.maxContour) {
+    const hasContourOverloadDrill = getEquipmentTiers("contour_overload_drill").length > 0;
+    const didExplode = hasContourOverloadDrill && triggerContourOverloadExplosion(state.pathTiles);
+    if (hasContourOverloadDrill || didExplode) {
+      state.pathTiles.length = 0;
+      state.pathTiles.push({ x, y });
+      state.pathTailGhost = null;
+      state.pathTailFade = 0;
+      rebuildPathIndex();
+      tryBeaconContourDeposit(x, y);
+      return;
+    }
     state.pathTailGhost = state.pathTiles[0];
     state.pathTiles.shift();
     state.pathTailFade = 1;
@@ -11763,6 +11854,10 @@ function renderMovingTiles(camera) {
 
 function renderPath(camera) {
   const ctx = state.ctx;
+  const hasContourOverloadDrill = getEquipmentTiers("contour_overload_drill").length > 0;
+  const contourAtMaxLength = hasContourOverloadDrill && state.pathTiles.length >= Math.max(1, Math.round(state.maxContour || 1));
+  const pathOuterColor = contourAtMaxLength ? "rgba(155, 30, 30, 0.82)" : "rgba(108, 62, 31, 0.65)";
+  const pathInnerColor = contourAtMaxLength ? "rgba(255, 120, 120, 0.72)" : "rgba(219, 171, 99, 0.52)";
   const liveTail =
     state.pathTiles.length > 0
       ? {
@@ -11811,7 +11906,7 @@ function renderPath(camera) {
   }
 
   // Main path
-  ctx.strokeStyle = "rgba(108, 62, 31, 0.65)";
+  ctx.strokeStyle = pathOuterColor;
   ctx.beginPath();
   for (let i = 0; i < renderPathLength; i += 1) {
     const tile = state.pathTiles[i];
@@ -11829,7 +11924,7 @@ function renderPath(camera) {
   ctx.stroke();
 
   ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(219, 171, 99, 0.52)";
+  ctx.strokeStyle = pathInnerColor;
   ctx.stroke();
 
   renderAutoClosePreview(camera);

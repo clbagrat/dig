@@ -863,6 +863,16 @@ const SPECIAL_SCALE_ROWS = {
       { label: 'Итог урон (рецептов=3)', values: [20, 26, 32, 38] },
     ];
   },
+  contour_overload_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [15, 20, 25, 30] },
+      { label: 'Взрыв переполнения (плоский)', values: [30, 40, 50, 60] },
+      { label: 'Скейл взрыва от explosionPower', values: ['20%', '30%', '40%', '50%'] },
+      { label: 'Итог взрыв (explosion=10)', values: [32, 43, 54, 65] },
+      { label: 'Радиус взрыва', values: [1, 1, 1, 1] },
+      { label: 'Правило попадания', values: ['Один удар по блоку', 'Один удар по блоку', 'Один удар по блоку', 'Один удар по блоку'] },
+    ];
+  },
 };
 
 function getScaleRows(item) {

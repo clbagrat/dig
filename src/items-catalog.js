@@ -207,6 +207,16 @@ export const ALL_EQUIPMENT = [
     tags: ["алхимия"],
     minRarity: 1,
   },
+  {
+    id: "contour_overload_drill",
+    type: "equipment",
+    name: "Контурный перегруз-бур",
+    icon: "🪢",
+    desc: "Урон 15/20/25/30. При превышении длины контура: взрыв от каждого сегмента 30/40/50/60 + 20/30/40/50% от explosionPower в радиусе 1.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+  },
 
   // ── Контур ────────────────────────────────────────────────────────────────────
   {
@@ -1889,6 +1899,24 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       perRecipe: formatDescriptionNumber(perRecipe),
       recipes: formatDescriptionNumber(recipeCount),
       total,
+    });
+  },
+  contour_overload_drill(rarity, stats = null) {
+    const baseFlat = getEffectValue({ effectByRarity: [0, 15, 20, 25, 30] }, rarity);
+    const overflowFlat = getEffectValue({ effectByRarity: [0, 30, 40, 50, 60] }, rarity);
+    const overflowScale = getEffectValue({ effectByRarity: [0, 20, 30, 40, 50] }, rarity);
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const baseTotal = ` [${formatDescriptionNumber(baseFlat)}]`;
+    const overflowTotal = hasExplosionPower
+      ? ` [${formatDescriptionNumber(overflowFlat + stats.explosionPower * (overflowScale / 100))}]`
+      : "";
+    return t("desc.special.contour_overload_drill", {
+      baseFlat: formatDescriptionNumber(baseFlat),
+      baseTotal,
+      overflowFlat: formatDescriptionNumber(overflowFlat),
+      overflowScale: formatDescriptionNumber(overflowScale),
+      overflowTotal,
+      radius: "1",
     });
   },
 };
