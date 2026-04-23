@@ -28,12 +28,12 @@ export const RARITY_EFFECT_MULT = {
 const CATEGORY_DEFS = [
   { id: "basic",        icon: "D",  inDevelopment: false },
   { id: "economy",      icon: "●",  inDevelopment: true },
-  { id: "maintenance",  icon: "💧", inDevelopment: true },
+  { id: "handwork",  icon: "💧", inDevelopment: true },
   { id: "heat",         icon: "🔥", inDevelopment: true },
   { id: "выживание",    icon: "❤️", inDevelopment: true },
   { id: "поиск_бреши",  icon: "🎯", inDevelopment: false },
   { id: "ракеты",       icon: "🚀", inDevelopment: true },
-  { id: "контур",       icon: "⚡", inDevelopment: true },
+  { id: "контур",       icon: "⚡", inDevelopment: false },
   { id: "алхимия",      icon: "⚗️", inDevelopment: false },
 ];
 
@@ -114,13 +114,13 @@ export const ALL_EQUIPMENT = [
     type: "equipment",
     name: "Осколочный бур",
     icon: "💥",
-    desc: "Урон 8. +4% шанс бреши. Попадание в брешь вызывает взрыв.",
+    desc: "Урон 8. +8/10/12/14% шанс бреши. Попадание в брешь вызывает взрыв.",
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
     effect: [
       { stat: "shardDrillLevel", effectByRarity: [null, 1, 2, 3, 4] },
-      { stat: "weakSpotChance", effectByRarity: [null, 0.04, 0.06, 0.08, 0.10] },
+      { stat: "weakSpotChance", effectByRarity: [null, 0.08, 0.10, 0.12, 0.14] },
     ],
   },
 
@@ -217,22 +217,16 @@ export const ALL_EQUIPMENT = [
     tags: ["контур"],
     minRarity: 1,
   },
-
-  // ── Контур ────────────────────────────────────────────────────────────────────
   {
-    id: "loop_pressure",
+    id: "contour_line_drill",
     type: "equipment",
-    name: "Контурное давление",
-    icon: "🔩",
-    desc: "Каждая клетка контура даёт +1% к урону бурения.",
+    name: "Контурный линейный бур",
+    icon: "📏",
+    desc: "Урон 10 + 10/20/30/40% от drillPower + 1/2/3/4 за длину контура.",
     category: "контур",
-    tags: ["контур", "урон"],
-    minRarity: 2,
-    effect: [
-      { stat: "loopLengthDamageBonus", effectByRarity: [null, null, 1, 2, 3] },
-    ],
+    tags: ["контур"],
+    minRarity: 1,
   },
-
   // ── Оглушение ─────────────────────────────────────────────────────────────────
   {
     id: "stun_detonator",
@@ -296,16 +290,26 @@ export const ALL_EQUIPMENT = [
 
 export const ALL_ITEMS = [
   {
+    id: "loop_pressure",
+    type: "item",
+    name: "Контурное давление",
+    icon: "🔩",
+    desc: "При замыкании контура: бафф 4/4.5/5/5.5 сек, +3/4/5/6 drillPower за каждый разрушенный контуром блок.",
+    category: "контур",
+    tags: ["контур", "урон"],
+    minRarity: 2,
+  },
+  {
     id: "heavy_drill",
     type: "item",
     name: "Утяжелитель",
     icon: "⚒️",
-    desc: "+8/10/12/15 drillPower. Скорость −10%.",
+    desc: "+10/13/16/18 drillPower. Скорость −10%.",
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
     effect: [
-      { stat: "drillPower",   effectByRarity: [null, 8, 10, 12, 15] },
+      { stat: "drillPower",   effectByRarity: [null, 10, 13, 16, 18] },
       { stat: "strikeSpeed",  effectByRarity: [null, -10, -10, -10, -10] },
     ],
   },
@@ -437,7 +441,7 @@ export const ALL_ITEMS = [
     tags: ["basic"],
     minRarity: 1,
     effect: [
-      { stat: "drillPower", effectByRarity: [null, 2, 3, 5, 8] },
+      { stat: "drillPower", effectByRarity: [null, 5, 8, 10, 12] },
       { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
     ],
   },
@@ -486,7 +490,7 @@ export const ALL_ITEMS = [
     tags: ["basic"],
     minRarity: 1,
     effect: [
-      { stat: "concentration", effectByRarity: [null, 10, 15, 20, 30] },
+      { stat: "drillPower", effectByRarity: [null, 10, 13, 16, 19] },
       { stat: "maxHeat", effectByRarity: [null, -10, -10, -10, -10] },
     ],
   },
@@ -614,8 +618,8 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Прошивной бур",
     icon: "🪡",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: [
       { stat: "weakSpotPierce", effectByRarity: [null, 1, 1, 2, 3] },
@@ -649,25 +653,12 @@ export const ALL_ITEMS = [
     ],
   },
   {
-    id: "long_loop",
-    type: "item",
-    name: "Длинный контур",
-    icon: "➰",
-    category: "basic",
-    tags: ["basic"],
-    minRarity: 2,
-    effect: [
-      { stat: "loopLengthDamageBonus", effectByRarity: [null, null, 1, 2, 3] },
-      { stat: "drillPower", effectByRarity: [null, null, -1, -1, -1] },
-    ],
-  },
-  {
     id: "study_crown",
     type: "item",
     name: "Учебная коронка",
     icon: "🎓",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: { stat: "drillPowerPerLevel", effectByRarity: [null, 5, 7, 10, 12] },
   },
@@ -739,8 +730,8 @@ export const ALL_ITEMS = [
         t("item.afterburner.hp_penalty"),
       ];
     },
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: [
       { stat: "strikeSpeed", effectByRarity: [null, 15, 22, 30, 40] },
@@ -803,8 +794,8 @@ export const ALL_ITEMS = [
     name: "Машинное масло",
     icon: "💧",
     desc: "+5% скорость бура.",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: {
       stat: "strikeSpeed",
@@ -936,13 +927,13 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Учебный алгоритм",
     icon: "🧠",
-    desc: "При каждом уровне: +2 к силе удара бура.",
+    desc: "При каждом уровне: +5/7/10/12 к силе удара бура.",
     category: "basic",
     tags: ["basic"],
     minRarity: 1,
     effect: {
       stat: "drillPowerPerLevel",
-      effectByRarity: [null, 2, 4, 6, 8],
+      effectByRarity: [null, 5, 7, 10, 12],
     },
   },
   {
@@ -965,8 +956,8 @@ export const ALL_ITEMS = [
     name: "Топливный импульс",
     icon: "⚗️",
     desc: "При каждом уровне: +50 топлива.",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: {
       stat: "fuelPerLevel",
@@ -979,8 +970,8 @@ export const ALL_ITEMS = [
     name: "Ускоренная адаптация",
     icon: "🔩",
     desc: "При каждом уровне: +2% скорости бура.",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: {
       stat: "strikeSpeedPerLevel",
@@ -1038,8 +1029,8 @@ export const ALL_ITEMS = [
     name: "Топливный инжектор",
     icon: "⚙️",
     desc: "+2 сила бура. +15% расход топлива.",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: [
       { stat: "drillPower",   effectByRarity: [null, 2,    3,    5,    8   ] },
@@ -1052,8 +1043,8 @@ export const ALL_ITEMS = [
     name: "Датчик износа",
     icon: "📟",
     desc: "−15% расход топлива. −8% скорость бура.",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: [
       { stat: "fuelDrainRate",effectByRarity: [null, -0.15, -0.22, -0.30, -0.40] },
@@ -1082,13 +1073,41 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Резонансный наконечник",
     icon: "〰️",
-    desc: "+5% шанс бреши. −1 сила бура.",
+    desc: "+5% шанс бреши. −3 сила бура.",
     category: "поиск_бреши",
     tags: ["поиск_бреши"],
     minRarity: 1,
     effect: [
       { stat: "weakSpotChance", effectByRarity: [null, 0.05, 0.08, 0.12, 0.18] },
-      { stat: "drillPower",     effectByRarity: [null, -1,   -1.5, -2,   -3  ] },
+      { stat: "drillPower",     effectByRarity: [null, -3,   -3,   -3,   -3  ] },
+    ],
+  },
+  {
+    id: "breach_power_spindle",
+    type: "item",
+    name: "Шпиндель бреши",
+    icon: "🧵",
+    desc: "+8/10/12/15 к силе бура. −3% шанс бреши.",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPower",     effectByRarity: [null, 8, 10, 12, 15] },
+      { stat: "weakSpotChance", effectByRarity: [null, -0.03, -0.03, -0.03, -0.03] },
+    ],
+  },
+  {
+    id: "breach_blast_spindle",
+    type: "item",
+    name: "Взрывной шпиндель бреши",
+    icon: "🧨",
+    desc: "+8/10/12/15 к силе взрыва. −3% шанс бреши.",
+    category: "поиск_бреши",
+    tags: ["поиск_бреши"],
+    minRarity: 1,
+    effect: [
+      { stat: "explosionPower", effectByRarity: [null, 8, 10, 12, 15] },
+      { stat: "weakSpotChance", effectByRarity: [null, -0.03, -0.03, -0.03, -0.03] },
     ],
   },
   {
@@ -1135,6 +1154,21 @@ export const ALL_ITEMS = [
     effect: [
       { stat: "visionRadius", effectByRarity: [null, 2, 3, 4, 5] },
       { stat: "strikeSpeed",  effectByRarity: [null, -8, -10, -12, -15] },
+    ],
+  },
+  {
+    id: "alchemical_twin_reactor",
+    type: "item",
+    name: "Алхимический двойной реактор",
+    icon: "⚗️",
+    desc: "+10/15/20/25 к силе бура и взрыва. −1 обзор.",
+    category: "алхимия",
+    tags: ["алхимия"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPower",     effectByRarity: [null, 10, 15, 20, 25] },
+      { stat: "explosionPower", effectByRarity: [null, 10, 15, 20, 25] },
+      { stat: "visionRadius",   effectByRarity: [null, -1, -1, -1, -1] },
     ],
   },
 
@@ -1262,8 +1296,8 @@ export const ALL_ITEMS = [
     name: "Форсированная подача",
     icon: "🚀",
     desc: "+20% скорость бура. +15% расход топлива.",
-    category: "maintenance",
-    tags: ["maintenance"],
+    category: "handwork",
+    tags: ["handwork"],
     minRarity: 1,
     effect: [
       { stat: "strikeSpeed",  effectByRarity: [null, 20, 28, 38, 50] },
@@ -1438,7 +1472,45 @@ export const ALL_ITEMS = [
     category: "контур",
     tags: ["контур"],
     minRarity: 1,
-    effect: { stat: "speedOfAutoClose", effectByRarity: [null, 5, 8, 12, 18] },
+    effect: { stat: "speedOfAutoClose", effectByRarity: [null, 10, 15, 20, 25] },
+  },
+  {
+    id: "contour_reservoir",
+    type: "item",
+    name: "Контурный резервуар",
+    icon: "🧿",
+    desc: "+10/15/20/25 к ресурсу контура. −10 концентрации.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "contourResMultiplier", effectByRarity: [null, 0.10, 0.15, 0.20, 0.25] },
+      { stat: "concentration",        effectByRarity: [null, -10, -10, -10, -10] },
+    ],
+  },
+  {
+    id: "contour_fuse",
+    type: "item",
+    name: "Контурный предохранитель",
+    icon: "🧯",
+    desc: "+5/10/15/20 к ресурсу контура. −3 урон взрывов.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "contourResMultiplier", effectByRarity: [null, 0.05, 0.10, 0.15, 0.20] },
+      { stat: "explosionBonus",       effectByRarity: [null, -3, -3, -3, -3] },
+    ],
+  },
+  {
+    id: "contour_blast_pressure",
+    type: "item",
+    name: "Контурное взрыв-давление",
+    icon: "💥",
+    desc: "При замыкании контура: бафф 5/6/7/8 сек, +5 explosionPower за каждый разрушенный контуром блок.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
   },
   {
     id: "loop_extender",
@@ -1450,6 +1522,91 @@ export const ALL_ITEMS = [
     tags: ["контур"],
     minRarity: 1,
     effect: { stat: "maxContour", effectByRarity: [null, 1, 2, 3, 4] },
+  },
+  {
+    id: "contour_chronometer",
+    type: "item",
+    name: "Контурный хронометр",
+    icon: "⏱️",
+    desc: "+10/15/20/25 к длительности эффектов. −20 скорость автозамыкания.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "effectDurationRate", effectByRarity: [null, 0.10, 0.15, 0.20, 0.25] },
+      { stat: "speedOfAutoClose",   effectByRarity: [null, -20, -20, -20, -20] },
+    ],
+  },
+  {
+    id: "contour_bait",
+    type: "item",
+    name: "Контурная приманка",
+    icon: "🪱",
+    desc: "+20/30/40/50 макс. HP. Монстр контура получает +4 HP за каждый съеденный сегмент.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "maxHp", effectByRarity: [null, 20, 30, 40, 50] },
+      { stat: "contourEnemyHpPerTileBonus", effectByRarity: [null, 4, 4, 4, 4] },
+    ],
+  },
+  {
+    id: "contour_bounty",
+    type: "item",
+    name: "Контурная добыча",
+    icon: "🧲",
+    desc: "Монстр контура даёт +1/2/3/4 награды за каждый съеденный сегмент. Но получает +4 HP за сегмент.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "contourEnemyRewardPerTileBonus", effectByRarity: [null, 1, 2, 3, 4] },
+      { stat: "contourEnemyHpPerTileBonus", effectByRarity: [null, 4, 4, 4, 4] },
+    ],
+  },
+  {
+    id: "contour_lure",
+    type: "item",
+    name: "Контурный манок",
+    icon: "🪈",
+    desc: "+10/15/20/25 концентрации. Монстр контура появляется на 10% чаще.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "concentration", effectByRarity: [null, 10, 15, 20, 25] },
+      { stat: "contourEnemySpawnRateBonus", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
+    ],
+  },
+  {
+    id: "contour_injector",
+    type: "item",
+    name: "Контурный инжектор",
+    icon: "♨️",
+    desc: "+8/12/16/20 к силе бура. Монстр контура появляется на 10% реже. +10/13/16/20% к нагреву.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPower", effectByRarity: [null, 8, 12, 16, 20] },
+      { stat: "contourEnemySpawnRateBonus", effectByRarity: [null, -0.10, -0.10, -0.10, -0.10] },
+      { stat: "heatRate", effectByRarity: [null, 0.13, 0.13, 0.13, 0.13] },
+    ],
+  },
+  {
+    id: "contour_resonance_drill",
+    type: "item",
+    name: "Резонансный контур-бур",
+    icon: "📡",
+    desc: "При попадании в брешь: резонанс по контуру наносит 20 + 10/15/20/30% от explosionPower. Контур не пропадает, только краснеет на миг.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "weakSpotChance", effectByRarity: [null, 0.03, 0.06, 0.09, 0.11] },
+      { stat: "maxContour",     effectByRarity: [null, -1,   -1,   -2,   -2  ] },
+    ],
   },
   {
     id: "loop_spawner",
@@ -1512,11 +1669,11 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Красное ядро",
     icon: "🔴",
-    desc: "При подборе красного кристалла: +1/2/3/4 силы бура (по редкости).",
+    desc: "При подборе красного кристалла: +3/5/7/9 силы бура (по редкости).",
     category: "алхимия",
     tags: ["алхимия"],
     minRarity: 1,
-    effect: { stat: "crystalRedDrillGain", effectByRarity: [null, 1, 2, 3, 4] },
+    effect: { stat: "crystalRedDrillGain", effectByRarity: [null, 3, 5, 7, 9] },
   },
   {
     id: "crystal_yellow_charge",
@@ -1675,6 +1832,9 @@ const SIMPLE_STAT_DESCRIPTORS = {
   recipeCollapseDelayPercent: value => t("desc.recipeCollapseDelayPercent", { val: formatSignedPercent(value, 1) }),
   fuelStarvationResistance: value => t("desc.fuelStarvationResistance", { val: formatSignedPercent(value) }),
   contourResMultiplier: value => t("desc.contourResMultiplier", { val: formatSignedPercent(value, 100) }),
+  contourEnemyHpPerTileBonus: value => t("desc.contourEnemyHpPerTileBonus", { val: formatSignedDescriptionNumber(value) }),
+  contourEnemyRewardPerTileBonus: value => t("desc.contourEnemyRewardPerTileBonus", { val: formatSignedDescriptionNumber(value) }),
+  contourEnemySpawnRateBonus: value => t("desc.contourEnemySpawnRateBonus", { val: formatSignedPercent(value, 100) }),
   goldBonus: value => t("desc.goldBonus", { val: formatSignedPercent(value, 100) }),
   miningGoldBonusMultiplier: value => t("desc.miningGoldBonusMultiplier", { val: formatSignedPercent(value, 100) }),
   xpBonus: value => t("desc.xpBonus", { val: formatSignedPercent(value, 100) }),
@@ -1694,7 +1854,6 @@ const SIMPLE_STAT_DESCRIPTORS = {
   strikeSpeedPerLevel: value => t("desc.strikeSpeedPerLevel", { val: formatSignedPercent(value) }),
   healPerLevel: value => t("desc.healPerLevel", { val: formatSignedDescriptionNumber(value) }),
   goldBonusPerLevel: value => t("desc.goldBonusPerLevel", { val: formatSignedPercent(value, 100) }),
-  loopLengthDamageBonus: value => t("desc.loopLengthDamageBonus", { val: formatSignedPercent(value) }),
   loopSpawnBonusChance: value => t("desc.loopSpawnBonusChance", { val: formatUnsignedPercent(value, 100) }),
   crystalGoldGain: value => t("desc.crystalGoldGain", { val: formatSignedDescriptionNumber(value) }),
   crystalRedDrillGain: value => t("desc.crystalRedDrillGain", { val: formatSignedDescriptionNumber(value) }),
@@ -1800,7 +1959,7 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
   },
   shard_drill(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 8, 12, 16, 20] }, rarity);
-    const weakSpotChance = getEffectValue({ effectByRarity: [0, 0.04, 0.06, 0.08, 0.10] }, rarity);
+    const weakSpotChance = getEffectValue({ effectByRarity: [0, 0.08, 0.10, 0.12, 0.14] }, rarity);
     const explosionDamage = getEffectValue({ effectByRarity: [0, 20, 30, 45, 60] }, rarity);
     const explosionScale = 10;
     const hasExplosionPower = Number.isFinite(stats?.explosionPower);
@@ -1917,6 +2076,70 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       overflowScale: formatDescriptionNumber(overflowScale),
       overflowTotal,
       radius: "1",
+    });
+  },
+  contour_line_drill(rarity, stats = null) {
+    const baseFlat = 10;
+    const drillScale = getEffectValue({ effectByRarity: [0, 10, 20, 30, 40] }, rarity);
+    const perLength = getEffectValue({ effectByRarity: [0, 1, 2, 3, 4] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const contourLength = Number.isFinite(stats?.contourLength)
+      ? Math.max(0, Math.round(stats.contourLength))
+      : 10;
+    const total = hasDrillPower
+      ? ` [${formatDescriptionNumber(baseFlat + stats.drillPower * (drillScale / 100) + perLength * contourLength)}]`
+      : "";
+    return t("desc.special.contour_line_drill", {
+      baseFlat: formatDescriptionNumber(baseFlat),
+      drillScale: formatDescriptionNumber(drillScale),
+      perLength: formatDescriptionNumber(perLength),
+      contourLength: formatDescriptionNumber(contourLength),
+      total,
+    });
+  },
+  contour_resonance_drill(rarity, stats = null) {
+    const flat = 20;
+    const explosionScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 30] }, rarity);
+    const breachChance = getEffectValue({ effectByRarity: [0, 0.03, 0.06, 0.09, 0.11] }, rarity);
+    const maxContourPenalty = getEffectValue({ effectByRarity: [0, -1, -1, -2, -2] }, rarity);
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const total = hasExplosionPower
+      ? ` [${formatDescriptionNumber(flat + stats.explosionPower * (explosionScale / 100))}]`
+      : "";
+    return t("desc.special.contour_resonance_drill", {
+      flat: formatDescriptionNumber(flat),
+      explosionScale: formatDescriptionNumber(explosionScale),
+      total,
+      breachChance: formatDescriptionNumber(breachChance * 100),
+      maxContourPenalty: formatDescriptionNumber(maxContourPenalty),
+    });
+  },
+  loop_pressure(rarity, stats = null) {
+    const duration = getEffectValue({ effectByRarity: [0, 4, 4.5, 5, 5.5] }, rarity);
+    const perBlock = getEffectValue({ effectByRarity: [0, 3, 4, 5, 6] }, rarity);
+    const hasBlocks = Number.isFinite(stats?.contourLoopBrokenCells);
+    const blocks = Math.max(0, Math.round(stats?.contourLoopBrokenCells || 0));
+    const total = hasBlocks ? ` [${formatDescriptionNumber(perBlock * blocks)}]` : "";
+    const blocksLabel = hasBlocks ? formatDescriptionNumber(blocks) : "N";
+    return t("desc.special.loop_pressure", {
+      duration: formatDescriptionNumber(duration),
+      perBlock: formatDescriptionNumber(perBlock),
+      blocks: blocksLabel,
+      total,
+    });
+  },
+  contour_blast_pressure(rarity, stats = null) {
+    const duration = getEffectValue({ effectByRarity: [0, 5, 6, 7, 8] }, rarity);
+    const perBlock = 5;
+    const hasBlocks = Number.isFinite(stats?.contourLoopBrokenCells);
+    const blocks = Math.max(0, Math.round(stats?.contourLoopBrokenCells || 0));
+    const total = hasBlocks ? ` [${formatDescriptionNumber(perBlock * blocks)}]` : "";
+    const blocksLabel = hasBlocks ? formatDescriptionNumber(blocks) : "N";
+    return t("desc.special.contour_blast_pressure", {
+      duration: formatDescriptionNumber(duration),
+      perBlock: formatDescriptionNumber(perBlock),
+      blocks: blocksLabel,
+      total,
     });
   },
 };

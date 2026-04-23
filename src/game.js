@@ -97,6 +97,9 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   collapseBudgetMaxScale:    { key: "stat.collapseBudgetMaxScale",    mode: "percent" },
   recipeCollapseDelayPercent:{ key: "stat.recipeCollapseDelayPercent",mode: "rawpercent" },
   contourResMultiplier:      { key: "stat.contourResMultiplier",      mode: "percent" },
+  contourEnemyHpPerTileBonus:{ key: "stat.contourEnemyHpPerTileBonus",mode: "integer" },
+  contourEnemyRewardPerTileBonus:{ key: "stat.contourEnemyRewardPerTileBonus",mode: "integer" },
+  contourEnemySpawnRateBonus:{ key: "stat.contourEnemySpawnRateBonus",mode: "percent" },
   cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
   crystalGoldGain:           { key: "stat.crystalGoldGain",           mode: "integer" },
   crystalRedDrillGain:       { key: "stat.crystalRedDrillGain",       mode: "fixed1" },
@@ -727,6 +730,9 @@ const state = {
   contourBlastPressureTimer: 0,
   contourBlastPressureDisplayDuration: 0,
   contourBlastPressureExplosionBonus: 0,
+  contourEnemyHpPerTileBonus: 0,
+  contourEnemyRewardPerTileBonus: 0,
+  contourEnemySpawnRateBonus: 0,
   contourReturnFuelLevel: 0,
   maxContour: 12,
   contourOverloadBrokenBlocks: 0,
@@ -2637,6 +2643,9 @@ function setupField(seedOverride = null) {
   state.contourBlastPressureTimer = 0;
   state.contourBlastPressureDisplayDuration = 0;
   state.contourBlastPressureExplosionBonus = 0;
+  state.contourEnemyHpPerTileBonus = 0;
+  state.contourEnemyRewardPerTileBonus = 0;
+  state.contourEnemySpawnRateBonus = 0;
   state.contourReturnFuelLevel = 0;
   state.maxContour = 12;
   state.contourOverloadBrokenBlocks = 0;
@@ -2976,7 +2985,8 @@ function spendCollapseBudget(amount) {
 function spendContourEnemyBudget(hardness, pathLength) {
   if (state.contourEnemy) return;
   if (pathLength < CONTOUR_ENEMY_MIN_PATH_LENGTH) return;
-  state.contourEnemyBudget -= hardness * (1 + 0.1 * pathLength);
+  const spawnRateMult = Math.max(0, 1 + (state.contourEnemySpawnRateBonus || 0));
+  state.contourEnemyBudget -= hardness * (1 + 0.1 * pathLength) * spawnRateMult;
   if (state.contourEnemyBudget <= 0) {
     state.contourEnemyBudget = CONTOUR_ENEMY_BUDGET_INITIAL;
     spawnContourEnemy();
@@ -4233,6 +4243,9 @@ function getShopStatsSnapshot() {
     miningGoldBonusMultiplier: state.miningGoldBonusMultiplier || 0,
     recipesCompletedThisRun: state.recipesCompletedThisRun || 0,
     contourLength: Math.max(0, state.pathTiles.length - 1),
+    contourEnemyHpPerTileBonus: state.contourEnemyHpPerTileBonus || 0,
+    contourEnemyRewardPerTileBonus: state.contourEnemyRewardPerTileBonus || 0,
+    contourEnemySpawnRateBonus: state.contourEnemySpawnRateBonus || 0,
   };
 }
 
@@ -4264,6 +4277,9 @@ function getShopDefaultStatsSnapshot() {
     miningGoldBonusMultiplier: 0,
     recipesCompletedThisRun: 0,
     contourLength: 0,
+    contourEnemyHpPerTileBonus: 0,
+    contourEnemyRewardPerTileBonus: 0,
+    contourEnemySpawnRateBonus: 0,
   };
 }
 
@@ -9309,6 +9325,7 @@ function hitContourEnemy(damage) {
   state.drill.moveResumeTimer = Math.max(state.drill.moveResumeTimer, POST_BREAK_MOVE_DELAY * 1.5);
   if (enemy.hp <= 0) {
     spawnGoldParticles(enemy.x, enemy.y, enemy.reward);
+    showGoldToast(enemy.reward);
     spawnExperienceParticles(enemy.x, enemy.y, Math.max(1, enemy.tilesEaten * 2 + 5));
     playSound("block_break", { pitch: 0.6 });
     state.contourEnemy = null;
@@ -9354,9 +9371,11 @@ function contourEnemyPickNext(enemy) {
       if (!(next.x === hx && next.y === hy)) {
         path.shift();
         rebuildPathIndex();
-        enemy.hp += CONTOUR_ENEMY_HP_PER_TILE;
+        const hpGainPerTile = Math.max(0, CONTOUR_ENEMY_HP_PER_TILE + (state.contourEnemyHpPerTileBonus || 0));
+        const rewardGainPerTile = Math.max(0, CONTOUR_ENEMY_REWARD_PER_TILE + (state.contourEnemyRewardPerTileBonus || 0));
+        enemy.hp += hpGainPerTile;
         enemy.maxHp = enemy.hp;
-        enemy.reward += CONTOUR_ENEMY_REWARD_PER_TILE;
+        enemy.reward += rewardGainPerTile;
         enemy.tilesEaten++;
         nextX = next.x;
         nextY = next.y;
