@@ -100,6 +100,12 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   contourEnemyHpPerTileBonus:{ key: "stat.contourEnemyHpPerTileBonus",mode: "integer" },
   contourEnemyRewardPerTileBonus:{ key: "stat.contourEnemyRewardPerTileBonus",mode: "integer" },
   contourEnemySpawnRateBonus:{ key: "stat.contourEnemySpawnRateBonus",mode: "percent" },
+  drillPiercingCount:        { key: "stat.drillPiercingCount",        mode: "integer" },
+  drillPiercingDamage:       { key: "stat.drillPiercingDamage",       mode: "rawpercent" },
+  overhealSpindlePiercingGain:{ key: "stat.overhealSpindlePiercingGain", mode: "rawpercent" },
+  overflowGovernorDrillGain: { key: "stat.overflowGovernorDrillGain", mode: "fixed1" },
+  drillDiagonalCount:        { key: "stat.drillDiagonalCount",        mode: "integer" },
+  drillDiagonalDamage:       { key: "stat.drillDiagonalDamage",       mode: "rawpercent" },
   cryoRocketCount:           { key: "stat.cryoRocketCount",           mode: "level" },
   crystalGoldGain:           { key: "stat.crystalGoldGain",           mode: "integer" },
   crystalRedDrillGain:       { key: "stat.crystalRedDrillGain",       mode: "fixed1" },
@@ -169,6 +175,8 @@ const ITEM_INSPECT_SPECIAL_DESCRIPTION_IDS = new Set([
   "blast_drill",
   "tradeoff_drill",
   "fragile_drill",
+  "telescopic_drill",
+  "diagonal_drill_array",
   "lucky_pickaxe",
   "shard_drill",
   "beacon_alchemy_drill",
@@ -190,6 +198,10 @@ const DEBUG_CORE_STATS = [
   { key: "heatRate",             label: "heatRate",              step: 0.1,  fmt: v => v.toFixed(1) },
   { key: "strikeSpeed",          label: "strikeSpeed",           step: 5,    fmt: v => Math.round(v) },
   { key: "drillPower",           label: "drillPower",            step: 1,    fmt: v => v.toFixed(1) },
+  { key: "drillPiercingCount",   label: "drillPiercingCount",    step: 1,    fmt: v => Math.round(v) },
+  { key: "drillPiercingDamage",  label: "drillPiercingDamage(%)",step: 5,    fmt: v => Math.round(v) },
+  { key: "drillDiagonalCount",   label: "drillDiagonalCount",    step: 1,    fmt: v => Math.round(v) },
+  { key: "drillDiagonalDamage",  label: "drillDiagonalDamage(%)",step: 5,    fmt: v => Math.round(v) },
   { key: "weakSpotChance",       label: "Breach%",               step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: "weakSpotMult",         label: "Breach%",               step: 0.5,  fmt: v => `${Math.round(v * 100)}%` },
   { key: "luck",                 label: "luck",                  step: 1,    fmt: v => Math.round(v) },
@@ -733,6 +745,12 @@ const state = {
   contourEnemyHpPerTileBonus: 0,
   contourEnemyRewardPerTileBonus: 0,
   contourEnemySpawnRateBonus: 0,
+  drillPiercingCount: 0,
+  drillPiercingDamage: 0,
+  overhealSpindlePiercingGain: 0,
+  overflowGovernorDrillGain: 0,
+  drillDiagonalCount: 0,
+  drillDiagonalDamage: 0,
   contourReturnFuelLevel: 0,
   maxContour: 12,
   contourOverloadBrokenBlocks: 0,
@@ -2646,6 +2664,12 @@ function setupField(seedOverride = null) {
   state.contourEnemyHpPerTileBonus = 0;
   state.contourEnemyRewardPerTileBonus = 0;
   state.contourEnemySpawnRateBonus = 0;
+  state.drillPiercingCount = 0;
+  state.drillPiercingDamage = 0;
+  state.overhealSpindlePiercingGain = 0;
+  state.overflowGovernorDrillGain = 0;
+  state.drillDiagonalCount = 0;
+  state.drillDiagonalDamage = 0;
   state.contourReturnFuelLevel = 0;
   state.maxContour = 12;
   state.contourOverloadBrokenBlocks = 0;
@@ -4214,6 +4238,10 @@ function removeShopPerk(effectId, rarityMult, rarity) {
 function getShopStatsSnapshot() {
   return {
     drillPower: state.drillPower,
+    drillPiercingCount: state.drillPiercingCount || 0,
+    drillPiercingDamage: state.drillPiercingDamage || 0,
+    drillDiagonalCount: state.drillDiagonalCount || 0,
+    drillDiagonalDamage: state.drillDiagonalDamage || 0,
     strikeSpeed: state.strikeSpeed + getFragileDrillSpeedBonus(),
     maxHp: state.maxHp,
     maxFuel: state.maxFuel,
@@ -4252,6 +4280,10 @@ function getShopStatsSnapshot() {
 function getShopDefaultStatsSnapshot() {
   return {
     drillPower: 0,
+    drillPiercingCount: 0,
+    drillPiercingDamage: 0,
+    drillDiagonalCount: 0,
+    drillDiagonalDamage: 0,
     strikeSpeed: 0,
     maxHp: START_HP,
     maxFuel: START_FUEL,
@@ -4718,6 +4750,34 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
       ];
     }
+    case "telescopic_drill": {
+      const flatDamage = 10;
+      const drillScale = [0, 10, 20, 30, 40][rarity] || 0;
+      const pierceCount = 1;
+      const pierceDamage = [0, 10, 20, 30, 40][rarity] || 0;
+      const totalDamage = flatDamage + state.drillPower * (drillScale / 100);
+      return [
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.drill_scale"), value: `+${drillScale}%` },
+        { label: t("stat.drillPiercingCount"), value: `+${pierceCount}` },
+        { label: t("stat.drillPiercingDamage"), value: `+${pierceDamage}%` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
+      ];
+    }
+    case "diagonal_drill_array": {
+      const flatDamage = 10;
+      const drillScale = [0, 10, 15, 20, 25][rarity] || 0;
+      const diagonalCount = 2;
+      const diagonalDamage = [0, 10, 20, 30, 40][rarity] || 0;
+      const totalDamage = flatDamage + state.drillPower * (drillScale / 100);
+      return [
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.drill_scale"), value: `+${drillScale}%` },
+        { label: t("stat.drillDiagonalCount"), value: `+${diagonalCount}` },
+        { label: t("stat.drillDiagonalDamage"), value: `+${diagonalDamage}%` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
+      ];
+    }
     case "lucky_pickaxe": {
       const flatDamage = [0, 10, 15, 20, 25][rarity] || 0;
       const damageScale = [0, 10, 20, 30, 40][rarity] || 0;
@@ -5155,6 +5215,10 @@ function bindUi() {
     const defaults = getShopDefaultStatsSnapshot();
     const statDefs = [
       { key: "drillPower", format: "fixed1" },
+      { key: "drillPiercingCount", format: null },
+      { key: "drillPiercingDamage", format: "rawpercent" },
+      { key: "drillDiagonalCount", format: null },
+      { key: "drillDiagonalDamage", format: "rawpercent" },
       { key: "damageBonus", format: "rawpercent" },
       { key: "strikeSpeed", format: "rawpercent" },
       { key: "maxHp", format: null },
@@ -7034,9 +7098,10 @@ function update(dt) {
   state.stunTimer = Math.max(0, state.stunTimer - dt);
   if (state.stunTimer === 0) {
     if (prevStunTimer > 0 && state.stunAfterburnerLevel > 0) {
-      const stunDuration = Math.max(state.stunDisplayDuration || 0, prevStunTimer);
-      const afterDuration = stunDuration * state.stunAfterburnerLevel * 2;
-      activateDrillOverdrive(afterDuration, t("toast.afterburner_after_stun"));
+      const afterDuration = [0, 3, 4, 5, 6][Math.max(0, Math.floor(state.stunAfterburnerLevel || 0))] || 0;
+      if (afterDuration > 0) {
+        activateDrillOverdrive(afterDuration, t("toast.afterburner_after_stun"));
+      }
     }
     state.stunDisplayDuration = 0;
   }
@@ -7594,6 +7659,9 @@ function healPlayer(amount, sourceText = "") {
   const actualHeal = Math.min(amount, missingHp);
   const overheal = Math.max(0, amount - actualHeal);
   state.hp = Math.min(state.maxHp, state.hp + amount);
+  if (overheal > 0 && state.overhealSpindlePiercingGain > 0) {
+    state.drillPiercingDamage += state.overhealSpindlePiercingGain;
+  }
 
   if (overheal > 0 && state.overhealOverdrive) {
     activateOverhealDrillBoost();
@@ -8207,6 +8275,8 @@ function getStrikeDamage(targetX = null, targetY = null) {
     getBlastDrillDamageBonus() +
     getTradeoffDrillDamageBonus() +
     getFragileDrillDamageBonus() +
+    getTelescopicDrillDamageBonus() +
+    getDiagonalDrillArrayDamageBonus() +
     getLuckyPickaxeDamageBonus() +
     getShardDrillDamageBonus() +
     getBreachMissileDamageBonus() +
@@ -8297,6 +8367,26 @@ function getLuckyPickaxeDamageBonus() {
     const damageScale = [0, 0.10, 0.20, 0.30, 0.40][tier] || 0;
     const luckScale = [0, 0.10, 0.15, 0.20, 0.25][tier] || 0;
     total += flat + state.drillPower * damageScale + state.luck * luckScale;
+  }
+  return total;
+}
+
+function getTelescopicDrillDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("telescopic_drill")) {
+    const flat = 10;
+    const drillScale = [0, 0.10, 0.20, 0.30, 0.40][tier] || 0;
+    total += flat + state.drillPower * drillScale;
+  }
+  return total;
+}
+
+function getDiagonalDrillArrayDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("diagonal_drill_array")) {
+    const flat = 10;
+    const drillScale = [0, 0.10, 0.15, 0.20, 0.25][tier] || 0;
+    total += flat + state.drillPower * drillScale;
   }
   return total;
 }
@@ -8445,7 +8535,11 @@ function triggerContourResonancePulse() {
   for (const index of uniqueTargets) {
     const tx = index % GRID_W;
     const ty = Math.floor(index / GRID_W);
-    damageCell(tx, ty, damage, { cause: "explosion", showActualDamage: true });
+    damageCell(tx, ty, damage, {
+      cause: "explosion",
+      showActualDamage: true,
+      suppressHazardPlayerDamage: true,
+    });
   }
   state.contourResonanceFlashTimer = Math.max(state.contourResonanceFlashTimer || 0, 0.22);
 }
@@ -8643,6 +8737,9 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   showFuelToast(totalGain);
   const overflow = state.fuel + totalGain - state.maxFuel;
   state.fuel = Math.min(state.maxFuel, state.fuel + totalGain);
+  if (overflow > 0 && state.overflowGovernorDrillGain > 0) {
+    state.drillPower += state.overflowGovernorDrillGain;
+  }
 
   if (!options.preventOverflowTrigger && state.overflowBomb && overflow > 0 && !state.overflowTriggeredInEvent && !state.resolvingOverflowBomb) {
     state.overflowTriggeredInEvent = true;
@@ -9516,7 +9613,13 @@ function damageCell(x, y, damage, options = {}) {
   }
 
   const index = cellIndex(x, y);
+  if (options.cause === "explosion" && state.gasMask[index]) {
+    scheduleChainExplosion({ kind: "gas", x, y });
+  }
   const pierceLeft = options.pierceLeft ?? 0;
+  const forcePierce = !!options.forcePierce;
+  const pierceDamageMult = Number.isFinite(options.pierceDamageMult) ? Math.max(0, options.pierceDamageMult) : 1;
+  const pierceBaseDamage = Number.isFinite(options.pierceBaseDamage) ? options.pierceBaseDamage : damage;
   let pierceActive = !!options.pierceActive;
   if (options.byDrill && state.weakSpotMask[index]) {
     state.lastStrikeHitWeakSpot = true;
@@ -9554,12 +9657,20 @@ function damageCell(x, y, damage, options = {}) {
     }
   }
   const continuePierce = () => {
-    if (!pierceActive || pierceLeft <= 0) {
+    if ((!pierceActive && !forcePierce) || pierceLeft <= 0) {
       return;
     }
     const px = x + (options.dirX ?? 0);
     const py = y + (options.dirY ?? 1);
-    damageCell(px, py, damage, { ...options, byDrill: true, pierceActive: true, pierceLeft: pierceLeft - 1 });
+    damageCell(px, py, pierceBaseDamage * pierceDamageMult, {
+      ...options,
+      byDrill: true,
+      pierceActive: true,
+      forcePierce,
+      pierceDamageMult,
+      pierceBaseDamage,
+      pierceLeft: pierceLeft - 1,
+    });
   };
   if (state.tunnelMask[index]) {
     return false;
@@ -10200,6 +10311,27 @@ function updateVisibilityFade(dt) {
   }
 }
 
+function collectExtraDrillStrikeTargets(targetX, targetY, dx, dy) {
+  const out = [];
+  const seen = new Set();
+  const push = (x, y) => {
+    if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) return;
+    if (x === targetX && y === targetY) return;
+    const key = `${x},${y}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ x, y });
+  };
+  const diagonalCount = Math.max(0, Math.floor(state.drillDiagonalCount || 0));
+  if (diagonalCount > 0) {
+    push(targetX - dy, targetY + dx);
+  }
+  if (diagonalCount > 1) {
+    push(targetX + dy, targetY - dx);
+  }
+  return out;
+}
+
 function updateDrill(dt) {
   state.drill.actionCooldown = Math.max(0, state.drill.actionCooldown - dt);
   state.drill.moveResumeTimer = Math.max(0, state.drill.moveResumeTimer - dt);
@@ -10405,7 +10537,14 @@ function updateDrill(dt) {
   if (empoweredStrike) {
     strikeDamage *= Math.max(1, state.weakSpotMult || 1);
   }
+  const piercingCount = Math.max(0, Math.floor(state.drillPiercingCount || 0));
+  const piercingDamageMult = Math.max(0, (state.drillPiercingDamage || 0) / 100);
+  const weakSpotPierceDamageMult = Math.max(0, Math.floor(state.weakSpotPierce || 0)) > 0
+    ? piercingDamageMult
+    : 1;
+  const diagonalDamageMult = Math.max(0, (state.drillDiagonalDamage || 0) / 100);
   const hardness = state.hardness[targetIndex];
+  const extraStrikeTargets = collectExtraDrillStrikeTargets(targetX, targetY, dx, dy);
   const brokeTargetBlock = damageCell(targetX, targetY, strikeDamage, {
     moveDrill: true,
     fromX: state.drill.x,
@@ -10413,9 +10552,11 @@ function updateDrill(dt) {
     byDrill: true,
     dirX: dx,
     dirY: dy,
-    pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)),
+    pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)) + piercingCount,
+    forcePierce: piercingCount > 0,
+    pierceDamageMult: piercingCount > 0 ? piercingDamageMult : weakSpotPierceDamageMult,
   });
-  state.comboCount = brokeTargetBlock ? (state.comboCount + 1) : 0;
+  let brokeAnyBlock = brokeTargetBlock;
   if (empoweredStrike) {
     state.breachChainEmpoweredHits = Math.max(0, state.breachChainEmpoweredHits - 1);
   }
@@ -10425,6 +10566,23 @@ function updateDrill(dt) {
   if (state.contourEnemy && state.contourEnemy.x === targetX && state.contourEnemy.y === targetY) {
     hitContourEnemy(strikeDamage);
   }
+  for (const extra of extraStrikeTargets) {
+    const brokeExtra = damageCell(extra.x, extra.y, strikeDamage * diagonalDamageMult, {
+      moveDrill: false,
+      fromX: state.drill.x,
+      fromY: state.drill.y,
+      byDrill: true,
+      dirX: dx,
+      dirY: dy,
+      pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)),
+      pierceDamageMult: weakSpotPierceDamageMult,
+    });
+    brokeAnyBlock = brokeAnyBlock || brokeExtra;
+    if (state.contourEnemy && state.contourEnemy.x === extra.x && state.contourEnemy.y === extra.y) {
+      hitContourEnemy(strikeDamage);
+    }
+  }
+  state.comboCount = brokeAnyBlock ? (state.comboCount + 1) : 0;
   state.drill.progress += strikeDamage;
   state.cameraShake.amplitude = Math.max(
     state.cameraShake.amplitude,
@@ -10552,7 +10710,10 @@ function triggerContourOverloadExplosion(pathTiles) {
   for (const index of uniqueTargets) {
     const tx = index % GRID_W;
     const ty = Math.floor(index / GRID_W);
-    damageCell(tx, ty, damage, { cause: "explosion" });
+    damageCell(tx, ty, damage, {
+      cause: "explosion",
+      suppressHazardPlayerDamage: true,
+    });
   }
   return true;
 }
@@ -15300,6 +15461,10 @@ function renderHudPerkColumn(x, y, width, title) {
   const defaults = getShopDefaultStatsSnapshot();
   const statDefs = [
     { key: "drillPower", format: "fixed1" },
+    { key: "drillPiercingCount", format: null },
+    { key: "drillPiercingDamage", format: "rawpercent" },
+    { key: "drillDiagonalCount", format: null },
+    { key: "drillDiagonalDamage", format: "rawpercent" },
     { key: "damageBonus", format: "rawpercent" },
     { key: "strikeSpeed", format: "rawpercent" },
     { key: "maxHp", format: null },

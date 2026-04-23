@@ -301,6 +301,7 @@ html, body {
 .stat-card:hover { border-color: var(--acc); background: rgba(215,159,73,0.07); }
 .stat-card--static { cursor: default; }
 .stat-card--static:hover { border-color: var(--border); background: rgba(20,13,8,0.88); }
+.stat-card--dimmed { opacity: 0.8; }
 .stat-card__name { font-size: 13px; font-weight: 700; color: var(--text); }
 .stat-card__id { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .stat-card__desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.35; min-height: 32px; }
@@ -447,7 +448,6 @@ const PERCENT_STATS = new Set([
   'recipeCollapseDelayPercent',
   'heatRate',
   'fuelDrainRate',
-  'loopLengthDamageBonus',
   'loopSpawnBonusChance',
   'lowFuelSpeedBonus',
   'lowFuelDamageBonus',
@@ -554,6 +554,7 @@ const PREVIEW_STATS = (() => {
     explosionPower: 10,
     heat: 10,
     luck: 10,
+    contourLength: 10,
   };
   for (const item of ALL) {
     const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
@@ -816,6 +817,24 @@ const SPECIAL_SCALE_ROWS = {
       { label: 'Скорость при броне', values: ['+10%', '+15%', '+20%', '+30%'] },
     ];
   },
+  telescopic_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '20%', '30%', '40%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 12, 13, 14] },
+      { label: 'drillPiercingCount', values: [1, 1, 1, 1] },
+      { label: 'drillPiercingDamage', values: ['10%', '20%', '30%', '40%'] },
+    ];
+  },
+  diagonal_drill_array() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 11.5, 12, 12.5] },
+      { label: 'drillDiagonalCount', values: [2, 2, 2, 2] },
+      { label: 'drillDiagonalDamage', values: ['10%', '20%', '30%', '40%'] },
+    ];
+  },
   lucky_pickaxe() {
     return [
       { label: 'Урон (плоский)', values: [10, 15, 20, 25] },
@@ -871,6 +890,37 @@ const SPECIAL_SCALE_ROWS = {
       { label: 'Итог взрыв (explosion=10)', values: [32, 43, 54, 65] },
       { label: 'Радиус взрыва', values: [1, 1, 1, 1] },
       { label: 'Правило попадания', values: ['Один удар по блоку', 'Один удар по блоку', 'Один удар по блоку', 'Один удар по блоку'] },
+    ];
+  },
+  contour_line_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '20%', '30%', '40%'] },
+      { label: 'Урон за длину контура', values: [1, 2, 3, 4] },
+      { label: 'Итог урон (drill=10, контур=10)', values: [21, 32, 43, 54] },
+    ];
+  },
+  loop_pressure() {
+    return [
+      { label: 'Длительность баффа (сек)', values: [4, 4.5, 5, 5.5] },
+      { label: 'drillPower за разрушенный блок контуром', values: [3, 4, 5, 6] },
+      { label: 'Пример бонуса (сломано 6 блоков)', values: [18, 24, 30, 36] },
+    ];
+  },
+  contour_resonance_drill() {
+    return [
+      { label: 'Резонанс (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл от explosionPower', values: ['10%', '15%', '20%', '30%'] },
+      { label: 'Итог резонанс (explosion=10)', values: [21, 21.5, 22, 23] },
+      { label: 'Триггер', values: ['При попадании в брешь', 'При попадании в брешь', 'При попадании в брешь', 'При попадании в брешь'] },
+      { label: 'Контур', values: ['Не исчезает, краснеет', 'Не исчезает, краснеет', 'Не исчезает, краснеет', 'Не исчезает, краснеет'] },
+    ];
+  },
+  contour_blast_pressure() {
+    return [
+      { label: 'Длительность баффа (сек)', values: [5, 6, 7, 8] },
+      { label: 'explosionPower за разрушенный блок контуром', values: [5, 5, 5, 5] },
+      { label: 'Пример бонуса (сломано 6 блоков)', values: [30, 30, 30, 30] },
     ];
   },
 };
@@ -1047,13 +1097,40 @@ function renderCountDots(kind, count) {
 
 function renderStats() {
   const items = getItemsForStatsFilters();
-  const rows = getStatRows(items);
+  const sourceItems = S.excludeDev
+    ? ALL.filter((item) => !isEntryInDevelopment(item))
+    : ALL;
+  const allRows = getStatRows(sourceItems);
+  const filteredRows = getStatRows(items);
+  const filteredMap = new Map(filteredRows.map((row) => [row.stat, row]));
+  const hasActiveStatsFilter =
+    S.statsType !== 'all' ||
+    S.statsCategory !== 'all' ||
+    S.statsSearch.trim().length > 0;
+
+  const rows = hasActiveStatsFilter
+    ? (() => {
+      const matched = [];
+      const rest = [];
+      for (const baseRow of allRows) {
+        const row = filteredMap.get(baseRow.stat) || {
+          ...baseRow,
+          posCount: 0,
+          negCount: 0,
+          itemCount: 0,
+        };
+        if (row.itemCount > 0) matched.push(row);
+        else rest.push(row);
+      }
+      return [...matched, ...rest];
+    })()
+    : allRows;
   if (!rows.length) {
     el.statsList.innerHTML = `<div class="empty">${esc(ui('scaleNone'))}</div>`;
     return;
   }
   el.statsList.innerHTML = rows.map(row => `
-    <article class="stat-card" data-stat="${esc(row.stat)}">
+    <article class="stat-card${row.itemCount > 0 ? '' : ' stat-card--dimmed'}" data-stat="${esc(row.stat)}">
       <div class="stat-card__name">${esc(row.label)}</div>
       <div class="stat-card__id">${esc(row.stat)}</div>
       <div class="stat-card__desc">${esc(row.desc)}</div>
@@ -1197,8 +1274,15 @@ function renderItemAffectedStats(item) {
 
   const statsMap = new Map(getStatRows().map(row => [row.stat, row]));
   const uniqStats = [...new Set(effects.map(effect => effect?.stat).filter(Boolean))];
+  const activeStatFilter = S.statFilter && S.statFilter !== 'all' ? S.statFilter : null;
+  const orderedStats = activeStatFilter
+    ? [
+      ...uniqStats.filter(stat => stat === activeStatFilter),
+      ...uniqStats.filter(stat => stat !== activeStatFilter),
+    ]
+    : uniqStats;
 
-  el.itemStats.innerHTML = uniqStats.map(stat => {
+  el.itemStats.innerHTML = orderedStats.map(stat => {
     const row = statsMap.get(stat);
     const labelRaw = t(`stat.${stat}`);
     const descRaw = t(`shop.stat.${stat}.tooltip`);

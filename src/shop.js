@@ -368,7 +368,7 @@ function getRarityUpgradeCost() {
 }
 
 function getSelectionCost() {
-  const n = Math.max(1, (shopLevel || 1) + shopSelectionCount);
+  const n = Math.max(1, (shopLevel || 1) * 2 + shopSelectionCount);
   return Math.max(1, Math.round(SHOP_SELECTION_BASE_COST + SHOP_SELECTION_STEP_PER_N * (n - 1)));
 }
 
@@ -863,6 +863,7 @@ function buildDOM() {
             <span id="shopGoldValue">0</span>
           </span>
           <button id="shopReroll" class="shop-reroll" type="button"></button>
+          <button id="shopClose" class="shop-close" type="button" title="${t("ui.close_item")}">✕</button>
         </div>
         <div class="shop-offerings" id="shopOfferings"></div>
         <div class="shop-detail" id="shopDetail" hidden>
@@ -1400,6 +1401,12 @@ function bindEvents() {
   if (!overlay) return;
 
   overlay.addEventListener("click", e => {
+    if (e.target.closest("#shopClose")) {
+      if (!purchaseAnimating) {
+        closeShop();
+      }
+      return;
+    }
     if (purchaseAnimating) return;
     // Rarity upgrade
     if (e.target.closest("#shopReroll")) {

@@ -128,7 +128,28 @@ function renderSvg(seed, map) {
 
   for (let i = 0; i < map.perkZones.length; i += 1) {
     const zone = map.perkZones[i];
+    if (zone.kind === "dual_stat" && Array.isArray(zone.sides)) {
+      const sideVisuals = {
+        drill: { icon: "D", color: "#69b7ff" },
+        explosion: { icon: "E", color: "#ffad63" },
+      };
+      for (const side of zone.sides) {
+        const visual = sideVisuals[side.kind] || sideVisuals.drill;
+        for (let j = 0; j < side.cells.length; j += 1) {
+          const cell = side.cells[j];
+          const zx = cell.x * TILE_PX;
+          const zy = cell.y * TILE_PX;
+          parts.push(`<rect x="${zx}" y="${zy}" width="${TILE_PX}" height="${TILE_PX}" fill="${visual.color}" fill-opacity="0.1"/>`);
+          parts.push(`<rect x="${zx + 2}" y="${zy + 2}" width="${TILE_PX - 4}" height="${TILE_PX - 4}" fill="none" stroke="${visual.color}" stroke-opacity="0.45" stroke-width="1"/>`);
+        }
+        parts.push(`<text x="${(side.iconX + 0.5) * TILE_PX}" y="${(side.iconY + 0.62) * TILE_PX}" fill="${visual.color}" font-size="${Math.max(10, TILE_PX)}" text-anchor="middle" font-family="monospace" font-weight="700">${esc(visual.icon)}</text>`);
+      }
+      continue;
+    }
     const perk = TILE_PERK_TYPES[zone.perkType];
+    if (!perk) {
+      continue;
+    }
     for (let j = 0; j < zone.cells.length; j += 1) {
       const cell = zone.cells[j];
       const zx = cell.x * TILE_PX;

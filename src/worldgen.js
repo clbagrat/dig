@@ -15,6 +15,13 @@ const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 26;
 const TILES_PER_PERK_ZONE = 380;
 const TILES_PER_CRYSTAL_TILE = 22;
+const DUAL_STAT_ZONE_RARITY_WEIGHTS = [
+  null,
+  [0, 74, 21, 4, 1],
+  [0, 64, 25, 8, 3],
+  [0, 54, 29, 12, 5],
+  [0, 42, 31, 18, 9],
+];
 const CRYSTAL_MIN_DISTANCE = 3;
 const BEACON_MIN_SPACING = 10;
 const ARTIFACT_MIN_DISTANCE = 8;
@@ -75,7 +82,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 17,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 1, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [0, 4, 17], thornVein: [1, 3, 5], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [0, 10, 25], goldOre: [5, 2, 2], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 8, hardnessBias: -1.2 },
+    rules: { beacons: 1, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, dualStatPerkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [0, 4, 17], thornVein: [1, 3, 5], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [0, 10, 25], goldOre: [5, 2, 2], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 8, hardnessBias: -1.2 },
+    required: {},
   },
   {
     id: 2,
@@ -83,7 +91,8 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 26,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 2, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [1, 4, 6], thornVein: [2, 4, 6], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 3, 6], goldOre: [5, 3, 5], gasPocket: [1, 4, 6], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 10, maxCrystals: 13, hardnessBias: -0.8 },
+    rules: { beacons: 2, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, dualStatPerkZones: 3, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [1, 4, 6], thornVein: [2, 4, 6], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 3, 6], goldOre: [5, 3, 5], gasPocket: [1, 4, 6], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 10, maxCrystals: 13, hardnessBias: -0.8 },
+    required: {},
   },
   {
     id: 3,
@@ -91,15 +100,26 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 40,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 4, hiddenBeacons: 1, upperBeacons: 0, lowerBeacons: 0, perkZones: 4, safes: 1, wormNests: 1, artifacts: 2, thornBlob: [2, 4, 5], thornVein: [3, 6, 9], bombBlob: [0, 4, 17], bombVein: [1, 6, 23], metalVein: [2, 10, 15], goldOre: [12, 4, 10], gasPocket: [1, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 1, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 20, maxCrystals: 25, hardnessBias: -0.4 },
+    rules: { beacons: 4, hiddenBeacons: 1, upperBeacons: 0, lowerBeacons: 0, perkZones: 4, dualStatPerkZones: 4, safes: 1, wormNests: 1, artifacts: 2, thornBlob: [2, 4, 5], thornVein: [3, 6, 9], bombBlob: [0, 4, 17], bombVein: [1, 6, 12], metalVein: [2, 10, 15], goldOre: [7, 4, 6], gasPocket: [4, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 2, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 20, maxCrystals: 25, hardnessBias: -0.4 },
+    required: {},
   },
   {
     id: 4,
+    height: 30,
+    width: 12,
+    canHostBase: false,
+    frame: "metal",
+    rules: { beacons: 1, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, dualStatPerkZones: 2, safes: 0, wormNests: 2, artifacts: 1, thornBlob: [1, 4, 8], thornVein: [2, 6, 11], bombBlob: [1, 4, 10], bombVein: [1, 6, 12], metalVein: [0, 8, 14], goldOre: [5, 3, 5], gasPocket: [0, 4, 10], steamPocket: [0, 3, 6], boulderPocketGroups: 0, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 6, maxCrystals: 10, hardnessBias: 0.75, hardnessDepthScale: 4.9, hardnessLocalScale: 0 },
+    required: {},
+  },
+  {
+    id: 5,
     height: 32,
     width: 52,
     canHostBase: true,
     frame: "metal",
-    rules: { beacons: 5, hiddenBeacons: 2, upperBeacons: 1, lowerBeacons: 1, perkZones: 5, safes: 1, wormNests: 2, artifacts: 2, thornBlob: [3, 4, 6], thornVein: [4, 7, 11], bombBlob: [1, 4, 17], bombVein: [2, 6, 23], metalVein: [3, 12, 18], goldOre: [16, 4, 11], gasPocket: [2, 4, 15], steamPocket: [2, 3, 10], boulderPocketGroups: 4, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 26, maxCrystals: 32, hardnessBias: 0.15 },
+    rules: { beacons: 5, hiddenBeacons: 2, upperBeacons: 1, lowerBeacons: 1, perkZones: 5, dualStatPerkZones: 5, safes: 1, wormNests: 2, artifacts: 2, thornBlob: [3, 4, 6], thornVein: [4, 7, 11], bombBlob: [1, 4, 17], bombVein: [2, 6, 23], metalVein: [3, 12, 18], goldOre: [10, 5, 7], gasPocket: [4, 4, 15], steamPocket: [4, 3, 10], boulderPocketGroups: 4, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 26, maxCrystals: 32, hardnessBias: 0.15 },
+    required: {},
   },
 ];
 
@@ -188,6 +208,28 @@ function validateLevelLayout(layout) {
     }
     if (level.rules.hiddenBeacons > level.rules.beacons) {
       throw new Error(`Level ${i + 1} hiddenBeacons must be <= beacons`);
+    }
+    if (!Number.isFinite(level.rules.dualStatPerkZones)) {
+      level.rules.dualStatPerkZones = i === 0 ? 0 : 1;
+    }
+    level.rules.dualStatPerkZones = Math.round(Number(level.rules.dualStatPerkZones));
+    if (!Number.isFinite(level.rules.dualStatPerkZones) || level.rules.dualStatPerkZones < 0) {
+      throw new Error(`Level ${i + 1} dualStatPerkZones must be at least 0`);
+    }
+    if (!Number.isFinite(Number(level.rules.hardnessBias))) {
+      level.rules.hardnessBias = 0;
+    } else {
+      level.rules.hardnessBias = Number(level.rules.hardnessBias);
+    }
+    if (!Number.isFinite(Number(level.rules.hardnessDepthScale))) {
+      level.rules.hardnessDepthScale = 4.9;
+    } else {
+      level.rules.hardnessDepthScale = Number(level.rules.hardnessDepthScale);
+    }
+    if (!Number.isFinite(Number(level.rules.hardnessLocalScale))) {
+      level.rules.hardnessLocalScale = 1.2;
+    } else {
+      level.rules.hardnessLocalScale = Number(level.rules.hardnessLocalScale);
     }
     const legacyTypes = Array.isArray(level.rules.thornTypes)
       ? level.rules.thornTypes
@@ -561,6 +603,29 @@ function chooseTilePerkForPosition(x, y, random) {
   return chooseWeightedPerk(random, weights);
 }
 
+function rollRarityFromWeights(weights, random) {
+  let total = 0;
+  for (let rarity = 1; rarity <= 4; rarity += 1) {
+    total += Math.max(0, Number(weights?.[rarity] || 0));
+  }
+  if (total <= 0) {
+    return 1;
+  }
+  let roll = random() * total;
+  for (let rarity = 1; rarity <= 4; rarity += 1) {
+    roll -= Math.max(0, Number(weights?.[rarity] || 0));
+    if (roll <= 0) {
+      return rarity;
+    }
+  }
+  return 1;
+}
+
+function rollDualStatZoneRarity(level, random) {
+  const depth = clamp(level?.level || 1, 1, DUAL_STAT_ZONE_RARITY_WEIGHTS.length - 1);
+  return rollRarityFromWeights(DUAL_STAT_ZONE_RARITY_WEIGHTS[depth], random);
+}
+
 function chooseCrystalType(random) {
   return 1 + Math.floor(random() * (CRYSTAL_TYPES.length - 1));
 }
@@ -605,7 +670,9 @@ function buildHardness(random) {
     forEachCellInLevel(level, (x, y) => {
       const depthRatio = getLevelDepthRatio(level, y);
       const localRatio = (y - level.startY) / Math.max(1, level.height - 1);
-      danger[cellIndex(x, y)] = 0.95 + depthRatio * 4.9 + localRatio * 1.2 + level.rules.hardnessBias;
+      const depthScale = Number.isFinite(Number(level.rules.hardnessDepthScale)) ? Number(level.rules.hardnessDepthScale) : 4.9;
+      const localScale = Number.isFinite(Number(level.rules.hardnessLocalScale)) ? Number(level.rules.hardnessLocalScale) : 1.2;
+      danger[cellIndex(x, y)] = 0.95 + depthRatio * depthScale + localRatio * localScale + level.rules.hardnessBias;
     });
 
     for (let n = 0; n < thornBlobCount; n += 1) {
@@ -1210,6 +1277,46 @@ function createPerkZoneShape(random) {
   };
 }
 
+function createDualStatZoneShape(random) {
+  const horizontal = random() < 0.5;
+  const swapSides = random() < 0.5;
+  const firstKind = swapSides ? "explosion" : "drill";
+  const secondKind = swapSides ? "drill" : "explosion";
+  const firstOrigin = { x: 0, y: 0 };
+  const secondOrigin = horizontal ? { x: 3, y: 0 } : { x: 0, y: 3 };
+  const cells = [];
+  const sides = [];
+  const sideDefs = [
+    { kind: firstKind, origin: firstOrigin },
+    { kind: secondKind, origin: secondOrigin },
+  ];
+
+  for (let sideIndex = 0; sideIndex < sideDefs.length; sideIndex += 1) {
+    const side = sideDefs[sideIndex];
+    const sideCells = [];
+    for (let dy = 0; dy < 2; dy += 1) {
+      for (let dx = 0; dx < 2; dx += 1) {
+        const x = side.origin.x + dx;
+        const y = side.origin.y + dy;
+        sideCells.push({ x, y });
+        cells.push({ x, y });
+      }
+    }
+    sides.push({
+      kind: side.kind,
+      iconX: side.origin.x,
+      iconY: side.origin.y,
+      cells: sideCells,
+    });
+  }
+
+  const width = horizontal ? 5 : 2;
+  const height = horizontal ? 2 : 5;
+  const centerX = (width - 1) * 0.5;
+  const centerY = (height - 1) * 0.5;
+  return { cells, sides, width, height, centerX, centerY };
+}
+
 function placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random) {
   for (const level of DEPTH_LEVELS) {
     const placed = [];
@@ -1259,6 +1366,88 @@ function placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask,
       for (let i = 0; i < cells.length; i += 1) {
         perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
       }
+    }
+  }
+}
+
+function placeDualStatPerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random) {
+  for (const level of DEPTH_LEVELS) {
+    const targetCount = Math.max(0, Math.round(level.rules.dualStatPerkZones || 0));
+    if (targetCount <= 0) {
+      continue;
+    }
+
+    const placed = [];
+    for (let i = 0; i < perkZones.length; i += 1) {
+      const zone = perkZones[i];
+      if (!zone || !isInsideLevel(Math.round(zone.x), Math.round(zone.y), level, 0)) continue;
+      placed.push({ x: zone.x, y: zone.y });
+    }
+
+    let placedCount = 0;
+    let attempts = 0;
+    const maxAttempts = Math.max(220, targetCount * 260);
+    while (placedCount < targetCount && attempts < maxAttempts) {
+      attempts += 1;
+      const shape = createDualStatZoneShape(random);
+      const origin = randomCellInLevel(level, 2, random);
+      if (!origin) break;
+      const originX = clamp(origin.x, level.xMin + 1, level.xMax - shape.width);
+      const originY = clamp(origin.y, level.startY + 1, level.endY - shape.height);
+      const centerX = originX + shape.centerX;
+      const centerY = originY + shape.centerY;
+      if (!isFarEnoughFromPlaced(centerX, centerY, placed, PERK_ZONE_MIN_DISTANCE)) continue;
+
+      let blocked = false;
+      const cells = [];
+      const sideCells = { drill: [], explosion: [] };
+      const sides = [];
+      for (let i = 0; i < shape.sides.length; i += 1) {
+        const side = shape.sides[i];
+        const absCells = [];
+        for (let j = 0; j < side.cells.length; j += 1) {
+          const cell = side.cells[j];
+          const x = originX + cell.x;
+          const y = originY + cell.y;
+          const index = cellIndex(x, y);
+          if (
+            !isInsideLevel(x, y, level, 0) ||
+            (x === START_X && y === START_Y) ||
+            (x === base.x && y === base.y) ||
+            metalMask[index] || perkZoneMask[index] !== -1 ||
+            gasPocketMask[index] || steamPocketMask[index] || boulderPocketMask[index] || beaconMask[index]
+          ) {
+            blocked = true;
+            break;
+          }
+          absCells.push({ x, y });
+          cells.push({ x, y });
+        }
+        if (blocked) break;
+        sideCells[side.kind] = absCells;
+        sides.push({
+          kind: side.kind,
+          iconX: originX + side.iconX,
+          iconY: originY + side.iconY,
+          cells: absCells,
+        });
+      }
+      if (blocked || sideCells.drill.length !== 4 || sideCells.explosion.length !== 4) continue;
+
+      const zoneId = perkZones.length;
+      perkZones.push({
+        kind: "dual_stat",
+        rarity: rollDualStatZoneRarity(level, random),
+        x: centerX,
+        y: centerY,
+        cells,
+        sides,
+      });
+      placed.push({ x: centerX, y: centerY });
+      for (let i = 0; i < cells.length; i += 1) {
+        perkZoneMask[cellIndex(cells[i].x, cells[i].y)] = zoneId;
+      }
+      placedCount += 1;
     }
   }
 }
@@ -1413,7 +1602,6 @@ function placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocket
       if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) continue;
       const distFromStart = Math.hypot(x - START_X, y - START_Y);
       if (distFromStart < WORM_NEST_MIN_START_DISTANCE) continue;
-      if (!isFarEnoughFromPlaced(x, y, placed, WORM_NEST_MIN_DISTANCE)) continue;
       let tooCloseToBeacon = false;
       for (const b of beacons) {
         if (Math.hypot(x - b.x, y - b.y) < WORM_NEST_MIN_BEACON_DIST) {
@@ -1467,7 +1655,9 @@ function repairPockets(pocketMask, beaconMask) {
 function validateLevelRequirements(map) {
   for (const level of DEPTH_LEVELS) {
     const beaconCount = map.beacons.filter((b) => isInsideLevel(b.x, b.y, level, 0)).length;
-    const perkZoneCount = map.perkZones.filter((zone) => isInsideLevel(Math.round(zone.x), Math.round(zone.y), level, 0)).length;
+    const perkZoneCount = map.perkZones.filter(
+      (zone) => (!zone?.kind || zone.kind !== "dual_stat") && isInsideLevel(Math.round(zone.x), Math.round(zone.y), level, 0),
+    ).length;
     const safeCount = map.safes.filter((safe) => isInsideLevel(safe.cx, safe.cy, level, 0)).length;
     const wormCount = map.wormNests.filter((nest) => isInsideLevel(nest.x, nest.y, level, 0)).length;
     const artifactCount = collectCandidatesInLevel(level, 0, (x, y) => map.artifactMask[cellIndex(x, y)] > 0).length;
@@ -1544,7 +1734,8 @@ function generateBeaconWires(beacons, metalMask, random) {
  * Returns plain data arrays — no game state, safe to use from any context.
  *
  * beacons entries: { x, y }  (game.js adds `active: false`)
- * perkZones entries: { x, y, cells, iconX, iconY, perkType }
+ * perkZones entries: { x, y, cells, iconX, iconY, perkType } or
+ *   { kind: "dual_stat", rarity, x, y, cells, sides: [{ kind, iconX, iconY, cells }] }
  *   (game.js adds openedCount, openedMask, arming, armingTimer, collected)
  */
 export function generateMap(seed) {
@@ -1636,6 +1827,7 @@ export function generateMap(seed) {
   placePerkTiles(perkMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placeCrystalTiles(crystalMask, perkMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
+  placeDualStatPerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
   placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
   const wormNests = placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, safes, base, random);
 

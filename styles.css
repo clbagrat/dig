@@ -919,6 +919,16 @@ strong {
   gap: 10px;
 }
 
+.debug-perk-menu__subhead {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  margin-bottom: -2px;
+  color: rgba(255, 225, 176, 0.9);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .debug-perk-menu__button {
   border: 1px solid rgba(215, 159, 73, 0.34);
   border-radius: 14px;
@@ -2280,6 +2290,12 @@ strong {
 .shop-card:not(.shop-card--sold):hover { transform: translateY(-2px); }
 .shop-card:active { transform: scale(0.95); }
 
+.shop-card--equipment {
+  background:
+    linear-gradient(180deg, rgba(66, 118, 182, 0.14), rgba(22, 11, 5, 0.7) 42%),
+    rgba(22, 11, 5, 0.7);
+}
+
 .shop-card--fading {
   opacity: 0.18;
 }
@@ -2384,11 +2400,16 @@ strong {
 }
 
 .shop-card__type {
-  font-size: 11px;
-  opacity: 0.6;
+  font-size: 13px;
+  opacity: 0.92;
   position: absolute;
-  top: 4px;
+  top: 6px;
   right: 6px;
+  line-height: 1;
+}
+
+.shop-card--equipment .shop-card__type {
+  font-size: 14px;
 }
 
 .shop-card__icon {

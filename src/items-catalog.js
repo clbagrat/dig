@@ -28,7 +28,7 @@ export const RARITY_EFFECT_MULT = {
 const CATEGORY_DEFS = [
   { id: "basic",        icon: "D",  inDevelopment: false },
   { id: "economy",      icon: "●",  inDevelopment: true },
-  { id: "handwork",  icon: "💧", inDevelopment: true },
+  { id: "handwork",  icon: "💧", inDevelopment: false },
   { id: "heat",         icon: "🔥", inDevelopment: true },
   { id: "выживание",    icon: "❤️", inDevelopment: true },
   { id: "поиск_бреши",  icon: "🎯", inDevelopment: false },
@@ -98,6 +98,34 @@ export const ALL_EQUIPMENT = [
     category: "выживание",
     tags: ["выживание"],
     minRarity: 1,
+  },
+  {
+    id: "telescopic_drill",
+    type: "equipment",
+    name: "Телескопический бур",
+    icon: "🪛",
+    desc: "Урон 10 + 10/20/30/40% от drillPower. Пробивает 1 блок вперед с 10/20/30/40% урона.",
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPiercingCount", effectByRarity: [null, 1, 1, 1, 1] },
+      { stat: "drillPiercingDamage", effectByRarity: [null, 10, 20, 30, 40] },
+    ],
+  },
+  {
+    id: "diagonal_drill_array",
+    type: "equipment",
+    name: "Диагональные буры",
+    icon: "⛏️",
+    desc: "Урон 10 + 10/15/20/25% от drillPower. Добавляет 2 диагональных удара. Диагонали наносят 10/20/30/40% финального урона.",
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillDiagonalCount", effectByRarity: [null, 2, 2, 2, 2] },
+      { stat: "drillDiagonalDamage", effectByRarity: [null, 10, 20, 30, 40] },
+    ],
   },
   {
     id: "lucky_pickaxe",
@@ -623,6 +651,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     effect: [
       { stat: "weakSpotPierce", effectByRarity: [null, 1, 1, 2, 3] },
+      { stat: "drillPiercingDamage", effectByRarity: [null, 10, 10, 15, 15] },
       { stat: "weakSpotMult", effectByRarity: [null, -0.30, -0.20, -0.20, -0.10] },
     ],
   },
@@ -651,16 +680,6 @@ export const ALL_ITEMS = [
       { stat: "lowFuelSpeedBonus", effectByRarity: [null, 0.10, 0.15, 0.22, 0.30] },
       { stat: "fuelDrainRate", effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
     ],
-  },
-  {
-    id: "study_crown",
-    type: "item",
-    name: "Учебная коронка",
-    icon: "🎓",
-    category: "handwork",
-    tags: ["handwork"],
-    minRarity: 1,
-    effect: { stat: "drillPowerPerLevel", effectByRarity: [null, 5, 7, 10, 12] },
   },
   {
     id: "acceleration_template",
@@ -723,7 +742,7 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Форсажная камера",
     icon: "💨",
-    desc: "+15% скорость бура. −1 макс. HP (не ниже 1).",
+    desc: "+15% скорость бура. −1 макс. ЖЗН. (не ниже 1 HP).",
     get descParts() {
       return [
         { type: "effect", index: 0 },
@@ -951,34 +970,6 @@ export const ALL_ITEMS = [
     },
   },
   {
-    id: "fuel_impulse",
-    type: "item",
-    name: "Топливный импульс",
-    icon: "⚗️",
-    desc: "При каждом уровне: +50 топлива.",
-    category: "handwork",
-    tags: ["handwork"],
-    minRarity: 1,
-    effect: {
-      stat: "fuelPerLevel",
-      effectByRarity: [null, 50, 75, 100, 150],
-    },
-  },
-  {
-    id: "rapid_adaptation",
-    type: "item",
-    name: "Ускоренная адаптация",
-    icon: "🔩",
-    desc: "При каждом уровне: +2% скорости бура.",
-    category: "handwork",
-    tags: ["handwork"],
-    minRarity: 1,
-    effect: {
-      stat: "strikeSpeedPerLevel",
-      effectByRarity: [null, 2, 3, 4, 6],
-    },
-  },
-  {
     id: "experience_regen",
     type: "item",
     name: "Регенерация через опыт",
@@ -1023,20 +1014,6 @@ export const ALL_ITEMS = [
   },
 
   // ── Maintenance ───────────────────────────────────────────────────────────────
-  {
-    id: "fuel_injector",
-    type: "item",
-    name: "Топливный инжектор",
-    icon: "⚙️",
-    desc: "+2 сила бура. +15% расход топлива.",
-    category: "handwork",
-    tags: ["handwork"],
-    minRarity: 1,
-    effect: [
-      { stat: "drillPower",   effectByRarity: [null, 2,    3,    5,    8   ] },
-      { stat: "fuelDrainRate",effectByRarity: [null, 0.15, 0.20, 0.28, 0.38] },
-    ],
-  },
   {
     id: "wear_sensor",
     type: "item",
@@ -1295,13 +1272,241 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Форсированная подача",
     icon: "🚀",
-    desc: "+20% скорость бура. +15% расход топлива.",
+    desc: "Скорость бура растёт, но растёт и расход топлива.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+      ];
+    },
     category: "handwork",
     tags: ["handwork"],
     minRarity: 1,
     effect: [
-      { stat: "strikeSpeed",  effectByRarity: [null, 20, 28, 38, 50] },
-      { stat: "fuelDrainRate",effectByRarity: [null, 0.15, 0.20, 0.25, 0.30] },
+      { stat: "strikeSpeed",  effectByRarity: [null, 14, 20, 27, 35] },
+      { stat: "fuelDrainRate",effectByRarity: [null, 0.12, 0.12, 0.12, 0.12] },
+    ],
+  },
+  {
+    id: "overheal_spindle",
+    type: "item",
+    name: "Сверхлечебный шпиндель",
+    icon: "🩺",
+    desc: "Оверхил даёт постоянный прирост пробивающего урона.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "overhealSpindlePiercingGain", effectByRarity: [null, 1, 1, 2, 2] },
+      { stat: "concentration", effectByRarity: [null, 5, 7, 10, 13] },
+      { stat: "explosionPower", effectByRarity: [null, -8, -8, -8, -8] },
+    ],
+  },
+  {
+    id: "overflow_governor",
+    type: "item",
+    name: "Регулятор переполнения",
+    icon: "🛢️",
+    desc: "Переполнение топлива даёт постоянный прирост силы бура.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "overflowGovernorDrillGain", effectByRarity: [null, 2, 3, 4, 5] },
+      { stat: "maxFuel", effectByRarity: [null, 25, 40, 55, 70] },
+      { stat: "explosionBonus", effectByRarity: [null, -25, -25, -25, -25] },
+    ],
+  },
+  {
+    id: "stun_latch_servo",
+    type: "item",
+    name: "Серво-защелка стана",
+    icon: "🔧",
+    desc: "После оглушения включает форсаж.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "stunAfterburnerLevel", effectByRarity: [null, 1, 2, 3, 4] },
+      { stat: "concentration", effectByRarity: [null, 8, 10, 12, 15] },
+      { stat: "explosionRadiusBonus", effectByRarity: [null, -0.5, -0.5, -0.5, -0.5] },
+    ],
+  },
+  {
+    id: "carbide_feed",
+    type: "item",
+    name: "Карбидная подача",
+    icon: "⚙️",
+    desc: "Сильнее бур и пробитие, слабее взрывы.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPower", effectByRarity: [null, 6, 9, 12, 15] },
+      { stat: "drillPiercingDamage", effectByRarity: [null, 8, 12, 16, 20] },
+      { stat: "explosionPower", effectByRarity: [null, -6, -6, -6, -6] },
+    ],
+  },
+  {
+    id: "narrow_bore_head",
+    type: "item",
+    name: "Узкая бур-головка",
+    icon: "🪛",
+    desc: "Упор в пробитие, но режет взрывной радиус.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPiercingDamage", effectByRarity: [null, 15, 20, 25, 30] },
+      { stat: "drillPiercingCount", effectByRarity: [null, 0, 1, 1, 1] },
+      { stat: "explosionRadiusBonus", effectByRarity: [null, -0.5, -0.5, -0.5, -0.5] },
+    ],
+  },
+  {
+    id: "anti_blast_coupler",
+    type: "item",
+    name: "Противовзрывная муфта",
+    icon: "🧲",
+    desc: "Быстрее и точнее бур, но хуже взрывной урон.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "strikeSpeed", effectByRarity: [null, 10, 14, 18, 22] },
+      { stat: "drillPower", effectByRarity: [null, 3, 5, 6, 8] },
+      { stat: "explosionBonus", effectByRarity: [null, -20, -20, -20, -20] },
+    ],
+  },
+  {
+    id: "dry_cut_regulator",
+    type: "item",
+    name: "Регулятор сухого реза",
+    icon: "🧰",
+    desc: "Усиливает бур, но режет взрывную силу.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPower", effectByRarity: [null, 8, 11, 14, 18] },
+      { stat: "strikeSpeed", effectByRarity: [null, 5, 7, 9, 12] },
+      { stat: "explosionPower", effectByRarity: [null, -10, -10, -10, -10] },
+    ],
+  },
+  {
+    id: "needle_rack",
+    type: "item",
+    name: "Игольчатый блок",
+    icon: "📌",
+    desc: "Больше пробивных ударов, но слабее взрывной урон.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPiercingCount", effectByRarity: [null, 1, 1, 2, 2] },
+      { stat: "drillPiercingDamage", effectByRarity: [null, 8, 12, 16, 20] },
+      { stat: "explosionBonus", effectByRarity: [null, -15, -15, -15, -15] },
+    ],
+  },
+  {
+    id: "precision_cooler",
+    type: "item",
+    name: "Точный охладитель",
+    icon: "🧊",
+    desc: "Бур быстрее и экономичнее, но взрывы слабее.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "strikeSpeed", effectByRarity: [null, 12, 16, 20, 25] },
+      { stat: "fuelDrainRate", effectByRarity: [null, -0.04, -0.06, -0.08, -0.10] },
+      { stat: "explosionPower", effectByRarity: [null, -5, -5, -5, -5] },
+    ],
+  },
+  {
+    id: "blast_shy_crown",
+    type: "item",
+    name: "Антивзрывная коронка",
+    icon: "👑",
+    desc: "Сильный бур и пробитие ценой взрывов.",
+    get descParts() {
+      return [
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+        { type: "effect", index: 2 },
+        { type: "effect", index: 3 },
+      ];
+    },
+    category: "handwork",
+    tags: ["handwork"],
+    minRarity: 1,
+    effect: [
+      { stat: "drillPower", effectByRarity: [null, 10, 13, 16, 20] },
+      { stat: "drillPiercingDamage", effectByRarity: [null, 6, 9, 12, 15] },
+      { stat: "explosionPower", effectByRarity: [null, -12, -12, -12, -12] },
+      { stat: "explosionRadiusBonus", effectByRarity: [null, -0.25, -0.25, -0.25, -0.25] },
     ],
   },
   {
@@ -1595,6 +1800,21 @@ export const ALL_ITEMS = [
     ],
   },
   {
+    id: "contour_combustor",
+    type: "item",
+    name: "Контурный комбустор",
+    icon: "💥",
+    desc: "+8/12/16/20 к силе взрыва. Монстр контура появляется на 10% реже. +13% к расходу топлива.",
+    category: "контур",
+    tags: ["контур"],
+    minRarity: 1,
+    effect: [
+      { stat: "explosionPower", effectByRarity: [null, 8, 12, 16, 20] },
+      { stat: "contourEnemySpawnRateBonus", effectByRarity: [null, -0.10, -0.10, -0.10, -0.10] },
+      { stat: "fuelDrainRate", effectByRarity: [null, 0.13, 0.13, 0.13, 0.13] },
+    ],
+  },
+  {
     id: "contour_resonance_drill",
     type: "item",
     name: "Резонансный контур-бур",
@@ -1753,7 +1973,7 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Форсаж после стана",
     icon: "⚡",
-    desc: "После оглушения — форсаж. Дольше стан → длиннее разгон.",
+    desc: "После оглушения — форсаж фиксированной длительности.",
     category: "выживание",
     tags: ["выживание"],
     minRarity: 2,
@@ -1835,6 +2055,12 @@ const SIMPLE_STAT_DESCRIPTORS = {
   contourEnemyHpPerTileBonus: value => t("desc.contourEnemyHpPerTileBonus", { val: formatSignedDescriptionNumber(value) }),
   contourEnemyRewardPerTileBonus: value => t("desc.contourEnemyRewardPerTileBonus", { val: formatSignedDescriptionNumber(value) }),
   contourEnemySpawnRateBonus: value => t("desc.contourEnemySpawnRateBonus", { val: formatSignedPercent(value, 100) }),
+  drillPiercingCount: value => t("desc.drillPiercingCount", { val: formatDescriptionNumber(value) }),
+  drillPiercingDamage: value => t("desc.drillPiercingDamage", { val: formatSignedPercent(value) }),
+  overhealSpindlePiercingGain: value => t("desc.overhealSpindlePiercingGain", { val: formatSignedPercent(value) }),
+  overflowGovernorDrillGain: value => t("desc.overflowGovernorDrillGain", { val: formatSignedDescriptionNumber(value) }),
+  drillDiagonalCount: value => t("desc.drillDiagonalCount", { val: formatDescriptionNumber(value) }),
+  drillDiagonalDamage: value => t("desc.drillDiagonalDamage", { val: formatSignedPercent(value) }),
   goldBonus: value => t("desc.goldBonus", { val: formatSignedPercent(value, 100) }),
   miningGoldBonusMultiplier: value => t("desc.miningGoldBonusMultiplier", { val: formatSignedPercent(value, 100) }),
   xpBonus: value => t("desc.xpBonus", { val: formatSignedPercent(value, 100) }),
@@ -1876,7 +2102,7 @@ const SIMPLE_STAT_DESCRIPTORS = {
   beaconCatalystLevel: () => t("desc.beaconCatalystLevel"),
   levelCatalystLevel: () => t("desc.levelCatalystLevel"),
   stunReservoirLevel: value => t("desc.stunReservoirLevel", { val: formatSignedDescriptionNumber(value * 40) }),
-  stunAfterburnerLevel: value => t("desc.stunAfterburnerLevel", { val: value * 2 }),
+  stunAfterburnerLevel: value => t("desc.stunAfterburnerLevel", { val: [0, 3, 4, 5, 6][Math.max(0, Math.floor(Number(value) || 0))] || 0 }),
   weakSpotPierce: value => t("desc.weakSpotPierce", { val: formatDescriptionNumber(value) }),
   breachAfterburnerSeconds: value => t("desc.breachAfterburnerSeconds", { val: formatDescriptionNumber(value) }),
   breachChainHitsOnTrigger: value => t("desc.breachChainHitsOnTrigger", { val: formatDescriptionNumber(value) }),
@@ -1944,6 +2170,40 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (damageScale / 100))}]`
       : "";
     return t("desc.special.fragile_drill", { flat: flatDamage, scale: formatDescriptionNumber(damageScale), total: totalText, speed: formatSignedPercent(speedBonus) });
+  },
+  telescopic_drill(rarity, stats = null) {
+    const flatDamage = 10;
+    const drillScale = getEffectValue({ effectByRarity: [0, 10, 20, 30, 40] }, rarity);
+    const pierceCount = 1;
+    const pierceDamage = getEffectValue({ effectByRarity: [0, 10, 20, 30, 40] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const totalText = hasDrillPower
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (drillScale / 100))}]`
+      : "";
+    return t("desc.special.telescopic_drill", {
+      flat: formatDescriptionNumber(flatDamage),
+      scale: formatDescriptionNumber(drillScale),
+      total: totalText,
+      pierceCount: formatDescriptionNumber(pierceCount),
+      pierceDamage: formatDescriptionNumber(pierceDamage),
+    });
+  },
+  diagonal_drill_array(rarity, stats = null) {
+    const flatDamage = 10;
+    const drillScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const diagonalCount = 2;
+    const diagonalDamage = getEffectValue({ effectByRarity: [0, 10, 20, 30, 40] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const totalText = hasDrillPower
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (drillScale / 100))}]`
+      : "";
+    return t("desc.special.diagonal_drill_array", {
+      flat: formatDescriptionNumber(flatDamage),
+      scale: formatDescriptionNumber(drillScale),
+      total: totalText,
+      diagonalCount: formatDescriptionNumber(diagonalCount),
+      diagonalDamage: formatDescriptionNumber(diagonalDamage),
+    });
   },
   lucky_pickaxe(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);

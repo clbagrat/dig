@@ -239,7 +239,9 @@ Current spatial rules:
 
 ## Perk Zones
 
-There are hidden `3x3` perk zones under rock.
+There are hidden perk zones under rock:
+- classic random shapes (`6..9` cells)
+- dual stat zones made of two `2x2` blocks with a `1`-tile gap between them (`D` and `E`)
 
 Rules:
 - each zone is assigned one tile perk type
@@ -252,6 +254,12 @@ Reward:
 Special bomb zone:
 - instead of three ordinary bomb pickups, it triggers one larger explosion
 - current large bomb radius: `3`
+
+Dual stat zone:
+- blue `D`: when fully excavated, gives `+5 * depthLevel` drill power
+- orange `E`: when fully excavated, gives `+5 * depthLevel` explosion power
+- if one side is excavated first, the other side instantly explodes and is lost
+- if both sides are excavated before resolve (same explosion/frame), both rewards are granted
 
 Zones are generated from density rules and scale with map area.
 
@@ -321,6 +329,9 @@ Current available shop content includes:
 - alchemy equipment `Маячный реторт-бур`: `12` base damage; when mining toward a beacon and moving closer to it within radius `10`, adds `20 + 15/20/25/30% drillPower`
 - alchemy equipment `Рецептурный реторт-бур`: `5 + 5/7/9/11` damage per completed crystal recipe this run
 - contour equipment `Контурный перегруз-бур`: base strike damage `15/20/25/30`; when contour length exceeds max, every contour segment explodes with radius `1` for `30/40/50/60 + 20/30/40/50% explosionPower`, with one hit per block in that overflow blast
+- contour equipment `Контурный линейный бур`: strike damage `10 + 10/20/30/40% drillPower + 1/2/3/4 * contourLength`
+- contour equipment `Контурное давление`: on contour closure grants a temporary buff for `4/4.5/5/5.5 sec`, increasing `drillPower` by `3/4/5/6` per block destroyed by that contour closure
+- contour item `Резонансный контур-бур`: on breach hit, contour resonance deals `20 + 10/15/20/30% explosionPower`; additionally grants `+3/6/9/11%` breach chance and applies `-1/-1/-2/-2` max contour length
 - alchemy item `Нестабильный реагент`: `+5/7/10/13% concentration`, `-5/8/12/16% fuel drain`, and `-5/7/10/13%` to max collapse points
 - alchemy item `Рецептурный стабилизатор`: recipe completion restores `10/20/30/40%` of current max collapse budget and also applies `-5%` to max collapse points
 - a new low-fuel damage stat that can appear on shop items and scales drill damage as the tank empties
