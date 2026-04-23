@@ -665,6 +665,7 @@ const state = {
   goldClustersCache: null,
   blocksBroken: 0,
   drillBrokenBlocks: 0,
+  comboCount: 0,
   weakSpotChance: 0,
   weakSpotMult: 2,
   weakSpotPierce: 0,
@@ -1529,7 +1530,11 @@ const GENERATION_QUICK_FIELDS = [
   { label: "Artifact Count", source: "rules.artifacts", min: 0, step: 1 },
   { label: "Minimum Crystals", source: "rules.minCrystals", min: 0, step: 1 },
   { label: "Maximum Crystals", source: "rules.maxCrystals", min: 0, step: 1 },
+  { label: "Hardness Bias", source: "rules.hardnessBias", min: -5, max: 5, step: 0.1, defaultValue: 0 },
+  { label: "Hardness Depth Scale", source: "rules.hardnessDepthScale", min: 0, max: 10, step: 0.1, defaultValue: 4.9 },
+  { label: "Hardness Local Scale", source: "rules.hardnessLocalScale", min: 0, max: 5, step: 0.1, defaultValue: 1.2 },
 ];
+const GENERATION_QUICK_FIELD_BY_SOURCE = new Map(GENERATION_QUICK_FIELDS.map((field) => [field.source, field]));
 
 const GENERATION_TRIPLET_FIELDS = [
   { label: "Thorn Blob", source: "rules.thornBlob" },
@@ -1649,6 +1654,24 @@ function tryParseGenerationEditorText() {
   } catch {
     return null;
   }
+}
+
+function getGenerationQuickFieldValue(level, field) {
+  const raw = getValueByPath(level, field.source);
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+  return Number.isFinite(Number(field.defaultValue)) ? Number(field.defaultValue) : 0;
+}
+
+function formatGenerationQuickFieldValue(field, value) {
+  const step = Number(field?.step ?? 1);
+  if (step > 0 && step < 1) {
+    const decimals = Math.min(4, Math.max(1, String(step).split(".")[1]?.length || 1));
+    return Number(value).toFixed(decimals).replace(/\.?0+$/, "");
+  }
+  return String(Math.round(Number(value)));
 }
 
 function renderGenerationQuickEditor() {
@@ -1776,9 +1799,9 @@ function renderGenerationQuickEditor() {
       const field = GENERATION_QUICK_FIELDS[j];
       const fieldWrap = document.createElement("label");
       fieldWrap.className = "debug-generation__field";
-      const value = getValueByPath(level, field.source);
-      const prevValue = prevLevel !== null ? getValueByPath(prevLevel, field.source) : null;
-      const prevValueFmt = prevValue !== null && Number.isFinite(Number(prevValue)) ? Math.round(Number(prevValue)) : null;
+      const value = getGenerationQuickFieldValue(level, field);
+      const prevValue = prevLevel !== null ? getGenerationQuickFieldValue(prevLevel, field) : null;
+      const prevValueFmt = prevValue !== null ? formatGenerationQuickFieldValue(field, prevValue) : null;
       fieldWrap.innerHTML = `
         <span class="debug-generation__field-label">${field.label}${ph(prevValueFmt)}</span>
         <input
@@ -1790,7 +1813,7 @@ function renderGenerationQuickEditor() {
           min="${field.min ?? 0}"
           ${field.max !== undefined ? `max="${field.max}"` : ""}
           step="${field.step ?? 1}"
-          value="${Number.isFinite(Number(value)) ? Math.round(Number(value)) : 0}"
+          value="${formatGenerationQuickFieldValue(field, value)}"
         >
       `;
       grid?.appendChild(fieldWrap);
@@ -1918,7 +1941,10 @@ function bindGenerationDebugControls() {
       if (target.type === "checkbox") {
         setValueByPath(config[levelIndex], source, target.checked);
       } else {
-        const nextValue = Math.round(Number(target.value));
+        const field = GENERATION_QUICK_FIELD_BY_SOURCE.get(source);
+        const parsed = Number(target.value);
+        const isDecimalField = !!field && Number(field.step) > 0 && Number(field.step) < 1;
+        const nextValue = isDecimalField ? parsed : Math.round(parsed);
         if (!Number.isFinite(nextValue)) {
           return;
         }
@@ -2548,6 +2574,7 @@ function setupField(seedOverride = null) {
   state.goldClustersCache = null;
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
+  state.comboCount = 0;
   state.weakSpotChance = 0;
   state.weakSpotMult = 2;
   state.weakSpotPierce = 0;
@@ -8316,7 +8343,7 @@ function applyLoopPressureBuff(brokenCellCount) {
   if (brokenCellCount <= 0) return;
   let bonus = 0;
   let duration = 0;
-  for (const tier of getEquipmentTiers("loop_pressure")) {
+  for (const tier of getItemTiers("loop_pressure")) {
     const perBlock = [0, 3, 4, 5, 6][tier] || 0;
     const tierDuration = [0, 4, 4.5, 5, 5.5][tier] || 0;
     bonus += perBlock * brokenCellCount;
@@ -10360,7 +10387,7 @@ function updateDrill(dt) {
     strikeDamage *= Math.max(1, state.weakSpotMult || 1);
   }
   const hardness = state.hardness[targetIndex];
-  damageCell(targetX, targetY, strikeDamage, {
+  const brokeTargetBlock = damageCell(targetX, targetY, strikeDamage, {
     moveDrill: true,
     fromX: state.drill.x,
     fromY: state.drill.y,
@@ -10369,6 +10396,7 @@ function updateDrill(dt) {
     dirY: dy,
     pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)),
   });
+  state.comboCount = brokeTargetBlock ? (state.comboCount + 1) : 0;
   if (empoweredStrike) {
     state.breachChainEmpoweredHits = Math.max(0, state.breachChainEmpoweredHits - 1);
   }
@@ -11656,7 +11684,8 @@ function render() {
         if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
         } else if (state.beaconMask[index] === 3) {
-          drawTileSprite(state.sprites.blocks[1]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
+          const hiddenBeaconCoverTier = clamp(Math.round(state.hardness[index] || 1), 1, BLOCK_TYPES.length - 1);
+          drawTileSprite(state.sprites.blocks[hiddenBeaconCoverTier]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
         } else if (state.gasPocketMask[index]) {
           drawTileSprite(state.sprites.gasPocket, sx, sy);
         } else if (state.steamPocketMask[index]) {
@@ -11679,7 +11708,8 @@ function render() {
         if (state.tunnelMask[index] || state.beaconMask[index] === 1) {
           drawTileSprite(state.sprites.tunnel, sx, sy);
         } else if (state.beaconMask[index] === 3) {
-          drawTileSprite(state.sprites.blocks[1]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
+          const hiddenBeaconCoverTier = clamp(Math.round(state.hardness[index] || 1), 1, BLOCK_TYPES.length - 1);
+          drawTileSprite(state.sprites.blocks[hiddenBeaconCoverTier]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
         } else if (state.gasPocketMask[index]) {
           drawTileSprite(state.sprites.gasPocket, sx, sy);
         } else if (state.steamPocketMask[index]) {
@@ -11803,7 +11833,8 @@ function render() {
       } else if (state.beaconMask[index] === 1) {
         drawTileSprite(state.sprites.tunnel, sx, sy);
       } else if (state.beaconMask[index] === 3) {
-        drawTileSprite(state.sprites.blocks[1]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
+        const hiddenBeaconCoverTier = clamp(Math.round(state.hardness[index] || 1), 1, BLOCK_TYPES.length - 1);
+        drawTileSprite(state.sprites.blocks[hiddenBeaconCoverTier]?.[(x * 7 + y * 13) % BLOCK_VARIANTS], sx, sy);
       } else if (state.metalMask[index]) {
         drawTileSprite(state.sprites.metal, sx, sy);
       } else if (state.gasPocketMask[index]) {
@@ -12060,6 +12091,7 @@ function render() {
     renderSignalStatus(camera);
     renderBeaconRadar(camera);
     renderPickupRadar(camera);
+    renderContourBlastPressureStatus(camera);
     renderLoopPressureStatus(camera);
     renderOverdriveStatus(camera);
     renderStunStatus(camera);
@@ -14398,6 +14430,37 @@ function getNearestRadarCrystals(recipeOnly = false) {
   return nearest;
 }
 
+function renderContourBlastPressureStatus(camera) {
+  if (state.contourBlastPressureTimer <= 0) {
+    return;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = state.drill.renderY * TILE_SIZE - camera.y - 36;
+  const width = 64;
+  const ratio = clamp(
+    state.contourBlastPressureTimer / Math.max(0.1, state.contourBlastPressureDisplayDuration || 0.1),
+    0,
+    1,
+  );
+
+  ctx.save();
+  ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
+  ctx.strokeStyle = "rgba(255, 184, 118, 0.42)";
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = "#ff9b52";
+  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
+  ctx.restore();
+}
+
 function renderLoopPressureStatus(camera) {
   if (state.loopPressureTimer <= 0) {
     return;
@@ -14768,11 +14831,13 @@ function renderHud() {
   const fpsText = `FPS ${Math.round(state.fps || 0)}`;
   const collapseText = `COL ${Math.round(state.collapseBudget || 0)}`;
   const enemyText = `ENM ${Math.round(state.contourEnemyBudget || 0)}`;
+  const comboText = t("ui.combo_hud", { count: Math.max(0, Math.round(state.comboCount || 0)) });
   const fpsX = state.width - 14;
   const fpsY = detailTop + 52;
   ctx.fillText(fpsText, fpsX, fpsY);
   ctx.fillText(collapseText, fpsX, fpsY + 12);
   ctx.fillText(enemyText, fpsX, fpsY + 24);
+  ctx.fillText(comboText, fpsX, fpsY + 36);
   state.syncSoundToggleButton?.();
 
   // FPS sparkline graph
@@ -15128,8 +15193,8 @@ function renderHudMiniPerkIcon(perkType, x, y, size) {
 function renderHudCoreStats(x, y, width, title) {
   const ctx = state.ctx;
   const rows = [
-    { perkType: 3, value: formatPerkNumber(state.drillPower) },
-    { perkType: 5, value: formatPerkPercent((state.strikeSpeed + getFragileDrillSpeedBonus()) / 100) },
+    { perkType: 5, value: formatPerkNumber(state.drillPower) },
+    { perkType: 3, value: formatPerkNumber(state.explosionPower) },
   ];
   const rowHeight = 22;
 
