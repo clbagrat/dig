@@ -4,15 +4,16 @@
 
 Mobile top-down drilling game on a `canvas`.
 
-The player starts in the center of a rock field and searches for a hidden moving base.
+The player starts in the center of a rock field and searches for a hidden base.
 The player sees only within a small radius around the driller.
 
 The run is about:
 - managing fuel,
+- collecting experience from destroyed blocks,
 - choosing digging routes through mixed rock difficulty,
 - picking up tile perks,
-- buying stronger scrap upgrades,
-- tracking the base before it slips away.
+- drawing contours around beacons to unlock the shop,
+- spending gold on upgrades.
 
 ## Goal And Failure
 
@@ -25,7 +26,13 @@ Loss condition:
 ## Map
 
 Current map size:
-- `150 x 220` tiles
+- `150 x 150` tiles
+
+Depth layout (current default):
+- Level 1: `24 x 17`
+- Level 2: `26 x 26`
+- Level 3: `28 x 40`
+- Level 4: `32 x 52`
 
 Start:
 - the driller starts at the center of the map
@@ -33,28 +40,28 @@ Start:
 
 Base:
 - the base initially spawns at exact distance `50` tiles from the start
+- base host level is Level 4 by default
 - the base can become visible when inside vision radius
 - visibility alone does not count as success
 
-Base movement:
-- the base moves after enough player movement progress is accumulated
-- any player move counts as `1` progress
-- usually the base moves every `8` player moves
-- if the base is within `5` tiles of the player, it moves every `3` player moves
-- with `50%` probability it prefers a direction that increases distance from the player
-- otherwise it picks a random valid direction
-- when moving, it swaps places with the target tile contents
-- it does not move onto the player
-- it does not enter `3x3` perk zones
-- once found, it stops moving
-
 ## Visibility
 
-Current base vision radius:
+Current vision radius:
 - `5`
 
 The player only sees nearby cells around the driller.
 Everything outside the radius is hidden by fog of war.
+
+## Start Zones
+
+Two concentric zones are guaranteed around the player start:
+
+**Easy zone** (radius `5`):
+- all rock is forced to tier 1
+- no hazards, metal, gas, steam, or boulders spawn here
+
+**Near zone** (radius `7`, ring between 5 and 7):
+- guaranteed `4` scrap ore tiles
 
 ## Terrain Generation
 
@@ -71,21 +78,36 @@ Design intent:
 - local routes still contain surprises
 - the field should look geological rather than like pure noise
 
+## Scrap Ore
+
+Scrap ore tiles are scattered across the map in vein groups.
+
+Current generation:
+- `50` vein groups, each `4–10` tiles
+- scrap ore does not spawn inside the easy zone (radius `5`)
+- `4` scrap ore tiles are guaranteed inside the near zone (radius `5–7`)
+
+Effect:
+- picking up a scrap ore tile gives a gold bonus
+
 ## Rock Tiers
 
 There are `7` rock tiers plus tunnel.
 
-Current durability / scrap:
-- Tier 1: `6 hp`, `2 scrap`
-- Tier 2: `9 hp`, `4 scrap`
-- Tier 3: `12 hp`, `6 scrap`
-- Tier 4: `15 hp`, `8 scrap`
-- Tier 5: `18 hp`, `11 scrap`
-- Tier 6: `21 hp`, `14 scrap`
-- Tier 7: `27 hp`, `18 scrap`
+Current durability / gold:
+- Tier 1: `60 hp`, `2 gold`
+- Tier 2: `90 hp`, `4 gold`
+- Tier 3: `120 hp`, `6 gold`
+- Tier 4: `180 hp`, `8 gold`
+- Tier 5: `300 hp`, `11 gold`
+- Tier 6: `420 hp`, `14 gold`
+- Tier 7: `600 hp`, `18 gold`
 
-The current drill power starts at `1`.
-Since damage is discrete, real hit counts depend on current drill power and upgrades.
+Current baseline:
+- base drill hit damage: `10`
+- `damage` stat starts at `10`
+- the `damage` stat does not increase the base hit by itself
+- `damage` matters only for equipment or effects that explicitly scale from `dmg`
 
 ## Movement And Drilling
 
@@ -102,39 +124,67 @@ This creates a deliberate `chunk-chunk-chunk` feel instead of smooth sliding.
 ## Fuel
 
 Current baseline:
-- starting fuel: `420`
-- max fuel: `420` by default
+- starting HP: `4`
+- starting fuel: `350`
+- max fuel: `350` by default
 - passive drain: `0.8 / sec`
-- tunnel move cost: `1.8`
-- drilling hit cost: `4.5`
+- drilling drain: `8 / sec` while the action cooldown is active
 
 Fuel can be modified by perks and upgrades.
 
 Important note:
-- max fuel can become lower than the current default because of `Overload`
+- `Перегрузка` reduces max fuel by `150`
 
-## Scrap
+## Collapses
 
-Scrap is earned from destroyed rock.
+There is a periodic collapse hazard tied to a collapse budget.
 
-Scrap is spent indirectly:
-- each threshold opens a choice of `3` random scrap upgrades
+Rules:
+- the run starts with `600` collapse points
+- every destroyed block subtracts its rock tier from that pool
+- every explosion additionally subtracts `10 * cellCountInExplosionRadius`
+- when the pool reaches `0`, one collapse is queued and the pool is refilled by `600`
+- the collapse telegraphs as a red danger zone above and around the driller on nearby empty tiles
+- after about `2.4` seconds, new rock blocks fall into those tiles
+- if the driller is still inside the collapse zone when it lands, the driller takes `25` damage
 
-Current timing:
-- the perk choice popup appears `500 ms` after the threshold is reached
+Current block spawn:
+- collapse rock uses hardness based on current run depth
+- only nearby walkable tiles are selected
+- collapse tiles are never selected inside the beacon activation area (`2×2` core + `1` tile ring)
+- the collapse can seal recently opened tunnels and break an active contour path
 
-Current cost model:
-- base cost: `30`
-- geometric multiplier: `1.35`
-- current formula: `round(30 * 1.35^level)`
+## Gold
 
-So the sequence is roughly:
-- `30`
-- `41`
-- `55`
-- `74`
-- `100`
-- ...
+Gold is earned from destroyed rock and scrap ore.
+
+Gold is spent in the beacon shop:
+- each beacon opens a shop when activated
+- in each shop cycle the player picks one free offer, then pays `100 gold` for the next cycle
+- if gold is below `100`, the shop closes automatically
+- the driller starts the run with one equipped `common` copy of `Просто дрель`
+
+## Experience And Levels
+
+Every destroyed block drops `10 XP` on the tile where that block stood.
+
+Pickup rules:
+- experience stays on the map until collected
+- the driller picks it up automatically when within radius `1`
+- multiple drops on one tile stack together
+
+Current level flow:
+- the run starts at level `1`
+- level requirement grows non-linearly: `round(400 * 1.3^(level-1))`
+- each level up opens a reward choice modal when a reward tier is assigned
+- reward tiers currently work like this:
+  - first reward: `+5% gold from mined blocks` or `+0.35 damage` or `+10% speed`
+  - second reward: `+5% gold from mined blocks` or `+100 fuel`
+  - third reward: `+0.35 damage` or `+100 fuel` or `+1 max HP`
+  - fourth reward: `carried artifact to deliver to a beacon` or `full heal + full fuel`
+  - fifth reward: `+10% speed` or `+100 fuel` or `+1 HP`
+  - sixth reward: `+5% gold from mined blocks` or `+100 fuel` or `+1 HP`
+  - after that, rewards repeat in the cycle: `third → fifth → sixth`
 
 ## Radar
 
@@ -157,49 +207,41 @@ UI:
 
 Tile perks are pickups placed directly on the map.
 
-Current tile perk pool:
-- `Бак`
-- `Радар`
-- `Бур`
-- `Бомба`
-- `Скорость`
-
-Current weighted spawn chances:
+Current tile perk pool and weights:
 - `Бак`: `7`
-- `Радар`: `3`
-- `Бур`: `2`
 - `Бомба`: `4`
-- `Скорость`: `3`
+- `HP+`: `2`
+- `Броня`: `2`
+
+Note: `Радар`, `Бур`, `Скорость` have weight `0` and do not spawn as tile perks on the map.
 
 Current spatial rules:
 - tile perks are denser near the center of the map
-- near the center, `Бак` and `Радар` get extra weight
+- near the center, `Бак` gets extra weight
 - tile perks respect minimum local spacing
 
 ### Tile Perk Effects
 
 `Бак`
 - gives fuel immediately
-- current raw amount before other fuel systems: `90`
-
-`Радар`
-- grants radar time
-- immediately updates the direction ring on pickup
-
-`Бур`
-- `+0.5` drill power
+- current raw amount before other fuel systems: `60`
 
 `Бомба`
-- explodes immediately on pickup
+- fires a rocket immediately in the current drilling direction
 - current damage: `drillPower * 10`
 - current radius: `2`
 
-`Скорость`
-- `+15%` strike speed
+`HP+`
+- `+1` to current HP (up to max)
+
+`Броня`
+- `+1` armor against external hazard damage
 
 ## Perk Zones
 
-There are hidden `3x3` perk zones under rock.
+There are hidden perk zones under rock:
+- classic random shapes (`6..9` cells)
+- dual stat zones made of two `2x2` blocks with a `1`-tile gap between them (`D` and `E`)
 
 Rules:
 - each zone is assigned one tile perk type
@@ -213,104 +255,171 @@ Special bomb zone:
 - instead of three ordinary bomb pickups, it triggers one larger explosion
 - current large bomb radius: `3`
 
+Dual stat zone:
+- blue `D`: when fully excavated, gives `+5 * depthLevel` drill power
+- orange `E`: when fully excavated, gives `+5 * depthLevel` explosion power
+- if one side is excavated first, the other side instantly explodes and is lost
+- if both sides are excavated before resolve (same explosion/frame), both rewards are granted
+
 Zones are generated from density rules and scale with map area.
 
-## Scrap Upgrades
+## Beacons
 
-Scrap upgrades are the stronger progression layer.
+Beacons are fixed landmarks placed on the map during generation.
 
-Current upgrade pool:
-- `Боковые буры`
-- `Длинный бур`
-- `Диагональные буры`
-- `Форсаж на нуле`
-- `Саперный заряд`
-- `Топливный контур`
-- `Гео-линза`
-- `Рециркулятор`
-- `Перегрузка`
+Structure:
+- each beacon occupies a `2×2` core (hardness `0`, always open)
+- surrounded by a 1-tile ring (also open, becomes tunnel)
 
-### Upgrade Effects
+Count and placement:
+- `25` regular beacons placed randomly at distance `9–60` from start
+- `4` compass beacons guaranteed at distance `11` in N/S/E/W directions from start
+- minimum distance between any two beacons: `9` tiles
+- beacons never overlap with metal, hazards, gas, steam, or boulders
 
-`Боковые буры`
-- each strike also hits the cells left and right of the driller
+Activation:
+- a beacon is activated by closing a contour around its `2×2` core inside the beacon ring
+- on activation: full fuel restore triggers during the animation
+- a `2000 ms` radar animation plays (ring → line → dot), followed by a `500 ms` pause
+- after the animation the shop (or artifact choice) opens
+- some beacons can generate as hidden: their `2×2` core is buried under ordinary breakable blocks until activation
+- hidden beacons do not get the normal 1-tile open ring; that area is filled with ordinary excavatable blocks as well
+- the beacon is rendered under those blocks and gets revealed as the core is excavated; on activation it becomes a normal beacon core
+- once a hidden core is fully excavated, it immediately solidifies into a normal non-walkable beacon core; if the player stands on it, the drill is pushed to the nearest free tile and the current contour is cleared
+- when all beacon wires are fully freed, `Full Freedom` triggers automatically: beacon wires fully fade out, then the beacon grants a bonus item reward
+- if beacon wires were already fully freed before the first activation, the beacon still opens the normal shop first; `Full Freedom` triggers automatically after the shop flow is closed
+- active beacons still accept contour-gold deposits
 
-`Длинный бур`
-- strikes the next forward tile as well
-- first pickup gives `20%` extra forward damage
-- each repeat adds `+10%`
+Gameplay role:
+- once activated, a beacon shows the direction to the base (similar to radar)
 
-`Диагональные буры`
-- strike the two forward diagonal tiles
-- first pickup gives `20%` diagonal damage
-- each repeat adds `+5%`
+## Shop
 
-`Форсаж на нуле`
-- lower fuel increases strike speed
-- repeated picks increase the low-fuel speed bonus
+The shop opens after each beacon activation.
+Each cycle offers:
+- `2` goods from the baseline `Базовое` category
+- `1` good from each additional category unlocked through artifacts
 
-`Саперный заряд`
-- every `15` destroyed blocks launches a remote `2x2` bomb at distance `3`
-- repeated picks increase damage
+Current available categories:
+- `Базовое`
+- `Экономика`
 
-`Топливный контур`
-- any perk gives `+50` fuel
-- `Бак` becomes weaker instead of also getting that full bonus
+Cycle rules:
+- offered goods are free to take
+- the first taken offer in a visit is always free
+- after taking any offer, reroll cost is charged only if there is enough gold for a new set; then the shop immediately generates a fresh set
+- reroll cost formula: `30 + 10 * (N - 1)`, where `N = current shop level + rerolls already made in this shop visit`
+- skipping is not allowed while enough gold remains for another cycle
+- the shop closes itself when gold drops below the current reroll cost
+- once per offered set, a paid action can increase rarity of the currently shown offers
+- rarity upgrade cost is `50%` of the current reroll cost
 
-`Гео-линза`
-- `+2` vision radius
-- `+2` extra radar charges whenever radar is gained
+Artifact-to-shop progression:
+- activations `1-2`: unlock a new category and add `+1` slot (category can be chosen if multiple are locked)
+- activation `3`: unlock a new category and replace one baseline offer slot with category offers (no extra slot)
+- activation `4`: no category choice; `1` offer is guaranteed at least `Uncommon`
+- activation `5`: no category choice; `2` offers are guaranteed at least `Uncommon`
+- activation `6`: no category choice; `1` offer is guaranteed at least `Uncommon` and `1` at least `Rare`
+- activation `7+`: no category choice; artifact converts into `500 gold`
 
-`Рециркулятор`
-- `+2` scrap per destroyed block
-- `+2` fuel per destroyed block
-
-`Перегрузка`
-- fuel gains get `+50` fuel
-- max fuel is reduced by `50`
-- if a fuel gain overflows max fuel, a remote overflow bomb is launched
+Current available shop content includes:
+- baseline stat items for core build directions such as HP, fuel, heat, contour size, weak spots, explosion scaling, and per-level growth
+- tradeoff items where one stat rises while another falls, mostly concentrated in `Базовое`
+- equipment such as `Просто дрель`, `Разменный бур`, `Осколочный бур`, and `Кирка счастливчика`, which remain part of the early shop pool
+- alchemy equipment `Маячный реторт-бур`: `12` base damage; when mining toward a beacon and moving closer to it within radius `10`, adds `20 + 15/20/25/30% drillPower`
+- alchemy equipment `Рецептурный реторт-бур`: `5 + 5/7/9/11` damage per completed crystal recipe this run
+- contour equipment `Контурный перегруз-бур`: base strike damage `15/20/25/30`; when contour length exceeds max, every contour segment explodes with radius `1` for `30/40/50/60 + 20/30/40/50% explosionPower`, with one hit per block in that overflow blast
+- contour equipment `Контурный линейный бур`: strike damage `10 + 10/20/30/40% drillPower + 1/2/3/4 * contourLength`
+- contour equipment `Контурное давление`: on contour closure grants a temporary buff for `4/4.5/5/5.5 sec`, increasing `drillPower` by `3/4/5/6` per block destroyed by that contour closure
+- contour item `Резонансный контур-бур`: on breach hit, contour resonance deals `20 + 10/15/20/30% explosionPower`; additionally grants `+3/6/9/11%` breach chance and applies `-1/-1/-2/-2` max contour length
+- alchemy item `Нестабильный реагент`: `+5/7/10/13% concentration`, `-5/8/12/16% fuel drain`, and `-5/7/10/13%` to max collapse points
+- alchemy item `Рецептурный стабилизатор`: recipe completion restores `10/20/30/40%` of current max collapse budget and also applies `-5%` to max collapse points
+- a new low-fuel damage stat that can appear on shop items and scales drill damage as the tank empties
 
 ## Overflow / Remote Bomb Rules
 
 There are multiple remote bomb style systems.
 
-`Перегрузка` overflow bomb:
-- triggered by fuel overflow
-- lands at distance `3`
-- affects a `2x2` square
-
-Safety rules:
+`Перегрузка` overflow:
+- triggered when a fuel gain overflows max fuel
+- gives a short forced charge (overdrive), then causes explosion and stun
 - overflow can trigger only once per fuel event
-- while the overflow bomb itself is resolving, fuel rewards from its own destruction chain cannot retrigger another overflow bomb
+- while resolving, fuel rewards from the explosion chain cannot retrigger another overflow
 
 `Саперный заряд`:
 - separate remote bomb system
-- triggers every `15` destroyed blocks
+- triggers every `15` destroyed blocks (decreases by 5 per upgrade level, minimum 15)
 
 ## Fuel Event Rules
 
 Fuel gains can come from several stacked sources:
-- direct fuel perk
-- `Топливный контур`
-- `Рециркулятор`
-- future chained perk rewards
+- direct tile perk (Бак)
+- chained perk rewards
 
 To prevent abuse and recursion:
 - one fuel event can cause at most one overflow trigger
 - zone rewards and perk rewards are grouped into single fuel events
 
+## Crystals
+
+Crystals are rare pickups scattered across the map.
+
+Types: Красный, Желтый, Светлый, Зеленый, Синий.
+
+Each crystal collected contributes to a recipe.
+When a recipe of `3` crystals of the correct types is completed, a tile perk reward is given:
+- Красный → Бур (+0.35 drill power)
+- Желтый → Бак (+60 fuel)
+- Светлый → Радар (+10 sec)
+- Зеленый → HP+
+- Синий → Скорость (+10% speed)
+
+The recipe is generated from crystals that exist on the current depth level.
+Picking up a wrong crystal no longer resets the recipe; instead, the drill is stunned for `1` second.
+
+`Радарный модуль` marks the nearest crystal of each color on the radar ring.
+
+`Alchemy & Navigation` now also includes crystal-color trigger items:
+- red crystal pickup: `+1 drillPower`
+- yellow crystal pickup: `+1 explosionPower`
+- green crystal pickup: heal `+5 HP`
+- light crystal pickup: hero radar for `1 sec`
+- blue crystal pickup: `+1% strikeSpeed`
+
+## Block Visuals
+
+Block appearance scales with tier to communicate hardness at a glance.
+
+Visual cues that increase with tier:
+- gradient contrast (tier 1 is nearly flat, tier 7 is sharp light→dark)
+- grain/noise density (scales from ~12 at tier 1 to ~35 at tier 7)
+- edge vignette depth
+
+Color:
+- tier 1 is light warm brown; tier 7 is dark brown with a slight cool shift
+- all tiers share one unified palette — no abrupt hue jumps
+
+Sprite variants:
+- each tier has `4` randomly assigned sprite variants to break visual repetition
+- variant is chosen per-block from a position hash
+
+Crack animation:
+- each damage stage has `4` random crack patterns
+- crack sprite is rotated to match the direction the player hit from
+
 ## UI / Feedback
 
 Current visible feedback:
 - fuel bar on top of the screen
-- scrap bar on top of the screen
+- gold counter in HUD
 - seed displayed in HUD
-- radar text above the driller
-- radar charge bar under the radar text
+- radar direction ring above the driller
+- radar charge bar under the radar direction ring
 - floating text for picked perks
 - floating fuel gain text
-- floating scrap gain text
+- floating gold gain text
 - victory / out-of-fuel overlays
+- health bar (appears after first hit)
 
 ## Debugging
 
@@ -324,11 +433,15 @@ node scripts/render-map-debug.js --seed 1 --output debug/map-seed-1.svg
 ```
 
 It renders:
-- full terrain
-- start
-- base
-- tile perks
-- perk zones
+- full terrain with hardness tiers
+- hazards, metal veins, gas/steam/boulder pockets
+- scrap ore tiles
+- beacons (teal diamond)
+- perk zones and tile perks
+- crystals
+- player start (gold circle) and base (blue circle)
+
+Debug teleport buttons are available in-game for jumping to the nearest perk zone of each type.
 
 ## Current Design Intent
 
@@ -336,5 +449,6 @@ The current prototype is centered on:
 - uncertain search,
 - constrained fuel routing,
 - local tactical perk spikes,
-- long-form scrap progression,
-- and a target that can move away from the player if the route is inefficient.
+- contour drawing to activate beacons,
+- long-form gold collection without shop upgrades,
+- and a target that stays hidden until found.

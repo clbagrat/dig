@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Items Preview</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+:root {
+  --bg: #0f0b09;
+  --bg2: #17110d;
+  --bg3: #241910;
+  --bg4: #2f1f13;
+  --text: #f2dfb7;
+  --muted: #967557;
+  --acc: #d79f49;
+  --acc2: #f0c060;
+  --accent: #d79f49;
+  --border: rgba(215,159,73,0.2);
+  --r1: #aaa;
+  --r2: #4488ff;
+  --r3: #aa44ff;
+  --r4: #ff4444;
+}
+html, body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(circle at 20% -10%, #2a1c11 0%, var(--bg) 48%);
+  color: var(--text);
+  font: 14px/1.4 "Trebuchet MS", "Segoe UI", sans-serif;
+}
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(18, 12, 8, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+}
+.hdr__title { font-size: 16px; font-weight: 700; color: var(--acc2); }
+.hdr__sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.controls {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr auto auto;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(22, 14, 10, 0.9);
+}
+.search, .select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg3);
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+}
+.search:focus, .select:focus { outline: none; border-color: var(--acc); }
+.rarity-switch {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.rarity-btn {
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rarity-btn.active { color: var(--acc2); border-color: var(--acc); background: var(--bg4); }
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+  flex: 1;
+}
+.sidebar, .panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(36,25,16,0.95), rgba(24,16,11,0.95));
+  min-height: 0;
+}
+.sidebar__summary {
+  padding: 10px 10px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.item-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+}
+.item-row {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  color: inherit;
+  text-align: left;
+  padding: 8px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 24px minmax(0,1fr);
+  gap: 8px;
+}
+.item-row:hover { background: rgba(255,255,255,0.03); }
+.item-row.active { border-color: var(--acc); background: rgba(215,159,73,0.08); }
+.item-row__icon { font-size: 18px; line-height: 1; text-align: center; }
+.item-row__name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-row__meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-row__meta .uniq {
+  margin-left: 6px;
+  color: var(--acc2);
+  font-weight: 700;
+}
+.item-row__meta .limited {
+  margin-left: 6px;
+  color: #f7c66b;
+  font-weight: 700;
+}
+.panel {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0,1fr);
+  gap: 12px;
+}
+.preview-stack { display: flex; flex-direction: column; gap: 10px; }
+.block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(20,13,8,0.88);
+  padding: 10px;
+}
+.block__title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.block .rarity-switch { margin-bottom: 8px; }
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 240px;
+  padding: 14px 12px 12px;
+  border: 1.5px solid rgba(215, 159, 73, 0.18);
+  border-radius: 14px;
+  background: rgba(22, 11, 5, 0.7);
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s, transform 0.1s, opacity 0.2s ease;
+  position: relative;
+}
+.shop-card--rarity-1 { border-color: rgba(170, 170, 170, 0.35); }
+.shop-card--rarity-2 { border-color: rgba(68, 136, 255, 0.55); }
+.shop-card--rarity-3 { border-color: rgba(170, 68, 255, 0.55); }
+.shop-card--rarity-4 { border-color: rgba(255, 68, 68, 0.65); }
+.shop-card__type {
+  font-size: 11px;
+  opacity: 0.6;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+}
+.shop-card__icon {
+  font-size: 28px;
+  line-height: 1;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.shop-card__name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.shop-card__category {
+  font-size: 11px;
+  color: var(--text-dim, #888);
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+.shop-card__desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+  min-height: 66px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+.shop-card__cost {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.shop-card__merge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #f7c66b;
+  font-weight: 700;
+}
+.chip {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+}
+.desc {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+  color: #e9d6ad;
+}
+.hint { margin-top: 8px; font-size: 11px; color: var(--muted); }
+.scale-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.scale-table th, .scale-table td {
+  padding: 6px 7px;
+  border-bottom: 1px solid rgba(215,159,73,0.12);
+  text-align: center;
+}
+.scale-table th:first-child, .scale-table td:first-child { text-align: left; }
+.scale-table tr.active td { background: rgba(215,159,73,0.09); }
+.legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.legend span { padding: 2px 6px; border: 1px solid var(--border); border-radius: 999px; }
+.empty { color: var(--muted); font-size: 12px; }
+.r1 { color: var(--r1); }
+.r2 { color: var(--r2); }
+.r3 { color: var(--r3); }
+.r4 { color: var(--r4); }
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+.tab-btn {
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tab-btn.active {
+  color: var(--acc2);
+  border-color: var(--acc);
+  background: var(--bg4);
+}
+.stats-wrap {
+  padding: 12px;
+}
+.stats-controls {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr auto;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+.stats-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(36,25,16,0.95), rgba(24,16,11,0.95));
+  padding: 10px;
+}
+.stats-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(20,13,8,0.88);
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.stat-card:hover { border-color: var(--acc); background: rgba(215,159,73,0.07); }
+.stat-card--static { cursor: default; }
+.stat-card--static:hover { border-color: var(--border); background: rgba(20,13,8,0.88); }
+.stat-card--dimmed { opacity: 0.8; }
+.stat-card__name { font-size: 13px; font-weight: 700; color: var(--text); }
+.stat-card__id { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.stat-card__desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.35; min-height: 32px; }
+.stat-card__counts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.count-dots {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 22px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+.count-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.count-dots.pos {
+  border-color: rgba(126,220,138,0.35);
+  background: rgba(126,220,138,0.08);
+}
+.count-dots.neg {
+  border-color: rgba(255,142,125,0.35);
+  background: rgba(255,142,125,0.08);
+}
+.count-dots.pos .count-dot { background: #7edc8a; }
+.count-dots.neg .count-dot { background: #ff8e7d; }
+@media (max-width: 980px) {
+  .controls { grid-template-columns: 1fr; }
+  .rarity-switch { justify-content: flex-start; }
+  .layout { grid-template-columns: 1fr; }
+  .item-list { max-height: 260px; }
+  .panel { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hdr">
+    <div id="ui-title" class="hdr__title">⛏ Item Card Preview</div>
+    <div id="ui-sub" class="hdr__sub">Preview-only mode. Final descriptions use all stats = 10.</div>
+  </header>
+  <section class="tabs">
+    <button id="tab-cards" class="tab-btn active" type="button">Cards</button>
+    <button id="tab-stats" class="tab-btn" type="button">Stats</button>
+  </section>
+
+  <section class="controls">
+    <input id="search" class="search" placeholder="">
+    <select id="filter" class="select">
+    </select>
+    <select id="artifact-type" class="select"></select>
+    <select id="stat-filter" class="select"></select>
+    <select id="lang" class="select" style="max-width:96px">
+      <option value="en">EN</option>
+      <option value="ru">RU</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input id="exclude-dev" type="checkbox">
+      <span id="exclude-dev-label">Exclude inDevelopment</span>
+    </label>
+    <button id="reset-filters" class="tab-btn" type="button">Reset</button>
+  </section>
+
+  <main id="cards-layout" class="layout">
+    <aside class="sidebar">
+      <div id="list-summary" class="sidebar__summary"></div>
+      <ul id="item-list" class="item-list"></ul>
+    </aside>
+    <section class="panel">
+      <div class="preview-stack">
+        <div class="block">
+          <div id="ui-block-shop" class="block__title">Shop Card</div>
+          <div id="rarity-switch" class="rarity-switch"></div>
+          <div id="shop-card"></div>
+        </div>
+        <div class="block">
+          <div id="ui-block-deps" class="block__title">Scaling Dependencies</div>
+          <div id="dependencies" class="legend"></div>
+        </div>
+      </div>
+      <div class="preview-stack">
+        <div class="block">
+          <div id="ui-block-scale" class="block__title">Rarity Scaling</div>
+          <div id="scale"></div>
+        </div>
+        <div class="block">
+          <div id="ui-block-affected" class="block__title">Affected Stats</div>
+          <div id="item-stats" class="stats-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <section id="stats-layout" class="stats-wrap" hidden>
+    <div id="stats-controls" class="stats-controls">
+      <input id="stats-search" class="search" placeholder="">
+      <select id="stats-type" class="select"></select>
+      <select id="stats-category" class="select"></select>
+      <label style="display:flex;align-items:center;gap:6px;">
+        <input id="stats-exclude-dev" type="checkbox">
+        <span id="stats-exclude-dev-label">Exclude inDevelopment</span>
+      </label>
+      <button id="stats-reset-filters" class="tab-btn" type="button">Reset</button>
+    </div>
+    <div class="stats-panel">
+      <div id="stats-list" class="stats-list"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+const {
+  ALL_EQUIPMENT,
+  ALL_ITEMS,
+  CATEGORIES,
+  RARITY_NAMES,
+  getGoodDescription,
+} = await import(`./src/items-catalog.js?t=${Date.now()}`);
+const { t, setLocale, getLocale } = await import(`./src/i18n.js?t=${Date.now()}`);
+
+const RARITY_CLASS = { 1: 'r1', 2: 'r2', 3: 'r3', 4: 'r4' };
+const RARITIES = [1, 2, 3, 4];
+const LOWER_IS_BETTER_STATS = new Set([
+  'fuelDrainRate',
+  'heatRate',
+  'idleAutoCloseDelay',
+]);
+const PERCENT_STATS = new Set([
+  'strikeSpeed',
+  'damageBonus',
+  'weakSpotChance',
+  'weakSpotMult',
+  'goldBonus',
+  'miningGoldBonusMultiplier',
+  'xpBonus',
+  'fuelBonus',
+  'bonusFindChance',
+  'speedOfAutoClose',
+  'collapseBudgetMaxScale',
+  'recipeCollapseDelayPercent',
+  'heatRate',
+  'fuelDrainRate',
+  'loopSpawnBonusChance',
+  'lowFuelSpeedBonus',
+  'lowFuelDamageBonus',
+  'effectDurationRate',
+  'concentration',
+  'contourResMultiplier',
+  'strikeSpeedPerLevel',
+  'goldBonusPerLevel',
+  'explosionBonus',
+]);
+const UI_TEXT = {
+  en: {
+    title: '⛏ Item Card Preview',
+    sub: 'Preview-only mode. Final descriptions use all stats = 10.',
+    search: 'Search by name, id, description',
+    filterAll: 'All items',
+    filterEquipment: 'Equipment only',
+    filterItems: 'Items only',
+    artifactTypeAll: 'Artifact type: all',
+    statFilterAll: 'Stat: all',
+    excludeDev: 'Exclude inDevelopment',
+    resetFilters: 'Reset filters',
+    blockShop: 'Shop Card',
+    blockDeps: 'Scaling Dependencies',
+    blockAffected: 'Affected Stats',
+    blockScale: 'Rarity Scaling',
+    listRarityFrom: 'from',
+    depsNone: 'No stat-based scaling dependencies. Only rarity/base values affect the item.',
+    scaleNone: 'No explicit scaling rows for this item.',
+    noResults: 'No items match current filters.',
+    selectItem: 'Select an item.',
+    hintScale: 'Table uses the same scaling format for effect values and special item formulas.',
+    scaleStat: 'Stat',
+    typeEquipment: 'equipment',
+    typeItem: 'item',
+    tabCards: 'Cards',
+    tabStats: 'Stats',
+    statPositive: 'Positive items',
+    statNegative: 'Negative items',
+    statNoDesc: 'No description yet.',
+    uniqueLabel: 'UNIQUE',
+    limitedLabel: 'LIMITED',
+    itemNoStats: 'This item has no direct stat effects.',
+    statsSearch: 'Filter by item name/id/description',
+    statsTypeAll: 'Stats: all items',
+    statsTypeEquipment: 'Stats: equipment only',
+    statsTypeItems: 'Stats: items only',
+    statsCategoryAll: 'Stats category: all',
+    statsExcludeDev: 'Exclude inDevelopment',
+    statsResetFilters: 'Reset stats filters',
+    listEquipmentCount: 'Equipment',
+    listItemCount: 'Items',
+  },
+  ru: {
+    title: '⛏ Превью карточек предметов',
+    sub: 'Режим только просмотра. Финальные описания считаются при all stats = 10.',
+    search: 'Поиск по названию, id, описанию',
+    filterAll: 'Все предметы',
+    filterEquipment: 'Только части корпуса',
+    filterItems: 'Только предметы',
+    artifactTypeAll: 'Тип артефакта: все',
+    statFilterAll: 'Стата: все',
+    excludeDev: 'Исключать inDevelopment',
+    resetFilters: 'Сбросить фильтры',
+    blockShop: 'Карточка магазина',
+    blockDeps: 'Зависимости скейлинга',
+    blockAffected: 'Статы предмета',
+    blockScale: 'Скейлинг по редкости',
+    listRarityFrom: 'от',
+    depsNone: 'Не скейлится от текущих статов. Влияют только редкость и базовые значения предмета.',
+    scaleNone: 'Нет явных рядов скейлинга для этого предмета.',
+    noResults: 'По фильтрам ничего не найдено.',
+    selectItem: 'Выбери предмет.',
+    hintScale: 'Таблица показывает одинаковый формат скейлинга для effect и спец-формул предметов.',
+    scaleStat: 'Стат',
+    typeEquipment: 'часть',
+    typeItem: 'предмет',
+    tabCards: 'Карточки',
+    tabStats: 'Статы',
+    statPositive: 'Положительных предметов',
+    statNegative: 'Отрицательных предметов',
+    statNoDesc: 'Описание пока не добавлено.',
+    uniqueLabel: 'УНИКАЛЬНЫЙ',
+    limitedLabel: 'ЛИМИТИРОВАННЫЙ',
+    itemNoStats: 'У этого предмета нет прямых стат-эффектов.',
+    statsSearch: 'Фильтр по названию/id/описанию предмета',
+    statsTypeAll: 'Статы: все предметы',
+    statsTypeEquipment: 'Статы: только части корпуса',
+    statsTypeItems: 'Статы: только предметы',
+    statsCategoryAll: 'Категория статов: все',
+    statsExcludeDev: 'Исключать inDevelopment',
+    statsResetFilters: 'Сбросить фильтры статов',
+    listEquipmentCount: 'Части корпуса',
+    listItemCount: 'Предметы',
+  },
+};
+
+const ALL = [
+  ...ALL_EQUIPMENT.map(item => ({ ...item, __kind: 'equipment' })),
+  ...ALL_ITEMS.map(item => ({ ...item, __kind: 'items' })),
+];
+
+const PREVIEW_STATS = (() => {
+  const stats = {
+    drillPower: 10,
+    explosionPower: 10,
+    heat: 10,
+    luck: 10,
+    contourLength: 10,
+  };
+  for (const item of ALL) {
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    for (const effect of effects) {
+      if (effect?.stat && stats[effect.stat] == null) stats[effect.stat] = 10;
+    }
+  }
+  return stats;
+})();
+
+const S = {
+  search: '',
+  filter: 'all',
+  artifactType: 'all',
+  statFilter: 'all',
+  statsSearch: '',
+  statsType: 'all',
+  statsCategory: 'all',
+  excludeDev: false,
+  rarity: 1,
+  tab: 'cards',
+  locale: getLocale() === 'ru' ? 'ru' : 'en',
+  selectedId: ALL[0]?.id ?? null,
+};
+
+const QUERY_KEYS = {
+  tab: 'tab',
+  q: 'q',
+  type: 'type',
+  category: 'category',
+  stat: 'stat',
+  sq: 'sq',
+  stype: 'stype',
+  scategory: 'scategory',
+  nodev: 'nodev',
+  rarity: 'rarity',
+  locale: 'locale',
+  item: 'item',
+};
+
+const el = {
+  search: document.getElementById('search'),
+  filter: document.getElementById('filter'),
+  artifactType: document.getElementById('artifact-type'),
+  statFilter: document.getElementById('stat-filter'),
+  lang: document.getElementById('lang'),
+  controls: document.querySelector('.controls'),
+  cardsLayout: document.getElementById('cards-layout'),
+  statsLayout: document.getElementById('stats-layout'),
+  statsControls: document.getElementById('stats-controls'),
+  statsSearch: document.getElementById('stats-search'),
+  statsType: document.getElementById('stats-type'),
+  statsCategory: document.getElementById('stats-category'),
+  excludeDev: document.getElementById('exclude-dev'),
+  excludeDevLabel: document.getElementById('exclude-dev-label'),
+  statsExcludeDev: document.getElementById('stats-exclude-dev'),
+  statsExcludeDevLabel: document.getElementById('stats-exclude-dev-label'),
+  statsResetFilters: document.getElementById('stats-reset-filters'),
+  statsList: document.getElementById('stats-list'),
+  tabCards: document.getElementById('tab-cards'),
+  tabStats: document.getElementById('tab-stats'),
+  resetFilters: document.getElementById('reset-filters'),
+  raritySwitch: document.getElementById('rarity-switch'),
+  listSummary: document.getElementById('list-summary'),
+  list: document.getElementById('item-list'),
+  shopCard: document.getElementById('shop-card'),
+  itemStats: document.getElementById('item-stats'),
+  scale: document.getElementById('scale'),
+  dependencies: document.getElementById('dependencies'),
+  title: document.getElementById('ui-title'),
+  sub: document.getElementById('ui-sub'),
+  blockShop: document.getElementById('ui-block-shop'),
+  blockDeps: document.getElementById('ui-block-deps'),
+  blockAffected: document.getElementById('ui-block-affected'),
+  blockScale: document.getElementById('ui-block-scale'),
+};
+
+function ui(key) {
+  return UI_TEXT[S.locale]?.[key] ?? UI_TEXT.en[key] ?? key;
+}
+
+function parseInitialStateFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get(QUERY_KEYS.tab);
+  if (tab === 'cards' || tab === 'stats') S.tab = tab;
+
+  const q = params.get(QUERY_KEYS.q);
+  if (q != null) S.search = q;
+
+  const type = params.get(QUERY_KEYS.type);
+  if (type === 'all' || type === 'equipment' || type === 'items') S.filter = type;
+
+  const category = params.get(QUERY_KEYS.category);
+  if (category === 'all' || CATEGORIES.some(cat => cat.id === category)) S.artifactType = category;
+
+  const stat = params.get(QUERY_KEYS.stat);
+  if (stat === 'all' || getStatRows().some(row => row.stat === stat)) S.statFilter = stat;
+
+  const sq = params.get(QUERY_KEYS.sq);
+  if (sq != null) S.statsSearch = sq;
+
+  const stype = params.get(QUERY_KEYS.stype);
+  if (stype === 'all' || stype === 'equipment' || stype === 'items') S.statsType = stype;
+
+  const scategory = params.get(QUERY_KEYS.scategory);
+  if (scategory === 'all' || CATEGORIES.some(cat => cat.id === scategory)) S.statsCategory = scategory;
+
+  const nodev = params.get(QUERY_KEYS.nodev);
+  if (nodev === '1') S.excludeDev = true;
+
+  const rarity = Number(params.get(QUERY_KEYS.rarity));
+  if (Number.isFinite(rarity) && rarity >= 1 && rarity <= 4) S.rarity = rarity;
+
+  const locale = params.get(QUERY_KEYS.locale);
+  if (locale === 'ru' || locale === 'en') S.locale = locale;
+
+  const item = params.get(QUERY_KEYS.item);
+  if (item && ALL.some(entry => entry.id === item)) S.selectedId = item;
+}
+
+function syncQueryFromState() {
+  const params = new URLSearchParams(window.location.search);
+  const setOrDelete = (key, value, def) => {
+    if (value === def || value == null || value === '') params.delete(key);
+    else params.set(key, String(value));
+  };
+
+  setOrDelete(QUERY_KEYS.tab, S.tab, 'cards');
+  setOrDelete(QUERY_KEYS.q, S.search.trim(), '');
+  setOrDelete(QUERY_KEYS.type, S.filter, 'all');
+  setOrDelete(QUERY_KEYS.category, S.artifactType, 'all');
+  setOrDelete(QUERY_KEYS.stat, S.statFilter, 'all');
+  setOrDelete(QUERY_KEYS.sq, S.statsSearch.trim(), '');
+  setOrDelete(QUERY_KEYS.stype, S.statsType, 'all');
+  setOrDelete(QUERY_KEYS.scategory, S.statsCategory, 'all');
+  setOrDelete(QUERY_KEYS.nodev, S.excludeDev ? 1 : 0, 0);
+  setOrDelete(QUERY_KEYS.rarity, S.rarity, 1);
+  setOrDelete(QUERY_KEYS.locale, S.locale, 'en');
+  setOrDelete(QUERY_KEYS.item, S.selectedId, ALL[0]?.id ?? null);
+
+  const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}${window.location.hash}`;
+  history.replaceState(null, '', next);
+}
+
+function rarityName(rarity) {
+  return t(`rarity.${rarity}`);
+}
+
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function categoryName(id) {
+  return CATEGORIES.find(cat => cat.id === id)?.name ?? id;
+}
+
+function isEntryInDevelopment(item) {
+  if (item?.inDevelopment) return true;
+  const category = CATEGORIES.find((cat) => cat.id === item?.category);
+  return !!category?.inDevelopment;
+}
+
+function effectValueByRarity(effect, rarity) {
+  if (!effect) return null;
+  if (Array.isArray(effect.effectByRarity)) {
+    const value = effect.effectByRarity[rarity];
+    return value == null ? null : value;
+  }
+  if (typeof effect.value === 'number') return effect.value;
+  return null;
+}
+
+function formatEffectValue(value) {
+  if (value == null) return '—';
+  if (Math.abs(value) < 1 && value !== 0) return `${(value * 100).toFixed(2).replace(/\.00$/, '')}%`;
+  return Number(value).toFixed(2).replace(/\.00$/, '');
+}
+
+function formatScaleValue(stat, value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  const sign = n > 0 ? '+' : '';
+  if (PERCENT_STATS.has(stat)) {
+    if (Math.abs(n) <= 1 && n !== 0) {
+      return `${sign}${(n * 100).toFixed(2).replace(/\.00$/, '')}%`;
+    }
+    return `${sign}${n.toFixed(2).replace(/\.00$/, '')}%`;
+  }
+  return Number(n).toFixed(2).replace(/\.00$/, '');
+}
+
+function classifyEffectPolarity(stat, value) {
+  if (!Number.isFinite(Number(value))) return 'neutral';
+  const polarity = LOWER_IS_BETTER_STATS.has(stat) ? -1 : 1;
+  const normalized = Number(value) * polarity;
+  if (normalized > 0) return 'pos';
+  if (normalized < 0) return 'neg';
+  return 'neutral';
+}
+
+function formatItemEffectValue(stat, value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  const sign = n > 0 ? '+' : '';
+  if (Math.abs(n) < 1 && n !== 0) {
+    return `${sign}${(n * 100).toFixed(2).replace(/\.00$/, '')}%`;
+  }
+  if (PERCENT_STATS.has(stat)) {
+    return `${sign}${n.toFixed(2).replace(/\.00$/, '')}%`;
+  }
+  return `${sign}${n.toFixed(2).replace(/\.00$/, '')}`;
+}
+
+function formatSignedPercent(value) {
+  const n = Number(value || 0);
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${n.toFixed(2).replace(/\.00$/, '')}%`;
+}
+
+const SPECIAL_SCALE_ROWS = {
+  thermo_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [0, 20, 25, 30] },
+      { label: 'Скейл от drillPower', values: ['0%', '15%', '20%', '25%'] },
+      { label: 'Бонус за каждые 10 heat', values: [0, 1, 2, 3] },
+      { label: 'Итог урон (drill=10, heat=10)', values: [0, 22.5, 29, 35.5] },
+    ];
+  },
+  basic_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 15, 20, 25] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 16.5, 22, 27.5] },
+    ];
+  },
+  blast_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [6, 10, 14, 18] },
+      { label: 'Скейл от explosionPower', values: ['30%', '40%', '50%', '60%'] },
+      { label: 'Итог урон (explosion=10)', values: [9, 14, 19, 24] },
+    ];
+  },
+  tradeoff_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [16, 22, 30, 40] },
+      { label: 'Скейл от drillPower', values: ['10%', '10%', '10%', '10%'] },
+      { label: 'Итог урон (drill=10)', values: [17, 23, 31, 41] },
+      { label: 'Штраф weakSpotMult', values: ['-30%', '-30%', '-30%', '-30%'] },
+    ];
+  },
+  fragile_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 15, 20, 25] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 16.5, 22, 27.5] },
+      { label: 'Скорость при броне', values: ['+10%', '+15%', '+20%', '+30%'] },
+    ];
+  },
+  telescopic_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '20%', '30%', '40%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 12, 13, 14] },
+      { label: 'drillPiercingCount', values: [1, 1, 1, 1] },
+      { label: 'drillPiercingDamage', values: ['10%', '20%', '30%', '40%'] },
+    ];
+  },
+  diagonal_drill_array() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [11, 11.5, 12, 12.5] },
+      { label: 'drillDiagonalCount', values: [2, 2, 2, 2] },
+      { label: 'drillDiagonalDamage', values: ['10%', '20%', '30%', '40%'] },
+    ];
+  },
+  lucky_pickaxe() {
+    return [
+      { label: 'Урон (плоский)', values: [10, 15, 20, 25] },
+      { label: 'Скейл от drillPower', values: ['10%', '20%', '30%', '40%'] },
+      { label: 'Скейл от luck', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10, luck=10)', values: [12, 18.5, 25, 31.5] },
+      { label: 'Рост ценности жилы', values: [1, 2, 3, 4] },
+    ];
+  },
+  shard_drill() {
+    return [
+      { label: 'Урон (плоский)', values: [8, 12, 16, 20] },
+      { label: 'Шанс бреши', values: ['4%', '6%', '8%', '10%'] },
+      { label: 'Взрыв по бреши (плоский)', values: [20, 30, 45, 60] },
+      { label: 'Скейл взрыва от explosionPower', values: ['10%', '10%', '10%', '10%'] },
+      { label: 'Итог взрыв (explosion=10)', values: [21, 31, 46, 61] },
+    ];
+  },
+  breach_missile() {
+    return [
+      { label: 'Урон ракеты (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон ракеты (drill=10)', values: [11, 11.5, 12, 12.5] },
+      { label: 'Доп. шанс бреши', values: ['5%', '7%', '10%', '12%'] },
+      { label: 'Вторичная ракета (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл вторичной от explosionPower', values: ['30%', '40%', '50%', '60%'] },
+      { label: 'Итог вторичной (explosion=10)', values: [23, 24, 25, 26] },
+      { label: 'Радиус взрыва', values: [1.5, 1.5, 1.5, 1.5] },
+    ];
+  },
+  cryo_rocket() {
+    return [
+      { label: 'Крио-ракеты за 20 охлаждения', values: [1, 1, 1, 1] },
+      { label: 'Урон крио-ракеты (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл крио-ракеты от explosionPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог крио-ракеты (explosion=10)', values: [21, 21.5, 22, 22.5] },
+      { label: 'Радиус крио-ракеты', values: [1, 1, 1, 1] },
+      { label: 'heatRate', values: ['-15%', '-15%', '-15%', '-15%'] },
+    ];
+  },
+  contour_salvo_rack() {
+    return [
+      { label: 'Триггер', values: ['При замыкании контура', 'При замыкании контура', 'При замыкании контура', 'При замыкании контура'] },
+      { label: 'Ракет за каждые 4 блока контура', values: [1, 1, 1, 1] },
+      { label: 'Урон ракеты (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл ракеты от explosionPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог ракеты (explosion=10)', values: [21, 21.5, 22, 22.5] },
+      { label: 'Радиус ракеты', values: [1, 1, 1, 1] },
+    ];
+  },
+  afterburn_flash_charge() {
+    return [
+      { label: 'Уникальный предмет', values: ['Да', 'Да', 'Да', 'Да'] },
+      { label: 'Триггер', values: ['После окончания форсажа', 'После окончания форсажа', 'После окончания форсажа', 'После окончания форсажа'] },
+      { label: 'Урон за 1 сек форсажа', values: [10, 15, 20, 25] },
+      { label: 'Формула урона', values: ['секунды форсажа × 10', 'секунды форсажа × 15', 'секунды форсажа × 20', 'секунды форсажа × 25'] },
+      { label: 'Радиус взрыва', values: [1.5, 1.5, 1.5, 1.5] },
+    ];
+  },
+  fuel_rocket() {
+    return [
+      { label: 'Урон (плоский)', values: [15, 15, 15, 15] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [16, 16.5, 17, 17.5] },
+      { label: 'Ракета при подборе топлива (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл ракеты от explosionPower', values: ['15%', '20%', '25%', '30%'] },
+      { label: 'Итог ракеты (explosion=10)', values: [21.5, 22, 22.5, 23] },
+      { label: 'Радиус ракеты', values: [1, 1, 1, 1] },
+    ];
+  },
+  overheal_warhead_matrix() {
+    return [
+      { label: 'Пост. прирост explosionPower от оверхила', values: [1, 2, 2, 3] },
+      { label: 'maxHp', values: [10, 15, 20, 25] },
+      { label: 'drillPower', values: [-6, -6, -6, -6] },
+    ];
+  },
+  overflow_booster_manifold() {
+    return [
+      { label: 'Пост. прирост explosionBonus от overflow', values: ['+2%', '+3%', '+4%', '+5%'] },
+      { label: 'maxFuel', values: [25, 25, 25, 25] },
+      { label: 'damageBonus', values: ['-12%', '-12%', '-12%', '-12%'] },
+    ];
+  },
+  stun_salvo_relay() {
+    return [
+      { label: 'Ракет после оглушения', values: [1, 2, 3, 4] },
+      { label: 'Урон ракеты', values: ['20 +20% explosionPower', '20 +20% explosionPower', '20 +20% explosionPower', '20 +20% explosionPower'] },
+      { label: 'concentration', values: ['-10%', '-10%', '-10%', '-10%'] },
+    ];
+  },
+  seeker_pod() {
+    return [
+      { label: 'Триггер', values: ['3-й удар по одному блоку без разрушения', '3-й удар по одному блоку без разрушения', '3-й удар по одному блоку без разрушения', '3-й удар по одному блоку без разрушения'] },
+      { label: 'Микро-ракет за триггер', values: [1, 2, 3, 4] },
+      { label: 'Урон микро-ракеты', values: [12, 16, 20, 24] },
+      { label: 'Скейл микро-ракеты', values: ['+20% explosionPower', '+20% explosionPower', '+20% explosionPower', '+20% explosionPower'] },
+      { label: 'weakSpotChance', values: ['+2%', '+3%', '+4%', '+5%'] },
+      { label: 'drillPower', values: [-4, -4, -4, -4] },
+    ];
+  },
+  carpet_payload() {
+    return [
+      { label: 'Микро-ракет при попадании в брешь', values: [2, 3, 4, 5] },
+      { label: 'Урон микро-ракеты', values: [8, 10, 12, 15] },
+      { label: 'Скейл микро-ракеты', values: ['+10% explosionPower', '+10% explosionPower', '+10% explosionPower', '+10% explosionPower'] },
+      { label: 'strikeSpeed', values: ['-10%', '-10%', '-10%', '-10%'] },
+    ];
+  },
+  siege_warhead() {
+    return [
+      { label: 'explosionPower', values: [6, 9, 12, 15] },
+      { label: 'Множитель урона ракет', values: ['+15%', '+20%', '+25%', '+30%'] },
+      { label: 'drillPower', values: [-8, -8, -8, -8] },
+    ];
+  },
+  beacon_alchemy_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [12, 12, 12, 12] },
+      { label: 'Итог базовый', values: [12, 12, 12, 12] },
+      { label: 'Бонус к маяку (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Бонус к маяку: скейл от drillPower', values: ['15%', '20%', '25%', '30%'] },
+      { label: 'Итог бонус к маяку (drill=10)', values: [21.5, 22, 22.5, 23] },
+      { label: 'Условие бонуса', values: ['К маяку, R=10', 'К маяку, R=10', 'К маяку, R=10', 'К маяку, R=10'] },
+    ];
+  },
+  recipe_alchemy_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [5, 5, 5, 5] },
+      { label: 'Бонус за рецепт', values: [5, 7, 9, 11] },
+      { label: 'Итог урон (рецептов=3)', values: [20, 26, 32, 38] },
+    ];
+  },
+  contour_overload_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [15, 20, 25, 30] },
+      { label: 'Взрыв переполнения (плоский)', values: [30, 40, 50, 60] },
+      { label: 'Скейл взрыва от explosionPower', values: ['20%', '30%', '40%', '50%'] },
+      { label: 'Итог взрыв (explosion=10)', values: [32, 43, 54, 65] },
+      { label: 'Радиус взрыва', values: [1, 1, 1, 1] },
+      { label: 'Правило попадания', values: ['Один удар по блоку', 'Один удар по блоку', 'Один удар по блоку', 'Один удар по блоку'] },
+    ];
+  },
+  contour_line_drill() {
+    return [
+      { label: 'Базовый урон (плоский)', values: [10, 10, 10, 10] },
+      { label: 'Скейл от drillPower', values: ['10%', '20%', '30%', '40%'] },
+      { label: 'Урон за длину контура', values: [1, 2, 3, 4] },
+      { label: 'Итог урон (drill=10, контур=10)', values: [21, 32, 43, 54] },
+    ];
+  },
+  loop_pressure() {
+    return [
+      { label: 'Длительность баффа (сек)', values: [4, 4.5, 5, 5.5] },
+      { label: 'drillPower за разрушенный блок контуром', values: [3, 4, 5, 6] },
+      { label: 'Пример бонуса (сломано 6 блоков)', values: [18, 24, 30, 36] },
+    ];
+  },
+  contour_resonance_drill() {
+    return [
+      { label: 'Резонанс (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл от explosionPower', values: ['10%', '15%', '20%', '30%'] },
+      { label: 'Итог резонанс (explosion=10)', values: [21, 21.5, 22, 23] },
+      { label: 'Триггер', values: ['При попадании в брешь', 'При попадании в брешь', 'При попадании в брешь', 'При попадании в брешь'] },
+      { label: 'Контур', values: ['Не исчезает, краснеет', 'Не исчезает, краснеет', 'Не исчезает, краснеет', 'Не исчезает, краснеет'] },
+    ];
+  },
+  contour_blast_pressure() {
+    return [
+      { label: 'Длительность баффа (сек)', values: [5, 6, 7, 8] },
+      { label: 'explosionPower за разрушенный блок контуром', values: [5, 5, 5, 5] },
+      { label: 'Пример бонуса (сломано 6 блоков)', values: [30, 30, 30, 30] },
+    ];
+  },
+};
+
+function getScaleRows(item) {
+  const rows = [];
+  const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+  for (const effect of effects) {
+    rows.push({
+      label: effect.stat || '—',
+      values: RARITIES.map(rarity => formatScaleValue(effect.stat || '', effectValueByRarity(effect, rarity))),
+    });
+  }
+  if (SPECIAL_SCALE_ROWS[item.id]) {
+    rows.push(...SPECIAL_SCALE_ROWS[item.id]());
+  }
+  return rows;
+}
+
+function getFilteredItems() {
+  const q = S.search.trim().toLowerCase();
+  const filtered = ALL.filter(item => {
+    if (S.excludeDev && isEntryInDevelopment(item)) return false;
+    if (S.filter !== 'all' && item.__kind !== S.filter) return false;
+    if (S.artifactType !== 'all' && item.category !== S.artifactType) return false;
+    if (S.statFilter !== 'all') {
+      const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+      if (!effects.some(effect => effect?.stat === S.statFilter)) return false;
+    }
+    if (!q) return true;
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    const statHay = effects.map(effect => {
+      const stat = effect?.stat || '';
+      const statLabel = stat ? t(`stat.${stat}`) : '';
+      return `${stat} ${statLabel}`;
+    }).join(' ');
+    const hay = `${item.name} ${item.id} ${item.desc} ${categoryName(item.category)} ${statHay}`.toLowerCase();
+    return hay.includes(q);
+  });
+  return filtered;
+}
+
+function renderUiText() {
+  document.title = ui('title');
+  el.title.textContent = ui('title');
+  el.sub.textContent = ui('sub');
+  el.blockShop.textContent = ui('blockShop');
+  el.blockDeps.textContent = ui('blockDeps');
+  el.blockAffected.textContent = ui('blockAffected');
+  el.blockScale.textContent = ui('blockScale');
+  el.search.placeholder = ui('search');
+
+  const current = S.filter;
+  el.filter.innerHTML = `
+    <option value="all">${ui('filterAll')}</option>
+    <option value="equipment">${ui('filterEquipment')}</option>
+    <option value="items">${ui('filterItems')}</option>
+  `;
+  el.filter.value = current;
+
+  const categorySource = S.excludeDev
+    ? CATEGORIES.filter((cat) => !cat.inDevelopment)
+    : CATEGORIES;
+  if (S.artifactType !== 'all' && !categorySource.some((cat) => cat.id === S.artifactType)) {
+    S.artifactType = 'all';
+  }
+  if (S.statsCategory !== 'all' && !categorySource.some((cat) => cat.id === S.statsCategory)) {
+    S.statsCategory = 'all';
+  }
+  const currentType = S.artifactType;
+  const categoryOptions = categorySource.map(cat =>
+    `<option value="${esc(cat.id)}">${esc(cat.icon)} ${esc(cat.name)}</option>`
+  ).join('');
+  el.artifactType.innerHTML = `
+    <option value="all">${ui('artifactTypeAll')}</option>
+    ${categoryOptions}
+  `;
+  el.artifactType.value = currentType;
+
+  const stats = getStatRows();
+  const currentStat = S.statFilter;
+  el.statFilter.innerHTML = `
+    <option value="all">${ui('statFilterAll')}</option>
+    ${stats.map(row => `<option value="${esc(row.stat)}">${esc(row.label)}</option>`).join('')}
+  `;
+  el.statFilter.value = currentStat;
+  el.lang.value = S.locale;
+  if (el.excludeDev) el.excludeDev.checked = !!S.excludeDev;
+  if (el.statsExcludeDev) el.statsExcludeDev.checked = !!S.excludeDev;
+  if (el.excludeDevLabel) el.excludeDevLabel.textContent = ui('excludeDev');
+  if (el.statsExcludeDevLabel) el.statsExcludeDevLabel.textContent = ui('statsExcludeDev');
+  el.resetFilters.textContent = ui('resetFilters');
+  el.tabCards.textContent = ui('tabCards');
+  el.tabStats.textContent = ui('tabStats');
+
+  el.statsSearch.placeholder = ui('statsSearch');
+  el.statsSearch.value = S.statsSearch;
+  el.statsType.innerHTML = `
+    <option value="all">${ui('statsTypeAll')}</option>
+    <option value="equipment">${ui('statsTypeEquipment')}</option>
+    <option value="items">${ui('statsTypeItems')}</option>
+  `;
+  el.statsType.value = S.statsType;
+  el.statsCategory.innerHTML = `
+    <option value="all">${ui('statsCategoryAll')}</option>
+    ${categoryOptions}
+  `;
+  el.statsCategory.value = S.statsCategory;
+  el.statsResetFilters.textContent = ui('statsResetFilters');
+}
+
+function getStatRows(sourceItems = ALL) {
+  const byStat = new Map();
+  for (const item of sourceItems) {
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    for (const effect of effects) {
+      const stat = effect?.stat;
+      if (!stat) continue;
+      if (!byStat.has(stat)) byStat.set(stat, { pos: new Set(), neg: new Set() });
+      const bucket = byStat.get(stat);
+
+      let hasPos = false;
+      let hasNeg = false;
+      if (Array.isArray(effect.effectByRarity)) {
+        for (const raw of effect.effectByRarity) {
+          const value = Number(raw);
+          if (!Number.isFinite(value)) continue;
+          const pol = classifyEffectPolarity(stat, value);
+          if (pol === 'pos') hasPos = true;
+          if (pol === 'neg') hasNeg = true;
+        }
+      } else if (typeof effect.value === 'number') {
+        const pol = classifyEffectPolarity(stat, effect.value);
+        if (pol === 'pos') hasPos = true;
+        if (pol === 'neg') hasNeg = true;
+      }
+      if (hasPos) bucket.pos.add(item.id);
+      if (hasNeg) bucket.neg.add(item.id);
+    }
+  }
+
+  return [...byStat.entries()]
+    .map(([stat, counts]) => {
+      const labelRaw = t(`stat.${stat}`);
+      const descRaw = t(`shop.stat.${stat}.tooltip`);
+      const label = labelRaw === `stat.${stat}` ? stat : labelRaw;
+      const desc = descRaw === `shop.stat.${stat}.tooltip` ? ui('statNoDesc') : descRaw;
+      return {
+        stat,
+        label,
+        desc,
+        posCount: counts.pos.size,
+        negCount: counts.neg.size,
+        itemCount: new Set([...counts.pos, ...counts.neg]).size,
+      };
+    })
+    .sort((a, b) => {
+      if (b.itemCount !== a.itemCount) return b.itemCount - a.itemCount;
+      if (b.posCount !== a.posCount) return b.posCount - a.posCount;
+      return a.label.localeCompare(b.label, S.locale);
+    });
+}
+
+function renderCountDots(kind, count) {
+  const safeCount = Math.max(0, Number(count) || 0);
+  const dots = safeCount > 0
+    ? Array.from({ length: safeCount }, () => '<span class="count-dot"></span>').join('')
+    : '';
+  const title = kind === 'pos'
+    ? `${ui('statPositive')}: ${safeCount}`
+    : `${ui('statNegative')}: ${safeCount}`;
+  return `<span class="count-dots ${kind}" title="${esc(title)}" aria-label="${esc(title)}">${dots}</span>`;
+}
+
+function renderStats() {
+  const items = getItemsForStatsFilters();
+  const sourceItems = S.excludeDev
+    ? ALL.filter((item) => !isEntryInDevelopment(item))
+    : ALL;
+  const allRows = getStatRows(sourceItems);
+  const filteredRows = getStatRows(items);
+  const filteredMap = new Map(filteredRows.map((row) => [row.stat, row]));
+  const hasActiveStatsFilter =
+    S.statsType !== 'all' ||
+    S.statsCategory !== 'all' ||
+    S.statsSearch.trim().length > 0;
+
+  const rows = hasActiveStatsFilter
+    ? (() => {
+      const matched = [];
+      const rest = [];
+      for (const baseRow of allRows) {
+        const row = filteredMap.get(baseRow.stat) || {
+          ...baseRow,
+          posCount: 0,
+          negCount: 0,
+          itemCount: 0,
+        };
+        if (row.itemCount > 0) matched.push(row);
+        else rest.push(row);
+      }
+      return [...matched, ...rest];
+    })()
+    : allRows;
+  if (!rows.length) {
+    el.statsList.innerHTML = `<div class="empty">${esc(ui('scaleNone'))}</div>`;
+    return;
+  }
+  el.statsList.innerHTML = rows.map(row => `
+    <article class="stat-card${row.itemCount > 0 ? '' : ' stat-card--dimmed'}" data-stat="${esc(row.stat)}">
+      <div class="stat-card__name">${esc(row.label)}</div>
+      <div class="stat-card__id">${esc(row.stat)}</div>
+      <div class="stat-card__desc">${esc(row.desc)}</div>
+      <div class="stat-card__counts">
+        ${renderCountDots('pos', row.posCount)}
+        ${renderCountDots('neg', row.negCount)}
+      </div>
+    </article>
+  `).join('');
+  el.statsList.querySelectorAll('[data-stat]').forEach(node => {
+    node.addEventListener('click', () => {
+      S.statFilter = node.dataset.stat || 'all';
+      S.tab = 'cards';
+      render();
+    });
+  });
+}
+
+function renderTabState() {
+  const cards = S.tab === 'cards';
+  el.controls.hidden = !cards;
+  el.cardsLayout.hidden = !cards;
+  el.statsLayout.hidden = cards;
+  el.statsControls.hidden = cards;
+  el.tabCards.classList.toggle('active', cards);
+  el.tabStats.classList.toggle('active', !cards);
+}
+
+function getItemsForStatsFilters() {
+  const q = S.statsSearch.trim().toLowerCase();
+  return ALL.filter(item => {
+    if (S.excludeDev && isEntryInDevelopment(item)) return false;
+    if (S.statsType !== 'all' && item.__kind !== S.statsType) return false;
+    if (S.statsCategory !== 'all' && item.category !== S.statsCategory) return false;
+    if (!q) return true;
+    const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+    const statHay = effects.map(effect => {
+      const stat = effect?.stat || '';
+      const statLabel = stat ? t(`stat.${stat}`) : '';
+      return `${stat} ${statLabel}`;
+    }).join(' ');
+    const hay = `${item.name} ${item.id} ${item.desc} ${categoryName(item.category)} ${statHay}`.toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+function getSelectedItem(items) {
+  let found = items.find(item => item.id === S.selectedId);
+  if (!found) {
+    found = items[0] ?? null;
+    S.selectedId = found?.id ?? null;
+  }
+  return found;
+}
+
+function renderRaritySwitch() {
+  el.raritySwitch.innerHTML = [1,2,3,4].map(rarity => `
+    <button class="rarity-btn ${S.rarity === rarity ? 'active' : ''}" data-rarity="${rarity}">
+      ${rarityName(rarity)}
+    </button>
+  `).join('');
+  el.raritySwitch.querySelectorAll('[data-rarity]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S.rarity = Number(btn.dataset.rarity);
+      render();
+    });
+  });
+}
+
+function renderList(items, selectedItem) {
+  el.list.innerHTML = items.map(item => `
+    <li>
+      <button class="item-row ${selectedItem?.id === item.id ? 'active' : ''}" data-id="${esc(item.id)}">
+        <span class="item-row__icon">${esc(item.icon || '✦')}</span>
+        <span>
+          <div class="item-row__name">${esc(item.name)}</div>
+          <div class="item-row__meta ${RARITY_CLASS[item.minRarity] || 'r1'}">
+            ${esc(categoryName(item.category))} · ${ui('listRarityFrom')} ${rarityName(item.minRarity)}
+            ${item.unique ? `<span class="uniq">• ${esc(ui('uniqueLabel'))}</span>` : ''}
+            ${item.limited ? `<span class="limited">• ${esc(ui('limitedLabel'))}</span>` : ''}
+          </div>
+        </span>
+      </button>
+    </li>
+  `).join('');
+
+  el.list.querySelectorAll('[data-id]').forEach(node => {
+    node.addEventListener('click', () => {
+      S.selectedId = node.dataset.id;
+      render();
+    });
+  });
+}
+
+function renderListSummary(items) {
+  const equipmentCount = items.filter(item => item.__kind === 'equipment').length;
+  const itemCount = items.filter(item => item.__kind === 'items').length;
+  el.listSummary.textContent = `${ui('listEquipmentCount')}: ${equipmentCount} · ${ui('listItemCount')}: ${itemCount}`;
+}
+
+function renderShopCard(item) {
+  const isEquip = item.type === 'equipment';
+  let cls = 'shop-card';
+  cls += ` shop-card--rarity-${S.rarity}`;
+  if (isEquip) cls += ' shop-card--equipment';
+  else cls += ' shop-card--item';
+
+  const typeLabel = isEquip ? '⛏' : '✧';
+  const badges = [];
+  if (item.unique) badges.push(ui('uniqueLabel'));
+  if (item.limited) badges.push(ui('limitedLabel'));
+  const mergeLabel = badges.length
+    ? `<div class="shop-card__merge">${badges.map(esc).join(' · ')}</div>`
+    : '';
+  const catDef = item.category ? CATEGORIES.find(c => c.id === item.category) : null;
+  const catLabel = catDef ? `<div class="shop-card__category">${catDef.icon} ${catDef.name}</div>` : '';
+  const desc = getGoodDescription(item, S.rarity, PREVIEW_STATS);
+
+  el.shopCard.innerHTML = `
+    <div class="${cls}">
+      <div class="shop-card__type">${typeLabel}</div>
+      <div class="shop-card__icon">${esc(item.icon || '✦')}</div>
+      <div class="shop-card__name">${esc(item.name)}</div>
+      ${catLabel}
+      <div class="shop-card__desc">${(desc || '').replace(/\n/g, '<br>')}</div>
+      ${mergeLabel}
+      <div class="shop-card__cost">${RARITY_NAMES[S.rarity]}</div>
+    </div>
+  `;
+}
+
+function renderDependencies(item) {
+  const uniq = getScalingDependencies(item);
+  if (uniq.length === 0) {
+    el.dependencies.innerHTML = `<div class="empty">${esc(ui('depsNone'))}</div>`;
+    return;
+  }
+  el.dependencies.innerHTML = uniq.map(stat => `<span>${esc(stat)}</span>`).join('');
+}
+
+function renderItemAffectedStats(item) {
+  const effects = Array.isArray(item.effect) ? item.effect : (item.effect ? [item.effect] : []);
+  if (!effects.length) {
+    el.itemStats.innerHTML = `<div class="empty">${esc(ui('itemNoStats'))}</div>`;
+    return;
+  }
+
+  const statsMap = new Map(getStatRows().map(row => [row.stat, row]));
+  const uniqStats = [...new Set(effects.map(effect => effect?.stat).filter(Boolean))];
+  const activeStatFilter = S.statFilter && S.statFilter !== 'all' ? S.statFilter : null;
+  const orderedStats = activeStatFilter
+    ? [
+      ...uniqStats.filter(stat => stat === activeStatFilter),
+      ...uniqStats.filter(stat => stat !== activeStatFilter),
+    ]
+    : uniqStats;
+
+  el.itemStats.innerHTML = orderedStats.map(stat => {
+    const row = statsMap.get(stat);
+    const labelRaw = t(`stat.${stat}`);
+    const descRaw = t(`shop.stat.${stat}.tooltip`);
+    const label = row?.label ?? (labelRaw === `stat.${stat}` ? stat : labelRaw);
+    const desc = row?.desc ?? (descRaw === `shop.stat.${stat}.tooltip` ? ui('statNoDesc') : descRaw);
+    const posCount = row?.posCount ?? 0;
+    const negCount = row?.negCount ?? 0;
+    return `
+      <article class="stat-card" data-stat="${esc(stat)}">
+        <div class="stat-card__name">${esc(label)}</div>
+        <div class="stat-card__id">${esc(stat)}</div>
+        <div class="stat-card__desc">${esc(desc)}</div>
+        <div class="stat-card__counts">
+          ${renderCountDots('pos', posCount)}
+          ${renderCountDots('neg', negCount)}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  el.itemStats.querySelectorAll('[data-stat]').forEach(node => {
+    node.addEventListener('click', () => {
+      S.statFilter = node.dataset.stat || 'all';
+      render();
+    });
+  });
+}
+
+function getScalingDependencies(item) {
+  const deps = new Set();
+  for (let rarity = 1; rarity <= 4; rarity += 1) {
+    const statsProbe = new Proxy({}, {
+      get(_target, prop) {
+        if (typeof prop === 'string') deps.add(prop);
+        return 10;
+      },
+    });
+    try {
+      getGoodDescription(item, rarity, statsProbe);
+    } catch {}
+  }
+  return [...deps].sort((a, b) => a.localeCompare(b));
+}
+
+function renderScale(item) {
+  const rows = getScaleRows(item);
+  if (!rows.length) {
+    el.scale.innerHTML = `<div class="empty">${esc(ui('scaleNone'))}</div>`;
+    return;
+  }
+
+  const rowsHtml = rows.map(row => `
+    <tr>
+      <td>${esc(row.label)}</td>
+      <td>${esc(row.values[0])}</td>
+      <td>${esc(row.values[1])}</td>
+      <td>${esc(row.values[2])}</td>
+      <td>${esc(row.values[3])}</td>
+    </tr>
+  `).join('');
+
+  el.scale.innerHTML = `
+    <table class="scale-table">
+      <thead>
+        <tr>
+          <th>${esc(ui('scaleStat'))}</th>
+          <th class="r1">${esc(rarityName(1))}</th>
+          <th class="r2">${esc(rarityName(2))}</th>
+          <th class="r3">${esc(rarityName(3))}</th>
+          <th class="r4">${esc(rarityName(4))}</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="hint" style="margin-top:8px">${esc(ui('hintScale'))}</div>
+  `;
+}
+
+function render() {
+  renderUiText();
+  renderTabState();
+  if (S.tab === 'stats') {
+    renderStats();
+    syncQueryFromState();
+    return;
+  }
+  renderRaritySwitch();
+  const items = getFilteredItems();
+  renderListSummary(items);
+  const selected = getSelectedItem(items);
+
+  if (!selected) {
+    el.list.innerHTML = `<li class="empty">${esc(ui('noResults'))}</li>`;
+    el.shopCard.innerHTML = `<div class="empty">${esc(ui('selectItem'))}</div>`;
+    el.itemStats.innerHTML = `<div class="empty">${esc(ui('selectItem'))}</div>`;
+    el.scale.innerHTML = `<div class="empty">${esc(ui('selectItem'))}</div>`;
+    el.dependencies.innerHTML = '';
+    return;
+  }
+
+  renderList(items, selected);
+  renderShopCard(selected);
+  renderDependencies(selected);
+  renderItemAffectedStats(selected);
+  renderScale(selected);
+  syncQueryFromState();
+}
+
+el.search.addEventListener('input', () => {
+  S.search = el.search.value;
+  render();
+});
+el.filter.addEventListener('change', () => {
+  S.filter = el.filter.value;
+  render();
+});
+el.artifactType.addEventListener('change', () => {
+  S.artifactType = el.artifactType.value;
+  render();
+});
+el.statFilter.addEventListener('change', () => {
+  S.statFilter = el.statFilter.value;
+  render();
+});
+el.statsSearch.addEventListener('input', () => {
+  S.statsSearch = el.statsSearch.value;
+  if (S.tab === 'stats') render();
+});
+el.statsType.addEventListener('change', () => {
+  S.statsType = el.statsType.value;
+  if (S.tab === 'stats') render();
+});
+el.statsCategory.addEventListener('change', () => {
+  S.statsCategory = el.statsCategory.value;
+  if (S.tab === 'stats') render();
+});
+el.excludeDev.addEventListener('change', () => {
+  S.excludeDev = !!el.excludeDev.checked;
+  if (el.statsExcludeDev) el.statsExcludeDev.checked = S.excludeDev;
+  render();
+});
+el.statsExcludeDev.addEventListener('change', () => {
+  S.excludeDev = !!el.statsExcludeDev.checked;
+  if (el.excludeDev) el.excludeDev.checked = S.excludeDev;
+  render();
+});
+el.statsResetFilters.addEventListener('click', () => {
+  S.statsSearch = '';
+  S.statsType = 'all';
+  S.statsCategory = 'all';
+  S.excludeDev = false;
+  el.statsSearch.value = '';
+  if (S.tab === 'stats') render();
+});
+el.lang.addEventListener('change', () => {
+  const next = el.lang.value === 'ru' ? 'ru' : 'en';
+  S.locale = next;
+  setLocale(next);
+  render();
+});
+el.tabCards.addEventListener('click', () => {
+  S.tab = 'cards';
+  render();
+});
+el.tabStats.addEventListener('click', () => {
+  S.tab = 'stats';
+  render();
+});
+el.resetFilters.addEventListener('click', () => {
+  S.search = '';
+  S.filter = 'all';
+  S.artifactType = 'all';
+  S.statFilter = 'all';
+  S.statsSearch = '';
+  S.statsType = 'all';
+  S.statsCategory = 'all';
+  S.excludeDev = false;
+  S.rarity = 1;
+  el.search.value = '';
+  render();
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  const next = S.rarity + (event.key === 'ArrowRight' ? 1 : -1);
+  if (next < 1 || next > 4) return;
+  S.rarity = next;
+  render();
+});
+
+parseInitialStateFromQuery();
+setLocale(S.locale);
+el.search.value = S.search;
+el.statsSearch.value = S.statsSearch;
+render();
+</script>
+</body>
+</html>

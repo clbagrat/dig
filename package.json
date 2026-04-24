@@ -1,0 +1,14 @@
+{
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "desktop": "electron .",
+    "serve": "PORT=3001 node scripts/sound-server.js"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "electron": "^37.10.3"
+  }
+}

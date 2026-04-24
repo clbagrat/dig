@@ -66,34 +66,10 @@
         <h2>Бур и бой</h2>
         <div class="perk-grid">
           <article class="perk-card">
-            <div class="perk-card__top"><span class="perk-icon">⫼</span><h3>Боковые буры</h3></div>
-            <p>Основной удар дополнительно бьет слева и справа от героя.</p>
-            <ul>
-              <li>Урон: `50% + 25%` за уровень.</li>
-              <li>Стакается без потолка.</li>
-            </ul>
-          </article>
-          <article class="perk-card">
-            <div class="perk-card__top"><span class="perk-icon">⇢</span><h3>Длинный бур</h3></div>
-            <p>Бьет следующий тайл по прямой после основного.</p>
-            <ul>
-              <li>Старт: `20%` основного урона.</li>
-              <li>Дальше: `+10%` за уровень.</li>
-            </ul>
-          </article>
-          <article class="perk-card">
-            <div class="perk-card__top"><span class="perk-icon">✣</span><h3>Диагональные буры</h3></div>
-            <p>Бьют по двум диагоналям вперед.</p>
-            <ul>
-              <li>Старт: `20%` основного урона.</li>
-              <li>Дальше: `+5%` за уровень.</li>
-            </ul>
-          </article>
-          <article class="perk-card">
             <div class="perk-card__top"><span class="perk-icon">⏚</span><h3>Форсаж на нуле</h3></div>
-            <p>Ускоряет цикл удара, когда топливо опускается.</p>
+            <p>При низком топливе временно повышает strikeSpeed.</p>
             <ul>
-              <li>Бонус: `+35%` за уровень на пустом баке.</li>
+              <li>На пустом баке даёт `+35` к strikeSpeed за уровень.</li>
               <li>Стакается без потолка.</li>
             </ul>
           </article>
@@ -121,11 +97,11 @@
         <div class="perk-grid">
           <article class="perk-card">
             <div class="perk-card__top"><span class="perk-icon">⬡</span><h3>Контурный заряд</h3></div>
-            <p>После замыкания дает временный бонус к урону бура.</p>
+            <p>После замыкания контура на 3 секунды усиливает drillPower.</p>
             <ul>
-              <li>`+5%` урона за каждую клетку внутри контура.</li>
-              <li>Длительность: `3 / 4 / 5 / 6` сек.</li>
-              <li>Потолок: 4 уровня.</li>
+              <li>Считает только реально разрушенные блоки внутри контура.</li>
+              <li>Первый уровень: `+0.05 drillPower` за блок.</li>
+              <li>Каждый повторный выбор: ещё `+0.05` за блок.</li>
             </ul>
           </article>
           <article class="perk-card">

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -7,12 +7,33 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <title>Dig Path Prototype</title>
-    <link rel="stylesheet" href="./styles.css?v=20260318-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260330-2" />
   </head>
   <body>
     <div class="app-shell">
       <canvas id="game"></canvas>
-      <button id="manualOpen" class="manual-link" type="button" aria-label="Открыть руководство">?</button>
+      <div class="top-actions">
+        <button id="reloadGame" class="top-action-button top-action-button--icon" type="button" aria-label="Reload">↻</button>
+        <button id="menuToggle" class="top-action-button top-action-button--icon" type="button" aria-label="Menu">≡</button>
+      </div>
+      <div id="menuPanel" class="menu-modal" hidden>
+        <div class="menu-modal__panel">
+          <button id="soundToggle" class="menu-modal__item" type="button">🔇 Sound</button>
+          <button id="langToggle" class="menu-modal__item" type="button">🌐 Language</button>
+          <div class="menu-modal__sep"></div>
+          <button id="manualOpen" class="menu-modal__item" type="button" aria-label="Open Manual">? Manual</button>
+        </div>
+        <div id="menuSummary" class="menu-summary menu-summary--below">
+          <div class="menu-summary__section">
+            <div id="menuSummaryItemsTitle" class="menu-summary__title">Inventory</div>
+            <div id="menuSummaryItems" class="menu-summary__grid"></div>
+          </div>
+          <div class="menu-summary__section">
+            <div id="menuSummaryStatsTitle" class="menu-summary__title">Stats</div>
+            <div id="menuSummaryStats" class="menu-summary__stats"></div>
+          </div>
+        </div>
+      </div>
       <div class="touch-zones">
         <div id="movePad" class="move-pad">
           <div id="moveStick" class="move-stick"></div>
@@ -21,24 +42,27 @@
       <div id="manualModal" class="manual-modal" hidden>
         <div class="manual-modal__panel">
           <div class="manual-modal__head">
-            <div class="manual-modal__title">Руководство</div>
-            <button id="manualClose" class="manual-modal__close" type="button">Закрыть</button>
+            <div class="manual-modal__title" data-i18n="ui.manual_title">Manual</div>
+            <button id="manualClose" class="manual-modal__close" type="button" data-i18n="ui.close">Close</button>
           </div>
           <iframe
             id="manualFrame"
             class="manual-modal__frame"
             src="./manual.html"
-            title="Руководство по игре"
+            title="Game Manual"
             loading="lazy"
           ></iframe>
         </div>
       </div>
+      <div id="itemInspectModal" class="item-inspect-modal" hidden>
+        <div class="item-inspect-modal__panel"></div>
+      </div>
       <div id="perkChoice" class="perk-choice" hidden>
         <div class="perk-choice__panel">
-          <div class="perk-choice__title">Выбери апгрейд</div>
-          <div class="perk-choice__subtitle">Апгрейд за 30 скрапа</div>
+          <div class="perk-choice__title" data-i18n="ui.choose_upgrade">Choose Upgrade</div>
+          <div class="perk-choice__subtitle" data-i18n="ui.upgrade_cost">Upgrade for 30 Gold</div>
           <div class="perk-choice__actions">
-            <button id="perkReroll" class="perk-choice__reroll" type="button">Реролл</button>
+            <button id="perkReroll" class="perk-choice__reroll" type="button" data-i18n="ui.reroll">Reroll</button>
             <span id="perkRerollCount" class="perk-choice__reroll-count">0</span>
           </div>
           <div class="perk-choice__options">
@@ -48,44 +72,136 @@
           </div>
         </div>
       </div>
+      <div id="artifactChoice" class="artifact-choice" hidden>
+        <div class="artifact-choice__panel">
+          <div id="artifactChoiceTitle" class="artifact-choice__title" data-i18n="ui.choose_category">Choose Category</div>
+          <div id="artifactChoiceSubtitle" class="artifact-choice__subtitle" data-i18n="ui.artifact_subtitle">Artifact activated — unlock a new category and get a slot</div>
+          <div id="artifactChoiceCards" class="artifact-choice__cards">
+            <button id="artifactChoiceCard0" class="artifact-choice__card"></button>
+            <button id="artifactChoiceCard1" class="artifact-choice__card"></button>
+          </div>
+          <button id="artifactChoiceContinue" class="artifact-choice__continue" type="button" data-i18n="ui.continue" hidden>Continue</button>
+        </div>
+      </div>
       <div id="crystalReward" class="crystal-reward" hidden>
         <div class="crystal-reward__panel">
-          <div class="crystal-reward__title">Рецепт собран</div>
-          <div class="crystal-reward__subtitle">Ты получил 2 тайловых перка и 1 реролл</div>
+          <div class="crystal-reward__title" data-i18n="ui.recipe_complete">Recipe Complete</div>
+          <div class="crystal-reward__subtitle" data-i18n="ui.crystal_subtitle">You received 2 tile perks</div>
           <div class="crystal-reward__cards">
             <div id="crystalRewardCard0" class="crystal-reward__card"></div>
             <div id="crystalRewardCard1" class="crystal-reward__card"></div>
           </div>
-          <button id="crystalRewardClose" class="crystal-reward__close" type="button" disabled>Продолжить</button>
+          <button id="crystalRewardClose" class="crystal-reward__close" type="button" disabled data-i18n="ui.continue">Continue</button>
         </div>
       </div>
       <div id="debugPerkMenu" class="debug-perk-menu" hidden>
         <div class="debug-perk-menu__panel">
           <div class="debug-perk-menu__head">
             <div>
-              <div class="debug-perk-menu__title">Debug Perks</div>
-              <div class="debug-perk-menu__subtitle">Тап по SEED открывает это меню</div>
+              <div class="debug-perk-menu__title">Debug</div>
+              <div class="debug-perk-menu__subtitle" data-i18n="ui.debug_subtitle">Tap SEED to open this menu</div>
+              <div id="debugSeedDisplay" class="debug-perk-menu__subtitle"></div>
             </div>
-            <button id="debugPerkClose" class="debug-perk-menu__close" type="button">Закрыть</button>
+            <button id="debugPerkClose" class="debug-perk-menu__close" type="button" data-i18n="ui.close">Close</button>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label" data-i18n="ui.quick_actions">Quick Actions</div>
+            <div class="debug-perk-menu__grid">
+              <button id="debugToggleAudioToasts" type="button" class="debug-perk-menu__button">🔊 Audio Toasts: OFF</button>
+              <button id="debugGiveArtifact" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.give_artifact">🔮 Give Artifact</button>
+              <button id="debugGiveKey" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.give_key">🔑 Give Key</button>
+              <button id="debugTeleportBeacon" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.to_nearest_beacon">📡 To nearest Beacon</button>
+              <button id="debugTeleportSafe" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.to_nearest_safe">🔒 To nearest Safe</button>
+              <button id="debugTeleportWorm" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.to_nearest_worm">🐛 To nearest Worm</button>
+              <button id="debugTeleportBoulder" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.to_nearest_boulder">🪨 To nearest Boulder</button>
+              <button id="debugSpawnContourEnemy" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.spawn_enemy">🦇 Spawn Enemy</button>
+              <button id="debugOpenShop" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.open_shop">🛒 Open Shop</button>
+              <button id="debugOpenMap" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.map">🗺 Map</button>
+              <button id="debugFinishRecipe" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.finish_recipe">🔮 Finish Recipe</button>
+            </div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label" data-i18n="ui.resources">Resources</div>
+            <div class="debug-perk-menu__grid">
+              <button id="debugAddGold" type="button" class="debug-perk-menu__button">+500 ●</button>
+              <button id="debugAddUnsafeGold" type="button" class="debug-perk-menu__button">+100 ⚠️●</button>
+              <button id="debugAddFuel" type="button" class="debug-perk-menu__button">+200 ⛽</button>
+              <button id="debugZeroFuel" type="button" class="debug-perk-menu__button">0 ⛽</button>
+              <button id="debugHealFull" type="button" class="debug-perk-menu__button">❤️ Full HP</button>
+            </div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label" data-i18n="ui.perk_zones">Perk Zones</div>
+            <div class="debug-perk-menu__grid">
+              <button id="debugZoneBak" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">⬡ Tank</button>
+              <button id="debugZoneBomba" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">⬡ Bomb</button>
+              <button id="debugZoneHp" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">⬡ HP+</button>
+              <button id="debugZoneBronya" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">⬡ Armor</button>
+              <button id="debugZoneDual" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">⬡ D/E</button>
+            </div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label" data-i18n="ui.tools">Tools</div>
+            <div id="debugInstruments" class="debug-perk-menu__grid"></div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Items & Equipment</div>
+            <div id="debugGoods" class="debug-perk-menu__grid"></div>
+          </div>
+          <div class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Core Stats</div>
+            <div id="debugCoreStats" class="debug-stat-list"></div>
           </div>
           <div class="debug-perk-menu__section">
             <div class="debug-perk-menu__label">Tile Perks</div>
             <div id="debugTilePerks" class="debug-perk-menu__grid"></div>
           </div>
-          <div class="debug-perk-menu__section">
-            <div class="debug-perk-menu__label">Scrap Perks</div>
-            <div id="debugScrapPerks" class="debug-perk-menu__grid"></div>
+          <div id="debugGenerationSection" class="debug-perk-menu__section">
+            <div class="debug-perk-menu__label">Generation</div>
+            <div class="debug-generation">
+              <div class="debug-generation__actions">
+                <button id="debugGenApply" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent">Apply + Regen</button>
+                <button id="debugGenRandomSeed" type="button" class="debug-perk-menu__button">Random Seed</button>
+                <button id="debugGenCopyJson" type="button" class="debug-perk-menu__button">Copy JSON</button>
+                <button id="debugGenReset" type="button" class="debug-perk-menu__button">Reset Defaults</button>
+              </div>
+              <div id="debugGenStatus" class="debug-generation__status"></div>
+              <div id="debugGenerationQuickEditor" class="debug-generation__quick"></div>
+              <details id="debugGenerationAdvanced" class="debug-generation__advanced">
+                <summary class="debug-generation__advanced-summary">Advanced JSON</summary>
+                <textarea id="debugGenerationEditor" class="debug-generation__editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+              </details>
+            </div>
           </div>
         </div>
       </div>
+      <div id="shopModal" class="shop-modal" hidden></div>
+      <div id="levelUpModal" class="level-up-modal" hidden>
+        <div class="level-up-modal__panel">
+          <div id="levelUpEyebrow" class="level-up-modal__eyebrow">Level Up</div>
+          <div id="levelUpTitle" class="level-up-modal__title">New Reward</div>
+          <div id="levelUpText" class="level-up-modal__text"></div>
+          <div id="levelUpChoices" class="level-up-modal__choices"></div>
+        </div>
+      </div>
+
+      <div id="crystalItemOffer" class="level-up-modal" hidden>
+        <div class="level-up-modal__panel">
+          <div id="crystalItemOfferEyebrow" class="level-up-modal__eyebrow">Рецепт собран</div>
+          <div id="crystalItemOfferTitle" class="level-up-modal__title">Предмет найден</div>
+          <div id="crystalItemOfferBody" class="level-up-modal__choices"></div>
+        </div>
+      </div>
+
       <div id="fatalError" class="fatal-error" hidden>
         <div class="fatal-error__panel">
           <div class="fatal-error__title">Runtime Error</div>
           <div class="fatal-error__subtitle">Скопируй текст ниже и пришли мне.</div>
           <pre id="fatalErrorText" class="fatal-error__text"></pre>
+          <button class="fatal-error__reload" onclick="location.reload()">Перезагрузить</button>
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js"></script>
+    <script type="module" src="./src/game.js?v=60"></script>
   </body>
 </html>
