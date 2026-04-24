@@ -18,6 +18,7 @@ const BASE_CATEGORY_OFFERS = 2;
 const SHOP_SELECTION_BASE_COST = 30;
 const SHOP_SELECTION_STEP_PER_N = 10;
 const RARITY_UPGRADE_BASE_RATIO = 0.5;
+const LIMITED_ITEM_STACK_CAP = 3;
 
 // ── Module state ─────────────────────────────────────────────────────────────────
 
@@ -153,6 +154,19 @@ export function getItemStacks(effectId) {
   return purchasedItems.filter(p => p.id === effectId).length;
 }
 
+function getItemStackLimit(good) {
+  if (!good || good.type !== "item") return Infinity;
+  if (Number.isFinite(good.maxStacks)) return Math.max(0, Math.floor(good.maxStacks));
+  if (good.unique) return 1;
+  if (good.limited) return LIMITED_ITEM_STACK_CAP;
+  return Infinity;
+}
+
+function isItemStackAtLimit(good) {
+  if (!good || good.type !== "item") return false;
+  return getItemStacks(good.id) >= getItemStackLimit(good);
+}
+
 export function getTagCounts() {
   const counts = {};
   for (const part of equippedParts) {
@@ -216,6 +230,9 @@ export function getPurchasedItems() {
 }
 
 export function grantItem(good, rarity) {
+  if (isItemStackAtLimit(good)) {
+    return false;
+  }
   purchasedItems.push({ id: good.id, rarity });
   document.dispatchEvent(new CustomEvent("shop:purchase-item", {
     detail: {
@@ -225,6 +242,7 @@ export function grantItem(good, rarity) {
       rarity,
     },
   }));
+  return true;
 }
 
 export function grantGood(good, rarity = RARITY.COMMON) {
@@ -233,7 +251,9 @@ export function grantGood(good, rarity = RARITY.COMMON) {
   }
   const clampedRarity = clampRarityForGood(good, rarity);
   if (good.type === "item") {
-    grantItem(good, clampedRarity);
+    if (!grantItem(good, clampedRarity)) {
+      return { ok: false, reason: "item-limit" };
+    }
     return { ok: true, rarity: clampedRarity, kind: "item" };
   }
   if (good.type !== "equipment") {
@@ -318,7 +338,7 @@ function rollOfferings(luck) {
     const categoryCandidates = ALL_GOODS.filter((good) =>
       good.category === categoryId &&
       !usedIds.has(good.id) &&
-      !(good.unique && getItemStacks(good.id) > 0) &&
+      !isItemStackAtLimit(good) &&
       (good.minRarity ?? RARITY.COMMON) <= effectiveRarity
     );
 
@@ -333,7 +353,7 @@ function rollOfferings(luck) {
       const categoryFallback = ALL_GOODS.filter((good) =>
         good.category === categoryId &&
         !usedIds.has(good.id) &&
-        !(good.unique && getItemStacks(good.id) > 0)
+        !isItemStackAtLimit(good)
       );
       if (categoryFallback.length > 0) {
         pick = categoryFallback[Math.floor(Math.random() * categoryFallback.length)];
@@ -341,7 +361,7 @@ function rollOfferings(luck) {
         const unlockedFallback = ALL_GOODS.filter((good) =>
           unlockedCategories.has(good.category) &&
           !usedIds.has(good.id) &&
-          !(good.unique && getItemStacks(good.id) > 0)
+          !isItemStackAtLimit(good)
         );
         if (unlockedFallback.length > 0) {
           pick = unlockedFallback[Math.floor(Math.random() * unlockedFallback.length)];
@@ -632,6 +652,7 @@ async function tryPurchase(offeringIdx) {
   const sourceRect = getOfferingCardRect(offeringIdx);
 
   if (offering.good.type === "item") {
+    if (isItemStackAtLimit(offering.good)) return;
     purchaseAnimating = true;
     setOfferingCardFading(offeringIdx, true);
     try {

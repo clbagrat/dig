@@ -32,7 +32,7 @@ const CATEGORY_DEFS = [
   { id: "heat",         icon: "🔥", inDevelopment: true },
   { id: "выживание",    icon: "❤️", inDevelopment: true },
   { id: "поиск_бреши",  icon: "🎯", inDevelopment: false },
-  { id: "ракеты",       icon: "🚀", inDevelopment: true },
+  { id: "ракеты",       icon: "🚀", inDevelopment: false },
   { id: "контур",       icon: "⚡", inDevelopment: false },
   { id: "алхимия",      icon: "⚗️", inDevelopment: false },
 ];
@@ -277,41 +277,63 @@ export const ALL_EQUIPMENT = [
     type: "equipment",
     name: "Бреш-ракета",
     icon: "🎯",
-    desc: "Даёт +10 урона и +10/15/20/25% от drillPower (по редкости). +5% шанс бреши. При попадании в брешь запускает ракету: 20 + 30/40/50/60% от explosionPower (по редкости), радиус 1.5.",
+    desc: "Даёт +10 урона и +10/15/20/25% от drillPower (по редкости). +5/7/10/12% шанс бреши. При попадании в брешь запускает ракету: 20 + 30/40/50/60% от explosionPower (по редкости), радиус 1.5.",
     category: "ракеты",
     tags: ["ракеты"],
-    minRarity: 2,
+    minRarity: 1,
     effect: [
-      { stat: "breachMissileLevel", effectByRarity: [null, null, 1, 1, 1] },
-      { stat: "weakSpotChance",     effectByRarity: [null, null, 0.05, 0.05, 0.05] },
+      { stat: "breachMissileLevel", effectByRarity: [null, 1, 1, 1, 1] },
+      { stat: "weakSpotChance",     effectByRarity: [null, 0.05, 0.07, 0.10, 0.12] },
     ],
   },
   {
     id: "cryo_rocket",
-    type: "equipment",
+    type: "item",
     name: "Крио-ракета",
     icon: "❄️",
-    desc: "При остывании на 20 единиц — ракета. −15% скорость нагрева.",
+    desc: "За каждые 20 остывания выпускает 1 крио-ракету: 20 + 10/15/20/25% от explosionPower, радиус 1. −15% скорость нагрева.",
     category: "ракеты",
     tags: ["ракеты"],
-    minRarity: 2,
+    limited: true,
+    minRarity: 1,
     effect: [
-      { stat: "cryoRocketCount", effectByRarity: [null, null, 1, 1, 1] },
-      { stat: "heatRate",        effectByRarity: [null, null, -0.15, -0.20, -0.28] },
+      { stat: "cryoRocketCount", effectByRarity: [null, 1, 1, 1, 1] },
+      { stat: "heatRate",        effectByRarity: [null, -0.15, -0.15, -0.15, -0.15] },
     ],
+  },
+  {
+    id: "contour_salvo_rack",
+    type: "item",
+    name: "Контурный ракетный блок",
+    icon: "🧷",
+    desc: "При замыкании контура: 1 ракета за каждые 4 блока в контуре. Ракета как у крио-ракеты: 20 + 10/15/20/25% от explosionPower, радиус 1.",
+    category: "ракеты",
+    tags: ["ракеты", "контур"],
+    minRarity: 1,
+  },
+  {
+    id: "afterburn_flash_charge",
+    type: "item",
+    name: "Заряд форсажной вспышки",
+    icon: "💥",
+    desc: "Уникальный. После окончания форсажа: взрыв вокруг героя. Урон 10/15/20/25 за каждую секунду форсажа.",
+    category: "ракеты",
+    tags: ["ракеты"],
+    unique: true,
+    minRarity: 1,
   },
   {
     id: "fuel_rocket",
     type: "equipment",
     name: "Топливная ракета",
     icon: "⛽",
-    desc: "При пополнении топлива запускает ракету. +10% расход.",
+    desc: "Урон 15 + 10/15/20/25% от drillPower. При подборе топлива запускает ракету: 20 + 15/20/25/30% от explosionPower, радиус 1.",
     category: "ракеты",
     tags: ["ракеты"],
-    minRarity: 2,
+    minRarity: 1,
     effect: [
-      { stat: "fuelRocketLevel", effectByRarity: [null, null, 1, 1, 1] },
-      { stat: "fuelDrainRate",   effectByRarity: [null, null, 0.10, 0.15, 0.20] },
+      { stat: "fuelRocketLevel", effectByRarity: [null, 1, 1, 1, 1] },
+      { stat: "fuelDrainRate",   effectByRarity: [null, 0.10, 0.15, 0.20, 0.25] },
     ],
   },
 ];
@@ -1199,13 +1221,13 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Ракетный ускоритель",
     icon: "🚀",
-    desc: "+30% урон взрывов. +10% скорость нагрева.",
+    desc: "+15/30/50/80% урон взрывов. +5/10/15/20% скорость нагрева.",
     category: "ракеты",
     tags: ["ракеты"],
-    minRarity: 2,
+    minRarity: 1,
     effect: [
-      { stat: "explosionBonus", effectByRarity: [null, null, 0.30, 0.50, 0.80] },
-      { stat: "heatRate",                  effectByRarity: [null, null, 0.10, 0.15, 0.20] },
+      { stat: "explosionBonus", effectByRarity: [null, 15, 30, 50, 80] },
+      { stat: "heatRate",       effectByRarity: [null, 0.05, 0.10, 0.15, 0.20] },
     ],
   },
   {
@@ -1213,32 +1235,226 @@ export const ALL_ITEMS = [
     type: "item",
     name: "Кассетная боеголовка",
     icon: "💣",
-    desc: "+1 радиус взрыва перегрева. +20% урон взрывов. −10% общий урон.",
+    desc: "+0.5/0.5/0.5/1 к радиусу взрыва. +10/15/20/25% к урону взрывов. −15% к урону дрели.",
     category: "ракеты",
     tags: ["ракеты"],
-    minRarity: 2,
+    minRarity: 1,
     effect: [
-      { stat: "explosionRadiusBonus",  effectByRarity: [null, null, 1.0, 1.5, 2.0] },
-      { stat: "explosionBonus", effectByRarity: [null, null, 0.20, 0.35, 0.50] },
-      { stat: "damageBonus",               effectByRarity: [null, null, -10, -12, -15] },
+      { stat: "explosionRadiusBonus",  effectByRarity: [null, 0.5, 0.5, 0.5, 1] },
+      { stat: "explosionBonus", effectByRarity: [null, 10, 15, 20, 25] },
+      { stat: "damageBonus",               effectByRarity: [null, -15, -15, -15, -15] },
     ],
   },
   {
-    id: "shaped_charge",
+    id: "overheal_warhead_matrix",
     type: "item",
-    name: "Кумулятивный заряд",
-    icon: "🔫",
-    desc: "+15% общий урон. −0.5 радиус взрыва перегрева. +10% расход топлива.",
+    name: "Матрица оверхил-боеголовок",
+    icon: "🩹",
+    desc: "Оверхил: постоянные +1/2/2/3 к explosionPower. +10/15/20/25 макс HP. −6 drillPower.",
+    get descParts() {
+      return [
+        "Оверхил: постоянные +1/2/2/3 к explosionPower",
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+      ];
+    },
     category: "ракеты",
     tags: ["ракеты"],
-    minRarity: 2,
+    minRarity: 1,
     effect: [
-      { stat: "damageBonus",               effectByRarity: [null, null, 15,   22,   30  ] },
-      { stat: "explosionRadiusBonus",  effectByRarity: [null, null, -0.5, -0.5, -0.5] },
-      { stat: "fuelDrainRate",             effectByRarity: [null, null, 0.10, 0.15, 0.20] },
+      { stat: "maxHp",      effectByRarity: [null, 10, 15, 20, 25] },
+      { stat: "drillPower", effectByRarity: [null, -6, -6, -6, -6] },
     ],
   },
-
+  {
+    id: "overflow_booster_manifold",
+    type: "item",
+    name: "Коллектор переполнения",
+    icon: "🛢️",
+    desc: "Переполнение топлива: постоянные +2/3/4/5% к урону взрывов. +25 макс топлива. −12% урона дрели.",
+    get descParts() {
+      return [
+        "Переполнение топлива: постоянные +2/3/4/5% к урону взрывов",
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+      ];
+    },
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "maxFuel",    effectByRarity: [null, 25, 25, 25, 25] },
+      { stat: "damageBonus",effectByRarity: [null, -12, -12, -12, -12] },
+    ],
+  },
+  {
+    id: "stun_salvo_relay",
+    type: "item",
+    name: "Релейный залп",
+    icon: "💢",
+    desc: "После оглушения: залп 1/2/3/4 ракет (20 +20% explosionPower). −10 концентрации.",
+    get descParts() {
+      return [
+        "После оглушения: залп 1/2/3/4 ракет (20 +20% explosionPower)",
+        { type: "effect", index: 0 },
+      ];
+    },
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "concentration", effectByRarity: [null, -10, -10, -10, -10] },
+    ],
+  },
+  {
+    id: "seeker_pod",
+    type: "item",
+    name: "Самонаводящийся модуль",
+    icon: "🛰️",
+    desc: "Если один и тот же блок не сломан за 3 удара: выпускает 1/2/3/4 микро-ракеты 12/16/20/24 +20% explosionPower. +2/3/4/5% шанс бреши. −4 drillPower.",
+    get descParts() {
+      return [
+        "Если один и тот же блок не сломан за 3 удара: 1/2/3/4 микро-ракеты 12/16/20/24 +20% explosionPower",
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+      ];
+    },
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "weakSpotChance", effectByRarity: [null, 0.02, 0.03, 0.04, 0.05] },
+      { stat: "drillPower",     effectByRarity: [null, -4, -4, -4, -4] },
+    ],
+  },
+  {
+    id: "carpet_payload",
+    type: "item",
+    name: "Ковровая полезная нагрузка",
+    icon: "🎇",
+    desc: "При попадании в брешь: 2/3/4/5 микро-ракет (8/10/12/15 +10% explosionPower). −10% скорость бура.",
+    get descParts() {
+      return [
+        "При попадании в брешь: 2/3/4/5 микро-ракет (8/10/12/15 +10% explosionPower)",
+        { type: "effect", index: 0 },
+      ];
+    },
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "strikeSpeed", effectByRarity: [null, -10, -10, -10, -10] },
+    ],
+  },
+  {
+    id: "siege_warhead",
+    type: "item",
+    name: "Осадная боеголовка",
+    icon: "🏹",
+    desc: "+6/9/12/15 explosionPower. +15/20/25/30% к урону ракет. −8 drillPower.",
+    get descParts() {
+      return [
+        "+15/20/25/30% к урону ракет",
+        { type: "effect", index: 0 },
+        { type: "effect", index: 1 },
+      ];
+    },
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "explosionPower", effectByRarity: [null, 6, 9, 12, 15] },
+      { stat: "drillPower",     effectByRarity: [null, -8, -8, -8, -8] },
+    ],
+  },
+  {
+    id: "safety_rockets",
+    type: "item",
+    name: "Защитные ракеты",
+    icon: "🛡️",
+    desc: "−15/20/25/30% нагрева от взрывов рядом с героем. −5 drillPower.",
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "explosionHeatTaken", effectByRarity: [null, -15, -20, -25, -30] },
+      { stat: "drillPower",         effectByRarity: [null, -5, -5, -5, -5] },
+    ],
+  },
+  {
+    id: "collapse_brake",
+    type: "item",
+    name: "Тормоз обвала",
+    icon: "🧱",
+    desc: "+15/25/35/50% к максимуму очков обвала. −10% урон дрели.",
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "collapseBudgetMaxScale", effectByRarity: [null, 0.15, 0.25, 0.35, 0.50] },
+      { stat: "damageBonus",            effectByRarity: [null, -10, -10, -10, -10] },
+    ],
+  },
+  {
+    id: "lucky_shrapnel",
+    type: "item",
+    name: "Счастливая шрапнель",
+    icon: "✨",
+    desc: "+4/6/8/10% шанс находки. +6/9/12/15 explosionPower. −4 drillPower.",
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "bonusFindChance", effectByRarity: [null, 0.04, 0.06, 0.08, 0.10] },
+      { stat: "explosionPower",  effectByRarity: [null, 6, 9, 12, 15] },
+      { stat: "drillPower",      effectByRarity: [null, -4, -4, -4, -4] },
+    ],
+  },
+  {
+    id: "fuel_warhead",
+    type: "item",
+    name: "Топливная боеголовка",
+    icon: "⛽",
+    desc: "+6/9/12/15 explosionPower. +3/5/7/9% шанс находки. +10% расход топлива.",
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "explosionPower",  effectByRarity: [null, 6, 9, 12, 15] },
+      { stat: "bonusFindChance", effectByRarity: [null, 0.03, 0.05, 0.07, 0.09] },
+      { stat: "fuelDrainRate",   effectByRarity: [null, 0.10, 0.10, 0.10, 0.10] },
+    ],
+  },
+  {
+    id: "breach_rockets",
+    type: "item",
+    name: "Бреш-ракеты",
+    icon: "🎯",
+    desc: "+3/5/7/10% шанс бреши. +6/9/12/15 explosionPower. −8% урон дрели.",
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "weakSpotChance", effectByRarity: [null, 0.03, 0.05, 0.07, 0.10] },
+      { stat: "explosionPower", effectByRarity: [null, 6, 9, 12, 15] },
+      { stat: "damageBonus",    effectByRarity: [null, -8, -8, -8, -8] },
+    ],
+  },
+  {
+    id: "scavenger_payload",
+    type: "item",
+    name: "Мусоросборный заряд",
+    icon: "🧲",
+    desc: "+5/8/12/15% шанс находки. +10/15/20/25% урон взрывов. −6 drillPower.",
+    category: "ракеты",
+    tags: ["ракеты"],
+    minRarity: 1,
+    effect: [
+      { stat: "bonusFindChance", effectByRarity: [null, 0.05, 0.08, 0.12, 0.15] },
+      { stat: "explosionBonus",  effectByRarity: [null, 10, 15, 20, 25] },
+      { stat: "drillPower",      effectByRarity: [null, -6, -6, -6, -6] },
+    ],
+  },
   {
     id: "explosive_condenser",
     type: "item",
@@ -1297,7 +1513,6 @@ export const ALL_ITEMS = [
       return [
         { type: "effect", index: 0 },
         { type: "effect", index: 1 },
-        { type: "effect", index: 2 },
       ];
     },
     category: "handwork",
@@ -1327,7 +1542,7 @@ export const ALL_ITEMS = [
     minRarity: 1,
     effect: [
       { stat: "overflowGovernorDrillGain", effectByRarity: [null, 2, 3, 4, 5] },
-      { stat: "maxFuel", effectByRarity: [null, 25, 40, 55, 70] },
+      { stat: "maxFuel", effectByRarity: [null, 25, 25, 25, 25] },
       { stat: "explosionBonus", effectByRarity: [null, -25, -25, -25, -25] },
     ],
   },
@@ -1393,7 +1608,6 @@ export const ALL_ITEMS = [
     minRarity: 1,
     effect: [
       { stat: "drillPiercingDamage", effectByRarity: [null, 15, 20, 25, 30] },
-      { stat: "drillPiercingCount", effectByRarity: [null, 0, 1, 1, 1] },
       { stat: "explosionRadiusBonus", effectByRarity: [null, -0.5, -0.5, -0.5, -0.5] },
     ],
   },
@@ -1456,9 +1670,11 @@ export const ALL_ITEMS = [
     },
     category: "handwork",
     tags: ["handwork"],
-    minRarity: 1,
+    limited: true,
+    maxStacks: 2,
+    minRarity: 3,
     effect: [
-      { stat: "drillPiercingCount", effectByRarity: [null, 1, 1, 2, 2] },
+      { stat: "drillPiercingCount", effectByRarity: [null, 1, 1, 1, 1] },
       { stat: "drillPiercingDamage", effectByRarity: [null, 8, 12, 16, 20] },
       { stat: "explosionBonus", effectByRarity: [null, -15, -15, -15, -15] },
     ],
@@ -1836,10 +2052,10 @@ export const ALL_ITEMS = [
     desc: "Замкнутый контур с шансом спавнит бонус внутри. Максимальная длина контура −3.",
     category: "контур",
     tags: ["контур"],
-    minRarity: 2,
+    minRarity: 1,
     effect: [
-      { stat: "loopSpawnBonusChance", effectByRarity: [null, null, 0.30, 0.50, 0.75] },
-      { stat: "maxContour",           effectByRarity: [null, null, -3,   -3,   -3   ] },
+      { stat: "loopSpawnBonusChance", effectByRarity: [null, 0.18, 0.30, 0.50, 0.75] },
+      { stat: "maxContour",           effectByRarity: [null, -3,   -3,   -3,   -3   ] },
     ],
   },
   // ── Алхимия ───────────────────────────────────────────────────────────────────
@@ -2069,6 +2285,7 @@ const SIMPLE_STAT_DESCRIPTORS = {
   speedOfAutoClose: value => t("desc.speedOfAutoClose", { val: formatSignedPercent(value) }),
   maxContour: value => t("desc.maxContour", { val: formatSignedDescriptionNumber(value) }),
   explosionBonus: value => t("desc.explosionBonus", { val: formatSignedPercent(value) }),
+  explosionHeatTaken: value => t("desc.explosionHeatTaken", { val: formatSignedPercent(value) }),
   explosionRadiusBonus: value => t("desc.explosionRadiusBonus", { val: formatSignedDescriptionNumber(value) }),
   explosionPower: value => t("desc.explosionPower", { val: formatSignedDescriptionNumber(value) }),
   weakSpotFuelGain: value => t("desc.weakSpotFuelGain", { val: formatSignedDescriptionNumber(value) }),
@@ -2232,7 +2449,7 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
   breach_missile(rarity, stats = null) {
     const flatDamage = getEffectValue({ effectByRarity: [0, 10, 10, 10, 10] }, rarity);
     const drillScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
-    const weakSpotChance = getEffectValue({ effectByRarity: [0, 0, 0.05, 0.05, 0.05] }, rarity);
+    const weakSpotChance = getEffectValue({ effectByRarity: [0, 0.05, 0.07, 0.10, 0.12] }, rarity);
     const rocketDamage = 20;
     const rocketExplosionScale = getEffectValue({ effectByRarity: [0, 30, 40, 50, 60] }, rarity);
     const hasDrillPower = Number.isFinite(stats?.drillPower);
@@ -2252,6 +2469,129 @@ const SPECIAL_DESCRIPTION_BUILDERS = {
       expScale: formatDescriptionNumber(rocketExplosionScale),
       rocketTotal,
       radius: "1.5",
+    });
+  },
+  cryo_rocket(rarity, stats = null) {
+    const rockets = 1;
+    const rocketDamage = 20;
+    const rocketExplosionScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const heatRatePenalty = -0.15;
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const rocketTotal = hasExplosionPower
+      ? ` [${formatDescriptionNumber(rocketDamage + stats.explosionPower * (rocketExplosionScale / 100))}]`
+      : "";
+    return t("desc.special.cryo_rocket", {
+      rockets: formatDescriptionNumber(rockets),
+      rocket: formatDescriptionNumber(rocketDamage),
+      expScale: formatDescriptionNumber(rocketExplosionScale),
+      rocketTotal,
+      radius: "1",
+      heatRate: formatSignedPercent(heatRatePenalty, 100),
+    });
+  },
+  contour_salvo_rack(rarity, stats = null) {
+    const blocksPerRocket = 4;
+    const rocketDamage = 20;
+    const rocketExplosionScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const rocketTotal = hasExplosionPower
+      ? ` [${formatDescriptionNumber(rocketDamage + stats.explosionPower * (rocketExplosionScale / 100))}]`
+      : "";
+    return t("desc.special.contour_salvo_rack", {
+      blocksPerRocket: formatDescriptionNumber(blocksPerRocket),
+      rocket: formatDescriptionNumber(rocketDamage),
+      expScale: formatDescriptionNumber(rocketExplosionScale),
+      rocketTotal,
+      radius: "1",
+    });
+  },
+  afterburn_flash_charge(rarity) {
+    const perSecond = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    return t("desc.special.afterburn_flash_charge", {
+      perSecond: formatDescriptionNumber(perSecond),
+    });
+  },
+  fuel_rocket(rarity, stats = null) {
+    const flatDamage = 15;
+    const drillScale = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const rocketDamage = 20;
+    const rocketExplosionScale = getEffectValue({ effectByRarity: [0, 15, 20, 25, 30] }, rarity);
+    const hasDrillPower = Number.isFinite(stats?.drillPower);
+    const hasExplosionPower = Number.isFinite(stats?.explosionPower);
+    const totalDamage = hasDrillPower
+      ? ` [${formatDescriptionNumber(flatDamage + stats.drillPower * (drillScale / 100))}]`
+      : "";
+    const rocketTotal = hasExplosionPower
+      ? ` [${formatDescriptionNumber(rocketDamage + stats.explosionPower * (rocketExplosionScale / 100))}]`
+      : "";
+    return t("desc.special.fuel_rocket", {
+      flat: formatDescriptionNumber(flatDamage),
+      drillScale: formatDescriptionNumber(drillScale),
+      totalDamage,
+      rocket: formatDescriptionNumber(rocketDamage),
+      expScale: formatDescriptionNumber(rocketExplosionScale),
+      rocketTotal,
+      radius: "1",
+    });
+  },
+  overheal_warhead_matrix(rarity) {
+    const gain = getEffectValue({ effectByRarity: [0, 1, 2, 2, 3] }, rarity);
+    const maxHp = getEffectValue({ effectByRarity: [0, 10, 15, 20, 25] }, rarity);
+    const drillPenalty = -6;
+    return t("desc.special.overheal_warhead_matrix", {
+      gain: formatDescriptionNumber(gain),
+      maxHp: formatDescriptionNumber(maxHp),
+      drillPenalty: formatDescriptionNumber(Math.abs(drillPenalty)),
+    });
+  },
+  overflow_booster_manifold(rarity) {
+    const gain = getEffectValue({ effectByRarity: [0, 2, 3, 4, 5] }, rarity);
+    const maxFuel = getEffectValue({ effectByRarity: [0, 25, 25, 25, 25] }, rarity);
+    const drillPenalty = 12;
+    return t("desc.special.overflow_booster_manifold", {
+      gain: formatDescriptionNumber(gain),
+      maxFuel: formatDescriptionNumber(maxFuel),
+      drillPenalty: formatDescriptionNumber(drillPenalty),
+    });
+  },
+  stun_salvo_relay(rarity) {
+    const rockets = getEffectValue({ effectByRarity: [0, 1, 2, 3, 4] }, rarity);
+    const concentrationPenalty = 10;
+    return t("desc.special.stun_salvo_relay", {
+      rockets: formatDescriptionNumber(rockets),
+      concentrationPenalty: formatDescriptionNumber(concentrationPenalty),
+    });
+  },
+  seeker_pod(rarity) {
+    const rocket = getEffectValue({ effectByRarity: [0, 12, 16, 20, 24] }, rarity);
+    const rockets = getEffectValue({ effectByRarity: [0, 1, 2, 3, 4] }, rarity);
+    const chance = getEffectValue({ effectByRarity: [0, 0.02, 0.03, 0.04, 0.05] }, rarity);
+    const drillPenalty = 4;
+    return t("desc.special.seeker_pod", {
+      rockets: formatDescriptionNumber(rockets),
+      rocket: formatDescriptionNumber(rocket),
+      chance: formatDescriptionNumber(chance * 100),
+      drillPenalty: formatDescriptionNumber(drillPenalty),
+    });
+  },
+  carpet_payload(rarity) {
+    const rockets = getEffectValue({ effectByRarity: [0, 2, 3, 4, 5] }, rarity);
+    const rocket = getEffectValue({ effectByRarity: [0, 8, 10, 12, 15] }, rarity);
+    const speedPenalty = 10;
+    return t("desc.special.carpet_payload", {
+      rockets: formatDescriptionNumber(rockets),
+      rocket: formatDescriptionNumber(rocket),
+      speedPenalty: formatDescriptionNumber(speedPenalty),
+    });
+  },
+  siege_warhead(rarity) {
+    const explosionPower = getEffectValue({ effectByRarity: [0, 6, 9, 12, 15] }, rarity);
+    const rocketBonus = getEffectValue({ effectByRarity: [0, 15, 20, 25, 30] }, rarity);
+    const drillPenalty = 8;
+    return t("desc.special.siege_warhead", {
+      explosionPower: formatDescriptionNumber(explosionPower),
+      rocketBonus: formatDescriptionNumber(rocketBonus),
+      drillPenalty: formatDescriptionNumber(drillPenalty),
     });
   },
   breach_afterburner(rarity, stats = null) {

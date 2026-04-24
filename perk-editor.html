@@ -129,6 +129,11 @@ html, body {
   color: var(--acc2);
   font-weight: 700;
 }
+.item-row__meta .limited {
+  margin-left: 6px;
+  color: #f7c66b;
+  font-weight: 700;
+}
 .panel {
   padding: 12px;
   display: grid;
@@ -216,6 +221,13 @@ html, body {
   font-weight: 700;
   color: var(--accent);
   white-space: nowrap;
+}
+.shop-card__merge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #f7c66b;
+  font-weight: 700;
 }
 .chip {
   font-size: 10px;
@@ -489,6 +501,7 @@ const UI_TEXT = {
     statNegative: 'Negative items',
     statNoDesc: 'No description yet.',
     uniqueLabel: 'UNIQUE',
+    limitedLabel: 'LIMITED',
     itemNoStats: 'This item has no direct stat effects.',
     statsSearch: 'Filter by item name/id/description',
     statsTypeAll: 'Stats: all items',
@@ -530,6 +543,7 @@ const UI_TEXT = {
     statNegative: 'Отрицательных предметов',
     statNoDesc: 'Описание пока не добавлено.',
     uniqueLabel: 'УНИКАЛЬНЫЙ',
+    limitedLabel: 'ЛИМИТИРОВАННЫЙ',
     itemNoStats: 'У этого предмета нет прямых стат-эффектов.',
     statsSearch: 'Фильтр по названию/id/описанию предмета',
     statsTypeAll: 'Статы: все предметы',
@@ -858,11 +872,97 @@ const SPECIAL_SCALE_ROWS = {
       { label: 'Урон ракеты (плоский)', values: [10, 10, 10, 10] },
       { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
       { label: 'Итог урон ракеты (drill=10)', values: [11, 11.5, 12, 12.5] },
-      { label: 'Доп. шанс бреши', values: ['0%', '5%', '5%', '5%'] },
+      { label: 'Доп. шанс бреши', values: ['5%', '7%', '10%', '12%'] },
       { label: 'Вторичная ракета (плоский)', values: [20, 20, 20, 20] },
       { label: 'Скейл вторичной от explosionPower', values: ['30%', '40%', '50%', '60%'] },
       { label: 'Итог вторичной (explosion=10)', values: [23, 24, 25, 26] },
       { label: 'Радиус взрыва', values: [1.5, 1.5, 1.5, 1.5] },
+    ];
+  },
+  cryo_rocket() {
+    return [
+      { label: 'Крио-ракеты за 20 охлаждения', values: [1, 1, 1, 1] },
+      { label: 'Урон крио-ракеты (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл крио-ракеты от explosionPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог крио-ракеты (explosion=10)', values: [21, 21.5, 22, 22.5] },
+      { label: 'Радиус крио-ракеты', values: [1, 1, 1, 1] },
+      { label: 'heatRate', values: ['-15%', '-15%', '-15%', '-15%'] },
+    ];
+  },
+  contour_salvo_rack() {
+    return [
+      { label: 'Триггер', values: ['При замыкании контура', 'При замыкании контура', 'При замыкании контура', 'При замыкании контура'] },
+      { label: 'Ракет за каждые 4 блока контура', values: [1, 1, 1, 1] },
+      { label: 'Урон ракеты (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл ракеты от explosionPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог ракеты (explosion=10)', values: [21, 21.5, 22, 22.5] },
+      { label: 'Радиус ракеты', values: [1, 1, 1, 1] },
+    ];
+  },
+  afterburn_flash_charge() {
+    return [
+      { label: 'Уникальный предмет', values: ['Да', 'Да', 'Да', 'Да'] },
+      { label: 'Триггер', values: ['После окончания форсажа', 'После окончания форсажа', 'После окончания форсажа', 'После окончания форсажа'] },
+      { label: 'Урон за 1 сек форсажа', values: [10, 15, 20, 25] },
+      { label: 'Формула урона', values: ['секунды форсажа × 10', 'секунды форсажа × 15', 'секунды форсажа × 20', 'секунды форсажа × 25'] },
+      { label: 'Радиус взрыва', values: [1.5, 1.5, 1.5, 1.5] },
+    ];
+  },
+  fuel_rocket() {
+    return [
+      { label: 'Урон (плоский)', values: [15, 15, 15, 15] },
+      { label: 'Скейл от drillPower', values: ['10%', '15%', '20%', '25%'] },
+      { label: 'Итог урон (drill=10)', values: [16, 16.5, 17, 17.5] },
+      { label: 'Ракета при подборе топлива (плоский)', values: [20, 20, 20, 20] },
+      { label: 'Скейл ракеты от explosionPower', values: ['15%', '20%', '25%', '30%'] },
+      { label: 'Итог ракеты (explosion=10)', values: [21.5, 22, 22.5, 23] },
+      { label: 'Радиус ракеты', values: [1, 1, 1, 1] },
+    ];
+  },
+  overheal_warhead_matrix() {
+    return [
+      { label: 'Пост. прирост explosionPower от оверхила', values: [1, 2, 2, 3] },
+      { label: 'maxHp', values: [10, 15, 20, 25] },
+      { label: 'drillPower', values: [-6, -6, -6, -6] },
+    ];
+  },
+  overflow_booster_manifold() {
+    return [
+      { label: 'Пост. прирост explosionBonus от overflow', values: ['+2%', '+3%', '+4%', '+5%'] },
+      { label: 'maxFuel', values: [25, 25, 25, 25] },
+      { label: 'damageBonus', values: ['-12%', '-12%', '-12%', '-12%'] },
+    ];
+  },
+  stun_salvo_relay() {
+    return [
+      { label: 'Ракет после оглушения', values: [1, 2, 3, 4] },
+      { label: 'Урон ракеты', values: ['20 +20% explosionPower', '20 +20% explosionPower', '20 +20% explosionPower', '20 +20% explosionPower'] },
+      { label: 'concentration', values: ['-10%', '-10%', '-10%', '-10%'] },
+    ];
+  },
+  seeker_pod() {
+    return [
+      { label: 'Триггер', values: ['3-й удар по одному блоку без разрушения', '3-й удар по одному блоку без разрушения', '3-й удар по одному блоку без разрушения', '3-й удар по одному блоку без разрушения'] },
+      { label: 'Микро-ракет за триггер', values: [1, 2, 3, 4] },
+      { label: 'Урон микро-ракеты', values: [12, 16, 20, 24] },
+      { label: 'Скейл микро-ракеты', values: ['+20% explosionPower', '+20% explosionPower', '+20% explosionPower', '+20% explosionPower'] },
+      { label: 'weakSpotChance', values: ['+2%', '+3%', '+4%', '+5%'] },
+      { label: 'drillPower', values: [-4, -4, -4, -4] },
+    ];
+  },
+  carpet_payload() {
+    return [
+      { label: 'Микро-ракет при попадании в брешь', values: [2, 3, 4, 5] },
+      { label: 'Урон микро-ракеты', values: [8, 10, 12, 15] },
+      { label: 'Скейл микро-ракеты', values: ['+10% explosionPower', '+10% explosionPower', '+10% explosionPower', '+10% explosionPower'] },
+      { label: 'strikeSpeed', values: ['-10%', '-10%', '-10%', '-10%'] },
+    ];
+  },
+  siege_warhead() {
+    return [
+      { label: 'explosionPower', values: [6, 9, 12, 15] },
+      { label: 'Множитель урона ракет', values: ['+15%', '+20%', '+25%', '+30%'] },
+      { label: 'drillPower', values: [-8, -8, -8, -8] },
     ];
   },
   beacon_alchemy_drill() {
@@ -1210,6 +1310,7 @@ function renderList(items, selectedItem) {
           <div class="item-row__meta ${RARITY_CLASS[item.minRarity] || 'r1'}">
             ${esc(categoryName(item.category))} · ${ui('listRarityFrom')} ${rarityName(item.minRarity)}
             ${item.unique ? `<span class="uniq">• ${esc(ui('uniqueLabel'))}</span>` : ''}
+            ${item.limited ? `<span class="limited">• ${esc(ui('limitedLabel'))}</span>` : ''}
           </div>
         </span>
       </button>
@@ -1238,7 +1339,12 @@ function renderShopCard(item) {
   else cls += ' shop-card--item';
 
   const typeLabel = isEquip ? '⛏' : '✧';
-  const mergeLabel = item.unique ? `<div class="shop-card__merge">${esc(ui('uniqueLabel'))}</div>` : '';
+  const badges = [];
+  if (item.unique) badges.push(ui('uniqueLabel'));
+  if (item.limited) badges.push(ui('limitedLabel'));
+  const mergeLabel = badges.length
+    ? `<div class="shop-card__merge">${badges.map(esc).join(' · ')}</div>`
+    : '';
   const catDef = item.category ? CATEGORIES.find(c => c.id === item.category) : null;
   const catLabel = catDef ? `<div class="shop-card__category">${catDef.icon} ${catDef.name}</div>` : '';
   const desc = getGoodDescription(item, S.rarity, PREVIEW_STATS);

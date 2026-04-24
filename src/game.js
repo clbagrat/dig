@@ -76,9 +76,9 @@ const EXPLOSION_BREAK_DAMAGE = 9999;
 const ROCKET_ARMED_DURATION = 1.0;
 const BREACH_MISSILE_DAMAGE = 20;
 const BREACH_MISSILE_RADIUS = 1.5;
-const FUEL_ROCKET_DAMAGE = 45;
-const FUEL_ROCKET_RADIUS = 1.5;
-const CRYO_ROCKET_DAMAGE = 28;
+const FUEL_ROCKET_DAMAGE = 20;
+const FUEL_ROCKET_RADIUS = 1;
+const CRYO_ROCKET_DAMAGE = 20;
 const SHARD_DRILL_BLAST_RADIUS = 1.0;
 
 const ITEM_INSPECT_STAT_META = new Proxy({
@@ -121,6 +121,7 @@ const ITEM_INSPECT_STAT_META = new Proxy({
   effectDurationRate:        { key: "stat.effectDurationRate",        mode: "multiplier" },
   explosionPower:            { key: "stat.explosionPower",            mode: "fixed1" },
   explosionBonus:            { key: "stat.explosionBonus",            mode: "rawpercent" },
+  explosionHeatTaken:        { key: "stat.explosionHeatTaken",        mode: "rawpercent" },
   fuelConverterLevel:        { key: "stat.fuelConverterLevel",        mode: "level" },
   fuelDrainRate:             { key: "stat.fuelDrainRate",             mode: "multiplier" },
   fuelStarvationResistance:  { key: "stat.fuelStarvationResistance",  mode: "rawpercent" },
@@ -294,7 +295,7 @@ const LEVEL_REWARD_POOL = [
   { stat: "drillPower",       minRarity: 1, values: [5, 10, 15, 20],                get label() { return t("reward.drillPower"); },       fmt: v => `+${v}` },
   { stat: "explosionPower",   minRarity: 1, values: [5, 10, 15, 20],                get label() { return t("reward.explosionPower"); },   fmt: v => `+${v}` },
   { stat: "strikeSpeed",      minRarity: 1, values: [3, 6, 10, 15],                 get label() { return t("reward.strikeSpeed"); },      fmt: v => `+${v}%` },
-  { stat: "damageBonus",      minRarity: 1, values: [0.03, 0.05, 0.08, 0.10],       get label() { return t("reward.damageBonus"); },      fmt: v => `+${Math.round(v*100)}%` },
+  { stat: "damageBonus",      minRarity: 1, values: [3, 5, 8, 10],                   get label() { return t("reward.damageBonus"); },      fmt: v => `+${Math.round(v)}%` },
   { stat: "goldBonus",        minRarity: 1, values: [0.03, 0.06, 0.10, 0.15],       get label() { return t("reward.goldBonus"); },        fmt: v => `+${Math.round(v*100)}%` },
   { stat: "maxFuel",          minRarity: 1, values: [10, 20, 30, 40],               get label() { return t("reward.maxFuel"); },          fmt: v => `+${v}` },
   { stat: "weakSpotChance",   minRarity: 1, values: [0.03, 0.05, 0.07, 0.11],       get label() { return t("reward.weakSpotChance"); },   fmt: v => `+${Math.round(v*100)}%` },
@@ -681,6 +682,8 @@ const state = {
   blocksBroken: 0,
   drillBrokenBlocks: 0,
   comboCount: 0,
+  seekerPodTargetIndex: -1,
+  seekerPodHitCount: 0,
   weakSpotChance: 0,
   weakSpotMult: 2,
   weakSpotPierce: 0,
@@ -714,6 +717,7 @@ const state = {
   overhealOverdrive: false,
   overhealOverdriveDuration: 0,
   overhealDrillTimer: 0,
+  overdriveElapsedForDetonation: 0,
   overdriveDisplayDuration: 0,
   idleTime: 0,
   idleAutoCloseTriggered: false,
@@ -721,6 +725,7 @@ const state = {
   damageBonus: 0,
   explosionPower: 0,
   explosionBonus: 0,
+  explosionHeatTaken: 0,
   explosionRadiusBonus: 0,
   bonusFindChance: 0,
   autoClosePreview: null,
@@ -2599,6 +2604,8 @@ function setupField(seedOverride = null) {
   state.blocksBroken = 0;
   state.drillBrokenBlocks = 0;
   state.comboCount = 0;
+  state.seekerPodTargetIndex = -1;
+  state.seekerPodHitCount = 0;
   state.weakSpotChance = 0;
   state.weakSpotMult = 2;
   state.weakSpotPierce = 0;
@@ -2633,6 +2640,7 @@ function setupField(seedOverride = null) {
   state.overhealOverdrive = false;
   state.overhealOverdriveDuration = 0;
   state.overhealDrillTimer = 0;
+  state.overdriveElapsedForDetonation = 0;
   state.overdriveDisplayDuration = 0;
   state.idleTime = 0;
   state.idleAutoCloseTriggered = false;
@@ -2640,6 +2648,7 @@ function setupField(seedOverride = null) {
   state.damageBonus = 0;
   state.explosionPower = 0;
   state.explosionBonus = 0;
+  state.explosionHeatTaken = 0;
   state.explosionRadiusBonus = 0;
   state.bonusFindChance = 0;
   state.autoClosePreview = null;
@@ -4803,6 +4812,47 @@ function getSpecialInspectEffectLines(good, rarity) {
         { label: t("inspect.breach_chance"), value: `+${Math.round(weakSpotChance * 100)}%` },
         { label: t("inspect.breach_explosion"), value: `+${explosionDamage} +${explosionScale}% [${formatPerkNumber(totalExplosion)}]` },
         { label: t("inspect.explosion_radius"), value: formatPerkNumber(SHARD_DRILL_BLAST_RADIUS, 1) },
+      ];
+    }
+    case "cryo_rocket": {
+      const rocketCount = 1;
+      const rocketDamage = 20;
+      const rocketScale = [0, 10, 15, 20, 25][rarity] || 0;
+      const rocketTotal = rocketDamage + state.explosionPower * (rocketScale / 100);
+      return [
+        { label: t("stat.cryoRocketCount"), value: `${rocketCount}` },
+        { label: t("inspect.on_cooling"), value: "20 heat" },
+        { label: t("inspect.breach_explosion"), value: `+${rocketDamage} +${rocketScale}% [${formatPerkNumber(rocketTotal)}]` },
+        { label: t("inspect.explosion_radius"), value: "1" },
+        { label: t("stat.heatRate"), value: "-15%" },
+      ];
+    }
+    case "contour_salvo_rack": {
+      const rocketDamage = 20;
+      const rocketScale = [0, 10, 15, 20, 25][rarity] || 0;
+      const rocketTotal = rocketDamage + state.explosionPower * (rocketScale / 100);
+      const contourBlocks = Math.max(0, Math.floor(state.pathTiles.length || 0));
+      const rockets = Math.floor(contourBlocks / 4);
+      return [
+        { label: t("inspect.on_contour_closure"), value: t("inspect.one_rocket_per_4_blocks") },
+        { label: t("inspect.current_rockets"), value: `${rockets}` },
+        { label: t("inspect.breach_explosion"), value: `+${rocketDamage} +${rocketScale}% [${formatPerkNumber(rocketTotal)}]` },
+        { label: t("inspect.explosion_radius"), value: "1" },
+      ];
+    }
+    case "fuel_rocket": {
+      const flatDamage = 15;
+      const drillScale = [0, 10, 15, 20, 25][rarity] || 0;
+      const rocketDamage = 20;
+      const rocketScale = [0, 15, 20, 25, 30][rarity] || 0;
+      const totalDamage = flatDamage + state.drillPower * (drillScale / 100);
+      const rocketTotal = rocketDamage + state.explosionPower * (rocketScale / 100);
+      return [
+        { label: t("inspect.flat_damage"), value: `+${flatDamage}` },
+        { label: t("inspect.drill_scale"), value: `+${drillScale}%` },
+        { label: t("inspect.current_damage"), value: formatPerkNumber(totalDamage) },
+        { label: t("inspect.on_fuel_pickup"), value: `+${rocketDamage} +${rocketScale}% [${formatPerkNumber(rocketTotal)}]` },
+        { label: t("inspect.explosion_radius"), value: "1" },
       ];
     }
     case "beacon_alchemy_drill": {
@@ -7082,8 +7132,18 @@ function update(dt) {
     openCrystalItemOfferModal();
   }
   updateBeaconActivationAnim();
+  const prevOverdriveTimer = state.overhealDrillTimer;
   state.overhealDrillTimer = Math.max(0, state.overhealDrillTimer - dt);
-  if (state.overhealDrillTimer === 0) {
+  const consumedOverdrive = Math.max(0, prevOverdriveTimer - state.overhealDrillTimer);
+  if (consumedOverdrive > 0) {
+    state.overdriveElapsedForDetonation += consumedOverdrive;
+  }
+  if (prevOverdriveTimer > 0 && state.overhealDrillTimer === 0) {
+    triggerAfterburnFlashChargeExplosion(state.overdriveElapsedForDetonation);
+    state.overdriveElapsedForDetonation = 0;
+    state.overdriveDisplayDuration = 0;
+  } else if (state.overhealDrillTimer === 0) {
+    state.overdriveElapsedForDetonation = 0;
     state.overdriveDisplayDuration = 0;
   }
   const hadOverflowSurge = state.overflowOverdriveTimer > 0;
@@ -7101,6 +7161,22 @@ function update(dt) {
       const afterDuration = [0, 3, 4, 5, 6][Math.max(0, Math.floor(state.stunAfterburnerLevel || 0))] || 0;
       if (afterDuration > 0) {
         activateDrillOverdrive(afterDuration, t("toast.afterburner_after_stun"));
+      }
+    }
+    if (prevStunTimer > 0) {
+      const stunSalvoRocketCount = getStunSalvoRocketCount();
+      for (let ri = 0; ri < stunSalvoRocketCount; ri += 1) {
+        fireRocket(
+          state.drill.x,
+          state.drill.y,
+          20,
+          1,
+          1 + Math.floor(Math.random() * 3),
+          {
+            explosionPowerScale: 0.20,
+            skipRadiusBonus: true,
+          },
+        );
       }
     }
     state.stunDisplayDuration = 0;
@@ -7135,8 +7211,35 @@ function update(dt) {
       state.cryoRocketAccumulator += cooledHeat;
       while (state.cryoRocketAccumulator >= 20) {
         state.cryoRocketAccumulator -= 20;
-        for (let ri = 0; ri < state.cryoRocketCount; ri += 1) {
-          fireRocket(state.drill.x, state.drill.y, CRYO_ROCKET_DAMAGE, CRYO_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
+        const cryoRocketTiers = getItemTiers("cryo_rocket");
+        if (cryoRocketTiers.length > 0) {
+          for (const tier of cryoRocketTiers) {
+            fireRocket(
+              state.drill.x,
+              state.drill.y,
+              CRYO_ROCKET_DAMAGE,
+              CRYO_ROCKET_RADIUS,
+              1 + Math.floor(Math.random() * 3),
+              {
+                explosionPowerScale: getCryoRocketExplosionScaleForTier(tier),
+                skipRadiusBonus: true,
+              },
+            );
+          }
+        } else {
+          for (let ri = 0; ri < state.cryoRocketCount; ri += 1) {
+            fireRocket(
+              state.drill.x,
+              state.drill.y,
+              CRYO_ROCKET_DAMAGE,
+              CRYO_ROCKET_RADIUS,
+              1 + Math.floor(Math.random() * 3),
+              {
+                explosionPowerScale: 0.10,
+                skipRadiusBonus: true,
+              },
+            );
+          }
         }
       }
     }
@@ -7350,6 +7453,9 @@ function updateChainExplosions(dt) {
       const ty = task.y;
       if (task.triggerGas && tx >= 1 && ty >= 1 && tx < GRID_W - 1 && ty < GRID_H - 1 && state.gasMask[cellIndex(tx, ty)]) {
         scheduleChainExplosion({ kind: "gas", x: tx, y: ty });
+      }
+      if (state.contourEnemy && state.contourEnemy.x === tx && state.contourEnemy.y === ty) {
+        hitContourEnemy(task.damage);
       }
       damageCell(tx, ty, task.damage, {
         ignoreHazardEffect: true,
@@ -7661,6 +7767,12 @@ function healPlayer(amount, sourceText = "") {
   state.hp = Math.min(state.maxHp, state.hp + amount);
   if (overheal > 0 && state.overhealSpindlePiercingGain > 0) {
     state.drillPiercingDamage += state.overhealSpindlePiercingGain;
+  }
+  if (overheal > 0) {
+    const overhealExplosionGain = getOverhealWarheadExplosionGain();
+    if (overhealExplosionGain > 0) {
+      state.explosionPower += overhealExplosionGain;
+    }
   }
 
   if (overheal > 0 && state.overhealOverdrive) {
@@ -8280,6 +8392,7 @@ function getStrikeDamage(targetX = null, targetY = null) {
     getLuckyPickaxeDamageBonus() +
     getShardDrillDamageBonus() +
     getBreachMissileDamageBonus() +
+    getFuelRocketDamageBonus() +
     getBreachAfterburnerDamageBonus() +
     getBreachChainDrillDamageBonus() +
     getThermoDrillDamageBonus() +
@@ -8302,12 +8415,53 @@ function getItemTiers(effectId) {
     .map((item) => clamp(Math.round(item.rarity || RARITY.COMMON), RARITY.COMMON, RARITY.LEGENDARY));
 }
 
+function sumItemTierValues(effectId, values) {
+  let total = 0;
+  for (const tier of getItemTiers(effectId)) {
+    total += values[tier] || 0;
+  }
+  return total;
+}
+
 function sumEquipmentTierValues(effectId, values) {
   let total = 0;
   for (const tier of getEquipmentTiers(effectId)) {
     total += values[tier] || 0;
   }
   return total;
+}
+
+function getRocketDamageMultiplier() {
+  const bonusPercent = sumItemTierValues("siege_warhead", [0, 15, 20, 25, 30]);
+  return 1 + bonusPercent / 100;
+}
+
+function getOverhealWarheadExplosionGain() {
+  return sumItemTierValues("overheal_warhead_matrix", [0, 1, 2, 2, 3]);
+}
+
+function getOverflowBoosterExplosionBonusGain() {
+  return sumItemTierValues("overflow_booster_manifold", [0, 2, 3, 4, 5]);
+}
+
+function getStunSalvoRocketCount() {
+  return sumItemTierValues("stun_salvo_relay", [0, 1, 2, 3, 4]);
+}
+
+function getSeekerPodRocketDamage() {
+  return sumItemTierValues("seeker_pod", [0, 12, 16, 20, 24]);
+}
+
+function getSeekerPodRocketCount() {
+  return sumItemTierValues("seeker_pod", [0, 1, 2, 3, 4]);
+}
+
+function getCarpetPayloadRocketCount() {
+  return sumItemTierValues("carpet_payload", [0, 2, 3, 4, 5]);
+}
+
+function getCarpetPayloadRocketDamage() {
+  return sumItemTierValues("carpet_payload", [0, 8, 10, 12, 15]);
 }
 
 function getFragileDrillDamageBonus() {
@@ -8560,6 +8714,16 @@ function getBreachMissileDamageBonus() {
   return flat + state.drillPower * (scale / 100);
 }
 
+function getFuelRocketDamageBonus() {
+  let total = 0;
+  for (const tier of getEquipmentTiers("fuel_rocket")) {
+    const flat = 15;
+    const scale = [0, 0.10, 0.15, 0.20, 0.25][tier] || 0;
+    total += flat + state.drillPower * scale;
+  }
+  return total;
+}
+
 function getBreachAfterburnerDamageBonus() {
   let total = 0;
   const weakSpotMultPoints = (state.weakSpotMult || 0) * 100;
@@ -8586,6 +8750,57 @@ function getBreachChainDrillDamageBonus() {
 
 function getBreachMissileExplosionScaleForTier(tier) {
   return [0, 0.3, 0.4, 0.5, 0.6][tier] || 0.3;
+}
+
+function getFuelRocketExplosionScaleForTier(tier) {
+  return [0, 0.15, 0.20, 0.25, 0.30][tier] || 0.15;
+}
+
+function getCryoRocketExplosionScaleForTier(tier) {
+  return [0, 0.10, 0.15, 0.20, 0.25][tier] || 0.10;
+}
+
+function triggerAfterburnFlashChargeExplosion(overdriveSeconds) {
+  const seconds = Math.max(0, Number(overdriveSeconds) || 0);
+  if (seconds <= 0 || state.dead) return;
+  let damagePerSecond = 0;
+  for (const tier of getItemTiers("afterburn_flash_charge")) {
+    damagePerSecond += [0, 10, 15, 20, 25][tier] || 0;
+  }
+  if (damagePerSecond <= 0) return;
+
+  const damage = seconds * damagePerSecond;
+  explodeAt(state.drill.x, state.drill.y, damage, 1.5, {
+    guaranteedBreak: false,
+    cause: "explosion",
+    explosionPowerScale: 0,
+  });
+}
+
+function triggerContourSalvoRack(loopBlockCount) {
+  const contourBlocks = Math.max(0, Math.floor(loopBlockCount || 0));
+  if (contourBlocks < 4) return;
+  const tiers = getItemTiers("contour_salvo_rack");
+  if (tiers.length === 0) return;
+  const rocketsPerItem = Math.floor(contourBlocks / 4);
+  if (rocketsPerItem <= 0) return;
+
+  for (const tier of tiers) {
+    const explosionPowerScale = getCryoRocketExplosionScaleForTier(tier);
+    for (let i = 0; i < rocketsPerItem; i += 1) {
+      fireRocket(
+        state.drill.x,
+        state.drill.y,
+        CRYO_ROCKET_DAMAGE,
+        CRYO_ROCKET_RADIUS,
+        1 + Math.floor(Math.random() * 3),
+        {
+          explosionPowerScale,
+          skipRadiusBonus: true,
+        },
+      );
+    }
+  }
 }
 
 function getLuckyPickaxeOreGain() {
@@ -8740,6 +8955,12 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   if (overflow > 0 && state.overflowGovernorDrillGain > 0) {
     state.drillPower += state.overflowGovernorDrillGain;
   }
+  if (overflow > 0) {
+    const overflowExplosionBonusGain = getOverflowBoosterExplosionBonusGain();
+    if (overflowExplosionBonusGain > 0) {
+      state.explosionBonus += overflowExplosionBonusGain;
+    }
+  }
 
   if (!options.preventOverflowTrigger && state.overflowBomb && overflow > 0 && !state.overflowTriggeredInEvent && !state.resolvingOverflowBomb) {
     state.overflowTriggeredInEvent = true;
@@ -8749,8 +8970,35 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
     const duration = getScaledEffectDuration(2 + state.fuelConverterLevel);
     activateDrillOverdrive(duration, t("toast.fuel_converter_boost"));
   }
-  for (let ri = 0; ri < state.fuelRocketLevel; ri += 1) {
-    fireRocket(state.drill.x, state.drill.y, FUEL_ROCKET_DAMAGE, FUEL_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
+  const fuelRocketTiers = getEquipmentTiers("fuel_rocket");
+  if (fuelRocketTiers.length > 0) {
+    for (const tier of fuelRocketTiers) {
+      fireRocket(
+        state.drill.x,
+        state.drill.y,
+        FUEL_ROCKET_DAMAGE,
+        FUEL_ROCKET_RADIUS,
+        1 + Math.floor(Math.random() * 3),
+        {
+          explosionPowerScale: getFuelRocketExplosionScaleForTier(tier),
+          skipRadiusBonus: true,
+        },
+      );
+    }
+  } else {
+    for (let ri = 0; ri < state.fuelRocketLevel; ri += 1) {
+      fireRocket(
+        state.drill.x,
+        state.drill.y,
+        FUEL_ROCKET_DAMAGE,
+        FUEL_ROCKET_RADIUS,
+        1 + Math.floor(Math.random() * 3),
+        {
+          explosionPowerScale: 0.15,
+          skipRadiusBonus: true,
+        },
+      );
+    }
   }
 }
 
@@ -9655,6 +9903,23 @@ function damageCell(x, y, damage, options = {}) {
     if (getItemTiers("contour_resonance_drill").length > 0) {
       triggerContourResonancePulse();
     }
+    const carpetPayloadCount = getCarpetPayloadRocketCount();
+    const carpetPayloadDamage = getCarpetPayloadRocketDamage();
+    if (carpetPayloadCount > 0 && carpetPayloadDamage > 0) {
+      for (let ri = 0; ri < carpetPayloadCount; ri += 1) {
+        fireRocket(
+          x,
+          y,
+          carpetPayloadDamage,
+          1,
+          1 + Math.floor(Math.random() * 3),
+          {
+            explosionPowerScale: 0.10,
+            skipRadiusBonus: true,
+          },
+        );
+      }
+    }
   }
   const continuePierce = () => {
     if ((!pierceActive && !forcePierce) || pierceLeft <= 0) {
@@ -9774,11 +10039,16 @@ function breakCell(x, y, index, options = {}) {
   spendContourEnemyBudget(hardness, state.pathTiles.length);
   const hazardType = state.hazardMask[index];
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
-  const baseGold = state.goldOreMask[index] ? Math.floor(GOLD_ORE_PER_BLOCK * goldMultiplier) : 0;
+  const oreBaseGold = state.goldOreMask[index] ? GOLD_ORE_PER_BLOCK : 0;
+  const oreScaledGold = oreBaseGold > 0 ? Math.floor(oreBaseGold * goldMultiplier) : 0;
   spawnBreakEffect(x, y, hardness, options.cause || "break");
-  if (baseGold > 0) {
+  if (oreScaledGold > 0) {
     playSound("block_break_ore");
-    addToGoldPickupMask(x, y, baseGold);
+    const contourBonusGold = Math.max(0, oreScaledGold - oreBaseGold);
+    addToGoldPickupMask(x, y, oreScaledGold - contourBonusGold);
+    if (contourBonusGold > 0) {
+      addToGoldBonusPickupMask(x, y, contourBonusGold);
+    }
   }
   const embeddedGold = Math.floor(state.droppedGoldMask[index]);
   if (embeddedGold > 0) {
@@ -9957,7 +10227,8 @@ function detonateRocketEffect(effect) {
     const distToPlayer = Math.hypot(effect.targetX - state.drill.x, effect.targetY - state.drill.y);
     if (distToPlayer <= blastRadius) {
       const scaledDamage = getScaledExplosionDamage(effect.payload.damage, effect.payload);
-      addHeatOnStrike(Math.round(scaledDamage * 0.3));
+      const heatTakenMult = Math.max(0, 1 + (state.explosionHeatTaken || 0) / 100);
+      addHeatOnStrike(Math.round(scaledDamage * 0.3 * heatTakenMult));
     }
     explodeAt(effect.targetX, effect.targetY, effect.payload.damage, effect.payload.radius, {
       guaranteedBreak: false,
@@ -9968,6 +10239,7 @@ function detonateRocketEffect(effect) {
 }
 
 function fireRocket(originX, originY, baseDamage, baseRadius, distance, options = {}) {
+  const rocketDamage = baseDamage * getRocketDamageMultiplier();
   const directions = [
     { x: 1, y: 0 },
     { x: -1, y: 0 },
@@ -9983,9 +10255,10 @@ function fireRocket(originX, originY, baseDamage, baseRadius, distance, options 
   const centerY = clamp(originY + dir.y * distance, 1, GRID_H - 2);
   spawnRocketEffect(originX, originY, centerX, centerY, {
     kind: "radiusBomb",
-    damage: baseDamage,
+    damage: rocketDamage,
     radius: baseRadius,
     explosionPowerScale: options.explosionPowerScale,
+    skipRadiusBonus: !!options.skipRadiusBonus,
   });
 }
 
@@ -10582,6 +10855,41 @@ function updateDrill(dt) {
       hitContourEnemy(strikeDamage);
     }
   }
+  const seekerRocketDamage = getSeekerPodRocketDamage();
+  const seekerRocketCount = getSeekerPodRocketCount();
+  if (seekerRocketDamage <= 0 || seekerRocketCount <= 0) {
+    state.seekerPodTargetIndex = -1;
+    state.seekerPodHitCount = 0;
+  } else if (brokeTargetBlock) {
+    state.seekerPodTargetIndex = -1;
+    state.seekerPodHitCount = 0;
+  } else if (state.hardness[targetIndex] > 0) {
+    if (state.seekerPodTargetIndex !== targetIndex) {
+      state.seekerPodTargetIndex = targetIndex;
+      state.seekerPodHitCount = 1;
+    } else {
+      state.seekerPodHitCount += 1;
+    }
+    if (state.seekerPodHitCount >= 3) {
+      for (let ri = 0; ri < seekerRocketCount; ri += 1) {
+        fireRocket(
+          state.drill.x,
+          state.drill.y,
+          seekerRocketDamage,
+          1,
+          1 + Math.floor(Math.random() * 3),
+          {
+            explosionPowerScale: 0.20,
+            skipRadiusBonus: true,
+          },
+        );
+      }
+      state.seekerPodHitCount = 0;
+    }
+  } else {
+    state.seekerPodTargetIndex = -1;
+    state.seekerPodHitCount = 0;
+  }
   state.comboCount = brokeAnyBlock ? (state.comboCount + 1) : 0;
   state.drill.progress += strikeDamage;
   state.cameraShake.amplitude = Math.max(
@@ -10830,6 +11138,7 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   maybeSpawnLoopPerk(interiorCells, brokenCellCount);
   applyLoopPressureBuff(brokenCellCount);
   applyContourBlastPressureBuff(brokenCellCount);
+  triggerContourSalvoRack(loopPath.length);
   spawnLoopFieldEffect(loopPath, affectedCells);
 
   for (const beacon of state.beacons) {
