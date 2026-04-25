@@ -1459,10 +1459,12 @@ function spawnGoldParticles(tileX, tileY, totalValue, options = {}) {
   }
 }
 
-function spawnExperienceParticles(tileX, tileY, totalValue) {
+function spawnExperienceParticles(tileX, tileY, totalValue, options = {}) {
   if (totalValue <= 0) {
     return;
   }
+  const showToast = options.showToast === true;
+  const isBonusXp = options.isBonusXp === true;
   const count = Math.min(6, Math.max(1, Math.ceil(totalValue / 2)));
   const baseValue = Math.floor(totalValue / count);
   for (let i = 0; i < count; i += 1) {
@@ -1476,7 +1478,8 @@ function spawnExperienceParticles(tileX, tileY, totalValue) {
       delay: i * 0.03,
       duration: 0.24 + (seed % 6) * 0.02,
       seed,
-      showTotal: i === count - 1 ? totalValue : 0,
+      isBonusXp,
+      showTotal: showToast && i === count - 1 ? totalValue : 0,
     });
   }
 }
@@ -3574,7 +3577,11 @@ function collectCrystalTile(x, y, index, crystalType) {
     showGoldToast(state.crystalGoldGain);
   }
   if (state.crystalXpGain > 0) {
-    gainExperience(scaleExperienceGain(state.crystalXpGain));
+    const gainedXp = scaleExperienceGain(state.crystalXpGain);
+    gainExperience(gainedXp);
+    if (gainedXp > 0) {
+      showBonusXpToast(gainedXp);
+    }
   }
   if (crystalType === CRYSTAL_RED && state.crystalRedDrillGain > 0) {
     state.drillPower += state.crystalRedDrillGain;
@@ -3815,7 +3822,6 @@ function collectPerkZone(zone) {
   zone.armingTimer = 0;
   zone.collected = true;
   state.perkText = `${TILE_PERK_TYPES[zone.perkType].name} x3`;
-  showPerkToast(state.perkText);
 
   if (zone.perkType === 4) {
     explodeAt(Math.round(zone.x), Math.round(zone.y), getStrikeDamage(), 3, { skipRadiusBonus: true });
@@ -3883,7 +3889,9 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
     case 1: {
       const fuelDelta = getTankFuelDelta();
       if (fuelDelta >= 0) {
-        addFuel(Math.round(fuelDelta * resMultiplier), x, y);
+        const baseFuelGain = Math.round(fuelDelta);
+        const scaledFuelGain = Math.round(baseFuelGain * resMultiplier);
+        addFuel(scaledFuelGain, x, y, { baseAmount: baseFuelGain });
       } else {
         state.fuel = Math.max(0, state.fuel + fuelDelta);
         showFuelToast(fuelDelta);
@@ -3917,14 +3925,28 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
       state.strikeSpeed += 10;
       state.perkText = t("perk.tile.speed.name");
       break;
-    case 6:
-      healPlayer(25, t("toast.hp_plus"));
+    case 6: {
+      const baseHeal = 25;
+      const scaledHeal = Math.max(0, Math.round(baseHeal * resMultiplier));
+      healPlayer(scaledHeal, t("toast.hp_plus"));
+      const baseHealShown = Math.min(baseHeal, scaledHeal);
+      const bonusHealShown = Math.max(0, scaledHeal - baseHealShown);
+      showHpGainToast(baseHealShown);
+      showBonusHpToast(bonusHealShown);
       state.perkText = t("perk.tile.hp.name");
       break;
-    case 7:
-      state.armor += 25;
+    }
+    case 7: {
+      const baseArmor = 25;
+      const scaledArmor = Math.max(0, Math.round(baseArmor * resMultiplier));
+      state.armor += scaledArmor;
+      const baseArmorShown = Math.min(baseArmor, scaledArmor);
+      const bonusArmorShown = Math.max(0, scaledArmor - baseArmorShown);
+      showArmorGainToast(baseArmorShown);
+      showBonusArmorToast(bonusArmorShown);
       state.perkText = t("perk.tile.armor.name");
       break;
+    }
     case 8:
       activateDrillOverdrive(8, "");
       state.perkText = t("perk.tile.boost.name");
@@ -3932,9 +3954,7 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
     default:
       break;
   }
-  if (showToast) {
-    showPerkToast(state.perkText);
-  }
+  void showToast;
 }
 
 function applyGoldPerk(perkType) {
@@ -4034,10 +4054,10 @@ function applyGoldPerk(perkType) {
     default:
       break;
   }
-  showPerkToast(state.perkText);
 }
 
 function applyShopPerk(effectId, rarityMult, rarity) {
+  const showPerkToast = () => {};
   const m = rarityMult || 1;
   switch (effectId) {
     case "drill_power":
@@ -4445,15 +4465,63 @@ function showPerkToast(text) {
 
 function showFuelToast(value) {
   const key = value >= 0 ? "fuel_pos" : "fuel_neg";
-  debounceToast(key, value, value >= 0 ? "#ffbf62" : "#ff8f8f", v => `${v > 0 ? "+" : ""}${v} fuel`);
+  debounceToast(
+    key,
+    value,
+    value >= 0 ? "#ffbf62" : "#ff8f8f",
+    v => (v >= 0 ? t("toast.fuel_plus_amount", { val: v }) : t("toast.fuel_minus_amount", { val: Math.abs(v) })),
+  );
+}
+
+function showBonusFuelToast(value) {
+  if (value <= 0) {
+    return;
+  }
+  debounceToast("fuel_bonus", value, "#ffbf62", v => t("toast.fuel_bonus_amount", { val: v }));
 }
 
 function showGoldToast(value) {
   debounceToast("gold", value, "#f8e040", v => `+${v} ●`);
 }
 
+function showBonusGoldToast(value) {
+  debounceToast("gold_bonus", value, "#f8e040", v => t("toast.bonus_gold", { val: v }));
+}
+
 function showXpToast(value) {
   debounceToast("xp", value, "#78d8ff", v => `+${v} ◆`);
+}
+
+function showBonusXpToast(value) {
+  debounceToast("xp_bonus", value, "#78d8ff", v => t("toast.bonus_xp", { val: v }));
+}
+
+function showHpGainToast(value) {
+  if (value <= 0) {
+    return;
+  }
+  debounceToast("hp_pos", value, "#8ff0a4", v => `+${v} HP`);
+}
+
+function showBonusHpToast(value) {
+  if (value <= 0) {
+    return;
+  }
+  debounceToast("hp_bonus", value, "#8ff0a4", v => t("toast.bonus_hp", { val: v }));
+}
+
+function showArmorGainToast(value) {
+  if (value <= 0) {
+    return;
+  }
+  debounceToast("armor_pos", value, "#9dd3ff", v => t("toast.armor_plus", { amount: v }));
+}
+
+function showBonusArmorToast(value) {
+  if (value <= 0) {
+    return;
+  }
+  debounceToast("armor_bonus", value, "#9dd3ff", v => t("toast.bonus_armor", { val: v }));
 }
 
 function runFuelEvent(callback) {
@@ -7285,7 +7353,7 @@ function update(dt) {
     state.toastQueueTimer = Math.max(0, state.toastQueueTimer - dt);
   } else if (state.toastQueue.length > 0) {
     applyToast(state.toastQueue.shift());
-    state.toastQueueTimer = 0.08;
+    state.toastQueueTimer = 0.16;
   }
   state.depthTitle.time = Math.max(0, state.depthTitle.time - dt);
   state.damageFlash = Math.max(0, state.damageFlash - dt * 2.4);
@@ -7373,11 +7441,23 @@ function updateExperienceParticles(dt) {
     if (particle.isGold || particle.isGoldBonus) {
       playSound("gold_pickup", { volume: particle.isGoldBonus ? 0.8 : 0.7 });
       state.unsafeGold += applyGoldBonus(particle.value);
-      if (particle.showTotal) showGoldToast(particle.showTotal);
+      if (particle.showTotal) {
+        if (particle.isGoldBonus) {
+          showBonusGoldToast(particle.showTotal);
+        } else {
+          showGoldToast(particle.showTotal);
+        }
+      }
     } else {
       playSound("xp_pickup", { volume: 0.6, pitch: 0.95 + Math.random() * 0.1 });
       gainExperience(particle.value);
-      if (particle.showTotal) showXpToast(particle.showTotal);
+      if (particle.showTotal) {
+        if (particle.isBonusXp) {
+          showBonusXpToast(particle.showTotal);
+        } else {
+          showXpToast(particle.showTotal);
+        }
+      }
     }
     state.xpParticles.splice(i, 1);
   }
@@ -8881,14 +8961,14 @@ function pickupExperienceNearPlayer() {
       const amount = state.xpPickupMask[index];
       if (amount > 0) {
         state.xpPickupMask[index] = 0;
-        spawnExperienceParticles(tx, ty, scaleExperienceGain(amount));
+        spawnExperienceParticles(tx, ty, scaleExperienceGain(amount), { showToast: false });
       }
       const bonusAmount = state.xpBonusPickupMask[index];
       if (bonusAmount <= 0) {
         continue;
       }
       state.xpBonusPickupMask[index] = 0;
-      spawnExperienceParticles(tx, ty, scaleExperienceGain(bonusAmount));
+      spawnExperienceParticles(tx, ty, scaleExperienceGain(bonusAmount), { showToast: true, isBonusXp: true });
     }
   }
 }
@@ -8903,8 +8983,9 @@ function addToGoldBonusPickupMask(x, y, amount) {
   state.goldBonusPickupMask[cellIndex(x, y)] += amount;
 }
 
-function spawnGoldPickupParticle(tx, ty, amount, isBonus) {
+function spawnGoldPickupParticle(tx, ty, amount, isBonus, options = {}) {
   const seed = (tx * 193 + ty * 389 + (isBonus ? 777 : 0)) % 1000;
+  const showToast = options.showToast === true;
   state.xpParticles.push({
     tileX: tx + 0.5,
     tileY: ty + 0.5,
@@ -8915,7 +8996,7 @@ function spawnGoldPickupParticle(tx, ty, amount, isBonus) {
     seed,
     isGold: true,
     isGoldBonus: isBonus,
-    showTotal: amount,
+    showTotal: showToast ? amount : 0,
   });
 }
 
@@ -8931,12 +9012,12 @@ function pickupGoldNearPlayer() {
       const amount = state.goldPickupMask[index];
       if (amount > 0) {
         state.goldPickupMask[index] = 0;
-        spawnGoldPickupParticle(tx, ty, amount, false);
+        spawnGoldPickupParticle(tx, ty, amount, false, { showToast: true });
       }
       const bonusAmount = state.goldBonusPickupMask[index];
       if (bonusAmount > 0) {
         state.goldBonusPickupMask[index] = 0;
-        spawnGoldPickupParticle(tx, ty, bonusAmount, true);
+        spawnGoldPickupParticle(tx, ty, bonusAmount, true, { showToast: true });
       }
     }
   }
@@ -8948,8 +9029,19 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
   }
 
   playSound("fuel_pickup", { volume: 0.7 });
+  const baseAmountFromSource = Number.isFinite(options.baseAmount) ? Math.max(0, Math.round(options.baseAmount)) : null;
+  const baseGainRaw = baseAmountFromSource ?? Math.max(0, Math.round(amount));
   const totalGain = Math.round(amount * Math.max(0, 1 + (state.fuelBonus || 0)));
-  showFuelToast(totalGain);
+  const baseGain = Math.min(baseGainRaw, totalGain);
+  const bonusGain = Math.max(0, totalGain - baseGain);
+  if (baseGain > 0) {
+    showFuelToast(baseGain);
+  } else if (totalGain > 0) {
+    showFuelToast(totalGain);
+  }
+  if (bonusGain > 0) {
+    showBonusFuelToast(bonusGain);
+  }
   const overflow = state.fuel + totalGain - state.maxFuel;
   state.fuel = Math.min(state.maxFuel, state.fuel + totalGain);
   if (overflow > 0 && state.overflowGovernorDrillGain > 0) {
@@ -10102,7 +10194,13 @@ function breakCell(x, y, index, options = {}) {
     finalizeHiddenBeaconExcavation(beacon);
     break;
   }
-  spawnExperienceCrystal(x, y, Math.round(XP_PER_BLOCK * goldMultiplier));
+  const baseBlockXp = XP_PER_BLOCK;
+  const totalBlockXp = Math.round(XP_PER_BLOCK * goldMultiplier);
+  const bonusBlockXp = Math.max(0, totalBlockXp - baseBlockXp);
+  spawnExperienceCrystal(x, y, baseBlockXp);
+  if (bonusBlockXp > 0) {
+    state.xpBonusPickupMask[index] += bonusBlockXp;
+  }
 
   // Check if a worm nest was destroyed
   for (const nest of state.wormNests) {
@@ -10536,6 +10634,9 @@ function tryAutoCloseContour() {
     x += candidate.stepX;
     y += candidate.stepY;
     const index = cellIndex(x, y);
+    // Auto-close boundary cells should receive contour resource bonus
+    // even though they can be broken before the loop interior pass runs.
+    state.loopGoldMask[index] = Math.max(state.loopGoldMask[index], state.contourResMultiplier);
     if (!state.tunnelMask[index]) {
       damageCell(x, y, EXPLOSION_BREAK_DAMAGE, {
         ignoreHazardEffect: true,
