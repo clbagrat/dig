@@ -39,6 +39,9 @@ const GOLD_PERK_BASE_COST = 30;
 const GOLD_PERK_COST_MULTIPLIER = 1.35;
 const GOLD_PERK_LEVEL_MULTIPLIER_STEP = 0.05;
 const GOLD_PERK_POPUP_DELAY = 0.5;
+const TOAST_DURATION_LEVEL_1 = 0.9;
+const TOAST_DURATION_LEVEL_2 = 2.0;
+const TOAST_DURATION_LEVEL_3 = 3.5;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
 const AUTO_CLOSE_SEC_PER_BLOCK = 0.52;
@@ -3601,7 +3604,7 @@ function collectCrystalTile(x, y, index, crystalType) {
   if (state.crystalRecipe.length === 0) {
     playSound("crystal_pickup");
     startCrystalRecipe(crystalType);
-    showPerkToast(state.crystalStatusText);
+    showCrystalToast(state.crystalStatusText);
     return;
   }
 
@@ -3617,11 +3620,11 @@ function collectCrystalTile(x, y, index, crystalType) {
     state.crystalCollected[crystalType] += 1;
     state.crystalProgress += 1;
     state.crystalStatusText = `${CRYSTAL_TYPES[crystalType].name}: ${state.crystalProgress}/${state.crystalRecipe.length}`;
-    showPerkToast(state.crystalStatusText);
+    showCrystalToast(state.crystalStatusText);
     if (state.crystalProgress >= state.crystalRecipe.length) {
       const firstCrystalType = state.crystalRecipe[0];
       const completedRecipe = [...state.crystalRecipe];
-      showPerkToast(t("toast.crystals_collected"));
+      showCrystalToast(t("toast.crystals_collected"));
       playSound("recipe_complete");
       clearCrystalRecipe();
       grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y);
@@ -4441,26 +4444,52 @@ window.__digShowAudioToast = (id, opts = {}) => {
 };
 
 function applyToast(item) {
+  const duration = Math.max(0.1, Number(item.duration) || TOAST_DURATION_LEVEL_1);
   state.activeToasts.push({
     text: item.text,
     color: item.color,
-    time: 0.9,
+    time: duration,
+    duration,
     wx: state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 + (Math.random() - 0.5) * TILE_SIZE * 1.6,
     wy: state.drill.renderY * TILE_SIZE - 10 + state.activeToasts.length * 4,
   });
 }
 
-function debounceToast(key, value, color, fmt) {
+function getToastDurationByLevel(level = 1) {
+  if (level >= 3) {
+    return TOAST_DURATION_LEVEL_3;
+  }
+  if (level === 2) {
+    return TOAST_DURATION_LEVEL_2;
+  }
+  return TOAST_DURATION_LEVEL_1;
+}
+
+function queueToast(text, color, level = 1) {
+  state.toastQueue.push({ text, color, duration: getToastDurationByLevel(level) });
+}
+
+function debounceToast(key, value, color, fmt, level = 1) {
+  const duration = getToastDurationByLevel(level);
   if (state.toastDebounceMap[key]) {
     state.toastDebounceMap[key].value += value;
     state.toastDebounceMap[key].timer = 0.1;
+    state.toastDebounceMap[key].duration = duration;
   } else {
-    state.toastDebounceMap[key] = { value, color, fmt, timer: 0.1 };
+    state.toastDebounceMap[key] = { value, color, fmt, timer: 0.1, duration };
   }
 }
 
 function showPerkToast(text) {
-  state.toastQueue.push({ text: `+ ${text}`, color: "#ffcf7a" });
+  queueToast(`+ ${text}`, "#ffcf7a", 3);
+}
+
+function showCrystalToast(text) {
+  queueToast(`+ ${text}`, "#ffcf7a", 2);
+}
+
+function showLevelToast(text) {
+  queueToast(`+ ${text}`, "#ffcf7a", 3);
 }
 
 function showFuelToast(value) {
@@ -4470,6 +4499,7 @@ function showFuelToast(value) {
     value,
     value >= 0 ? "#ffbf62" : "#ff8f8f",
     v => (v >= 0 ? t("toast.fuel_plus_amount", { val: v }) : t("toast.fuel_minus_amount", { val: Math.abs(v) })),
+    1,
   );
 }
 
@@ -4477,51 +4507,51 @@ function showBonusFuelToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("fuel_bonus", value, "#ffbf62", v => t("toast.fuel_bonus_amount", { val: v }));
+  debounceToast("fuel_bonus", value, "#ffbf62", v => t("toast.fuel_bonus_amount", { val: v }), 1);
 }
 
 function showGoldToast(value) {
-  debounceToast("gold", value, "#f8e040", v => `+${v} ●`);
+  debounceToast("gold", value, "#f8e040", v => `+${v} ●`, 1);
 }
 
 function showBonusGoldToast(value) {
-  debounceToast("gold_bonus", value, "#f8e040", v => t("toast.bonus_gold", { val: v }));
+  debounceToast("gold_bonus", value, "#f8e040", v => t("toast.bonus_gold", { val: v }), 1);
 }
 
 function showXpToast(value) {
-  debounceToast("xp", value, "#78d8ff", v => `+${v} ◆`);
+  debounceToast("xp", value, "#78d8ff", v => `+${v} ◆`, 1);
 }
 
 function showBonusXpToast(value) {
-  debounceToast("xp_bonus", value, "#78d8ff", v => t("toast.bonus_xp", { val: v }));
+  debounceToast("xp_bonus", value, "#78d8ff", v => t("toast.bonus_xp", { val: v }), 1);
 }
 
 function showHpGainToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("hp_pos", value, "#8ff0a4", v => `+${v} HP`);
+  debounceToast("hp_pos", value, "#8ff0a4", v => `+${v} HP`, 2);
 }
 
 function showBonusHpToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("hp_bonus", value, "#8ff0a4", v => t("toast.bonus_hp", { val: v }));
+  debounceToast("hp_bonus", value, "#8ff0a4", v => t("toast.bonus_hp", { val: v }), 2);
 }
 
 function showArmorGainToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("armor_pos", value, "#9dd3ff", v => t("toast.armor_plus", { amount: v }));
+  debounceToast("armor_pos", value, "#9dd3ff", v => t("toast.armor_plus", { amount: v }), 2);
 }
 
 function showBonusArmorToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("armor_bonus", value, "#9dd3ff", v => t("toast.bonus_armor", { val: v }));
+  debounceToast("armor_bonus", value, "#9dd3ff", v => t("toast.bonus_armor", { val: v }), 2);
 }
 
 function runFuelEvent(callback) {
@@ -7345,7 +7375,7 @@ function update(dt) {
     const entry = state.toastDebounceMap[key];
     entry.timer -= dt;
     if (entry.timer <= 0) {
-      state.toastQueue.push({ text: entry.fmt(entry.value), color: entry.color });
+      state.toastQueue.push({ text: entry.fmt(entry.value), color: entry.color, duration: entry.duration });
       delete state.toastDebounceMap[key];
     }
   }
@@ -8943,7 +8973,7 @@ function gainExperience(amount) {
     state.levelUpPulse = 0.9;
     state.levelUpModalDelay = 0.9;
     spawnLevelUpBurst(state.drill.x, state.drill.y);
-    showPerkToast(t("toast.level", { level: state.level }));
+    showLevelToast(t("toast.level", { level: state.level }));
   }
 }
 
@@ -9347,7 +9377,7 @@ function showHpToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("hp", value, "#ff8a8a", v => `-${v} HP`);
+  debounceToast("hp", value, "#ff8a8a", v => `-${v} HP`, 2);
 }
 
 
@@ -15200,7 +15230,8 @@ function renderActiveToast(camera) {
   ctx.lineWidth = 3.5;
   for (let i = 0; i < state.activeToasts.length; i++) {
     const toast = state.activeToasts[i];
-    const t = 1 - toast.time / 0.9;
+    const duration = Math.max(0.1, toast.duration || TOAST_DURATION_LEVEL_1);
+    const t = 1 - toast.time / duration;
     const alpha = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.25) / 0.75);
     const lift = (1 - (1 - t) * (1 - t)) * 28;
     const x = toast.wx - camera.x;
