@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Hide and Dig - Cutscene</title>
+    <link rel="stylesheet" href="./styles.css?v=20260330-2" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <canvas id="game"></canvas>
+      <div id="cutControls" class="cut-ui">
+        <div class="cut-ui__row">
+          <button id="cutRestart" class="top-action-button top-action-button--text" type="button">↻ Restart</button>
+          <button id="cutPause" class="top-action-button top-action-button--text" type="button">⏸ Pause</button>
+          <div id="cutStatus" class="top-action-button top-action-button--status">Phase: intro</div>
+        </div>
+        <div class="cut-ui__row">
+          <button class="top-action-button top-action-button--text" data-cut-jump="0">1 Intro</button>
+          <button class="top-action-button top-action-button--text" data-cut-jump="4">2 Rumble</button>
+          <button class="top-action-button top-action-button--text" data-cut-jump="6.5">3 Collapse</button>
+          <button class="top-action-button top-action-button--text" data-cut-jump="10.5">4 Crush</button>
+          <button class="top-action-button top-action-button--text" data-cut-jump="11.5">5 Find Her</button>
+        </div>
+        <div class="cut-ui__row">
+          <input id="cutTimeline" class="cut-timeline" type="range" min="0" max="14" step="0.01" value="0" />
+        </div>
+      </div>
+      <button id="cutFindHerButton" class="top-action-button top-action-button--text cut-find-her" type="button" hidden>Find Her</button>
+      <div id="fatalError" class="fatal-error" hidden>
+        <div class="fatal-error__panel">
+          <div class="fatal-error__title">Runtime Error</div>
+          <div class="fatal-error__subtitle">Скопируй текст ниже и пришли мне.</div>
+          <pre id="fatalErrorText" class="fatal-error__text"></pre>
+          <button class="fatal-error__reload" onclick="location.reload()">Перезагрузить</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./src/game.js?v=62"></script>
+    <style>
+      .cut-ui {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        left: 10px;
+        right: 10px;
+        z-index: 50;
+        display: grid;
+        gap: 8px;
+        pointer-events: none;
+      }
+
+      .cut-ui__row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        pointer-events: auto;
+      }
+
+      .cut-timeline {
+        width: min(560px, calc(100vw - 20px));
+        accent-color: #d79f49;
+      }
+
+      .cut-find-her {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 120;
+        min-width: 170px;
+        height: 44px;
+        pointer-events: auto;
+      }
+
+      .cut-find-her[hidden] {
+        display: none !important;
+      }
+    </style>
+  </body>
+</html>

@@ -118,6 +118,7 @@
               <button id="debugOpenShop" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.open_shop">🛒 Open Shop</button>
               <button id="debugOpenMap" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.map">🗺 Map</button>
               <button id="debugFinishRecipe" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.finish_recipe">🔮 Finish Recipe</button>
+              <button id="debugResetIntroCutscene" type="button" class="debug-perk-menu__button">🧹 Reset Intro Cutscene</button>
             </div>
           </div>
           <div class="debug-perk-menu__section">
@@ -193,6 +194,18 @@
         </div>
       </div>
 
+      <div id="startOverlay" class="start-overlay">
+        <button id="newGameButton" class="top-action-button top-action-button--text start-overlay__button" type="button">New Game</button>
+      </div>
+      <div id="baseFoundOverlay" class="base-found-overlay" hidden>
+        <div class="base-found-overlay__panel">
+          <div id="baseFoundTitle" class="base-found-overlay__title">Ты нашел ее</div>
+          <div id="baseFoundSubtitle" class="base-found-overlay__subtitle">Ты справился за 0:00</div>
+          <button id="playAgainButton" class="top-action-button top-action-button--text base-found-overlay__button" type="button">Сыграть еще</button>
+        </div>
+      </div>
+      <button id="cutFindHerButton" class="top-action-button top-action-button--text cut-find-her" type="button" hidden>Find Her</button>
+
       <div id="fatalError" class="fatal-error" hidden>
         <div class="fatal-error__panel">
           <div class="fatal-error__title">Runtime Error</div>
@@ -202,6 +215,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="./src/game.js?v=60"></script>
+    <script type="module" src="./src/game.js?v=62"></script>
   </body>
 </html>

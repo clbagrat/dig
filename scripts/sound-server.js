@@ -133,6 +133,7 @@ const server = http.createServer(async (req, res) => {
   // ── Static files ──────────────────────────────────────────────────────
   let filePath = path.join(ROOT, decodeURIComponent(pathname));
   if (pathname === "/") filePath = path.join(ROOT, "index.html");
+  if (pathname === "/cut" || pathname === "/cut/") filePath = path.join(ROOT, "cut.html");
 
   // Strip query strings from file paths
   const realPath = filePath.split("?")[0];

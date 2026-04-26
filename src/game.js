@@ -17,6 +17,12 @@ import {
   resetGenerationConfig,
 } from "./worldgen.js?v=42";
 
+const CUTSCENE_MODE =
+  location.pathname === "/cut" ||
+  location.pathname === "/cut/" ||
+  new URLSearchParams(location.search).has("cutscene");
+const INTRO_CUTSCENE_SEEN_KEY = "dig_intro_cutscene_seen_v1";
+
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
 const STEP_MS = 1000 / 60;
@@ -507,6 +513,12 @@ const state = {
   dpr: 1,
   debugMapActive: false,
   debugMapCamera: { zoom: 1, x: 0, y: 0 },
+  cutsceneModeActive: false,
+  cutsceneLaunchesGame: false,
+  cutscene: null,
+  cutsceneControlsBound: false,
+  coreReady: false,
+  gameLoopRunning: false,
   worldSeed: 0,
   worldRandom: Math.random,
   timeAcc: 0,
@@ -567,6 +579,8 @@ const state = {
   goldParticles: [],
   xpParticles: [],
   baseFound: false,
+  runTimeSec: 0,
+  baseFoundRunTimeSec: 0,
   outOfFuel: false,
   dead: false,
   visionRadius: VISION_RADIUS,
@@ -2437,6 +2451,16 @@ function revealSteamPocket(x, y, dirX, dirY) {
 
 function setupField(seedOverride = null) {
   ensureGridBuffers();
+  state.drill.x = START_X;
+  state.drill.y = START_Y;
+  state.drill.renderX = START_X;
+  state.drill.renderY = START_Y;
+  state.drill.animFromX = START_X;
+  state.drill.animFromY = START_Y;
+  state.drill.animToX = START_X;
+  state.drill.animToY = START_Y;
+  state.drill.facingX = 0;
+  state.drill.facingY = 1;
   state.pathIndexByCell.fill(-1);
   state.perkMask.fill(0);
   state.crystalMask.fill(0);
@@ -2491,6 +2515,8 @@ function setupField(seedOverride = null) {
   state.steamJets.length = 0;
   state.boulders.length = 0;
   state.baseFound = false;
+  state.runTimeSec = 0;
+  state.baseFoundRunTimeSec = 0;
   state.cameraShake.time = 0;
   state.cameraShake.amplitude = 0;
   state.outOfFuel = false;
@@ -5202,17 +5228,9 @@ function syncItemInspectModal() {
   syncTouchZonesInteractivity();
 }
 
-function init() {
-  bindFatalErrorHandlers();
-  try {
-    initSounds();
-    loadStoredGenerationConfig();
-    state.ctx = state.canvas.getContext("2d");
-    state.sprites = createSpriteAtlas();
-    resize();
-    setupField();
-    initShop({
-      onClose: () => {
+function getShopInitOptions() {
+  return {
+    onClose: () => {
       playSound("shop_close");
       state.shopModalOpen = false;
       syncTouchZonesInteractivity();
@@ -5228,10 +5246,152 @@ function init() {
           state.pendingBeaconWireActivationAt = (state.lastTs || performance.now()) + BEACON_WIRE_POST_SHOP_DELAY_MS;
         }
       }
-      },
-    });
-    bindUi();
-    requestAnimationFrame(frame);
+    },
+  };
+}
+
+function ensureCoreReady() {
+  if (state.coreReady) return;
+  initSounds();
+  loadStoredGenerationConfig();
+  state.ctx = state.canvas.getContext("2d");
+  state.sprites = createSpriteAtlas();
+  resize();
+  initShop(getShopInitOptions());
+  bindUi();
+  state.coreReady = true;
+}
+
+function hasSeenIntroCutscene() {
+  try {
+    return localStorage.getItem(INTRO_CUTSCENE_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markIntroCutsceneSeen() {
+  try {
+    localStorage.setItem(INTRO_CUTSCENE_SEEN_KEY, "1");
+  } catch {}
+}
+
+function showStartOverlay(show) {
+  const overlay = document.getElementById("startOverlay");
+  if (!overlay) return;
+  overlay.hidden = !show;
+  if (show) {
+    const newGameButton = document.getElementById("newGameButton");
+    if (newGameButton) newGameButton.textContent = t("ui.new_game");
+  }
+}
+
+function showFindHerButton(show) {
+  const button = document.getElementById("cutFindHerButton");
+  if (!button) return;
+  button.textContent = t("ui.find_her");
+  button.hidden = !show;
+  button.style.display = show ? "inline-flex" : "none";
+}
+
+function formatRunTime(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+function showBaseFoundOverlay(show, runTimeSec = 0) {
+  const overlay = document.getElementById("baseFoundOverlay");
+  if (!overlay) return;
+  overlay.hidden = !show;
+  if (!show) return;
+
+  const title = document.getElementById("baseFoundTitle");
+  const subtitle = document.getElementById("baseFoundSubtitle");
+  const button = document.getElementById("playAgainButton");
+  const timeText = formatRunTime(runTimeSec);
+  if (title) title.textContent = t("ui.found_her_title");
+  if (subtitle) subtitle.textContent = t("ui.found_her_desc_time", { time: timeText });
+  if (button) button.textContent = t("ui.play_again");
+}
+
+function showDeadOverlay(show) {
+  const overlay = document.getElementById("baseFoundOverlay");
+  if (!overlay) return;
+  overlay.hidden = !show;
+  if (!show) return;
+
+  const title = document.getElementById("baseFoundTitle");
+  const subtitle = document.getElementById("baseFoundSubtitle");
+  const button = document.getElementById("playAgainButton");
+  if (title) title.textContent = t("ui.drill_broken");
+  if (subtitle) subtitle.textContent = t("ui.drill_broken_desc");
+  if (button) button.textContent = t("ui.play_again");
+}
+
+function startGameplayLoop() {
+  if (state.gameLoopRunning) return;
+  state.lastTs = 0;
+  state.timeAcc = 0;
+  state.gameLoopRunning = true;
+  requestAnimationFrame(frame);
+}
+
+function startGameplayRun() {
+  state.cutsceneModeActive = false;
+  state.cutsceneLaunchesGame = false;
+  state.cutscene = null;
+  state.debugMapActive = false;
+  state.debugMapGenerationPanelCollapsed = false;
+  showFindHerButton(false);
+  showStartOverlay(false);
+  showBaseFoundOverlay(false);
+  setupField();
+  startGameplayLoop();
+}
+
+function startIntroCutsceneFromMenu() {
+  showStartOverlay(false);
+  showBaseFoundOverlay(false);
+  state.cutsceneLaunchesGame = true;
+  prepareCutsceneField();
+  state.cutsceneModeActive = true;
+  updateCutsceneControlsUi();
+  requestAnimationFrame(cutsceneFrame);
+}
+
+function initMainMenuMode() {
+  bindFatalErrorHandlers();
+  try {
+    ensureCoreReady();
+    bindCutsceneControls();
+    showFindHerButton(false);
+    showBaseFoundOverlay(false);
+    showStartOverlay(true);
+    const newGameButton = document.getElementById("newGameButton");
+    if (newGameButton && !newGameButton.dataset.boundStart) {
+      newGameButton.dataset.boundStart = "1";
+      newGameButton.addEventListener("click", () => {
+        if (state.gameLoopRunning || state.cutsceneModeActive) return;
+        if (hasSeenIntroCutscene()) {
+          startGameplayRun();
+        } else {
+          startIntroCutsceneFromMenu();
+        }
+      });
+    }
+  } catch (error) {
+    reportFatalError(error, "initMainMenuMode");
+  }
+}
+
+function init() {
+  bindFatalErrorHandlers();
+  try {
+    ensureCoreReady();
+    setupField();
+    startGameplayLoop();
   } catch (error) {
     reportFatalError(error, "init");
   }
@@ -5260,6 +5420,7 @@ function bindUi() {
   const reloadButton = document.getElementById("reloadGame");
   const soundToggle = document.getElementById("soundToggle");
   const langToggle = document.getElementById("langToggle");
+  const playAgainButton = document.getElementById("playAgainButton");
   const manualOpen = document.getElementById("manualOpen");
   const manualClose = document.getElementById("manualClose");
   const manualOverlay = document.getElementById("manualModal");
@@ -5649,6 +5810,14 @@ function bindUi() {
     });
   }
 
+  if (playAgainButton && !playAgainButton.dataset.boundReplay) {
+    playAgainButton.dataset.boundReplay = "1";
+    playAgainButton.addEventListener("click", () => {
+      if (state.cutsceneModeActive) return;
+      startGameplayRun();
+    });
+  }
+
   document.addEventListener("shop:purchase-equipment", (e) => {
     const { effectId, cost, rarity, rarityMultiplier, isMerge, oldRarity, oldRarityMultiplier } = e.detail;
     playSound(isMerge ? "equipment_merge" : "purchase");
@@ -5826,6 +5995,18 @@ function bindUi() {
     debugGiveArtifact.addEventListener("click", () => {
       state.artifactCount++;
       showPerkToast(t("toast.artifact_given"));
+      state.debugPerkMenuOpen = false;
+      syncDebugPerkOverlay();
+    });
+  }
+
+  const debugResetIntroCutscene = document.getElementById("debugResetIntroCutscene");
+  if (debugResetIntroCutscene) {
+    debugResetIntroCutscene.addEventListener("click", () => {
+      try {
+        localStorage.removeItem(INTRO_CUTSCENE_SEEN_KEY);
+      } catch {}
+      showPerkToast("Intro cutscene flag reset");
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
     });
@@ -7084,7 +7265,9 @@ function frame(ts) {
     }
 
     render();
-    requestAnimationFrame(frame);
+    if (state.gameLoopRunning) {
+      requestAnimationFrame(frame);
+    }
   } catch (error) {
     reportFatalError(error, "frame");
   }
@@ -7093,6 +7276,9 @@ function frame(ts) {
 function update(dt) {
   if (state.dead) {
     return;
+  }
+  if (!state.cutsceneModeActive && !state.baseFound) {
+    state.runTimeSec += dt;
   }
 
   updateHudBarFx(dt);
@@ -11065,6 +11251,7 @@ function consumeSignalMove(fromX, fromY, toX, toY) {
 function updateDiscovery() {
   if (!state.baseFound && state.tunnelMask[cellIndex(state.base.x, state.base.y)]) {
     state.baseFound = true;
+    state.baseFoundRunTimeSec = state.runTimeSec;
     playSound("base_found");
   }
 }
@@ -12703,6 +12890,9 @@ function render() {
   renderWorms(camera);
   renderContourEnemy(camera);
   renderDrill(camera);
+  if (state.cutsceneModeActive) {
+    renderCutsceneWorldOverlay(camera);
+  }
   renderWormTelegraph(camera);
   renderCollapseWarnings(camera);
   renderBaseProximityDot(camera);
@@ -12735,24 +12925,21 @@ function render() {
     ctx.fillRect(0, 0, state.width, state.height);
   }
 
-  if (state.baseFound) {
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(0, 0, state.width, state.height);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `700 28px ${HUD_FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(t("ui.base_found"), state.width * 0.5, state.height * 0.46);
-    ctx.font = `400 16px ${HUD_FONT}`;
-    ctx.fillText(t("ui.base_found_desc"), state.width * 0.5, state.height * 0.52);
-  } else if (state.dead) {
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(0, 0, state.width, state.height);
-    ctx.fillStyle = "#ffe2d5";
-    ctx.font = `700 28px ${HUD_FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(t("ui.drill_broken"), state.width * 0.5, state.height * 0.46);
-    ctx.font = `400 16px ${HUD_FONT}`;
-    ctx.fillText(t("ui.drill_broken_desc"), state.width * 0.5, state.height * 0.52);
+  if (state.cutsceneModeActive) {
+    renderCutsceneScreenFx(camera);
+  }
+
+  if (state.baseFound && !state.cutsceneModeActive) {
+    showBaseFoundOverlay(true, state.baseFoundRunTimeSec || state.runTimeSec);
+  } else if (state.dead && !state.cutsceneModeActive) {
+    showDeadOverlay(true);
+  } else {
+    showBaseFoundOverlay(false);
+  }
+
+  if (state.cutsceneModeActive) {
+    renderCutsceneDialogBubbles(camera, zoom);
+    renderCutsceneFindHerOverlay();
   }
 }
 
@@ -14001,6 +14188,7 @@ function renderPickupRadar(camera) {
 }
 
 function renderBaseProximityDot(camera) {
+  if (state.cutsceneModeActive) return;
   const ACTIVATE_RADIUS = 6;
   const dist = Math.hypot(state.base.x - state.drill.x, state.base.y - state.drill.y);
   if (dist > ACTIVATE_RADIUS || state.baseFound) return;
@@ -14041,7 +14229,7 @@ function renderBaseProximityDot(camera) {
 
 function renderBase(camera) {
   const ctx = state.ctx;
-  if (!state.baseFound) {
+  if (!state.baseFound && !state.cutsceneModeActive) {
     return;
   }
 
@@ -16070,6 +16258,668 @@ function renderVisionMask(camera) {
   ctx.restore();
 }
 
+const CUTSCENE_PHASES = [
+  { key: "intro", from: 0, to: 4, label: "Intro: сближение" },
+  { key: "rumble", from: 4, to: 6.5, label: "Rumble: тревога" },
+  { key: "collapse", from: 6.5, to: 10.5, label: "Collapse: обвал" },
+  { key: "crush", from: 10.5, to: 11.5, label: "Crush: базу завалило" },
+  { key: "findher", from: 11.5, to: 14, label: "Find Her: тьма" },
+];
+
+const CUTSCENE_TOTAL_TIME = CUTSCENE_PHASES[CUTSCENE_PHASES.length - 1].to;
+const CUTSCENE_FIELD_SIZE = 15;
+
+function getCutscenePhase(time) {
+  for (const phase of CUTSCENE_PHASES) {
+    if (time >= phase.from && time < phase.to) return phase;
+  }
+  return CUTSCENE_PHASES[CUTSCENE_PHASES.length - 1];
+}
+
+function getCutscenePhaseProgress(time, key) {
+  const phase = CUTSCENE_PHASES.find((entry) => entry.key === key);
+  if (!phase) return 0;
+  return clamp((time - phase.from) / (phase.to - phase.from), 0, 1);
+}
+
+function setCutsceneCellOpen(x, y) {
+  if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) return;
+  const index = cellIndex(x, y);
+  state.tunnelMask[index] = 1;
+  state.hardness[index] = 0;
+  state.health[index] = 0;
+  state.metalMask[index] = 0;
+  state.goldOreMask[index] = 0;
+  state.perkMask[index] = 0;
+  state.crystalMask[index] = 0;
+  state.perkZoneMask[index] = -1;
+  state.hazardMask[index] = 0;
+  state.gasPocketMask[index] = 0;
+  state.steamPocketMask[index] = 0;
+  state.boulderPocketMask[index] = 0;
+  state.microResourceMask[index] = 0;
+  state.microResourceRevealedMask[index] = 0;
+  state.visibleMask[index] = 1;
+  state.visibleAlpha[index] = 1;
+  state.visibleTargetAlpha[index] = 1;
+}
+
+function setCutsceneCellSolid(x, y, hardness = 4) {
+  if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) return;
+  const index = cellIndex(x, y);
+  state.tunnelMask[index] = 0;
+  state.hardness[index] = clamp(Math.round(hardness), 1, BLOCK_TYPES.length - 1);
+  state.health[index] = BLOCK_TYPES[state.hardness[index]].hp;
+  state.metalMask[index] = 0;
+  state.goldOreMask[index] = 0;
+  state.perkMask[index] = 0;
+  state.crystalMask[index] = 0;
+  state.perkZoneMask[index] = -1;
+  state.hazardMask[index] = 0;
+  state.hazardTriggeredMask[index] = 0;
+  state.gasPocketMask[index] = 0;
+  state.steamPocketMask[index] = 0;
+  state.boulderPocketMask[index] = 0;
+  state.microResourceMask[index] = 0;
+  state.microResourceRevealedMask[index] = 0;
+  state.visibleMask[index] = 1;
+  state.visibleAlpha[index] = 1;
+  state.visibleTargetAlpha[index] = 1;
+}
+
+function prepareCutsceneField() {
+  state.tunnelMask.fill(1);
+  state.hardness.fill(0);
+  state.health.fill(0);
+  state.visibleMask.fill(1);
+  state.visibleAlpha.fill(1);
+  state.visibleTargetAlpha.fill(1);
+  state.perkMask.fill(0);
+  state.crystalMask.fill(0);
+  state.perkZoneMask.fill(-1);
+  state.gasMask.fill(0);
+  state.steamMask.fill(0);
+  state.loopGoldMask.fill(0);
+  state.droppedGoldMask.fill(0);
+  state.xpPickupMask.fill(0);
+  state.xpBonusPickupMask.fill(0);
+  state.goldPickupMask.fill(0);
+  state.goldBonusPickupMask.fill(0);
+  state.hazardMask.fill(0);
+  state.hazardTriggeredMask.fill(0);
+  state.metalMask.fill(0);
+  state.goldOreMask.fill(0);
+  state.microResourceMask.fill(0);
+  state.microResourceRevealedMask.fill(0);
+  state.gasPocketMask.fill(0);
+  state.steamPocketMask.fill(0);
+  state.boulderPocketMask.fill(0);
+  state.beaconMask.fill(0);
+  state.artifactMask.fill(0);
+  state.safeDoorMask.fill(0);
+  state.keyMask.fill(0);
+  state.safeInteriorMask.fill(0);
+  state.weakSpotMask.fill(0);
+  state.pathTiles.length = 0;
+  rebuildPathIndex();
+
+  const half = Math.floor(CUTSCENE_FIELD_SIZE / 2);
+  const centerX = clamp(START_X + 8, 1 + half, GRID_W - 2 - half);
+  const centerY = clamp(START_Y + 6, 1 + half, GRID_H - 2 - half);
+  for (let y = centerY - half; y <= centerY + half; y += 1) {
+    for (let x = centerX - half; x <= centerX + half; x += 1) {
+      setCutsceneCellOpen(x, y);
+    }
+  }
+
+  state.base.x = centerX + 1;
+  state.base.y = centerY;
+  state.base.renderX = state.base.x;
+  state.base.renderY = state.base.y;
+
+  state.drill.x = centerX - 3;
+  state.drill.y = centerY;
+  state.drill.renderX = state.drill.x;
+  state.drill.renderY = state.drill.y;
+  state.drill.facingX = 1;
+  state.drill.facingY = 0;
+  state.drill.strikeEnergy = 0.15;
+  state.drill.strikePhase = 0;
+
+  state.beacons.length = 0;
+  state.beaconWires.length = 0;
+  state.beaconWireBreaks.length = 0;
+  state.collapseWarnings.length = 0;
+  state.pendingCollapseCount = 0;
+  state.safes.length = 0;
+  state.wormNests.length = 0;
+  state.activeWorms.length = 0;
+  state.boulders.length = 0;
+  state.effects.length = 0;
+  state.tileAnimations.length = 0;
+  state.tileAnimDest.clear();
+
+  state.baseFound = false;
+  state.runTimeSec = 0;
+  state.baseFoundRunTimeSec = 0;
+  state.dead = false;
+  state.outOfFuel = false;
+  state.damageFlash = 0;
+  state.levelUpFlash = 0;
+  state.menuOpen = false;
+
+  state.debugMapActive = true;
+  state.debugMapGenerationPanelCollapsed = true;
+  state.debugMapCamera.zoom = 1;
+  state.cutscene = {
+    time: 0,
+    playing: true,
+    heroStartX: state.drill.x,
+    heroNearX: centerX - 0.8,
+    heroFinalX: centerX - 1.6,
+    heroY: centerY,
+    baseX: state.base.x,
+    baseY: state.base.y,
+    baseBuried: false,
+    fieldMinX: centerX - half,
+    fieldMaxX: centerX + half,
+    fieldMinY: centerY - half,
+    fieldMaxY: centerY + half,
+    cameraBaseX: centerX * TILE_SIZE - state.width * 0.5 + TILE_SIZE * 0.5,
+    cameraBaseY: centerY * TILE_SIZE - state.height * 0.5 + TILE_SIZE * 0.4,
+    blocks: [],
+    sparks: [],
+    warningSpawnAcc: 0,
+  };
+  state.debugMapCamera.x = state.cutscene.cameraBaseX;
+  state.debugMapCamera.y = state.cutscene.cameraBaseY;
+}
+
+function addCutsceneFallingBlock(targetX = null, targetY = null) {
+  const cut = state.cutscene;
+  if (!cut) return;
+  let fromX;
+  let fromY;
+  if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
+    fromX = targetX + (Math.random() - 0.5) * 0.35;
+    fromY = targetY - (4.8 + Math.random() * 2.2);
+  } else {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    fromX = cut.baseX + side * (4.2 + Math.random() * 2.8);
+    fromY = cut.baseY - 5.5 - Math.random() * 3;
+  }
+  cut.blocks.push({
+    x: fromX,
+    y: fromY,
+    vx: (Math.random() - 0.5) * 2.2,
+    vy: 2.4 + Math.random() * 2.6,
+    rot: Math.random() * Math.PI,
+    vr: (Math.random() - 0.5) * 2.8,
+    tier: clamp(2 + Math.floor(Math.random() * 3), 1, BLOCK_TYPES.length - 1),
+    variant: Math.floor(Math.random() * BLOCK_VARIANTS),
+  });
+}
+
+function pickCutsceneCollapseTarget() {
+  const cut = state.cutscene;
+  if (!cut) return null;
+  const taken = new Set();
+  for (const warning of state.collapseWarnings) {
+    if (!warning?.__cutscene || !Array.isArray(warning.cells)) continue;
+    for (const cell of warning.cells) {
+      taken.add(`${cell.x},${cell.y}`);
+    }
+  }
+  const forbidden = new Set([
+    `${Math.round(state.drill.renderX)},${Math.round(state.drill.renderY)}`,
+    `${cut.baseX},${cut.baseY}`,
+  ]);
+  const anchorX = Math.round((state.drill.renderX + cut.baseX) * 0.5);
+  const anchorY = Math.round((state.drill.renderY + cut.baseY) * 0.5);
+  const offsets = [
+    { x: 0, y: -1 }, { x: -1, y: -1 }, { x: 1, y: -1 },
+    { x: -2, y: 0 }, { x: 2, y: 0 }, { x: 0, y: 1 },
+    { x: -3, y: 1 }, { x: 3, y: 1 }, { x: -2, y: -2 },
+    { x: 2, y: -2 }, { x: 0, y: 2 }, { x: -1, y: 2 }, { x: 1, y: 2 },
+  ];
+  for (let i = offsets.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
+  }
+  for (const offset of offsets) {
+    const x = anchorX + offset.x;
+    const y = anchorY + offset.y;
+    if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) continue;
+    const key = `${x},${y}`;
+    if (taken.has(key) || forbidden.has(key)) continue;
+    const index = cellIndex(x, y);
+    if (!state.tunnelMask[index]) continue;
+    return { x, y };
+  }
+  return null;
+}
+
+function spawnCutsceneCollapseWarning() {
+  const target = pickCutsceneCollapseTarget();
+  if (!target) return;
+  state.collapseWarnings.push({
+    __cutscene: true,
+    cells: [target],
+    timer: COLLAPSE_WARNING_DURATION,
+    duration: COLLAPSE_WARNING_DURATION,
+    hardness: 4,
+    resolveIndex: 0,
+    landDelay: 0,
+    heroDamaged: false,
+    clearPath: false,
+  });
+  state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 0.8);
+}
+
+function updateCutsceneCollapseWarnings(dt) {
+  for (let i = state.collapseWarnings.length - 1; i >= 0; i -= 1) {
+    const warning = state.collapseWarnings[i];
+    if (!warning?.__cutscene) continue;
+    warning.timer -= dt;
+    if (warning.timer > 0) continue;
+    const cell = warning.cells?.[0];
+    if (cell) {
+      setCutsceneCellSolid(cell.x, cell.y, warning.hardness || 4);
+      spawnBreakEffect(cell.x, cell.y, warning.hardness || 4, "collapse");
+      addCutsceneFallingBlock(cell.x, cell.y);
+      state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.2);
+      state.visibilityDirty = true;
+    }
+    state.collapseWarnings.splice(i, 1);
+  }
+}
+
+function updateCutsceneMode(dt) {
+  const cut = state.cutscene;
+  if (!cut) return;
+
+  if (cut.playing) {
+    cut.time += dt;
+    if (cut.time >= CUTSCENE_TOTAL_TIME) {
+      cut.time = CUTSCENE_TOTAL_TIME;
+      cut.playing = false;
+    }
+  }
+
+  const phase = getCutscenePhase(cut.time);
+  const introP = getCutscenePhaseProgress(cut.time, "intro");
+  const rumbleP = getCutscenePhaseProgress(cut.time, "rumble");
+  const collapseP = getCutscenePhaseProgress(cut.time, "collapse");
+  const crushP = getCutscenePhaseProgress(cut.time, "crush");
+
+  const heroMidX = cut.heroStartX + (cut.heroNearX - cut.heroStartX) * introP;
+  const heroX = heroMidX;
+  const heroY = cut.heroY;
+  state.drill.renderX = heroX;
+  state.drill.renderY = heroY;
+  state.drill.x = Math.round(heroX);
+  state.drill.y = Math.round(heroY);
+  state.drill.facingX = Math.sign(cut.baseX - heroX) || 1;
+  state.drill.facingY = 0;
+  state.drill.strikePhase += dt * 9;
+  state.drill.strikeEnergy = phase.key === "collapse" ? 0.5 : 0.2;
+
+  state.base.renderX = cut.baseX;
+  state.base.renderY = cut.baseY;
+  cut.baseBuried = phase.key === "crush";
+
+  const shake = rumbleP * 5 + collapseP * 12 + crushP * 20;
+  state.debugMapCamera.x = cut.cameraBaseX + (Math.random() - 0.5) * shake;
+  state.debugMapCamera.y = cut.cameraBaseY + (Math.random() - 0.5) * shake * 0.8;
+
+  if (phase.key === "rumble" || phase.key === "collapse" || phase.key === "crush") {
+    const warningRate = phase.key === "crush" ? 2.6 : phase.key === "collapse" ? 1.45 : 1.05;
+    cut.warningSpawnAcc += dt * warningRate;
+    while (cut.warningSpawnAcc >= 1) {
+      cut.warningSpawnAcc -= 1;
+      spawnCutsceneCollapseWarning();
+    }
+  }
+  updateCutsceneCollapseWarnings(dt);
+
+  for (const block of cut.blocks) {
+    block.x += block.vx * dt;
+    block.y += block.vy * dt;
+    block.vy += 7.2 * dt;
+    block.rot += block.vr * dt;
+  }
+  cut.blocks = cut.blocks.filter((block) => block.y < cut.baseY + 8);
+
+  for (const spark of cut.sparks) {
+    spark.age += dt;
+    spark.x += spark.vx * dt;
+    spark.y += spark.vy * dt;
+    spark.vy += 8.6 * dt;
+  }
+  cut.sparks = cut.sparks.filter((spark) => spark.age < spark.life);
+}
+
+function renderCutsceneBubble(camera, tileX, tileY, emoji, scale = 1, zoom = 1) {
+  if (!emoji) return;
+  const ctx = state.ctx;
+  const px = (tileX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x) * zoom;
+  const py = (tileY * TILE_SIZE - camera.y - 34) * zoom;
+  const w = 50 * scale * zoom;
+  const h = 38 * scale * zoom;
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 248, 233, 0.94)";
+  ctx.strokeStyle = "rgba(41, 25, 14, 0.82)";
+  ctx.lineWidth = 2 * zoom;
+  buildRoundedRectPath(ctx, px - w * 0.5, py - h * 0.5, w, h, 9 * scale);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(px - 7 * scale * zoom, py + h * 0.5 - zoom);
+  ctx.lineTo(px - scale * zoom, py + h * 0.5 + 10 * scale * zoom);
+  ctx.lineTo(px + 7 * scale * zoom, py + h * 0.5 - zoom);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#21130b";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${Math.floor(22 * scale * zoom)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.fillText(emoji, px, py);
+  ctx.restore();
+}
+
+function renderCutsceneWorldOverlay(camera) {
+  const cut = state.cutscene;
+  if (!state.cutsceneModeActive || !cut) return;
+  const ctx = state.ctx;
+  const phase = getCutscenePhase(cut.time);
+
+  for (const block of cut.blocks) {
+    const sprite = state.sprites.blocks[block.tier]?.[block.variant];
+    if (!sprite) continue;
+    const sx = block.x * TILE_SIZE - camera.x;
+    const sy = block.y * TILE_SIZE - camera.y;
+    ctx.save();
+    ctx.translate(sx + TILE_SIZE * 0.5, sy + TILE_SIZE * 0.5);
+    ctx.rotate(block.rot);
+    ctx.drawImage(sprite, -TILE_SIZE * 0.5, -TILE_SIZE * 0.5, TILE_SIZE, TILE_SIZE);
+    ctx.restore();
+  }
+
+  if (cut.baseBuried) {
+    const burySprite = state.sprites.blocks[4]?.[2] || state.sprites.blocks[3]?.[1];
+    if (burySprite) {
+      const sx = cut.baseX * TILE_SIZE - camera.x - TILE_SIZE * 0.62;
+      const sy = cut.baseY * TILE_SIZE - camera.y - TILE_SIZE * 0.52;
+      ctx.globalAlpha = phase.key === "spark" ? 0.88 : 1;
+      ctx.drawImage(burySprite, sx, sy, TILE_SIZE * 2.2, TILE_SIZE * 1.8);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  for (const spark of cut.sparks) {
+    const t = 1 - spark.age / spark.life;
+    const px = spark.x * TILE_SIZE - camera.x;
+    const py = spark.y * TILE_SIZE - camera.y;
+    ctx.fillStyle = `rgba(255, ${Math.floor(172 + 83 * t)}, 88, ${t})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.6 + t * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function renderCutsceneDialogBubbles(camera, zoom = 1) {
+  const cut = state.cutscene;
+  if (!state.cutsceneModeActive || !cut) return;
+  const phase = getCutscenePhase(cut.time);
+  let heroEmoji = "🙂";
+  let baseEmoji = "🙂";
+  if (phase.key === "intro") {
+    heroEmoji = getCutscenePhaseProgress(cut.time, "intro") < 0.6 ? "😍" : "💖";
+    baseEmoji = getCutscenePhaseProgress(cut.time, "intro") < 0.6 ? "🥰" : "💖";
+  } else if (phase.key === "rumble") {
+    const rumbleP = getCutscenePhaseProgress(cut.time, "rumble");
+    if (rumbleP < 0.38) {
+      heroEmoji = "💖";
+      baseEmoji = "💖";
+    } else {
+      heroEmoji = "😨";
+      baseEmoji = "😰";
+    }
+  } else if (phase.key === "collapse") {
+    heroEmoji = "😱";
+    baseEmoji = "😱";
+  } else if (phase.key === "crush") {
+    heroEmoji = "😵";
+    baseEmoji = "";
+  } else if (phase.key === "findher") {
+    heroEmoji = "😡";
+    baseEmoji = "";
+  }
+
+  renderCutsceneBubble(camera, state.drill.renderX, state.drill.renderY, heroEmoji, 1, zoom);
+  renderCutsceneBubble(camera, cut.baseX, cut.baseY, baseEmoji, 1.04, zoom);
+}
+
+function renderCutsceneFindHerOverlay() {
+  const cut = state.cutscene;
+  if (!state.cutsceneModeActive || !cut) return;
+  const phase = getCutscenePhase(cut.time);
+  if (phase.key !== "findher") return;
+  const p = getCutscenePhaseProgress(cut.time, "findher");
+  const ctx = state.ctx;
+  ctx.save();
+  ctx.fillStyle = `rgba(0,0,0,${0.9 + p * 0.1})`;
+  ctx.fillRect(0, 0, state.width, state.height);
+  ctx.restore();
+}
+
+function renderCutsceneScreenFx(camera) {
+  const cut = state.cutscene;
+  if (!state.cutsceneModeActive || !cut) return;
+  const ctx = state.ctx;
+  const phase = getCutscenePhase(cut.time);
+  const fieldCenterX = ((cut.fieldMinX + cut.fieldMaxX + 1) * 0.5) * TILE_SIZE - camera.x;
+  const fieldCenterY = ((cut.fieldMinY + cut.fieldMaxY + 1) * 0.5) * TILE_SIZE - camera.y;
+  const innerRadius = CUTSCENE_FIELD_SIZE * TILE_SIZE * 0.36;
+  const outerRadius = CUTSCENE_FIELD_SIZE * TILE_SIZE * 0.56;
+
+  ctx.save();
+  const arenaFade = ctx.createRadialGradient(
+    fieldCenterX,
+    fieldCenterY,
+    innerRadius,
+    fieldCenterX,
+    fieldCenterY,
+    outerRadius,
+  );
+  arenaFade.addColorStop(0, "rgba(0,0,0,0)");
+  arenaFade.addColorStop(0.72, "rgba(0,0,0,0.18)");
+  arenaFade.addColorStop(1, "rgba(0,0,0,0.92)");
+  ctx.fillStyle = arenaFade;
+  ctx.fillRect(0, 0, state.width, state.height);
+  ctx.restore();
+
+  if (phase.key === "collapse" || phase.key === "crush") {
+    const t = phase.key === "collapse" ? getCutscenePhaseProgress(cut.time, "collapse") : 1;
+    ctx.fillStyle = `rgba(180, 40, 24, ${0.12 + t * 0.28})`;
+    ctx.fillRect(0, 0, state.width, state.height);
+  }
+
+  if (phase.key === "crush") {
+    const t = getCutscenePhaseProgress(cut.time, "crush");
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.72 + t * 0.28})`;
+    ctx.fillRect(0, 0, state.width, state.height);
+  }
+
+}
+
+function updateCutsceneControlsUi() {
+  const cut = state.cutscene;
+  if (!cut) return;
+  const phase = getCutscenePhase(cut.time);
+  const status = document.getElementById("cutStatus");
+  const pause = document.getElementById("cutPause");
+  const timeline = document.getElementById("cutTimeline");
+  const findHerButton = document.getElementById("cutFindHerButton");
+  if (status) status.textContent = `Phase: ${phase.label} (${cut.time.toFixed(2)}s)`;
+  if (pause) pause.textContent = cut.playing ? "⏸ Pause" : "▶ Play";
+  if (timeline) timeline.value = String(cut.time);
+  if (findHerButton) {
+    findHerButton.textContent = t("ui.find_her");
+    const show = cut.time >= CUTSCENE_TOTAL_TIME - 0.02;
+    findHerButton.hidden = !show;
+    findHerButton.style.display = show ? "inline-flex" : "none";
+  }
+}
+
+function resetCutsceneTo(time = 0) {
+  const cut = state.cutscene;
+  if (!cut) return;
+  state.tunnelMask.fill(1);
+  state.hardness.fill(0);
+  state.health.fill(0);
+  state.visibleMask.fill(1);
+  state.visibleAlpha.fill(1);
+  state.visibleTargetAlpha.fill(1);
+  state.perkMask.fill(0);
+  state.crystalMask.fill(0);
+  state.perkZoneMask.fill(-1);
+  state.metalMask.fill(0);
+  state.goldOreMask.fill(0);
+  state.microResourceMask.fill(0);
+  state.microResourceRevealedMask.fill(0);
+  state.gasPocketMask.fill(0);
+  state.steamPocketMask.fill(0);
+  state.boulderPocketMask.fill(0);
+  state.beaconMask.fill(0);
+  state.artifactMask.fill(0);
+  state.safeDoorMask.fill(0);
+  state.keyMask.fill(0);
+  state.safeInteriorMask.fill(0);
+  for (let y = cut.fieldMinY; y <= cut.fieldMaxY; y += 1) {
+    for (let x = cut.fieldMinX; x <= cut.fieldMaxX; x += 1) {
+      setCutsceneCellOpen(x, y);
+    }
+  }
+  state.pathTiles.length = 0;
+  rebuildPathIndex();
+  state.collapseWarnings.length = 0;
+  cut.time = clamp(time, 0, CUTSCENE_TOTAL_TIME);
+  cut.blocks.length = 0;
+  cut.sparks.length = 0;
+  cut.warningSpawnAcc = 0;
+  cut.baseBuried = false;
+}
+
+function bindCutsceneControls() {
+  if (state.cutsceneControlsBound) return;
+  state.cutsceneControlsBound = true;
+
+  document.getElementById("cutFindHerButton")?.addEventListener("click", () => {
+    if (!state.cutsceneModeActive || !state.cutscene) return;
+    if (state.cutsceneLaunchesGame) {
+      markIntroCutsceneSeen();
+      startGameplayRun();
+      return;
+    }
+    state.cutscene.playing = false;
+    state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.5);
+    state.cameraShake.time = Math.max(state.cameraShake.time, 0.35);
+  });
+
+  document.getElementById("cutRestart")?.addEventListener("click", () => {
+    if (!state.cutscene) return;
+    state.cutscene.playing = true;
+    resetCutsceneTo(0);
+    updateCutsceneControlsUi();
+  });
+
+  document.getElementById("cutPause")?.addEventListener("click", () => {
+    if (!state.cutscene) return;
+    state.cutscene.playing = !state.cutscene.playing;
+    updateCutsceneControlsUi();
+  });
+
+  document.getElementById("cutTimeline")?.addEventListener("input", (event) => {
+    if (!state.cutscene) return;
+    resetCutsceneTo(Number(event.target.value) || 0);
+    state.cutscene.playing = false;
+    updateCutsceneControlsUi();
+  });
+
+  for (const button of document.querySelectorAll("[data-cut-jump]")) {
+    button.addEventListener("click", () => {
+      if (!state.cutscene) return;
+      state.cutscene.playing = false;
+      resetCutsceneTo(Number(button.getAttribute("data-cut-jump") || 0));
+      updateCutsceneControlsUi();
+    });
+  }
+
+  window.addEventListener("keydown", (event) => {
+    if (!state.cutsceneModeActive || !state.cutscene) return;
+    if (event.code === "Space") {
+      event.preventDefault();
+      state.cutscene.playing = !state.cutscene.playing;
+      updateCutsceneControlsUi();
+      return;
+    }
+    const idx = Number(event.key) - 1;
+    if (Number.isInteger(idx) && idx >= 0 && idx < CUTSCENE_PHASES.length) {
+      const phase = CUTSCENE_PHASES[idx];
+      if (!phase) return;
+      state.cutscene.playing = false;
+      resetCutsceneTo(phase.from);
+      updateCutsceneControlsUi();
+    }
+  });
+}
+
+function cutsceneFrame(ts) {
+  if (!state.cutsceneModeActive) {
+    return;
+  }
+  if (state.fatalErrorText) {
+    syncFatalErrorOverlay();
+    return;
+  }
+
+  try {
+    if (!state.lastTs) state.lastTs = ts;
+    let delta = Math.min(ts - state.lastTs, MAX_FRAME_MS);
+    state.lastTs = ts;
+    if (state.cutscene?.playing === false) delta = 0;
+    updateCutsceneMode(delta / 1000);
+    render();
+    updateCutsceneControlsUi();
+    if (state.cutsceneModeActive) {
+      requestAnimationFrame(cutsceneFrame);
+    }
+  } catch (error) {
+    reportFatalError(error, "cutsceneFrame");
+  }
+}
+
+function initCutsceneMode() {
+  bindFatalErrorHandlers();
+  try {
+    ensureCoreReady();
+    setupField();
+    prepareCutsceneField();
+    state.cutsceneModeActive = true;
+    state.cutsceneLaunchesGame = false;
+    document.querySelectorAll(".app-shell > *:not(#game):not(#cutControls):not(#fatalError)").forEach((node) => {
+      node.hidden = true;
+    });
+    bindCutsceneControls();
+    updateCutsceneControlsUi();
+    requestAnimationFrame(cutsceneFrame);
+  } catch (error) {
+    reportFatalError(error, "initCutsceneMode");
+  }
+}
+
 // ── Debug map mode (?debug-map query param) ──────────────────────────────────
 function initDebugMapMode() {
   try {
@@ -16376,6 +17226,8 @@ function initDebugMapMode() {
 
 if (new URLSearchParams(location.search).has("debug-map")) {
   initDebugMapMode();
+} else if (CUTSCENE_MODE) {
+  initCutsceneMode();
 } else {
-  init();
+  initMainMenuMode();
 }
