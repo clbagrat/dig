@@ -317,6 +317,7 @@ html, body {
 .stat-card__name { font-size: 13px; font-weight: 700; color: var(--text); }
 .stat-card__id { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .stat-card__desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.35; min-height: 32px; }
+.concept-stats-line { margin-top: 10px; }
 .stat-card__counts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .count-dots {
   display: inline-flex;
@@ -363,6 +364,7 @@ html, body {
   <section class="tabs">
     <button id="tab-cards" class="tab-btn active" type="button">Cards</button>
     <button id="tab-stats" class="tab-btn" type="button">Stats</button>
+    <button id="tab-concepts" class="tab-btn" type="button">Concepts</button>
   </section>
 
   <section class="controls">
@@ -426,6 +428,11 @@ html, body {
       <div id="stats-list" class="stats-list"></div>
     </div>
   </section>
+  <section id="concepts-layout" class="stats-wrap" hidden>
+    <div class="stats-panel">
+      <div id="concepts-list" class="stats-list"></div>
+    </div>
+  </section>
 </div>
 
 <script type="module">
@@ -470,6 +477,111 @@ const PERCENT_STATS = new Set([
   'goldBonusPerLevel',
   'explosionBonus',
 ]);
+
+const STAT_CONCEPT_MAP = {
+  drillPower: 'breach',
+  damageBonus: 'breach',
+  strikeSpeed: 'breach',
+  drillPiercingCount: 'breach',
+  drillPiercingDamage: 'breach',
+  drillDiagonalCount: 'breach',
+  drillDiagonalDamage: 'breach',
+  strikeSpeedPerLevel: 'breach',
+  drillPowerPerLevel: 'breach',
+
+  weakSpotChance: 'breach',
+  weakSpotMult: 'breach',
+  weakSpotFuelGain: ['breach', 'fuel'],
+  weakSpotPierce: 'breach',
+  weakSpotChancePerLevel: 'breach',
+  lowFuelWeakSpotChance: ['breach', 'fuel', 'starvation'],
+  breachAfterburnerSeconds: ['breach', 'afterburner'],
+  breachChainHitsOnTrigger: 'breach',
+  breachMissCool: 'breach',
+  breachMissileLevel: ['breach', 'afterburner'],
+  breachPresenceChance: 'breach',
+  breachThermostatLevel: ['breach', 'heat'],
+  luckAsWeakSpotChance: ['breach', 'luck'],
+  overdriveBreachChance: ['breach', 'afterburner'],
+
+  maxFuel: 'fuel',
+  fuelDrainRate: 'fuel',
+  fuelBonus: 'fuel',
+  fuelStarvationResistance: ['fuel', 'starvation'],
+  fuelPerLevel: 'fuel',
+  fuelConverterLevel: ['fuel', 'starvation'],
+  fuelRocketLevel: ['fuel', 'afterburner'],
+  lowFuelSpeedBonus: ['fuel', 'afterburner', 'starvation'],
+  lowFuelDamageBonus: ['fuel', 'starvation', 'breach'],
+
+  concentration: 'concentration',
+  effectDurationRate: 'effectDuration',
+
+  heatRate: 'heat',
+  maxHeat: 'heat',
+  explosionHeatTaken: ['heat', 'collapse', 'explosion'],
+
+  luck: 'luck',
+  bonusFindChance: 'find',
+
+  xpBonus: 'xp',
+  goldBonus: 'xp',
+  goldBonusPerLevel: 'xp',
+  miningGoldBonusMultiplier: 'xp',
+  crystalXpGain: ['xp', 'crystals'],
+
+  maxContour: 'contour',
+  contourResMultiplier: 'contour',
+  speedOfAutoClose: 'contour',
+  loopSpawnBonusChance: 'contour',
+
+  contourEnemyHpPerTileBonus: 'contourMonster',
+  contourEnemyRewardPerTileBonus: 'contourMonster',
+  contourEnemySpawnRateBonus: 'contourMonster',
+
+  explosionPower: ['collapse', 'explosion'],
+  explosionBonus: ['collapse', 'explosion'],
+  explosionRadiusBonus: ['collapse', 'explosion'],
+  explosionPowerPerLevel: ['collapse', 'explosion'],
+  collapseBudgetMaxScale: 'collapse',
+  recipeCollapseDelayPercent: ['collapse', 'crystals'],
+
+  armor: 'armor',
+  maxHp: 'hp',
+  healPerLevel: 'hp',
+  adrenalineLevel: ['hp', 'afterburner'],
+
+  visionRadius: 'radar',
+  goldRadarMode: 'radar',
+  navigatorMode: ['radar', 'beacon'],
+  radarCrystalModule: ['radar', 'crystals'],
+  crystalLightRadarSeconds: ['radar', 'crystals'],
+
+  artifactRadarMode: ['radar', 'artifacts', 'beacon'],
+  crystalGoldGain: 'crystals',
+
+  cryoRocketCount: 'afterburner',
+  stunDetonatorLevel: 'concentration',
+  stunReservoirLevel: 'concentration',
+  stunAfterburnerLevel: ['afterburner', 'concentration'],
+};
+
+function getConceptIdsForStat(statKey) {
+  const raw = STAT_CONCEPT_MAP[statKey];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  return raw ? [raw] : [];
+}
+
+const CONCEPT_STAT_MAP = Object.entries(STAT_CONCEPT_MAP).reduce((acc, [stat, conceptIds]) => {
+  const ids = Array.isArray(conceptIds) ? conceptIds : (conceptIds ? [conceptIds] : []);
+  for (const conceptId of ids) {
+    if (!conceptId) continue;
+    if (!acc[conceptId]) acc[conceptId] = [];
+    acc[conceptId].push(stat);
+  }
+  return acc;
+}, {});
+
 const UI_TEXT = {
   en: {
     title: '⛏ Item Card Preview',
@@ -497,6 +609,7 @@ const UI_TEXT = {
     typeItem: 'item',
     tabCards: 'Cards',
     tabStats: 'Stats',
+    tabConcepts: 'Concepts',
     statPositive: 'Positive items',
     statNegative: 'Negative items',
     statNoDesc: 'No description yet.',
@@ -512,6 +625,8 @@ const UI_TEXT = {
     statsResetFilters: 'Reset stats filters',
     listEquipmentCount: 'Equipment',
     listItemCount: 'Items',
+    conceptsEmpty: 'No concepts found for current filters.',
+    conceptStatsLabel: 'Related stats',
   },
   ru: {
     title: '⛏ Превью карточек предметов',
@@ -539,6 +654,7 @@ const UI_TEXT = {
     typeItem: 'предмет',
     tabCards: 'Карточки',
     tabStats: 'Статы',
+    tabConcepts: 'Концепты',
     statPositive: 'Положительных предметов',
     statNegative: 'Отрицательных предметов',
     statNoDesc: 'Описание пока не добавлено.',
@@ -554,6 +670,8 @@ const UI_TEXT = {
     statsResetFilters: 'Сбросить фильтры статов',
     listEquipmentCount: 'Части корпуса',
     listItemCount: 'Предметы',
+    conceptsEmpty: 'По текущим фильтрам концепты не найдены.',
+    conceptStatsLabel: 'Связанные статы',
   },
 };
 
@@ -630,12 +748,14 @@ const el = {
   statsList: document.getElementById('stats-list'),
   tabCards: document.getElementById('tab-cards'),
   tabStats: document.getElementById('tab-stats'),
+  tabConcepts: document.getElementById('tab-concepts'),
   resetFilters: document.getElementById('reset-filters'),
   raritySwitch: document.getElementById('rarity-switch'),
   listSummary: document.getElementById('list-summary'),
   list: document.getElementById('item-list'),
   shopCard: document.getElementById('shop-card'),
   itemStats: document.getElementById('item-stats'),
+  conceptsList: document.getElementById('concepts-list'),
   scale: document.getElementById('scale'),
   dependencies: document.getElementById('dependencies'),
   title: document.getElementById('ui-title'),
@@ -644,6 +764,7 @@ const el = {
   blockDeps: document.getElementById('ui-block-deps'),
   blockAffected: document.getElementById('ui-block-affected'),
   blockScale: document.getElementById('ui-block-scale'),
+  conceptsLayout: document.getElementById('concepts-layout'),
 };
 
 function ui(key) {
@@ -653,7 +774,7 @@ function ui(key) {
 function parseInitialStateFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get(QUERY_KEYS.tab);
-  if (tab === 'cards' || tab === 'stats') S.tab = tab;
+  if (tab === 'cards' || tab === 'stats' || tab === 'concepts') S.tab = tab;
 
   const q = params.get(QUERY_KEYS.q);
   if (q != null) S.search = q;
@@ -1115,6 +1236,7 @@ function renderUiText() {
   el.resetFilters.textContent = ui('resetFilters');
   el.tabCards.textContent = ui('tabCards');
   el.tabStats.textContent = ui('tabStats');
+  el.tabConcepts.textContent = ui('tabConcepts');
 
   el.statsSearch.placeholder = ui('statsSearch');
   el.statsSearch.value = S.statsSearch;
@@ -1130,6 +1252,31 @@ function renderUiText() {
   `;
   el.statsCategory.value = S.statsCategory;
   el.statsResetFilters.textContent = ui('statsResetFilters');
+}
+
+function collectMentionedStatKeys(effect, out = new Set()) {
+  if (!effect) return out;
+  if (Array.isArray(effect)) {
+    for (const entry of effect) collectMentionedStatKeys(entry, out);
+    return out;
+  }
+  if (typeof effect !== 'object') return out;
+  if (typeof effect.stat === 'string') out.add(effect.stat);
+  for (const [key, value] of Object.entries(effect)) {
+    if (key === 'stat') continue;
+    if (value && typeof value === 'object') collectMentionedStatKeys(value, out);
+  }
+  return out;
+}
+
+function getConceptInfo(conceptId) {
+  if (!conceptId) return null;
+  const titleKey = `inspect.concept.${conceptId}.title`;
+  const descKey = `inspect.concept.${conceptId}.desc`;
+  const title = t(titleKey);
+  const desc = t(descKey);
+  if (title === titleKey || desc === descKey) return null;
+  return { title, desc };
 }
 
 function getStatRows(sourceItems = ALL) {
@@ -1251,12 +1398,17 @@ function renderStats() {
 
 function renderTabState() {
   const cards = S.tab === 'cards';
-  el.controls.hidden = !cards;
+  const stats = S.tab === 'stats';
+  const concepts = S.tab === 'concepts';
+  const cardLike = cards || concepts;
+  el.controls.hidden = !cardLike;
   el.cardsLayout.hidden = !cards;
-  el.statsLayout.hidden = cards;
-  el.statsControls.hidden = cards;
+  el.statsLayout.hidden = !stats;
+  el.statsControls.hidden = !stats;
+  el.conceptsLayout.hidden = !concepts;
   el.tabCards.classList.toggle('active', cards);
-  el.tabStats.classList.toggle('active', !cards);
+  el.tabStats.classList.toggle('active', stats);
+  el.tabConcepts.classList.toggle('active', concepts);
 }
 
 function getItemsForStatsFilters() {
@@ -1417,6 +1569,61 @@ function renderItemAffectedStats(item) {
   });
 }
 
+function getConceptRowsForItem(item) {
+  const statKeys = Array.from(collectMentionedStatKeys(item.effect || {}));
+  const conceptRows = [];
+  const seen = new Set();
+  for (const stat of statKeys) {
+    for (const conceptId of getConceptIdsForStat(stat)) {
+      const concept = getConceptInfo(conceptId);
+      if (!concept || seen.has(conceptId)) continue;
+      seen.add(conceptId);
+      conceptRows.push({ ...concept, conceptId });
+    }
+  }
+  return conceptRows;
+}
+
+function getConceptStatsText(conceptId) {
+  const stats = [...(CONCEPT_STAT_MAP[conceptId] || [])];
+  if (!stats.length) return '';
+  stats.sort((a, b) => {
+    const labelA = t(`stat.${a}`);
+    const labelB = t(`stat.${b}`);
+    return labelA.localeCompare(labelB, S.locale);
+  });
+  return stats.map((stat) => {
+    const labelRaw = t(`stat.${stat}`);
+    const label = labelRaw === `stat.${stat}` ? stat : labelRaw;
+    return `${label} (${stat})`;
+  }).join(', ');
+}
+
+function renderConceptsTab() {
+  const items = getFilteredItems();
+  const seen = new Set();
+  const rows = [];
+  for (const item of items) {
+    const conceptRows = getConceptRowsForItem(item);
+    for (const row of conceptRows) {
+      if (seen.has(row.conceptId)) continue;
+      seen.add(row.conceptId);
+      rows.push(row);
+    }
+  }
+  if (!rows.length) {
+    el.conceptsList.innerHTML = `<div class="empty">${esc(ui('conceptsEmpty'))}</div>`;
+    return;
+  }
+  el.conceptsList.innerHTML = rows.map((row) => `
+    <article class="stat-card stat-card--static">
+      <div class="stat-card__name">${esc(row.title)}</div>
+      <div class="stat-card__desc">${esc(row.desc)}</div>
+      <div class="stat-card__id concept-stats-line">${esc(ui('conceptStatsLabel'))}: ${esc(getConceptStatsText(row.conceptId))}</div>
+    </article>
+  `).join('');
+}
+
 function getScalingDependencies(item) {
   const deps = new Set();
   for (let rarity = 1; rarity <= 4; rarity += 1) {
@@ -1472,6 +1679,11 @@ function render() {
   renderTabState();
   if (S.tab === 'stats') {
     renderStats();
+    syncQueryFromState();
+    return;
+  }
+  if (S.tab === 'concepts') {
+    renderConceptsTab();
     syncQueryFromState();
     return;
   }
@@ -1555,6 +1767,10 @@ el.tabCards.addEventListener('click', () => {
 });
 el.tabStats.addEventListener('click', () => {
   S.tab = 'stats';
+  render();
+});
+el.tabConcepts.addEventListener('click', () => {
+  S.tab = 'concepts';
   render();
 });
 el.resetFilters.addEventListener('click', () => {

@@ -49,6 +49,7 @@ let previousRenderedStats = null;
 let lastRenderedOfferingsSignature = "";
 let suppressNextOfferingsEnterAnimation = false;
 let nextOfferingsAnimationClass = "";
+let inspectedOfferingIdx = -1;
 
 function getStarterEquipment() {
   return [{ id: "basic_drill", rarity: RARITY.COMMON }];
@@ -78,6 +79,7 @@ export function openShop(currentGold, depthLevel, luck = 0, stats = null, defaul
   lastRenderedOfferingsSignature = "";
   selectedOfferingIdx = -1;
   selectedSlotIdx = -1;
+  inspectedOfferingIdx = -1;
   replaceMode = false;
   rollOfferings(luck);
   overlay.hidden = false;
@@ -98,6 +100,7 @@ export function closeShop() {
   hideShopItemTooltip();
   selectedOfferingIdx = -1;
   selectedSlotIdx = -1;
+  inspectedOfferingIdx = -1;
   replaceMode = false;
   lastRenderedOfferingsSignature = "";
   overlay.style.pointerEvents = "none";
@@ -134,6 +137,7 @@ export function renderShop(currentGold, stats = null, defaultStats = null) {
   if (titleEl) titleEl.textContent = t("shop.title", { level: shopLevel, depth: currentDepthLevel });
   renderStats(true);
   renderOfferings();
+  renderInspectModal();
   renderSlots();
   renderCurrentItems();
   renderRerollButton();
@@ -399,6 +403,7 @@ function wait(ms) {
 function applyPostSelectionReroll(canReroll) {
   selectedOfferingIdx = -1;
   selectedSlotIdx = -1;
+  inspectedOfferingIdx = -1;
   replaceMode = false;
   rarityBoostLevel = 0;
   rarityUpgradeUsed = false;
@@ -887,24 +892,24 @@ function buildDOM() {
           <button id="shopClose" class="shop-close" type="button" title="${t("ui.close_item")}">✕</button>
         </div>
         <div class="shop-offerings" id="shopOfferings"></div>
-        <div class="shop-detail" id="shopDetail" hidden>
-          <div class="shop-detail__row">
-            <div class="shop-detail__icon" id="shopDetailIcon"></div>
-            <div class="shop-detail__info">
-              <div class="shop-detail__name" id="shopDetailName"></div>
-              <div class="shop-detail__desc" id="shopDetailDesc"></div>
-              <div class="shop-detail__tags" id="shopDetailTags"></div>
-            </div>
-          </div>
-          <div class="shop-detail__footer">
-            <div class="shop-detail__rarity" id="shopDetailRarity"></div>
-            <div class="shop-detail__actions">
-              <button class="shop-detail__buy" id="shopDetailBuy" type="button"></button>
-            </div>
-          </div>
-        </div>
         <div class="shop-slots" id="shopSlots"></div>
         <div class="shop-current-items" id="shopCurrentItems"></div>
+      </div>
+      <div class="shop-inspect-modal" id="shopInspectModal" hidden>
+        <div class="shop-inspect-modal__panel" id="shopInspectModalPanel">
+          <div class="shop-inspect-modal__head">
+            <div class="shop-inspect-modal__icon" id="shopInspectIcon"></div>
+            <div class="shop-inspect-modal__title-wrap">
+              <div class="shop-inspect-modal__name" id="shopInspectName"></div>
+              <div class="shop-inspect-modal__rarity" id="shopInspectRarity"></div>
+            </div>
+          </div>
+          <div class="shop-inspect-modal__tags" id="shopInspectTags"></div>
+          <div class="shop-inspect-modal__desc" id="shopInspectDesc"></div>
+        </div>
+        <div class="shop-inspect-concepts" id="shopInspectConcepts" hidden>
+          <div class="shop-inspect-concepts__list" id="shopInspectStats"></div>
+        </div>
       </div>
       <div class="shop-stats" id="shopStats"></div>
     </div>
@@ -1002,6 +1007,110 @@ const STAT_DEFS = [
   { key: "speedOfAutoClose",          get label() { return t("shop.stat.speedOfAutoClose.label"); },          get shortLabel() { return t("shop.stat.speedOfAutoClose.short"); },          format: "rawpercent" },
 ];
 
+const STAT_CONCEPT_MAP = {
+  drillPower: "breach",
+  damageBonus: "breach",
+  strikeSpeed: "breach",
+  drillPiercingCount: "breach",
+  drillPiercingDamage: "breach",
+  drillDiagonalCount: "breach",
+  drillDiagonalDamage: "breach",
+  strikeSpeedPerLevel: "breach",
+  drillPowerPerLevel: "breach",
+
+  weakSpotChance: "breach",
+  weakSpotMult: "breach",
+  weakSpotFuelGain: ["breach", "fuel"],
+  weakSpotPierce: "breach",
+  weakSpotChancePerLevel: "breach",
+  lowFuelWeakSpotChance: ["breach", "fuel", "starvation"],
+  breachAfterburnerSeconds: ["breach", "afterburner"],
+  breachChainHitsOnTrigger: "breach",
+  breachMissCool: "breach",
+  breachMissileLevel: ["breach", "afterburner"],
+  breachPresenceChance: "breach",
+  breachThermostatLevel: ["breach", "heat"],
+  luckAsWeakSpotChance: ["breach", "luck"],
+  overdriveBreachChance: ["breach", "afterburner"],
+
+  maxFuel: "fuel",
+  fuelDrainRate: "fuel",
+  fuelBonus: "fuel",
+  fuelStarvationResistance: ["fuel", "starvation"],
+  fuelPerLevel: "fuel",
+  fuelConverterLevel: ["fuel", "starvation"],
+  fuelRocketLevel: ["fuel", "afterburner"],
+  lowFuelSpeedBonus: ["fuel", "afterburner", "starvation"],
+  lowFuelDamageBonus: ["fuel", "starvation", "breach"],
+
+  concentration: "concentration",
+  effectDurationRate: "effectDuration",
+
+  heatRate: "heat",
+  maxHeat: "heat",
+  explosionHeatTaken: ["heat", "collapse", "explosion"],
+
+  luck: "luck",
+  bonusFindChance: "find",
+
+  xpBonus: "xp",
+  goldBonus: "xp",
+  goldBonusPerLevel: "xp",
+  miningGoldBonusMultiplier: "xp",
+  crystalXpGain: ["xp", "crystals"],
+
+  maxContour: "contour",
+  contourResMultiplier: "contour",
+  speedOfAutoClose: "contour",
+  loopSpawnBonusChance: "contour",
+
+  contourEnemyHpPerTileBonus: "contourMonster",
+  contourEnemyRewardPerTileBonus: "contourMonster",
+  contourEnemySpawnRateBonus: "contourMonster",
+
+  explosionPower: ["collapse", "explosion"],
+  explosionBonus: ["collapse", "explosion"],
+  explosionRadiusBonus: ["collapse", "explosion"],
+  explosionPowerPerLevel: ["collapse", "explosion"],
+  collapseBudgetMaxScale: "collapse",
+  recipeCollapseDelayPercent: ["collapse", "crystals"],
+
+  armor: "armor",
+  maxHp: "hp",
+  healPerLevel: "hp",
+  adrenalineLevel: ["hp", "afterburner"],
+
+  visionRadius: "radar",
+  goldRadarMode: "radar",
+  navigatorMode: ["radar", "beacon"],
+  radarCrystalModule: ["radar", "crystals"],
+  crystalLightRadarSeconds: ["radar", "crystals"],
+
+  artifactRadarMode: ["radar", "artifacts", "beacon"],
+  crystalGoldGain: "crystals",
+
+  cryoRocketCount: "afterburner",
+  stunDetonatorLevel: "concentration",
+  stunReservoirLevel: "concentration",
+  stunAfterburnerLevel: ["afterburner", "concentration"],
+};
+
+function getConceptIdsForStat(statKey) {
+  const raw = STAT_CONCEPT_MAP[statKey];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  return raw ? [raw] : [];
+}
+
+function getConceptInfo(conceptId) {
+  if (!conceptId) return null;
+  const titleKey = `inspect.concept.${conceptId}.title`;
+  const descKey = `inspect.concept.${conceptId}.desc`;
+  const title = t(titleKey);
+  const desc = t(descKey);
+  if (title === titleKey || desc === descKey) return null;
+  return { id: conceptId, title, desc };
+}
+
 function renderStats(short = false) {
   const container = document.getElementById("shopStats");
   if (!container) return;
@@ -1065,6 +1174,16 @@ function getShopStatTooltipDescription(statKey) {
   const key = `shop.stat.${statKey}.tooltip`;
   const translated = t(key);
   return translated === key ? "" : translated;
+}
+
+function getStatLabel(statKey) {
+  const statDef = STAT_DEFS.find((def) => def.key === statKey);
+  if (statDef) return statDef.label;
+  const shopLabel = t(`shop.stat.${statKey}.label`);
+  if (shopLabel !== `shop.stat.${statKey}.label`) return shopLabel;
+  const genericLabel = t(`stat.${statKey}`);
+  if (genericLabel !== `stat.${statKey}`) return genericLabel;
+  return statKey;
 }
 
 function showStatTooltip(anchor, title, description = "") {
@@ -1300,6 +1419,7 @@ function renderOfferings() {
     const desc = getGoodDescription(offering.good, offering.rarity, currentStatsCache);
 
     card.innerHTML = `
+      <button class="shop-card__inspect" type="button" data-inspect-offering-idx="${i}" aria-label="${t("ui.description")}">i</button>
       <div class="shop-card__type">${typeLabel}</div>
       <div class="shop-card__icon">${offering.good.icon}</div>
       <div class="shop-card__name">${offering.good.name}</div>
@@ -1410,9 +1530,98 @@ function renderRerollButton() {
   btn.disabled = !canAfford || !hasUpgradeable || rarityUpgradeUsed;
 }
 
-function renderDetail() {
-  const detail = document.getElementById("shopDetail");
-  if (detail) detail.hidden = true;
+function collectMentionedStatKeys(effect, out = new Set()) {
+  if (!effect) return out;
+  if (Array.isArray(effect)) {
+    for (const entry of effect) {
+      collectMentionedStatKeys(entry, out);
+    }
+    return out;
+  }
+  if (typeof effect !== "object") return out;
+
+  if (typeof effect.stat === "string") {
+    out.add(effect.stat);
+  }
+
+  for (const [key, value] of Object.entries(effect)) {
+    if (key === "stat") {
+      continue;
+    }
+    const hasShopLabel = t(`shop.stat.${key}.label`) !== `shop.stat.${key}.label`;
+    const hasStatLabel = t(`stat.${key}`) !== `stat.${key}`;
+    if (STAT_DEFS.some((def) => def.key === key) || hasShopLabel || hasStatLabel) {
+      out.add(key);
+    }
+    if (value && typeof value === "object") {
+      collectMentionedStatKeys(value, out);
+    }
+  }
+  return out;
+}
+
+function renderInspectModal() {
+  const modal = document.getElementById("shopInspectModal");
+  if (!modal) return;
+
+  const offering = Number.isInteger(inspectedOfferingIdx) ? currentOfferings[inspectedOfferingIdx] : null;
+  if (!offering?.good) {
+    modal.hidden = true;
+    return;
+  }
+
+  const icon = document.getElementById("shopInspectIcon");
+  const name = document.getElementById("shopInspectName");
+  const desc = document.getElementById("shopInspectDesc");
+  const tags = document.getElementById("shopInspectTags");
+  const rarity = document.getElementById("shopInspectRarity");
+  const statList = document.getElementById("shopInspectStats");
+  const conceptsWrap = document.getElementById("shopInspectConcepts");
+  const category = CATEGORIES.find((cat) => cat.id === offering.good.category);
+  const fullDesc = getGoodDescription(offering.good, offering.rarity, currentStatsCache);
+  const mentionedStatKeys = Array.from(collectMentionedStatKeys(offering.good.effect || {}));
+  const mergeable = canMerge(offering);
+  const conceptRows = [];
+  const conceptSeen = new Set();
+  for (const key of mentionedStatKeys) {
+    for (const conceptId of getConceptIdsForStat(key)) {
+      const concept = getConceptInfo(conceptId);
+      if (concept && !conceptSeen.has(concept.id)) {
+        conceptSeen.add(concept.id);
+        conceptRows.push(concept);
+      }
+    }
+  }
+
+  if (icon) icon.textContent = offering.good.icon || "?";
+  if (name) name.textContent = offering.good.name;
+  if (desc) desc.innerHTML = fullDesc.replace(/\n/g, "<br>");
+  if (rarity) rarity.textContent = RARITY_NAMES[offering.rarity] || "";
+  if (tags) {
+    const tagBits = [];
+    tagBits.push(`<span class="shop-tag">${offering.good.type === "equipment" ? "⛏" : "✧"}</span>`);
+    if (category) tagBits.push(`<span class="shop-tag">${category.icon} ${category.name}</span>`);
+    if (mergeable) tagBits.push(`<span class="shop-tag">${t("shop.merge_label")}</span>`);
+    tags.innerHTML = tagBits.join("");
+  }
+  if (statList) {
+    if (conceptRows.length === 0) {
+      statList.innerHTML = "";
+      if (conceptsWrap) conceptsWrap.hidden = true;
+    } else {
+      statList.innerHTML = conceptRows
+        .map((row) => `
+          <div class="shop-inspect-modal__stat">
+            <div class="shop-inspect-modal__stat-name">${row.title}</div>
+            <div class="shop-inspect-modal__stat-desc">${row.desc}</div>
+          </div>
+        `)
+        .join("");
+      if (conceptsWrap) conceptsWrap.hidden = false;
+    }
+  }
+
+  modal.hidden = false;
 }
 
 // ── Events ───────────────────────────────────────────────────────────────────────
@@ -1435,6 +1644,10 @@ function bindEvents() {
       return;
     }
 
+    if (e.target.closest("#shopInspectModal")) {
+      return;
+    }
+
     // Slot click (replace mode)
     const slotEl = e.target.closest(".shop-slot--replaceable");
     if (slotEl && replaceMode) {
@@ -1454,6 +1667,14 @@ function bindEvents() {
       return;
     }
 
+    const inspectBtn = e.target.closest(".shop-card__inspect[data-inspect-offering-idx]");
+    if (inspectBtn) {
+      e.stopPropagation();
+      inspectedOfferingIdx = Number(inspectBtn.dataset.inspectOfferingIdx);
+      renderInspectModal();
+      return;
+    }
+
     // Offering card click
     const card = e.target.closest(".shop-card[data-offering-idx]");
     if (card) {
@@ -1466,16 +1687,30 @@ function bindEvents() {
 
     // Click outside
     if (
-      !e.target.closest(".shop-detail") &&
       !e.target.closest(".shop-slot") &&
       !e.target.closest(".shop-current-item")
     ) {
       selectedOfferingIdx = -1;
       selectedSlotIdx = -1;
       replaceMode = false;
+      inspectedOfferingIdx = -1;
       renderShop(currentGoldCache);
     }
   });
+
+  const inspectModal = document.getElementById("shopInspectModal");
+  const inspectPanel = document.getElementById("shopInspectModalPanel");
+  if (inspectModal) {
+    inspectModal.addEventListener("click", (event) => {
+      if (event.target !== inspectModal) return;
+      inspectedOfferingIdx = -1;
+      renderInspectModal();
+    });
+  }
+  if (inspectPanel) {
+    inspectPanel.addEventListener("pointerdown", (event) => event.stopPropagation());
+    inspectPanel.addEventListener("click", (event) => event.stopPropagation());
+  }
 
   overlay.addEventListener("click", (e) => {
     const entry = buildShopTooltipEntry(e.target);

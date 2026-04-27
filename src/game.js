@@ -1,4 +1,4 @@
-import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, grantGood, getEquippedParts, getPurchasedItems, replaceOneBaseOfferWithSpecial, setShopRarityGuarantees, showGoodTooltip, hideGoodTooltip, showStatTooltipForStat, hideStatTooltip } from "./shop.js?v=46";
+import { initShop, openShop, closeShop, renderShop, getEquipmentLevels, addSlot, unlockCategory, getLockedCategories, resetShopState, getItemStacks, grantItem, grantGood, getEquippedParts, getPurchasedItems, replaceOneBaseOfferWithSpecial, setShopRarityGuarantees, showGoodTooltip, hideGoodTooltip, showStatTooltipForStat, hideStatTooltip } from "./shop.js?v=47";
 import { t, setLocale, getLocale } from "./i18n.js";
 import { playSound, initSounds, getSoundPreloadProgress, setMuted, isMuted } from "./sounds.js?v=1";
 import { CATEGORIES, TAG_SYNERGIES, RARITY_COLORS, RARITY_NAMES, ALL_GOODS, ALL_EQUIPMENT, ALL_ITEMS, RARITY, getGoodDescription } from "./items-catalog.js?v=1";
@@ -3754,12 +3754,13 @@ function applyDualPerkZoneReward(zone, sideKey) {
   side.collected = true;
   const depthLevel = getDualPerkZoneDepthLevel(side);
   const amount = 5 * depthLevel;
+  const signedAmount = `+${amount}`;
   if (sideKey === "explosion") {
     state.explosionPower += amount;
-    state.perkText = t("toast.dual_zone_explosion", { val: amount, depth: depthLevel });
+    state.perkText = t("toast.dual_zone_explosion", { val: signedAmount, depth: depthLevel });
   } else {
     state.drillPower += amount;
-    state.perkText = t("toast.dual_zone_drill", { val: amount, depth: depthLevel });
+    state.perkText = t("toast.dual_zone_drill", { val: signedAmount, depth: depthLevel });
   }
   showPerkToast(state.perkText);
 }
