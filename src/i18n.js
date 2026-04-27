@@ -595,8 +595,8 @@ const TRANSLATIONS = {
     "toast.contour_not_found": "Contour not found",
     "toast.beacon_activated": "Beacon activated!",
     "toast.contour_charge_power": "Contour Charge +{val} power",
-    "toast.dual_zone_drill": "Blue D: +{val} drill power (depth {depth})",
-    "toast.dual_zone_explosion": "Orange E: +{val} explosion power (depth {depth})",
+    "toast.dual_zone_drill": "+{val} drill power",
+    "toast.dual_zone_explosion": "+{val} explosion power",
 
     // ── index.html UI ────────────────────────────────────────────────────────
     "ui.sound_toggle": "Toggle Sound",
@@ -1466,8 +1466,8 @@ const TRANSLATIONS = {
     "toast.contour_not_found": "Контур не найден",
     "toast.beacon_activated": "Маяк активирован!",
     "toast.contour_charge_power": "Контурный заряд +{val} силы",
-    "toast.dual_zone_drill": "Синяя D: +{val} силы бура (глубина {depth})",
-    "toast.dual_zone_explosion": "Оранжевая E: +{val} силы взрыва (глубина {depth})",
+    "toast.dual_zone_drill": "+{val} к силе бура",
+    "toast.dual_zone_explosion": "+{val} к силе взрыва",
 
     // ── index.html UI ────────────────────────────────────────────────────────
     "ui.sound_toggle": "Включить звук",
