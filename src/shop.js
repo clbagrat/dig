@@ -19,6 +19,11 @@ const SHOP_SELECTION_BASE_COST = 30;
 const SHOP_SELECTION_STEP_PER_N = 10;
 const RARITY_UPGRADE_BASE_RATIO = 0.5;
 const LIMITED_ITEM_STACK_CAP = 3;
+const LOWER_IS_BETTER_DESC_STATS = new Set([
+  "fuelDrainRate",
+  "heatRate",
+  "explosionHeatTaken",
+]);
 
 // ── Module state ─────────────────────────────────────────────────────────────────
 
@@ -920,6 +925,110 @@ function hasShopContent() {
   return ALL_GOODS.length > 0;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function getEffectValueByRarity(effect, rarity) {
+  if (!effect) return null;
+  if (Array.isArray(effect.effectByRarity)) {
+    const value = effect.effectByRarity[rarity] ?? effect.effectByRarity[RARITY.COMMON];
+    return Number.isFinite(value) ? value : null;
+  }
+  return Number.isFinite(effect.value) ? effect.value : null;
+}
+
+function classifyEffectPolarity(statKey, value) {
+  if (!Number.isFinite(value) || value === 0) return "";
+  const lowerIsBetter = LOWER_IS_BETTER_DESC_STATS.has(statKey);
+  if (lowerIsBetter) {
+    return value < 0 ? "pos" : "neg";
+  }
+  return value > 0 ? "pos" : "neg";
+}
+
+function guessLinePolarity(line) {
+  const hasPlus = /(^|[\s(])\+\d/.test(line);
+  const hasMinus = /(^|[\s(])-\d/.test(line) || /(^|[\s(])−\d/.test(line);
+  if (hasPlus && !hasMinus) return "pos";
+  if (hasMinus && !hasPlus) return "neg";
+  return "";
+}
+
+function lineReferencesStat(line, statKey) {
+  if (!line || !statKey) return false;
+  const hay = line.toLowerCase();
+  const probes = [
+    statKey,
+    t(`stat.${statKey}`),
+    t(`shop.stat.${statKey}.label`),
+  ]
+    .filter(Boolean)
+    .map((v) => String(v).toLowerCase().trim())
+    .filter((v) => v && !v.startsWith("stat.") && !v.startsWith("shop.stat."));
+  return probes.some((probe) => hay.includes(probe));
+}
+
+function isNeutralEquipmentDamageLine(good, line) {
+  if (good?.type !== "equipment") return false;
+  return /^(damage|урон)\b/i.test(String(line || "").trim());
+}
+
+function isNeutralConditionLine(line) {
+  return /^(on\b.+:?|if\b.+:?|every\b.+:?|при\b.+:?|если\b.+:?|за\s+каждые\b.+:?)/i.test(String(line || "").trim());
+}
+
+function highlightDescriptionNumbers(line, polarity) {
+  const escaped = escapeHtml(line);
+  const cls = polarity === "neg" ? "shop-desc-number--neg" : "shop-desc-number--pos";
+  return escaped.replace(/([+\-−]?\d+(?:[.,]\d+)?%?)/g, `<span class="${cls}">$1</span>`);
+}
+
+function renderGoodDescriptionHtml(good, rarity, stats = null) {
+  const raw = getGoodDescription(good, rarity, stats);
+  if (!raw) return "";
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return "";
+
+  const effects = Array.isArray(good?.effect)
+    ? good.effect
+    : (good?.effect ? [good.effect] : []);
+  const effectPolarities = effects.map((effect) => {
+    const value = getEffectValueByRarity(effect, rarity);
+    return classifyEffectPolarity(effect?.stat, value);
+  });
+
+  let effectIdx = 0;
+  return lines.map((line) => {
+    if (isNeutralConditionLine(line)) {
+      return `<span class="shop-desc-line">${highlightDescriptionNumbers(line, "")}</span>`;
+    }
+    if (isNeutralEquipmentDamageLine(good, line)) {
+      return `<span class="shop-desc-line">${highlightDescriptionNumbers(line, "")}</span>`;
+    }
+    let polarity = guessLinePolarity(line);
+    if (effectIdx < effects.length) {
+      const effect = effects[effectIdx];
+      const effectPolarity = effectPolarities[effectIdx] || "";
+      if (!polarity) {
+        polarity = effectPolarity;
+        effectIdx += 1;
+      } else if (lineReferencesStat(line, effect?.stat)) {
+        polarity = effectPolarity || polarity;
+        effectIdx += 1;
+      }
+    }
+    return `<span class="shop-desc-line">${highlightDescriptionNumbers(line, polarity)}</span>`;
+  }).join("<br>");
+}
+
 function formatStatValue(value, mode = "number") {
   if (!Number.isFinite(value)) return "0";
   if (mode === "percent") {
@@ -1008,21 +1117,11 @@ const STAT_DEFS = [
 ];
 
 const STAT_CONCEPT_MAP = {
-  drillPower: "breach",
-  damageBonus: "breach",
-  strikeSpeed: "breach",
-  drillPiercingCount: "breach",
-  drillPiercingDamage: "breach",
-  drillDiagonalCount: "breach",
-  drillDiagonalDamage: "breach",
-  strikeSpeedPerLevel: "breach",
-  drillPowerPerLevel: "breach",
-
   weakSpotChance: "breach",
   weakSpotMult: "breach",
   weakSpotFuelGain: ["breach", "fuel"],
   weakSpotPierce: "breach",
-  weakSpotChancePerLevel: "breach",
+  weakSpotChancePerLevel: ["breach", "xp"],
   lowFuelWeakSpotChance: ["breach", "fuel", "starvation"],
   breachAfterburnerSeconds: ["breach", "afterburner"],
   breachChainHitsOnTrigger: "breach",
@@ -1037,11 +1136,11 @@ const STAT_CONCEPT_MAP = {
   fuelDrainRate: "fuel",
   fuelBonus: "fuel",
   fuelStarvationResistance: ["fuel", "starvation"],
-  fuelPerLevel: "fuel",
+  fuelPerLevel: ["fuel", "xp"],
   fuelConverterLevel: ["fuel", "starvation"],
   fuelRocketLevel: ["fuel", "afterburner"],
   lowFuelSpeedBonus: ["fuel", "afterburner", "starvation"],
-  lowFuelDamageBonus: ["fuel", "starvation", "breach"],
+  lowFuelDamageBonus: ["fuel", "starvation"],
 
   concentration: "concentration",
   effectDurationRate: "effectDuration",
@@ -1054,9 +1153,9 @@ const STAT_CONCEPT_MAP = {
   bonusFindChance: "find",
 
   xpBonus: "xp",
-  goldBonus: "xp",
   goldBonusPerLevel: "xp",
-  miningGoldBonusMultiplier: "xp",
+  drillPowerPerLevel: "xp",
+  strikeSpeedPerLevel: "xp",
   crystalXpGain: ["xp", "crystals"],
 
   maxContour: "contour",
@@ -1071,18 +1170,19 @@ const STAT_CONCEPT_MAP = {
   explosionPower: ["collapse", "explosion"],
   explosionBonus: ["collapse", "explosion"],
   explosionRadiusBonus: ["collapse", "explosion"],
-  explosionPowerPerLevel: ["collapse", "explosion"],
+  explosionPowerPerLevel: ["collapse", "explosion", "xp"],
   collapseBudgetMaxScale: "collapse",
   recipeCollapseDelayPercent: ["collapse", "crystals"],
 
   armor: "armor",
   maxHp: "hp",
-  healPerLevel: "hp",
+  healPerLevel: ["hp", "xp"],
   adrenalineLevel: ["hp", "afterburner"],
 
   visionRadius: "radar",
   goldRadarMode: "radar",
   navigatorMode: ["radar", "beacon"],
+  beaconCatalystLevel: "beacon",
   radarCrystalModule: ["radar", "crystals"],
   crystalLightRadarSeconds: ["radar", "crystals"],
 
@@ -1303,7 +1403,7 @@ function showShopItemTooltip(entry) {
   const rarityName = RARITY_NAMES[entry.rarity] || "";
   const rarityColor = RARITY_COLORS[entry.rarity] || "#aaa";
   const category = CATEGORIES.find((cat) => cat.id === entry.good.category);
-  const desc = getGoodDescription(entry.good, entry.rarity, currentStatsCache || undefined).replace(/\n/g, "<br>");
+  const descHtml = renderGoodDescriptionHtml(entry.good, entry.rarity, currentStatsCache || undefined);
 
   _shopItemTooltipEl.innerHTML = `
     <div class="shop-item-tooltip__type">${entry.good.type === "equipment" ? "⛏" : "✧"}</div>
@@ -1315,7 +1415,7 @@ function showShopItemTooltip(entry) {
       ${category ? `<span class="shop-item-tooltip__category">${category.icon} ${category.name}</span>` : ""}
       <span class="shop-item-tooltip__rarity" style="color:${rarityColor}">${rarityName}</span>
     </div>
-    <div class="shop-item-tooltip__desc">${desc}</div>
+    <div class="shop-item-tooltip__desc">${descHtml}</div>
   `;
   _shopItemTooltipEl.hidden = false;
 
@@ -1416,7 +1516,7 @@ function renderOfferings() {
     const catId = offering.good.category;
     const catDef = catId ? CATEGORIES.find(c => c.id === catId) : null;
     const catLabel = catDef ? `<div class="shop-card__category">${catDef.icon} ${catDef.name}</div>` : "";
-    const desc = getGoodDescription(offering.good, offering.rarity, currentStatsCache);
+    const descHtml = renderGoodDescriptionHtml(offering.good, offering.rarity, currentStatsCache);
 
     card.innerHTML = `
       <button class="shop-card__inspect" type="button" data-inspect-offering-idx="${i}" aria-label="${t("ui.description")}">i</button>
@@ -1424,7 +1524,7 @@ function renderOfferings() {
       <div class="shop-card__icon">${offering.good.icon}</div>
       <div class="shop-card__name">${offering.good.name}</div>
       ${catLabel}
-      <div class="shop-card__desc">${desc.replace(/\n/g, "<br>")}</div>
+      <div class="shop-card__desc">${descHtml}</div>
       ${mergeLabel}
       <div class="shop-card__cost">${RARITY_NAMES[offering.rarity]}</div>
     `;
@@ -1578,7 +1678,7 @@ function renderInspectModal() {
   const statList = document.getElementById("shopInspectStats");
   const conceptsWrap = document.getElementById("shopInspectConcepts");
   const category = CATEGORIES.find((cat) => cat.id === offering.good.category);
-  const fullDesc = getGoodDescription(offering.good, offering.rarity, currentStatsCache);
+  const fullDescHtml = renderGoodDescriptionHtml(offering.good, offering.rarity, currentStatsCache);
   const mentionedStatKeys = Array.from(collectMentionedStatKeys(offering.good.effect || {}));
   const mergeable = canMerge(offering);
   const conceptRows = [];
@@ -1595,7 +1695,7 @@ function renderInspectModal() {
 
   if (icon) icon.textContent = offering.good.icon || "?";
   if (name) name.textContent = offering.good.name;
-  if (desc) desc.innerHTML = fullDesc.replace(/\n/g, "<br>");
+  if (desc) desc.innerHTML = fullDescHtml;
   if (rarity) rarity.textContent = RARITY_NAMES[offering.rarity] || "";
   if (tags) {
     const tagBits = [];

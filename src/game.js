@@ -15494,7 +15494,8 @@ function renderHud() {
   const totalWidth = Math.min(state.width - 28, 560);
   const panelWidth = (totalWidth - gap) / 2;
   const panelHeight = 34;
-  const left = state.width - 14 - totalWidth;
+  const left = Math.round((state.width - totalWidth) * 0.5);
+  const sideInset = Math.max(0, Math.round((state.width - totalWidth) * 0.5));
   const secondRowTop = top + panelHeight + 8;
   state.hudInspectableRects = [];
 
@@ -15597,7 +15598,7 @@ function renderHud() {
   if (topActions) {
     topActions.style.top = `${detailTop - 1}px`;
     topActions.style.left = "auto";
-    topActions.style.right = "14px";
+    topActions.style.right = `${sideInset}px`;
   }
 
   // Key indicator

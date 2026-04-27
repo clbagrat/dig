@@ -215,6 +215,8 @@ html, body {
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
 }
+.shop-desc-number--pos { color: #93e59a; }
+.shop-desc-number--neg { color: #ff9a8f; }
 .shop-card__cost {
   margin-top: auto;
   font-size: 12px;
@@ -450,6 +452,7 @@ const RARITIES = [1, 2, 3, 4];
 const LOWER_IS_BETTER_STATS = new Set([
   'fuelDrainRate',
   'heatRate',
+  'explosionHeatTaken',
   'idleAutoCloseDelay',
 ]);
 const PERCENT_STATS = new Set([
@@ -479,21 +482,11 @@ const PERCENT_STATS = new Set([
 ]);
 
 const STAT_CONCEPT_MAP = {
-  drillPower: 'breach',
-  damageBonus: 'breach',
-  strikeSpeed: 'breach',
-  drillPiercingCount: 'breach',
-  drillPiercingDamage: 'breach',
-  drillDiagonalCount: 'breach',
-  drillDiagonalDamage: 'breach',
-  strikeSpeedPerLevel: 'breach',
-  drillPowerPerLevel: 'breach',
-
   weakSpotChance: 'breach',
   weakSpotMult: 'breach',
   weakSpotFuelGain: ['breach', 'fuel'],
   weakSpotPierce: 'breach',
-  weakSpotChancePerLevel: 'breach',
+  weakSpotChancePerLevel: ['breach', 'xp'],
   lowFuelWeakSpotChance: ['breach', 'fuel', 'starvation'],
   breachAfterburnerSeconds: ['breach', 'afterburner'],
   breachChainHitsOnTrigger: 'breach',
@@ -508,11 +501,11 @@ const STAT_CONCEPT_MAP = {
   fuelDrainRate: 'fuel',
   fuelBonus: 'fuel',
   fuelStarvationResistance: ['fuel', 'starvation'],
-  fuelPerLevel: 'fuel',
+  fuelPerLevel: ['fuel', 'xp'],
   fuelConverterLevel: ['fuel', 'starvation'],
   fuelRocketLevel: ['fuel', 'afterburner'],
   lowFuelSpeedBonus: ['fuel', 'afterburner', 'starvation'],
-  lowFuelDamageBonus: ['fuel', 'starvation', 'breach'],
+  lowFuelDamageBonus: ['fuel', 'starvation'],
 
   concentration: 'concentration',
   effectDurationRate: 'effectDuration',
@@ -525,9 +518,9 @@ const STAT_CONCEPT_MAP = {
   bonusFindChance: 'find',
 
   xpBonus: 'xp',
-  goldBonus: 'xp',
   goldBonusPerLevel: 'xp',
-  miningGoldBonusMultiplier: 'xp',
+  drillPowerPerLevel: 'xp',
+  strikeSpeedPerLevel: 'xp',
   crystalXpGain: ['xp', 'crystals'],
 
   maxContour: 'contour',
@@ -542,18 +535,19 @@ const STAT_CONCEPT_MAP = {
   explosionPower: ['collapse', 'explosion'],
   explosionBonus: ['collapse', 'explosion'],
   explosionRadiusBonus: ['collapse', 'explosion'],
-  explosionPowerPerLevel: ['collapse', 'explosion'],
+  explosionPowerPerLevel: ['collapse', 'explosion', 'xp'],
   collapseBudgetMaxScale: 'collapse',
   recipeCollapseDelayPercent: ['collapse', 'crystals'],
 
   armor: 'armor',
   maxHp: 'hp',
-  healPerLevel: 'hp',
+  healPerLevel: ['hp', 'xp'],
   adrenalineLevel: ['hp', 'afterburner'],
 
   visionRadius: 'radar',
   goldRadarMode: 'radar',
   navigatorMode: ['radar', 'beacon'],
+  beaconCatalystLevel: 'beacon',
   radarCrystalModule: ['radar', 'crystals'],
   crystalLightRadarSeconds: ['radar', 'crystals'],
 
@@ -892,6 +886,84 @@ function classifyEffectPolarity(stat, value) {
   if (normalized > 0) return 'pos';
   if (normalized < 0) return 'neg';
   return 'neutral';
+}
+
+function guessLinePolarity(line) {
+  const hasPlus = /(^|[\s(])\+\d/.test(line);
+  const hasMinus = /(^|[\s(])-\d/.test(line) || /(^|[\s(])−\d/.test(line);
+  if (hasPlus && !hasMinus) return 'pos';
+  if (hasMinus && !hasPlus) return 'neg';
+  return '';
+}
+
+function lineReferencesStat(line, statKey) {
+  if (!line || !statKey) return false;
+  const hay = line.toLowerCase();
+  const probes = [
+    statKey,
+    t(`stat.${statKey}`),
+    t(`shop.stat.${statKey}.label`),
+  ]
+    .filter(Boolean)
+    .map((v) => String(v).toLowerCase().trim())
+    .filter((v) => v && !v.startsWith('stat.') && !v.startsWith('shop.stat.'));
+  return probes.some((probe) => hay.includes(probe));
+}
+
+function isNeutralEquipmentDamageLine(item, line) {
+  if (item?.type !== 'equipment') return false;
+  return /^(damage|урон)\b/i.test(String(line || '').trim());
+}
+
+function isNeutralConditionLine(line) {
+  return /^(on\b.+:?|if\b.+:?|every\b.+:?|при\b.+:?|если\b.+:?|за\s+каждые\b.+:?)/i.test(String(line || '').trim());
+}
+
+function highlightDescriptionNumbers(line, polarity) {
+  const escaped = esc(line);
+  const cls = polarity === 'neg' ? 'shop-desc-number--neg' : 'shop-desc-number--pos';
+  return escaped.replace(/([+\-−]?\d+(?:[.,]\d+)?%?)/g, `<span class="${cls}">$1</span>`);
+}
+
+function renderGoodDescriptionHtml(item, rarity, stats = null) {
+  const raw = getGoodDescription(item, rarity, stats);
+  if (!raw) return '';
+  const lines = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return '';
+
+  const effects = Array.isArray(item?.effect)
+    ? item.effect
+    : (item?.effect ? [item.effect] : []);
+  const effectPolarities = effects.map((effect) => {
+    const value = effectValueByRarity(effect, rarity);
+    return classifyEffectPolarity(effect?.stat, value);
+  });
+
+  let effectIdx = 0;
+  return lines.map((line) => {
+    if (isNeutralConditionLine(line)) {
+      return `<span class="shop-desc-line">${highlightDescriptionNumbers(line, '')}</span>`;
+    }
+    if (isNeutralEquipmentDamageLine(item, line)) {
+      return `<span class="shop-desc-line">${highlightDescriptionNumbers(line, '')}</span>`;
+    }
+    let polarity = guessLinePolarity(line);
+    if (effectIdx < effects.length) {
+      const effect = effects[effectIdx];
+      const effectPolarity = effectPolarities[effectIdx] || '';
+      if (!polarity) {
+        polarity = effectPolarity;
+        effectIdx += 1;
+      } else if (lineReferencesStat(line, effect?.stat)) {
+        polarity = effectPolarity || polarity;
+        effectIdx += 1;
+      }
+    }
+    return `<span class="shop-desc-line">${highlightDescriptionNumbers(line, polarity)}</span>`;
+  }).join('<br>');
 }
 
 function formatItemEffectValue(stat, value) {
@@ -1499,7 +1571,7 @@ function renderShopCard(item) {
     : '';
   const catDef = item.category ? CATEGORIES.find(c => c.id === item.category) : null;
   const catLabel = catDef ? `<div class="shop-card__category">${catDef.icon} ${catDef.name}</div>` : '';
-  const desc = getGoodDescription(item, S.rarity, PREVIEW_STATS);
+  const descHtml = renderGoodDescriptionHtml(item, S.rarity, PREVIEW_STATS);
 
   el.shopCard.innerHTML = `
     <div class="${cls}">
@@ -1507,7 +1579,7 @@ function renderShopCard(item) {
       <div class="shop-card__icon">${esc(item.icon || '✦')}</div>
       <div class="shop-card__name">${esc(item.name)}</div>
       ${catLabel}
-      <div class="shop-card__desc">${(desc || '').replace(/\n/g, '<br>')}</div>
+      <div class="shop-card__desc">${descHtml}</div>
       ${mergeLabel}
       <div class="shop-card__cost">${RARITY_NAMES[S.rarity]}</div>
     </div>

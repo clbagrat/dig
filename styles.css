@@ -2473,6 +2473,14 @@ strong {
   -webkit-box-orient: vertical;
 }
 
+.shop-desc-number--pos {
+  color: #93e59a;
+}
+
+.shop-desc-number--neg {
+  color: #ff9a8f;
+}
+
 .shop-card__merge {
   font-size: 10px;
   font-weight: 700;
