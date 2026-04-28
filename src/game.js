@@ -569,6 +569,7 @@ const state = {
   gold: 0,
   unsafeGold: 0,
   goldBonusRemainder: 0,
+  miningGoldBonusRemainder: 0,
   xp: 0,
   xpBonusRemainder: 0,
   level: 1,
@@ -2557,6 +2558,7 @@ function setupField(seedOverride = null) {
   state.gold = 0;
   state.unsafeGold = 0;
   state.goldBonusRemainder = 0;
+  state.miningGoldBonusRemainder = 0;
   state.xp = 0;
   state.xpBonusRemainder = 0;
   state.level = 1;
@@ -9119,6 +9121,17 @@ function applyGoldBonus(amount) {
   return whole;
 }
 
+function applyMiningGoldBonus(amount) {
+  if (amount <= 0) {
+    return 0;
+  }
+  const multiplier = Math.max(0, 1 + (state.miningGoldBonusMultiplier || 0));
+  const total = amount * multiplier + (state.miningGoldBonusRemainder || 0);
+  const whole = Math.max(1, Math.floor(total + 1e-9));
+  state.miningGoldBonusRemainder = Math.max(0, total - whole);
+  return whole;
+}
+
 function spawnExperienceCrystal(x, y, amount = XP_PER_BLOCK) {
   if (amount <= 0) {
     return;
@@ -10350,11 +10363,12 @@ function breakCell(x, y, index, options = {}) {
   const goldMultiplier = state.loopGoldMask[index] > 0 ? state.loopGoldMask[index] : 1;
   const oreBaseGold = state.goldOreMask[index] ? GOLD_ORE_PER_BLOCK : 0;
   const oreScaledGold = oreBaseGold > 0 ? Math.floor(oreBaseGold * goldMultiplier) : 0;
+  const oreScaledGoldWithStat = applyMiningGoldBonus(oreScaledGold);
   spawnBreakEffect(x, y, hardness, options.cause || "break");
-  if (oreScaledGold > 0) {
+  if (oreScaledGoldWithStat > 0) {
     playSound("block_break_ore");
-    const contourBonusGold = Math.max(0, oreScaledGold - oreBaseGold);
-    addToGoldPickupMask(x, y, oreScaledGold - contourBonusGold);
+    const contourBonusGold = Math.max(0, oreScaledGoldWithStat - oreBaseGold);
+    addToGoldPickupMask(x, y, oreScaledGoldWithStat - contourBonusGold);
     if (contourBonusGold > 0) {
       addToGoldBonusPickupMask(x, y, contourBonusGold);
     }
