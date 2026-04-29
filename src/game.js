@@ -591,6 +591,7 @@ const state = {
   levelUpModalOpen: false,
   goldParticles: [],
   xpParticles: [],
+  drillSmokeParticles: [],
   baseFound: false,
   runTimeSec: 0,
   baseFoundRunTimeSec: 0,
@@ -804,6 +805,7 @@ const state = {
   toastQueue: [],
   toastQueueTimer: 0,
   toastDebounceMap: {},
+  toastSeq: 0,
   debugAudioToastsEnabled: false,
   depthTitle: {
     text: "",
@@ -2743,8 +2745,10 @@ function setupField(seedOverride = null) {
   state.toastQueue.length = 0;
   state.toastQueueTimer = 0;
   state.toastDebounceMap = {};
+  state.toastSeq = 0;
   state.goldParticles.length = 0;
   state.xpParticles.length = 0;
+  state.drillSmokeParticles.length = 0;
   state.depthTitle.text = "";
   state.depthTitle.time = 0;
   state.damageFlash = 0;
@@ -3993,6 +3997,7 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
     }
     case 8:
       activateDrillOverdrive(8, "");
+      showPerkToast(t("toast.tile_boost_seconds", { sec: 8 }));
       state.perkText = t("perk.tile.boost.name");
       break;
     default:
@@ -4486,13 +4491,23 @@ window.__digShowAudioToast = (id, opts = {}) => {
 
 function applyToast(item) {
   const duration = Math.max(0.1, Number(item.duration) || TOAST_DURATION_LEVEL_1);
+  state.toastSeq += 1;
+  const stackGap = 5;
+  const baseHeight = 18;
+  let nextStackOffset = 0;
+  if (state.activeToasts.length > 0) {
+    const maxOffset = Math.max(...state.activeToasts.map((toast) => toast.stackOffset || 0));
+    nextStackOffset = maxOffset + baseHeight + stackGap;
+  }
   state.activeToasts.push({
+    id: state.toastSeq,
     text: item.text,
     color: item.color,
     time: duration,
     duration,
+    stackOffset: nextStackOffset,
     wx: state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 + (Math.random() - 0.5) * TILE_SIZE * 1.6,
-    wy: state.drill.renderY * TILE_SIZE - 10 + state.activeToasts.length * 4,
+    wy: state.drill.renderY * TILE_SIZE - 10,
   });
 }
 
@@ -7419,6 +7434,7 @@ function update(dt) {
 
   updateMovementAnimations(dt);
   updateExperienceParticles(dt);
+  updateDrillSmokeParticles(dt);
 
   if (state.crystalRewardModalOpen) {
     updateCrystalRewardModal(dt);
@@ -7803,6 +7819,38 @@ function updateExperienceParticles(dt) {
       }
     }
     state.xpParticles.splice(i, 1);
+  }
+}
+
+function spawnDrillSmokeParticles(tileX, tileY, dirX, dirY) {
+  for (let i = 0; i < 5; i += 1) {
+    const angle = Math.atan2(-dirY || 0, -dirX || 0) + (Math.random() - 0.5) * 0.9;
+    const speed = 18 + Math.random() * 24;
+    state.drillSmokeParticles.push({
+      x: tileX * TILE_SIZE + TILE_SIZE * 0.5 + (Math.random() - 0.5) * 8,
+      y: tileY * TILE_SIZE + TILE_SIZE * 0.5 + (Math.random() - 0.5) * 8,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - (10 + Math.random() * 14),
+      life: 0.22 + Math.random() * 0.18,
+      maxLife: 0.22 + Math.random() * 0.18,
+      size: 3 + Math.random() * 3,
+    });
+  }
+}
+
+function updateDrillSmokeParticles(dt) {
+  for (let i = state.drillSmokeParticles.length - 1; i >= 0; i -= 1) {
+    const p = state.drillSmokeParticles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      state.drillSmokeParticles.splice(i, 1);
+      continue;
+    }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= Math.max(0, 1 - dt * 4.5);
+    p.vy *= Math.max(0, 1 - dt * 3.5);
+    p.vy -= 8 * dt;
   }
 }
 
@@ -11273,6 +11321,9 @@ function updateDrill(dt) {
     : 1;
   const diagonalDamageMult = Math.max(0, (state.drillDiagonalDamage || 0) / 100);
   const hardness = state.hardness[targetIndex];
+  if (hardness > 0 && !state.metalMask[targetIndex]) {
+    spawnDrillSmokeParticles(targetX, targetY, dx, dy);
+  }
   const extraStrikeTargets = collectExtraDrillStrikeTargets(targetX, targetY, dx, dy);
   const brokeTargetBlock = damageCell(targetX, targetY, strikeDamage, {
     moveDrill: true,
@@ -12557,6 +12608,27 @@ function renderExperienceParticles(camera) {
   ctx.globalAlpha = 1;
 }
 
+function renderDrillSmokeParticles(camera) {
+  if (state.drillSmokeParticles.length === 0) return;
+  const ctx = state.ctx;
+  ctx.save();
+  for (let i = 0; i < state.drillSmokeParticles.length; i += 1) {
+    const p = state.drillSmokeParticles[i];
+    const lifeT = Math.max(0, Math.min(1, p.life / p.maxLife));
+    const alpha = lifeT * 0.3;
+    const radius = p.size * (1 + (1 - lifeT) * 0.8);
+    const x = p.x - camera.x;
+    const y = p.y - camera.y;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#bcb6ad";
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
 function render() {
   const ctx = state.ctx;
   const camera = getCamera();
@@ -13020,6 +13092,7 @@ function render() {
   renderMovingTiles(camera);
   renderSteamJets(camera);
   renderEffects(camera);
+  renderDrillSmokeParticles(camera);
   renderBeacon(camera);
   renderGoldParticles(camera);
   renderExperienceParticles(camera);
@@ -15562,7 +15635,7 @@ function renderActiveToast(camera) {
     const alpha = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.25) / 0.75);
     const lift = (1 - (1 - t) * (1 - t)) * 28;
     const x = toast.wx - camera.x;
-    const y = toast.wy - camera.y - lift;
+    const y = toast.wy - camera.y - lift - (toast.stackOffset || 0);
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = "rgba(8, 4, 2, 0.95)";
     ctx.fillStyle = toast.color;
