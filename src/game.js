@@ -22,6 +22,25 @@ const CUTSCENE_MODE =
   location.pathname === "/cut/" ||
   new URLSearchParams(location.search).has("cutscene");
 const INTRO_CUTSCENE_SEEN_KEY = "dig_intro_cutscene_seen_v1";
+const DEATH_FREEZE_DURATION = 0.2;
+const DEATH_SCALE_DURATION = 0.22;
+const DEATH_SHAKE_DURATION = 0.28;
+const DEATH_DUST_DURATION = 0.45;
+const DEATH_ANIM_DURATION =
+  DEATH_FREEZE_DURATION + DEATH_SCALE_DURATION + DEATH_SHAKE_DURATION + DEATH_DUST_DURATION;
+const DEATH_MODAL_DELAY = 0.5;
+const DEATH_CAUSE = {
+  UNKNOWN: "unknown",
+  STARVATION: "starvation",
+  STEAM: "steam",
+  GAS: "gas",
+  COLLAPSE: "collapse",
+  BOULDER: "boulder",
+  WORM: "worm",
+  CONTOUR_ENEMY: "contour_enemy",
+  SPIKE: "spike",
+  VOLATILE: "volatile",
+};
 
 const TILE_SIZE = 36;
 const HUD_FONT = 'Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif';
@@ -599,6 +618,10 @@ const state = {
   baseFoundRunTimeSec: 0,
   outOfFuel: false,
   dead: false,
+  deathCause: null,
+  deathAnimTime: 0,
+  deathOverlayReady: false,
+  deathBurstSpawned: false,
   visionRadius: VISION_RADIUS,
   dragId: null,
   padCenterX: 0,
@@ -2395,7 +2418,7 @@ function traceSteamLine(origins, dirX, dirY) {
 
 function applySteamContactDamage() {
   if (state.steamMask[cellIndex(state.drill.x, state.drill.y)]) {
-    applyHazardDamage(STEAM_DAMAGE);
+    applyHazardDamage(STEAM_DAMAGE, { deathCause: DEATH_CAUSE.STEAM });
   }
 }
 
@@ -2538,6 +2561,10 @@ function setupField(seedOverride = null) {
   state.cameraShake.amplitude = 0;
   state.outOfFuel = false;
   state.dead = false;
+  state.deathCause = null;
+  state.deathAnimTime = 0;
+  state.deathOverlayReady = false;
+  state.deathBurstSpawned = false;
   state.fuel = START_FUEL;
   state.maxFuel = START_FUEL;
   state.hp = START_HP;
@@ -3205,7 +3232,7 @@ function resolveNextCollapseCell(warning) {
   }
   if (!warning.heroDamaged && key === `${state.drill.x},${state.drill.y}`) {
     warning.heroDamaged = true;
-    applyHazardDamage(getCollapseDamage(warning.hardness));
+    applyHazardDamage(getCollapseDamage(warning.hardness), { deathCause: DEATH_CAUSE.COLLAPSE });
     const fallback = findNearestWalkableTileExcluding(state.drill.x, state.drill.y, blockedKeys);
     if (fallback) {
       state.drill.x = fallback.x;
@@ -5357,8 +5384,9 @@ function showDeadOverlay(show) {
   const title = document.getElementById("baseFoundTitle");
   const subtitle = document.getElementById("baseFoundSubtitle");
   const button = document.getElementById("playAgainButton");
+  const deathReason = state.deathCause ? t(`ui.death_reason.${state.deathCause}`) : t("ui.death_reason.unknown");
   if (title) title.textContent = t("ui.drill_broken");
-  if (subtitle) subtitle.textContent = t("ui.drill_broken_desc");
+  if (subtitle) subtitle.textContent = t("ui.drill_broken_desc_with_reason", { reason: deathReason });
   if (button) button.textContent = t("ui.play_again");
 }
 
@@ -7419,6 +7447,34 @@ function frame(ts) {
 
 function update(dt) {
   if (state.dead) {
+    state.deathAnimTime += dt;
+    const burstAt = DEATH_FREEZE_DURATION + DEATH_SCALE_DURATION + DEATH_SHAKE_DURATION;
+    if (!state.deathBurstSpawned && state.deathAnimTime >= burstAt) {
+      state.deathBurstSpawned = true;
+      const cx = state.drill.renderX;
+      const cy = state.drill.renderY;
+      spawnExplosionEffect(cx, cy, 1.15);
+      spawnExplosionEffect(cx + 0.24, cy - 0.1, 1.0);
+      spawnExplosionEffect(cx - 0.22, cy + 0.08, 0.95);
+      for (let i = 0; i < 18; i += 1) {
+        const a = (Math.PI * 2 * i) / 18;
+        const speed = 34 + (state.worldRandom?.() || Math.random()) * 36;
+        state.drillSmokeParticles.push({
+          x: cx * TILE_SIZE + TILE_SIZE * 0.5 + Math.cos(a) * 6,
+          y: cy * TILE_SIZE + TILE_SIZE * 0.5 + Math.sin(a) * 6,
+          vx: Math.cos(a) * speed * 0.55,
+          vy: Math.sin(a) * speed * 0.42 - 16 - (state.worldRandom?.() || Math.random()) * 18,
+          life: 0.35 + (state.worldRandom?.() || Math.random()) * 0.25,
+          maxLife: 0.35 + (state.worldRandom?.() || Math.random()) * 0.25,
+          size: 5 + (state.worldRandom?.() || Math.random()) * 6,
+        });
+      }
+    }
+    if (state.deathAnimTime >= DEATH_ANIM_DURATION + DEATH_MODAL_DELAY) {
+      state.deathOverlayReady = true;
+    }
+    updateEffects(dt);
+    updateDrillSmokeParticles(dt);
     return;
   }
   if (!state.cutsceneModeActive && !state.baseFound) {
@@ -7942,7 +7998,7 @@ function updateChainExplosions(dt) {
       const gasBlastRadius = getScaledExplosionRadius(2, { skipRadiusBonus: true });
       const distToHero = Math.hypot(task.x - state.drill.x, task.y - state.drill.y);
       if (distToHero <= gasBlastRadius) {
-        applyHazardDamage(GAS_DAMAGE);
+        applyHazardDamage(GAS_DAMAGE, { deathCause: DEATH_CAUSE.GAS });
       }
       explodeAt(task.x, task.y, EXPLOSION_BREAK_DAMAGE, 2, {
         cause: "explosion",
@@ -9720,7 +9776,12 @@ function drainFuel(amount, options = {}) {
     state.outOfFuel = true;
     playSound("fuel_emergency");
   }
-  applyHazardDamage(fromHp, { affectsArmor: false, dropOnDamage: false, silent: true });
+  applyHazardDamage(fromHp, {
+    affectsArmor: false,
+    dropOnDamage: false,
+    silent: true,
+    deathCause: DEATH_CAUSE.STARVATION,
+  });
 }
 
 function applyHazardDamage(amount, options = {}) {
@@ -9760,7 +9821,11 @@ function applyHazardDamage(amount, options = {}) {
   }
   if (state.hp <= 0) {
     playSound("player_death");
+    state.deathCause = options.deathCause || DEATH_CAUSE.UNKNOWN;
     state.dead = true;
+    state.deathAnimTime = 0;
+    state.deathOverlayReady = false;
+    state.deathBurstSpawned = false;
   }
 }
 
@@ -9774,7 +9839,7 @@ function showHpToast(value) {
 
 function applyGasContactDamage() {
   if (state.gasMask[cellIndex(state.drill.x, state.drill.y)]) {
-    applyHazardDamage(GAS_DAMAGE);
+    applyHazardDamage(GAS_DAMAGE, { deathCause: DEATH_CAUSE.GAS });
   }
 }
 
@@ -9964,7 +10029,7 @@ function updateBoulders(dt) {
     state.hardness[nextIndex] = 0;
     state.health[nextIndex] = 0;
     if (boulder.x === state.drill.x && boulder.y === state.drill.y) {
-      applyHazardDamage(BOULDER_DAMAGE);
+      applyHazardDamage(BOULDER_DAMAGE, { deathCause: DEATH_CAUSE.BOULDER });
     }
   }
 }
@@ -10104,7 +10169,7 @@ function updateWorms(dt) {
       if (!worm.hitPlayer && worm.tileX === drillX && worm.tileY === drillY) {
         worm.hitPlayer = true;
         playSound("worm_attack");
-        applyHazardDamage(WORM_DAMAGE);
+        applyHazardDamage(WORM_DAMAGE, { deathCause: DEATH_CAUSE.WORM });
       }
     }
   }
@@ -10308,7 +10373,9 @@ function updateContourEnemy(dt) {
     enemy.attackTelegraphTimer -= dt;
     if (enemy.attackTelegraphTimer <= 0) {
       if (state.drill.x === enemy.attackTargetX && state.drill.y === enemy.attackTargetY) {
-        applyHazardDamage(Math.round(CONTOUR_ENEMY_DAMAGE * enemy.depthMult));
+        applyHazardDamage(Math.round(CONTOUR_ENEMY_DAMAGE * enemy.depthMult), {
+          deathCause: DEATH_CAUSE.CONTOUR_ENEMY,
+        });
         playSound("worm_attack");
       }
       enemy.attackPhase = null;
@@ -10350,7 +10417,10 @@ function triggerHazardEffect(hazardType, x, y, options = {}) {
 
   const hazard = HAZARD_DATA[hazardType];
   if (hazard && hazard.damage && !options.suppressPlayerDamage) {
-    applyHazardDamage(hazard.damage);
+    let deathCause = DEATH_CAUSE.UNKNOWN;
+    if (hazardType === HAZARD_TYPES.SPIKE) deathCause = DEATH_CAUSE.SPIKE;
+    if (hazardType === HAZARD_TYPES.VOLATILE) deathCause = DEATH_CAUSE.VOLATILE;
+    applyHazardDamage(hazard.damage, { deathCause });
   }
 
   if (hazardType === HAZARD_TYPES.VOLATILE) {
@@ -13203,7 +13273,7 @@ function render() {
 
   if (state.baseFound && !state.cutsceneModeActive) {
     showBaseFoundOverlay(true, state.baseFoundRunTimeSec || state.runTimeSec);
-  } else if (state.dead && !state.cutsceneModeActive) {
+  } else if (state.dead && state.deathOverlayReady && !state.cutsceneModeActive) {
     showDeadOverlay(true);
   } else {
     showBaseFoundOverlay(false);
@@ -15231,6 +15301,32 @@ function renderDrill(camera) {
   const py = state.drill.renderY * TILE_SIZE - camera.y + bodyOffsetY;
   const frame = strikeWave > 0.78 && state.drill.strikeEnergy > 0.3 ? 2 + (Math.floor((state.lastTs || 0) / 50) % 2) : Math.floor((state.lastTs || 0) / 160) % 2;
   const angle = state.drill.facingX > 0 ? Math.PI * 0.5 : state.drill.facingX < 0 ? -Math.PI * 0.5 : state.drill.facingY < 0 ? Math.PI : 0;
+  if (state.dead) {
+    const t = state.deathAnimTime;
+    const scaleStart = DEATH_FREEZE_DURATION;
+    const shakeStart = scaleStart + DEATH_SCALE_DURATION;
+    const burstStart = shakeStart + DEATH_SHAKE_DURATION;
+    const fadeEnd = burstStart + DEATH_DUST_DURATION;
+    const scaleT = clamp((t - scaleStart) / DEATH_SCALE_DURATION, 0, 1);
+    const shakeT = clamp((t - shakeStart) / DEATH_SHAKE_DURATION, 0, 1);
+    const dustT = clamp((t - burstStart) / DEATH_DUST_DURATION, 0, 1);
+    const scale = 1 + easeOutCubic(scaleT);
+    const shakeAmp = (1 - shakeT) * 4;
+    const shakeX = shakeAmp * Math.sin((state.lastTs || 0) * 0.11);
+    const shakeY = shakeAmp * Math.cos((state.lastTs || 0) * 0.14);
+    const alpha = t >= burstStart ? 1 - easeOutCubic(dustT) : 1;
+
+    if (t < fadeEnd) {
+      ctx.save();
+      ctx.translate(px + TILE_SIZE * 0.5 + shakeX, py + TILE_SIZE * 0.5 + shakeY);
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(state.sprites.drillFrames[frame], -TILE_SIZE * 0.5, -TILE_SIZE * 0.5, TILE_SIZE, TILE_SIZE);
+      ctx.restore();
+    }
+    return;
+  }
+
   ctx.save();
   ctx.translate(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.5);
 
@@ -16678,6 +16774,10 @@ function prepareCutsceneField() {
   state.runTimeSec = 0;
   state.baseFoundRunTimeSec = 0;
   state.dead = false;
+  state.deathCause = null;
+  state.deathAnimTime = 0;
+  state.deathOverlayReady = false;
+  state.deathBurstSpawned = false;
   state.outOfFuel = false;
   state.damageFlash = 0;
   state.levelUpFlash = 0;
