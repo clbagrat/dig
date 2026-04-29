@@ -12987,6 +12987,32 @@ function render() {
             ctx.restore();
           } else {
             drawTileSprite(state.sprites.hazards[hazardType], sx, sy);
+            if (hazardType === HAZARD_TYPES.VOLATILE) {
+              const pulse = Math.sin((state.lastTs || 0) * 0.012 + x * 0.85 + y * 1.11) * 0.5 + 0.5;
+              const cx = sx + TILE_SIZE * 0.5;
+              const cy = sy + TILE_SIZE * 0.5;
+              const warnAlpha = 0.22 + pulse * 0.22;
+              const ringRadius = 8 + pulse * 2.4;
+              const halo = ctx.createRadialGradient(cx, cy, 2, cx, cy, ringRadius + 5);
+              halo.addColorStop(0, `rgba(255, 88, 56, ${0.28 + pulse * 0.22})`);
+              halo.addColorStop(1, "rgba(255, 88, 56, 0)");
+              ctx.save();
+              ctx.globalAlpha = visibleAlpha;
+              ctx.fillStyle = halo;
+              ctx.beginPath();
+              ctx.arc(cx, cy, ringRadius + 5, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.strokeStyle = `rgba(255, 214, 132, ${warnAlpha})`;
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.fillStyle = `rgba(255, 238, 182, ${0.58 + pulse * 0.28})`;
+              ctx.beginPath();
+              ctx.arc(cx, cy, 2.1 + pulse * 0.8, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
           }
         }
       }
