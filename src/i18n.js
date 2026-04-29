@@ -443,7 +443,7 @@ const TRANSLATIONS = {
 
     // ── Tile perk names & descs ──────────────────────────────────────────────
     "perk.tile.tank.name": "Tank",
-    "perk.tile.tank.desc": "+60 fuel right now",
+    "perk.tile.tank.desc": "+70 fuel right now",
     "perk.tile.radar.name": "Radar",
     "perk.tile.radar.desc": "+10 sec guiding radar",
     "perk.tile.drill.name": "Drill",
@@ -1370,7 +1370,7 @@ const TRANSLATIONS = {
 
     // ── Tile perk names & descs ──────────────────────────────────────────────
     "perk.tile.tank.name": "Бак",
-    "perk.tile.tank.desc": "+60 топлива прямо сейчас",
+    "perk.tile.tank.desc": "+70 топлива прямо сейчас",
     "perk.tile.radar.name": "Радар",
     "perk.tile.radar.desc": "+10 сек направляющего радара",
     "perk.tile.drill.name": "Бур",

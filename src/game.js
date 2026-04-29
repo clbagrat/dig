@@ -30,10 +30,10 @@ const MAX_FRAME_MS = 100;
 const START_FUEL = 350;
 const START_HP = 100;
 const MAX_HEAT = 100;
-const BASE_DRILL_DAMAGE = 20;
+const BASE_DRILL_DAMAGE = 13.4;
 const IDLE_FUEL_DRAIN = 0.8;
 const DRILL_FUEL_DRAIN = 8;
-const STRIKE_CYCLE_SPEED = 8;
+const STRIKE_CYCLE_SPEED = 10.64;
 const PERK_MIN_DISTANCE = 4;
 const PERK_ZONE_MIN_DISTANCE = 6;
 const TILES_PER_PERK_TILE = 26;
@@ -65,7 +65,7 @@ const STEAM_POCKET_GROUPS = 8;
 const BOULDER_POCKET_GROUPS = 8;
 const METAL_VEIN_GROUPS = 16;
 const GOLD_ORE_GROUPS = 50;
-const GOLD_ORE_PER_BLOCK = 30;
+const GOLD_ORE_PER_BLOCK = 25;
 const GAS_SPREAD_INTERVAL = 2;
 const GAS_SPREAD_STEPS = 3;
 const GAS_DAMAGE = 25;
@@ -89,6 +89,7 @@ const FUEL_ROCKET_DAMAGE = 20;
 const FUEL_ROCKET_RADIUS = 1;
 const CRYO_ROCKET_DAMAGE = 20;
 const SHARD_DRILL_BLAST_RADIUS = 1.0;
+const BLOCK_HP_BAR_HIGHLIGHT_MS = 3000;
 const BLUEPRINT_CATEGORY_CONCEPT_MAP = {
   basic: ["breach", "contour", "xp"],
   economy: ["luck", "xp", "find"],
@@ -260,7 +261,7 @@ const REMOTE_BOMB_DAMAGE = 40;
 const REMOTE_BOMB_RADIUS = 1.0;
 const OVERFLOW_OVERDRIVE_DURATION = 3;
 const OVERFLOW_STUN_DURATION = 3;
-const HEAT_PER_STRIKE = 3;
+const HEAT_PER_STRIKE = 2.01;
 const HEAT_COOL_RATE = 8;
 const HEAT_STUN_DURATION = 3;
 const FUEL_DEPLETION_HP_COST = 25;
@@ -399,6 +400,7 @@ function createGridStateBuffers() {
     keyMask: new Uint8Array(cellCount),
     safeInteriorMask: new Int16Array(cellCount),
     health: new Float32Array(cellCount),
+    blockHpBarLastHitTs: new Float32Array(cellCount),
     crackAngle: new Float32Array(cellCount),
     loopGoldMask: new Float32Array(cellCount),
     droppedGoldMask: new Float32Array(cellCount),
@@ -2279,7 +2281,7 @@ function getTankFuelMultiplier(level = state.tankBoostLevel) {
 }
 
 function getTankFuelDelta() {
-  return Math.round(60 * getTankFuelMultiplier());
+  return Math.round(70 * getTankFuelMultiplier());
 }
 
 function getCenterDistanceRatio(x, y) {
@@ -8196,10 +8198,27 @@ function triggerHeatOverload() {
   state.heat = 0;
   const overloadDamage = getStrikeDamage();
   const overloadRadius = 1;
+  const overloadCellX = state.drill.x;
+  const overloadCellY = state.drill.y;
   explodeAt(state.drill.x, state.drill.y, overloadDamage, overloadRadius, {
     guaranteedBreak: false,
     cause: "explosion",
   });
+  // Extra visual burst so overheating explosion always has debris particles
+  // even when no blocks are actually destroyed by low-radius/low-damage blast.
+  for (let oy = -1; oy <= 1; oy += 1) {
+    for (let ox = -1; ox <= 1; ox += 1) {
+      const tx = overloadCellX + ox;
+      const ty = overloadCellY + oy;
+      if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
+      const idx = cellIndex(tx, ty);
+      const hardness = state.hardness[idx];
+      if (hardness <= 0 || state.metalMask[idx]) continue;
+      if (Math.random() < 0.65) {
+        spawnBreakEffect(tx, ty, hardness, "explosion");
+      }
+    }
+  }
   for (let i = 0; i < state.heatOverloadRocketLevel; i += 1) {
     fireRocket(state.drill.x, state.drill.y, OVERLOAD_ROCKET_DAMAGE, OVERLOAD_ROCKET_RADIUS, 1 + Math.floor(Math.random() * 3));
   }
@@ -10483,6 +10502,9 @@ function damageCell(x, y, damage, options = {}) {
 
   const actualDamage = spikeExplosion ? state.health[index] : Math.min(state.health[index], damage);
   const displayedDamage = options.showActualDamage ? actualDamage : damage;
+  if (actualDamage > 0) {
+    state.blockHpBarLastHitTs[index] = state.lastTs || performance.now();
+  }
   spawnDamageNumberEffect(x, y, displayedDamage);
   state.health[index] -= spikeExplosion ? actualDamage : damage;
   if (state.health[index] > 0) {
@@ -12971,6 +12993,9 @@ function render() {
 
       if (!state.tunnelMask[index] && !state.metalMask[index] && state.health[index] < BLOCK_TYPES[state.hardness[index]].hp) {
         const ratio = clamp(state.health[index] / BLOCK_TYPES[state.hardness[index]].hp, 0, 1);
+        const now = state.lastTs || 0;
+        const elapsedSinceHit = now - (state.blockHpBarLastHitTs[index] || 0);
+        const isBarHighlighted = elapsedSinceHit <= BLOCK_HP_BAR_HIGHLIGHT_MS;
         const crackStage = clamp(Math.ceil((1 - ratio) * 3), 0, 3);
         const crackVisible = state.visibleMask[index] === 1;
         if (crackStage > 0 && crackVisible) {
@@ -12986,8 +13011,17 @@ function render() {
           ctx.restore();
           ctx.globalAlpha = 1;
         }
-        ctx.fillStyle = "rgba(255, 231, 195, 0.2)";
-        ctx.fillRect(sx + 6, sy + TILE_SIZE - 9, (TILE_SIZE - 12) * ratio, 4);
+        const barX = sx + 6;
+        const barY = sy + TILE_SIZE - 9;
+        const barW = TILE_SIZE - 12;
+        const barH = 4;
+        ctx.fillStyle = isBarHighlighted ? "rgba(18, 11, 8, 0.7)" : "rgba(18, 11, 8, 0.35)";
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.strokeStyle = isBarHighlighted ? "rgba(255, 236, 206, 0.45)" : "rgba(255, 236, 206, 0.2)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX - 0.5, barY - 0.5, barW + 1, barH + 1);
+        ctx.fillStyle = isBarHighlighted ? "rgba(255, 238, 210, 0.78)" : "rgba(255, 238, 210, 0.38)";
+        ctx.fillRect(barX, barY, barW * ratio, barH);
       }
 
       if (state.weakSpotMask[index]) {
