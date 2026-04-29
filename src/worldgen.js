@@ -82,7 +82,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 17,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 1, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, dualStatPerkZones: 2, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [0, 4, 17], thornVein: [1, 3, 5], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [0, 10, 25], goldOre: [5, 2, 2], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 8, hardnessBias: -1.2 },
+    rules: { beacons: 1, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, dualStatPerkZones: 2, safes: 0, wormNests: 0, blueprints: 1, thornBlob: [0, 4, 17], thornVein: [1, 3, 5], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [0, 10, 25], goldOre: [5, 2, 2], gasPocket: [0, 4, 15], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.2, perkZoneDensity: 1.15, minCrystals: 8, maxCrystals: 8, hardnessBias: -1.2 },
     required: {},
   },
   {
@@ -91,7 +91,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 26,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 2, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, dualStatPerkZones: 3, safes: 0, wormNests: 0, artifacts: 1, thornBlob: [1, 4, 6], thornVein: [2, 4, 6], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 3, 6], goldOre: [5, 3, 5], gasPocket: [1, 4, 6], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 10, maxCrystals: 13, hardnessBias: -0.8 },
+    rules: { beacons: 2, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 0, perkZones: 2, dualStatPerkZones: 3, safes: 0, wormNests: 0, blueprints: 1, thornBlob: [1, 4, 6], thornVein: [2, 4, 6], bombBlob: [0, 4, 17], bombVein: [0, 6, 23], metalVein: [2, 3, 6], goldOre: [5, 3, 5], gasPocket: [1, 4, 6], steamPocket: [0, 3, 10], boulderPocketGroups: 0, perkTileDensity: 1.05, perkZoneDensity: 1.0, minCrystals: 10, maxCrystals: 13, hardnessBias: -0.8 },
     required: {},
   },
   {
@@ -100,7 +100,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 40,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 4, hiddenBeacons: 1, upperBeacons: 0, lowerBeacons: 0, perkZones: 4, dualStatPerkZones: 4, safes: 1, wormNests: 1, artifacts: 2, thornBlob: [2, 4, 5], thornVein: [3, 6, 9], bombBlob: [0, 4, 17], bombVein: [1, 6, 12], metalVein: [2, 10, 15], goldOre: [7, 4, 6], gasPocket: [4, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 2, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 20, maxCrystals: 25, hardnessBias: -0.4 },
+    rules: { beacons: 4, hiddenBeacons: 1, upperBeacons: 0, lowerBeacons: 0, perkZones: 4, dualStatPerkZones: 4, safes: 1, wormNests: 1, blueprints: 2, thornBlob: [2, 4, 5], thornVein: [3, 6, 9], bombBlob: [0, 4, 17], bombVein: [1, 6, 12], metalVein: [2, 10, 15], goldOre: [7, 4, 6], gasPocket: [4, 4, 15], steamPocket: [1, 3, 10], boulderPocketGroups: 2, perkTileDensity: 1.0, perkZoneDensity: 0.95, minCrystals: 20, maxCrystals: 25, hardnessBias: -0.4 },
     required: {},
   },
   {
@@ -109,7 +109,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 12,
     canHostBase: false,
     frame: "metal",
-    rules: { beacons: 1, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, dualStatPerkZones: 2, safes: 0, wormNests: 2, artifacts: 1, thornBlob: [1, 4, 8], thornVein: [2, 6, 11], bombBlob: [1, 4, 10], bombVein: [1, 6, 12], metalVein: [0, 8, 14], goldOre: [5, 3, 5], gasPocket: [0, 4, 10], steamPocket: [0, 3, 6], boulderPocketGroups: 0, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 6, maxCrystals: 10, hardnessBias: 0.75, hardnessDepthScale: 4.9, hardnessLocalScale: 0 },
+    rules: { beacons: 1, hiddenBeacons: 0, upperBeacons: 0, lowerBeacons: 1, perkZones: 1, dualStatPerkZones: 2, safes: 0, wormNests: 2, blueprints: 1, thornBlob: [1, 4, 8], thornVein: [2, 6, 11], bombBlob: [1, 4, 10], bombVein: [1, 6, 12], metalVein: [0, 8, 14], goldOre: [5, 3, 5], gasPocket: [0, 4, 10], steamPocket: [0, 3, 6], boulderPocketGroups: 0, perkTileDensity: 0.75, perkZoneDensity: 0.7, minCrystals: 6, maxCrystals: 10, hardnessBias: 0.75, hardnessDepthScale: 4.9, hardnessLocalScale: 0 },
     required: {},
   },
   {
@@ -118,7 +118,7 @@ const DEFAULT_LEVEL_LAYOUT = [
     width: 52,
     canHostBase: true,
     frame: "metal",
-    rules: { beacons: 5, hiddenBeacons: 2, upperBeacons: 1, lowerBeacons: 1, perkZones: 5, dualStatPerkZones: 5, safes: 1, wormNests: 2, artifacts: 2, thornBlob: [3, 4, 6], thornVein: [4, 7, 11], bombBlob: [1, 4, 17], bombVein: [2, 6, 23], metalVein: [3, 12, 18], goldOre: [10, 5, 7], gasPocket: [4, 4, 15], steamPocket: [4, 3, 10], boulderPocketGroups: 4, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 26, maxCrystals: 32, hardnessBias: 0.15 },
+    rules: { beacons: 5, hiddenBeacons: 2, upperBeacons: 1, lowerBeacons: 1, perkZones: 5, dualStatPerkZones: 5, safes: 1, wormNests: 2, blueprints: 2, thornBlob: [3, 4, 6], thornVein: [4, 7, 11], bombBlob: [1, 4, 17], bombVein: [2, 6, 23], metalVein: [3, 12, 18], goldOre: [10, 5, 7], gasPocket: [4, 4, 15], steamPocket: [4, 3, 10], boulderPocketGroups: 4, perkTileDensity: 0.95, perkZoneDensity: 0.9, minCrystals: 26, maxCrystals: 32, hardnessBias: 0.15 },
     required: {},
   },
 ];
@@ -190,7 +190,13 @@ function validateLevelLayout(layout) {
     if (!level.required || typeof level.required !== "object") {
       level.required = {};
     }
-    const requiredKeys = ["beacons", "hiddenBeacons", "upperBeacons", "lowerBeacons", "perkZones", "safes", "wormNests", "artifacts"];
+    if (!Number.isFinite(level.rules.blueprints) && Number.isFinite(level.rules.artifacts)) {
+      level.rules.blueprints = level.rules.artifacts;
+    }
+    if (!Number.isFinite(level.required.blueprints) && Number.isFinite(level.required.artifacts)) {
+      level.required.blueprints = level.required.artifacts;
+    }
+    const requiredKeys = ["beacons", "hiddenBeacons", "upperBeacons", "lowerBeacons", "perkZones", "safes", "wormNests", "blueprints"];
     for (const key of requiredKeys) {
       if (!Number.isFinite(level.rules[key]) && Number.isFinite(level.required[key])) {
         level.rules[key] = level.required[key];
@@ -379,7 +385,9 @@ function validateLevelLayout(layout) {
     delete level.required.perkZones;
     delete level.required.safes;
     delete level.required.wormNests;
+    delete level.rules.artifacts;
     delete level.required.artifacts;
+    delete level.required.blueprints;
     delete level.required.crystals;
     delete level.rules.crystalDensity;
   }
@@ -1542,23 +1550,23 @@ function placeSafes(metalMask, hardness, beaconMask, gasPocketMask, steamPocketM
   }
 }
 
-function isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, placed) {
+function isArtifactPlacementBlocked(x, y, blueprintMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, placed) {
   if (!isInsidePlayableArea(x, y)) return true;
   const index = cellIndex(x, y);
   if (
     perkMask[index] > 0 || crystalMask[index] > 0 || perkZoneMask[index] !== -1 ||
     metalMask[index] || gasPocketMask[index] || steamPocketMask[index] ||
-    boulderPocketMask[index] || beaconMask[index] || artifactMask[index]
+    boulderPocketMask[index] || beaconMask[index] || blueprintMask[index]
   ) return true;
   if ((x === base.x && y === base.y) || (x === START_X && y === START_Y)) return true;
   if (!isFarEnoughFromPlaced(x, y, placed, ARTIFACT_MIN_DISTANCE)) return true;
   return false;
 }
 
-function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
+function placeArtifacts(blueprintMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random) {
   const placed = [];
   for (const level of DEPTH_LEVELS) {
-    const target = level.rules.artifacts || 0;
+    const target = level.rules.blueprints || 0;
     let placedOnLevel = 0;
     let attempts = 0;
     while (placedOnLevel < target && attempts < target * 200) {
@@ -1567,7 +1575,7 @@ function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metal
       if (!cell) break;
       const x = cell.x;
       const y = cell.y;
-      if (isArtifactPlacementBlocked(x, y, artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, placed)) {
+      if (isArtifactPlacementBlocked(x, y, blueprintMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, placed)) {
         continue;
       }
       let tooCloseToBeacon = false;
@@ -1578,7 +1586,7 @@ function placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metal
         }
       }
       if (tooCloseToBeacon) continue;
-      artifactMask[cellIndex(x, y)] = 1;
+      blueprintMask[cellIndex(x, y)] = 1;
       placed.push({ x, y });
       placedOnLevel += 1;
     }
@@ -1660,7 +1668,7 @@ function validateLevelRequirements(map) {
     ).length;
     const safeCount = map.safes.filter((safe) => isInsideLevel(safe.cx, safe.cy, level, 0)).length;
     const wormCount = map.wormNests.filter((nest) => isInsideLevel(nest.x, nest.y, level, 0)).length;
-    const artifactCount = collectCandidatesInLevel(level, 0, (x, y) => map.artifactMask[cellIndex(x, y)] > 0).length;
+    const blueprintCount = collectCandidatesInLevel(level, 0, (x, y) => map.blueprintMask[cellIndex(x, y)] > 0).length;
     const crystalCount = collectCandidatesInLevel(level, 0, (x, y) => map.crystalMask[cellIndex(x, y)] > 0).length;
 
     const expectedBeaconCount = level.rules.beacons || 0;
@@ -1676,8 +1684,8 @@ function validateLevelRequirements(map) {
     if (wormCount < (level.rules.wormNests || 0)) {
       throw new Error(`Level ${level.level} worm nest count too low: ${wormCount}/${level.rules.wormNests || 0}`);
     }
-    if (artifactCount < (level.rules.artifacts || 0)) {
-      throw new Error(`Level ${level.level} artifact count too low: ${artifactCount}/${level.rules.artifacts || 0}`);
+    if (blueprintCount < (level.rules.blueprints || 0)) {
+      throw new Error(`Level ${level.level} blueprint count too low: ${blueprintCount}/${level.rules.blueprints || 0}`);
     }
     if (crystalCount < level.rules.minCrystals) {
       throw new Error(`Level ${level.level} crystal count too low: ${crystalCount}/${level.rules.minCrystals}`);
@@ -1752,7 +1760,7 @@ export function generateMap(seed) {
   const perkMask = new Uint8Array(GRID_W * GRID_H);
   const crystalMask = new Uint8Array(GRID_W * GRID_H);
   const perkZoneMask = new Int32Array(GRID_W * GRID_H).fill(-1);
-  const artifactMask = new Uint8Array(GRID_W * GRID_H);
+  const blueprintMask = new Uint8Array(GRID_W * GRID_H);
 
   const beacons = [];
   const perkZones = [];
@@ -1828,7 +1836,7 @@ export function generateMap(seed) {
   placeCrystalTiles(crystalMask, perkMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, base, random);
   placePerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
   placeDualStatPerkZones(perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, perkZones, base, random);
-  placeArtifacts(artifactMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
+  placeArtifacts(blueprintMask, perkMask, crystalMask, perkZoneMask, metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, base, random);
   const wormNests = placeWormNests(metalMask, gasPocketMask, steamPocketMask, boulderPocketMask, beaconMask, beacons, safes, base, random);
 
   repairPockets(gasPocketMask, beaconMask);
@@ -1851,7 +1859,7 @@ export function generateMap(seed) {
     perkMask,
     crystalMask,
     perkZones,
-    artifactMask,
+    blueprintMask,
     safes,
     wormNests,
     base,

@@ -72,15 +72,15 @@
           </div>
         </div>
       </div>
-      <div id="artifactChoice" class="artifact-choice" hidden>
-        <div class="artifact-choice__panel">
-          <div id="artifactChoiceTitle" class="artifact-choice__title" data-i18n="ui.choose_category">Choose Category</div>
-          <div id="artifactChoiceSubtitle" class="artifact-choice__subtitle" data-i18n="ui.artifact_subtitle">Artifact activated — unlock a new category and get a slot</div>
-          <div id="artifactChoiceCards" class="artifact-choice__cards">
-            <button id="artifactChoiceCard0" class="artifact-choice__card"></button>
-            <button id="artifactChoiceCard1" class="artifact-choice__card"></button>
+      <div id="blueprintChoice" class="blueprint-choice" hidden>
+        <div class="blueprint-choice__panel">
+          <div id="blueprintChoiceTitle" class="blueprint-choice__title" data-i18n="ui.choose_category">Choose Category</div>
+          <div id="blueprintChoiceSubtitle" class="blueprint-choice__subtitle" data-i18n="ui.artifact_subtitle">Blueprint activated — unlock a new category and get a slot</div>
+          <div id="blueprintChoiceCards" class="blueprint-choice__cards">
+            <button id="blueprintChoiceCard0" class="blueprint-choice__card"></button>
+            <button id="blueprintChoiceCard1" class="blueprint-choice__card"></button>
           </div>
-          <button id="artifactChoiceContinue" class="artifact-choice__continue" type="button" data-i18n="ui.continue" hidden>Continue</button>
+          <button id="blueprintChoiceContinue" class="blueprint-choice__continue" type="button" data-i18n="ui.continue" hidden>Continue</button>
         </div>
       </div>
       <div id="crystalReward" class="crystal-reward" hidden>
@@ -108,7 +108,7 @@
             <div class="debug-perk-menu__label" data-i18n="ui.quick_actions">Quick Actions</div>
             <div class="debug-perk-menu__grid">
               <button id="debugToggleAudioToasts" type="button" class="debug-perk-menu__button">🔊 Audio Toasts: OFF</button>
-              <button id="debugGiveArtifact" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.give_artifact">🔮 Give Artifact</button>
+              <button id="debugGiveBlueprint" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.give_artifact">🔮 Give Blueprint</button>
               <button id="debugGiveKey" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.give_key">🔑 Give Key</button>
               <button id="debugTeleportBeacon" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.to_nearest_beacon">📡 To nearest Beacon</button>
               <button id="debugTeleportSafe" type="button" class="debug-perk-menu__button debug-perk-menu__button--accent" data-i18n="ui.to_nearest_safe">🔒 To nearest Safe</button>
@@ -177,6 +177,22 @@
         </div>
       </div>
       <div id="shopModal" class="shop-modal" hidden></div>
+      <div id="blueprintCategoryInspectModal" class="shop-inspect-modal" hidden>
+        <div id="blueprintCategoryInspectPanel" class="shop-inspect-modal__panel">
+          <div class="shop-inspect-modal__head">
+            <div id="blueprintCategoryInspectIcon" class="shop-inspect-modal__icon"></div>
+            <div class="shop-inspect-modal__title-wrap">
+              <div id="blueprintCategoryInspectName" class="shop-inspect-modal__name"></div>
+              <div id="blueprintCategoryInspectRarity" class="shop-inspect-modal__rarity"></div>
+            </div>
+          </div>
+          <div id="blueprintCategoryInspectTags" class="shop-inspect-modal__tags"></div>
+          <div id="blueprintCategoryInspectDesc" class="shop-inspect-modal__desc"></div>
+          <div id="blueprintCategoryInspectConcepts" class="shop-inspect-concepts">
+            <div id="blueprintCategoryInspectStats" class="shop-inspect-concepts__list"></div>
+          </div>
+        </div>
+      </div>
       <div id="levelUpModal" class="level-up-modal" hidden>
         <div class="level-up-modal__panel">
           <div id="levelUpEyebrow" class="level-up-modal__eyebrow">Level Up</div>

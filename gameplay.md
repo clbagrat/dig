@@ -181,7 +181,7 @@ Current level flow:
   - first reward: `+5% gold from mined blocks` or `+0.35 damage` or `+10% speed`
   - second reward: `+5% gold from mined blocks` or `+100 fuel`
   - third reward: `+0.35 damage` or `+100 fuel` or `+1 max HP`
-  - fourth reward: `carried artifact to deliver to a beacon` or `full heal + full fuel`
+  - fourth reward: `carried blueprint to deliver to a beacon` or `full heal + full fuel`
   - fifth reward: `+10% speed` or `+100 fuel` or `+1 HP`
   - sixth reward: `+5% gold from mined blocks` or `+100 fuel` or `+1 HP`
   - after that, rewards repeat in the cycle: `third → fifth → sixth`
@@ -281,7 +281,7 @@ Activation:
 - a beacon is activated by closing a contour around its `2×2` core inside the beacon ring
 - on activation: full fuel restore triggers during the animation
 - a `2000 ms` radar animation plays (ring → line → dot), followed by a `500 ms` pause
-- after the animation the shop (or artifact choice) opens
+- after the animation the shop (or blueprint choice) opens
 - some beacons can generate as hidden: their `2×2` core is buried under ordinary breakable blocks until activation
 - hidden beacons do not get the normal 1-tile open ring; that area is filled with ordinary excavatable blocks as well
 - the beacon is rendered under those blocks and gets revealed as the core is excavated; on activation it becomes a normal beacon core
@@ -298,7 +298,7 @@ Gameplay role:
 The shop opens after each beacon activation.
 Each cycle offers:
 - `2` goods from the baseline `Базовое` category
-- `1` good from each additional category unlocked through artifacts
+- `1` good from each additional category unlocked through blueprints
 
 Current available categories:
 - `Базовое`
@@ -314,13 +314,13 @@ Cycle rules:
 - once per offered set, a paid action can increase rarity of the currently shown offers
 - rarity upgrade cost is `50%` of the current reroll cost
 
-Artifact-to-shop progression:
+Blueprint-to-shop progression:
 - activations `1-2`: unlock a new category and add `+1` slot (category can be chosen if multiple are locked)
 - activation `3`: unlock a new category and replace one baseline offer slot with category offers (no extra slot)
 - activation `4`: no category choice; `1` offer is guaranteed at least `Uncommon`
 - activation `5`: no category choice; `2` offers are guaranteed at least `Uncommon`
 - activation `6`: no category choice; `1` offer is guaranteed at least `Uncommon` and `1` at least `Rare`
-- activation `7+`: no category choice; artifact converts into `500 gold`
+- activation `7+`: no category choice; blueprint converts into `500 gold`
 
 Current available shop content includes:
 - baseline stat items for core build directions such as HP, fuel, heat, contour size, weak spots, explosion scaling, and per-level growth

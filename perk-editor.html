@@ -319,6 +319,49 @@ html, body {
 .stat-card__name { font-size: 13px; font-weight: 700; color: var(--text); }
 .stat-card__id { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .stat-card__desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.35; min-height: 32px; }
+.stat-card__inspect-hitbox { display: flex; justify-content: flex-end; margin-top: 4px; }
+.stat-card__inspect {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--acc2);
+  font-weight: 700;
+  cursor: pointer;
+}
+.stat-card__inspect:hover { border-color: var(--acc); background: rgba(215,159,73,0.12); }
+.fullscreen-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(8, 6, 4, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.fullscreen-modal__panel {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(36,25,16,0.98), rgba(24,16,11,0.98));
+  padding: 14px;
+}
+.fullscreen-modal__title { font-size: 18px; font-weight: 700; color: var(--acc2); }
+.fullscreen-modal__desc { margin-top: 8px; color: #e9d6ad; line-height: 1.45; }
+.fullscreen-modal__section { margin-top: 12px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.fullscreen-modal__concepts { margin-top: 8px; display: grid; gap: 8px; }
+.fullscreen-modal__concept-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(20,13,8,0.88);
+}
+.fullscreen-modal__concept-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.fullscreen-modal__concept-desc { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
 .concept-stats-line { margin-top: 10px; }
 .stat-card__counts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .count-dots {
@@ -367,13 +410,14 @@ html, body {
     <button id="tab-cards" class="tab-btn active" type="button">Cards</button>
     <button id="tab-stats" class="tab-btn" type="button">Stats</button>
     <button id="tab-concepts" class="tab-btn" type="button">Concepts</button>
+    <button id="tab-categories" class="tab-btn" type="button">Categories</button>
   </section>
 
   <section class="controls">
     <input id="search" class="search" placeholder="">
     <select id="filter" class="select">
     </select>
-    <select id="artifact-type" class="select"></select>
+    <select id="blueprint-type" class="select"></select>
     <select id="stat-filter" class="select"></select>
     <select id="lang" class="select" style="max-width:96px">
       <option value="en">EN</option>
@@ -435,6 +479,19 @@ html, body {
       <div id="concepts-list" class="stats-list"></div>
     </div>
   </section>
+  <section id="categories-layout" class="stats-wrap" hidden>
+    <div class="stats-panel">
+      <div id="categories-list" class="stats-list"></div>
+    </div>
+  </section>
+</div>
+<div id="category-inspect-modal" class="fullscreen-modal" hidden>
+  <div class="fullscreen-modal__panel">
+    <div id="category-inspect-title" class="fullscreen-modal__title"></div>
+    <div id="category-inspect-desc" class="fullscreen-modal__desc"></div>
+    <div id="category-inspect-concepts-title" class="fullscreen-modal__section"></div>
+    <div id="category-inspect-concepts" class="fullscreen-modal__concepts"></div>
+  </div>
 </div>
 
 <script type="module">
@@ -551,7 +608,7 @@ const STAT_CONCEPT_MAP = {
   radarCrystalModule: ['radar', 'crystals'],
   crystalLightRadarSeconds: ['radar', 'crystals'],
 
-  artifactRadarMode: ['radar', 'artifacts', 'beacon'],
+  blueprintRadarMode: ['radar', 'artifacts', 'beacon'],
   crystalGoldGain: 'crystals',
 
   cryoRocketCount: 'afterburner',
@@ -576,6 +633,19 @@ const CONCEPT_STAT_MAP = Object.entries(STAT_CONCEPT_MAP).reduce((acc, [stat, co
   return acc;
 }, {});
 
+const CATEGORY_CONCEPT_MAP = {
+  basic: ['breach', 'contour', 'xp'],
+  economy: ['luck', 'xp', 'find'],
+  handwork: ['breach', 'contour', 'fuel'],
+  heat: ['heat', 'explosion', 'collapse'],
+  выживание: ['fuel', 'starvation', 'hp', 'armor', 'concentration'],
+  поиск_бреши: ['breach', 'afterburner', 'concentration'],
+  ракеты: ['explosion', 'collapse', 'heat', 'afterburner'],
+  контур: ['contour', 'contourMonster', 'effectDuration'],
+  навигация: ['radar', 'beacon', 'find'],
+  алхимия: ['beacon', 'crystals', 'xp'],
+};
+
 const UI_TEXT = {
   en: {
     title: '⛏ Item Card Preview',
@@ -584,7 +654,7 @@ const UI_TEXT = {
     filterAll: 'All items',
     filterEquipment: 'Equipment only',
     filterItems: 'Items only',
-    artifactTypeAll: 'Artifact type: all',
+    artifactTypeAll: 'Blueprint type: all',
     statFilterAll: 'Stat: all',
     excludeDev: 'Exclude inDevelopment',
     resetFilters: 'Reset filters',
@@ -604,6 +674,7 @@ const UI_TEXT = {
     tabCards: 'Cards',
     tabStats: 'Stats',
     tabConcepts: 'Concepts',
+    tabCategories: 'Categories',
     statPositive: 'Positive items',
     statNegative: 'Negative items',
     statNoDesc: 'No description yet.',
@@ -621,6 +692,9 @@ const UI_TEXT = {
     listItemCount: 'Items',
     conceptsEmpty: 'No concepts found for current filters.',
     conceptStatsLabel: 'Related stats',
+    categoriesEmpty: 'No categories found for current filters.',
+    conceptsInCategory: 'Concepts in this category',
+    noConceptsInCategory: 'No concepts mapped to this category yet.',
   },
   ru: {
     title: '⛏ Превью карточек предметов',
@@ -629,7 +703,7 @@ const UI_TEXT = {
     filterAll: 'Все предметы',
     filterEquipment: 'Только части корпуса',
     filterItems: 'Только предметы',
-    artifactTypeAll: 'Тип артефакта: все',
+    artifactTypeAll: 'Тип чертежа: все',
     statFilterAll: 'Стата: все',
     excludeDev: 'Исключать inDevelopment',
     resetFilters: 'Сбросить фильтры',
@@ -649,6 +723,7 @@ const UI_TEXT = {
     tabCards: 'Карточки',
     tabStats: 'Статы',
     tabConcepts: 'Концепты',
+    tabCategories: 'Категории',
     statPositive: 'Положительных предметов',
     statNegative: 'Отрицательных предметов',
     statNoDesc: 'Описание пока не добавлено.',
@@ -666,6 +741,9 @@ const UI_TEXT = {
     listItemCount: 'Предметы',
     conceptsEmpty: 'По текущим фильтрам концепты не найдены.',
     conceptStatsLabel: 'Связанные статы',
+    categoriesEmpty: 'По текущим фильтрам категории не найдены.',
+    conceptsInCategory: 'Концепты категории',
+    noConceptsInCategory: 'Для этой категории концепты пока не привязаны.',
   },
 };
 
@@ -724,7 +802,7 @@ const QUERY_KEYS = {
 const el = {
   search: document.getElementById('search'),
   filter: document.getElementById('filter'),
-  artifactType: document.getElementById('artifact-type'),
+  artifactType: document.getElementById('blueprint-type'),
   statFilter: document.getElementById('stat-filter'),
   lang: document.getElementById('lang'),
   controls: document.querySelector('.controls'),
@@ -743,6 +821,7 @@ const el = {
   tabCards: document.getElementById('tab-cards'),
   tabStats: document.getElementById('tab-stats'),
   tabConcepts: document.getElementById('tab-concepts'),
+  tabCategories: document.getElementById('tab-categories'),
   resetFilters: document.getElementById('reset-filters'),
   raritySwitch: document.getElementById('rarity-switch'),
   listSummary: document.getElementById('list-summary'),
@@ -750,6 +829,12 @@ const el = {
   shopCard: document.getElementById('shop-card'),
   itemStats: document.getElementById('item-stats'),
   conceptsList: document.getElementById('concepts-list'),
+  categoriesList: document.getElementById('categories-list'),
+  categoryInspectModal: document.getElementById('category-inspect-modal'),
+  categoryInspectTitle: document.getElementById('category-inspect-title'),
+  categoryInspectDesc: document.getElementById('category-inspect-desc'),
+  categoryInspectConceptsTitle: document.getElementById('category-inspect-concepts-title'),
+  categoryInspectConcepts: document.getElementById('category-inspect-concepts'),
   scale: document.getElementById('scale'),
   dependencies: document.getElementById('dependencies'),
   title: document.getElementById('ui-title'),
@@ -759,6 +844,7 @@ const el = {
   blockAffected: document.getElementById('ui-block-affected'),
   blockScale: document.getElementById('ui-block-scale'),
   conceptsLayout: document.getElementById('concepts-layout'),
+  categoriesLayout: document.getElementById('categories-layout'),
 };
 
 function ui(key) {
@@ -768,7 +854,7 @@ function ui(key) {
 function parseInitialStateFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get(QUERY_KEYS.tab);
-  if (tab === 'cards' || tab === 'stats' || tab === 'concepts') S.tab = tab;
+  if (tab === 'cards' || tab === 'stats' || tab === 'concepts' || tab === 'categories') S.tab = tab;
 
   const q = params.get(QUERY_KEYS.q);
   if (q != null) S.search = q;
@@ -1309,6 +1395,7 @@ function renderUiText() {
   el.tabCards.textContent = ui('tabCards');
   el.tabStats.textContent = ui('tabStats');
   el.tabConcepts.textContent = ui('tabConcepts');
+  el.tabCategories.textContent = ui('tabCategories');
 
   el.statsSearch.placeholder = ui('statsSearch');
   el.statsSearch.value = S.statsSearch;
@@ -1472,15 +1559,18 @@ function renderTabState() {
   const cards = S.tab === 'cards';
   const stats = S.tab === 'stats';
   const concepts = S.tab === 'concepts';
-  const cardLike = cards || concepts;
+  const categories = S.tab === 'categories';
+  const cardLike = cards || concepts || categories;
   el.controls.hidden = !cardLike;
   el.cardsLayout.hidden = !cards;
   el.statsLayout.hidden = !stats;
   el.statsControls.hidden = !stats;
   el.conceptsLayout.hidden = !concepts;
+  el.categoriesLayout.hidden = !categories;
   el.tabCards.classList.toggle('active', cards);
   el.tabStats.classList.toggle('active', stats);
   el.tabConcepts.classList.toggle('active', concepts);
+  el.tabCategories.classList.toggle('active', categories);
 }
 
 function getItemsForStatsFilters() {
@@ -1696,6 +1786,91 @@ function renderConceptsTab() {
   `).join('');
 }
 
+function renderCategoriesTab() {
+  const q = S.search.trim().toLowerCase();
+  const rows = CATEGORIES
+    .filter((cat) => !S.excludeDev || !cat.inDevelopment)
+    .filter((cat) => S.artifactType === 'all' || cat.id === S.artifactType)
+    .map((cat) => {
+      const descKey = `category.desc.${cat.id}`;
+      const descRaw = t(descKey);
+      const desc = descRaw === descKey ? '' : descRaw;
+      return { ...cat, desc };
+    })
+    .filter((cat) => {
+      if (!q) return true;
+      const hay = `${cat.id} ${cat.name} ${cat.desc}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+  if (!rows.length) {
+    el.categoriesList.innerHTML = `<div class="empty">${esc(ui('categoriesEmpty'))}</div>`;
+    return;
+  }
+
+  el.categoriesList.innerHTML = rows.map((row) => `
+    <article class="stat-card stat-card--static">
+      <div class="stat-card__name">${esc(row.icon)} ${esc(row.name)}</div>
+      <div class="stat-card__id">${esc(row.id)}</div>
+      <div class="stat-card__desc">${esc(row.desc || '—')}</div>
+      <div class="stat-card__id concept-stats-line">${esc(ui('conceptsInCategory'))}: ${esc(getCategoryConceptNames(row.id))}</div>
+      <div class="stat-card__inspect-hitbox">
+        <button class="stat-card__inspect" type="button" data-category-inspect="${esc(row.id)}" aria-label="Category info">i</button>
+      </div>
+    </article>
+  `).join('');
+
+  el.categoriesList.querySelectorAll('[data-category-inspect]').forEach((node) => {
+    node.addEventListener('click', () => {
+      const categoryId = node.getAttribute('data-category-inspect') || '';
+      openCategoryInspect(categoryId);
+    });
+  });
+}
+
+function getCategoryConceptRows(categoryId) {
+  const conceptIds = CATEGORY_CONCEPT_MAP[categoryId] || [];
+  const rows = [];
+  for (const conceptId of conceptIds) {
+    const info = getConceptInfo(conceptId);
+    if (!info) continue;
+    rows.push({ id: conceptId, ...info });
+  }
+  return rows;
+}
+
+function getCategoryConceptNames(categoryId) {
+  const rows = getCategoryConceptRows(categoryId);
+  if (!rows.length) return ui('noConceptsInCategory');
+  return rows.map((row) => row.title).join(', ');
+}
+
+function openCategoryInspect(categoryId) {
+  const cat = CATEGORIES.find((entry) => entry.id === categoryId);
+  if (!cat || !el.categoryInspectModal) return;
+  const descKey = `category.desc.${cat.id}`;
+  const descRaw = t(descKey);
+  const desc = descRaw === descKey ? '—' : descRaw;
+  const conceptRows = getCategoryConceptRows(cat.id);
+
+  el.categoryInspectTitle.textContent = `${cat.icon} ${cat.name}`;
+  el.categoryInspectDesc.textContent = desc;
+  el.categoryInspectConceptsTitle.textContent = ui('conceptsInCategory');
+  el.categoryInspectConcepts.innerHTML = conceptRows.length
+    ? conceptRows.map((row) => `
+      <div class="fullscreen-modal__concept-card">
+        <div class="fullscreen-modal__concept-title">${esc(row.title)}</div>
+        <div class="fullscreen-modal__concept-desc">${esc(row.desc)}</div>
+      </div>
+    `).join('')
+    : `<div class="empty">${esc(ui('noConceptsInCategory'))}</div>`;
+  el.categoryInspectModal.hidden = false;
+}
+
+function closeCategoryInspect() {
+  if (el.categoryInspectModal) el.categoryInspectModal.hidden = true;
+}
+
 function getScalingDependencies(item) {
   const deps = new Set();
   for (let rarity = 1; rarity <= 4; rarity += 1) {
@@ -1756,6 +1931,11 @@ function render() {
   }
   if (S.tab === 'concepts') {
     renderConceptsTab();
+    syncQueryFromState();
+    return;
+  }
+  if (S.tab === 'categories') {
+    renderCategoriesTab();
     syncQueryFromState();
     return;
   }
@@ -1845,6 +2025,10 @@ el.tabConcepts.addEventListener('click', () => {
   S.tab = 'concepts';
   render();
 });
+el.tabCategories.addEventListener('click', () => {
+  S.tab = 'categories';
+  render();
+});
 el.resetFilters.addEventListener('click', () => {
   S.search = '';
   S.filter = 'all';
@@ -1859,12 +2043,22 @@ el.resetFilters.addEventListener('click', () => {
   render();
 });
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && el.categoryInspectModal && !el.categoryInspectModal.hidden) {
+    closeCategoryInspect();
+    return;
+  }
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
   const next = S.rarity + (event.key === 'ArrowRight' ? 1 : -1);
   if (next < 1 || next > 4) return;
   S.rarity = next;
   render();
 });
+
+if (el.categoryInspectModal) {
+  el.categoryInspectModal.addEventListener('click', (event) => {
+    if (event.target === el.categoryInspectModal) closeCategoryInspect();
+  });
+}
 
 parseInitialStateFromQuery();
 setLocale(S.locale);

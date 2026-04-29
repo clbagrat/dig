@@ -89,11 +89,23 @@ const FUEL_ROCKET_DAMAGE = 20;
 const FUEL_ROCKET_RADIUS = 1;
 const CRYO_ROCKET_DAMAGE = 20;
 const SHARD_DRILL_BLAST_RADIUS = 1.0;
+const BLUEPRINT_CATEGORY_CONCEPT_MAP = {
+  basic: ["breach", "contour", "xp"],
+  economy: ["luck", "xp", "find"],
+  handwork: ["breach", "contour", "fuel"],
+  heat: ["heat", "explosion", "collapse"],
+  выживание: ["fuel", "starvation", "hp", "armor", "concentration"],
+  поиск_бреши: ["breach", "afterburner", "concentration"],
+  ракеты: ["explosion", "collapse", "heat", "afterburner"],
+  контур: ["contour", "contourMonster", "effectDuration"],
+  навигация: ["radar", "beacon", "find"],
+  алхимия: ["beacon", "crystals", "xp"],
+};
 
 const ITEM_INSPECT_STAT_META = new Proxy({
   adrenalineLevel:           { key: "stat.adrenalineLevel",           mode: "percent" },
   armor:                     { key: "stat.armor",                     mode: "armor" },
-  artifactRadarMode:         { key: "stat.artifactRadarMode",         mode: "toggle" },
+  blueprintRadarMode:         { key: "stat.blueprintRadarMode",         mode: "toggle" },
   beaconCatalystLevel:       { key: "stat.beaconCatalystLevel",       mode: "level" },
   bonusFindChance:           { key: "stat.bonusFindChance",           mode: "percent" },
   breachAfterburnerSeconds:  { key: "stat.breachAfterburnerSeconds",  mode: "fixed1" },
@@ -382,7 +394,7 @@ function createGridStateBuffers() {
     steamMask: new Uint8Array(cellCount),
     boulderPocketMask: new Uint8Array(cellCount),
     beaconMask: new Uint8Array(cellCount),
-    artifactMask: new Uint8Array(cellCount),
+    blueprintMask: new Uint8Array(cellCount),
     safeDoorMask: new Int16Array(cellCount),
     keyMask: new Uint8Array(cellCount),
     safeInteriorMask: new Int16Array(cellCount),
@@ -602,7 +614,7 @@ const state = {
   menuOpen: false,
   manualModalOpen: false,
   shopModalOpen: false,
-  beaconActivationAnim: null, // { beacon, startTs, pendingAction, artifactFlightCount, artifactFlightFromX, artifactFlightFromY }
+  beaconActivationAnim: null, // { beacon, startTs, pendingAction, blueprintFlightCount, blueprintFlightFromX, blueprintFlightFromY }
   debugPerkMenuOpen: false,
   debugPerkSelection: "",
   generationEditorText: "",
@@ -637,16 +649,16 @@ const state = {
   gasClouds: [],
   steamJets: [],
   boulders: [],
-  artifactCount: 0,
-  artifactChoiceOpen: false,
-  artifactChoiceMode: "category",
-  artifactChoiceCategories: [],
-  artifactChoicePendingBeacon: null,
-  artifactChoiceRemaining: 0,
-  artifactChoiceGrantSlot: true,
-  artifactChoiceReplaceBaseSlot: false,
-  artifactChoiceBenefitSubtitleKey: "",
-  artifactActivationCount: 0,
+  blueprintCount: 0,
+  blueprintChoiceOpen: false,
+  blueprintChoiceMode: "category",
+  blueprintChoiceCategories: [],
+  blueprintChoicePendingBeacon: null,
+  blueprintChoiceRemaining: 0,
+  blueprintChoiceGrantSlot: true,
+  blueprintChoiceReplaceBaseSlot: false,
+  blueprintChoiceBenefitSubtitleKey: "",
+  blueprintActivationCount: 0,
   // Safe/key system
   safes: [],
   heldKeyForSafe: -1,      // index of safe this key belongs to, -1 = no key
@@ -654,7 +666,7 @@ const state = {
   keyBumpDir: null,
   pickupRadarTimer: 0,     // seconds remaining for pickup radar pulse
   crystalLightRadarTimer: 0, // seconds remaining for temporary crystal radar after light crystal
-  pickupRadarKind: null,   // "artifact" or "key"
+  pickupRadarKind: null,   // "blueprint" or "key"
   pickupRadarTargetX: 0,
   pickupRadarTargetY: 0,
   wormNests: [],
@@ -694,7 +706,7 @@ const state = {
   stunDisplayDuration: 0,
   radarCrystalModule: false,
   navigatorMode: false,
-  artifactRadarMode: false,
+  blueprintRadarMode: false,
   goldRadarMode: false,
   goldClustersCache: null,
   blocksBroken: 0,
@@ -1577,7 +1589,7 @@ const GENERATION_QUICK_FIELDS = [
   { label: "Boulder Pocket Groups", source: "rules.boulderPocketGroups", min: 0, step: 1 },
   { label: "Safe Count", source: "rules.safes", min: 0, step: 1 },
   { label: "Worm Nest Count", source: "rules.wormNests", min: 0, step: 1 },
-  { label: "Artifact Count", source: "rules.artifacts", min: 0, step: 1 },
+  { label: "Blueprint Count", source: "rules.blueprints", min: 0, step: 1 },
   { label: "Minimum Crystals", source: "rules.minCrystals", min: 0, step: 1 },
   { label: "Maximum Crystals", source: "rules.maxCrystals", min: 0, step: 1 },
   { label: "Hardness Bias", source: "rules.hardnessBias", min: -5, max: 5, step: 0.1, defaultValue: 0 },
@@ -2484,17 +2496,17 @@ function setupField(seedOverride = null) {
   state.steamPocketMask.fill(0);
   state.boulderPocketMask.fill(0);
   state.beaconMask.fill(0);
-  state.artifactMask.fill(0);
-  state.artifactCount = 0;
-  state.artifactChoiceOpen = false;
-  state.artifactChoiceMode = "category";
-  state.artifactChoiceCategories = [];
-  state.artifactChoicePendingBeacon = null;
-  state.artifactChoiceRemaining = 0;
-  state.artifactChoiceGrantSlot = true;
-  state.artifactChoiceReplaceBaseSlot = false;
-  state.artifactChoiceBenefitSubtitleKey = "";
-  state.artifactActivationCount = 0;
+  state.blueprintMask.fill(0);
+  state.blueprintCount = 0;
+  state.blueprintChoiceOpen = false;
+  state.blueprintChoiceMode = "category";
+  state.blueprintChoiceCategories = [];
+  state.blueprintChoicePendingBeacon = null;
+  state.blueprintChoiceRemaining = 0;
+  state.blueprintChoiceGrantSlot = true;
+  state.blueprintChoiceReplaceBaseSlot = false;
+  state.blueprintChoiceBenefitSubtitleKey = "";
+  state.blueprintActivationCount = 0;
   resetShopState();
   state.safes.length = 0;
   state.wormNests.length = 0;
@@ -2632,7 +2644,7 @@ function setupField(seedOverride = null) {
   state.stunDisplayDuration = 0;
   state.radarCrystalModule = false;
   state.navigatorMode = false;
-  state.artifactRadarMode = false;
+  state.blueprintRadarMode = false;
   state.goldRadarMode = false;
   state.goldClustersCache = null;
   state.blocksBroken = 0;
@@ -2778,7 +2790,7 @@ function setupField(seedOverride = null) {
   state.steamPocketMask.set(map.steamPocketMask);
   state.boulderPocketMask.set(map.boulderPocketMask);
   state.beaconMask.set(map.beaconMask);
-  state.artifactMask.set(map.artifactMask);
+  state.blueprintMask.set(map.blueprintMask);
   state.tunnelMask.fill(0);
   state.microResourceMask.fill(0);
   state.microResourceRevealedMask.fill(0);
@@ -3074,7 +3086,7 @@ function isCollapseCandidateCell(x, y) {
   if (
     state.perkMask[index] > 0 ||
     state.crystalMask[index] > 0 ||
-    state.artifactMask[index] > 0 ||
+    state.blueprintMask[index] > 0 ||
     state.keyMask[index] > 0 ||
     state.goldPickupMask[index] > 0 ||
     state.xpPickupMask[index] > 0 ||
@@ -3942,8 +3954,8 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
       state.perkText = t("perk.tile.drill.name");
       break;
     case 4: {
-      const targetX = clamp(x + state.drill.facingX * 2, 1, GRID_W - 2);
-      const targetY = clamp(y + state.drill.facingY * 2, 1, GRID_H - 2);
+      const targetX = clamp(x + state.drill.facingX * 3, 1, GRID_W - 2);
+      const targetY = clamp(y + state.drill.facingY * 3, 1, GRID_H - 2);
       spawnRocketEffect(x, y, targetX, targetY, {
         kind: "radiusBomb",
         damage: BASE_DRILL_DAMAGE * 10,
@@ -4392,8 +4404,8 @@ function applyItemEffect(effect, rarityMult, rarity) {
     if (stat === "goldRadarMode") {
       state.goldRadarMode = true;
       state.goldClustersCache = null;
-    } else if (stat === "artifactRadarMode") {
-      state.artifactRadarMode = true;
+    } else if (stat === "blueprintRadarMode") {
+      state.blueprintRadarMode = true;
     } else if (stat === "navigatorMode") {
       state.navigatorMode = true;
     } else if (stat === "radarCrystalModule") {
@@ -5213,7 +5225,7 @@ function syncItemInspectModal() {
   overlay.style.cssText = [
     "position:absolute",
     "inset:0",
-    "z-index:9998",
+    "z-index:10001",
     "display:flex",
     "visibility:visible",
     "pointer-events:auto",
@@ -5435,13 +5447,15 @@ function bindUi() {
   const menuSummaryStatsTitle = document.getElementById("menuSummaryStatsTitle");
   const itemInspectOverlay = document.getElementById("itemInspectModal");
   const itemInspectPanel = itemInspectOverlay?.querySelector(".item-inspect-modal__panel");
+  const blueprintCategoryInspectOverlay = document.getElementById("blueprintCategoryInspectModal");
+  const blueprintCategoryInspectPanel = document.getElementById("blueprintCategoryInspectPanel");
   const debugClose = document.getElementById("debugPerkClose");
   const debugOverlay = document.getElementById("debugPerkMenu");
   const debugPanel = debugOverlay?.querySelector(".debug-perk-menu__panel");
   const debugGenerationSection = document.getElementById("debugGenerationSection");
   const crystalRewardOverlay = document.getElementById("crystalReward");
   const crystalRewardClose = document.getElementById("crystalRewardClose");
-  const artifactChoiceOverlay = document.getElementById("artifactChoice");
+  const blueprintChoiceOverlay = document.getElementById("blueprintChoice");
   const levelUpOverlay = document.getElementById("levelUpModal");
   const keysDown = new Set();
 
@@ -5925,6 +5939,24 @@ function bindUi() {
     });
   }
 
+  if (blueprintCategoryInspectOverlay) {
+    blueprintCategoryInspectOverlay.addEventListener("click", (event) => {
+      if (event.target !== blueprintCategoryInspectOverlay) {
+        return;
+      }
+      closeBlueprintCategoryInspectModal();
+    });
+  }
+
+  if (blueprintCategoryInspectPanel) {
+    blueprintCategoryInspectPanel.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    blueprintCategoryInspectPanel.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+  }
+
   if (manualPanel) {
     manualPanel.addEventListener("pointerdown", (event) => {
       event.stopPropagation();
@@ -5993,10 +6025,10 @@ function bindUi() {
     });
   }
 
-  const debugGiveArtifact = document.getElementById("debugGiveArtifact");
-  if (debugGiveArtifact) {
-    debugGiveArtifact.addEventListener("click", () => {
-      state.artifactCount++;
+  const debugGiveBlueprint = document.getElementById("debugGiveBlueprint");
+  if (debugGiveBlueprint) {
+    debugGiveBlueprint.addEventListener("click", () => {
+      state.blueprintCount++;
       showPerkToast(t("toast.artifact_given"));
       state.debugPerkMenuOpen = false;
       syncDebugPerkOverlay();
@@ -6359,16 +6391,24 @@ function bindUi() {
     });
   }
 
-  if (artifactChoiceOverlay) {
-    artifactChoiceOverlay.addEventListener("click", (event) => {
-      const continueBtn = event.target.closest("#artifactChoiceContinue");
+  if (blueprintChoiceOverlay) {
+    blueprintChoiceOverlay.addEventListener("click", (event) => {
+      const inspectBtn = event.target.closest(".blueprint-choice__card-inspect");
+      if (inspectBtn) {
+        event.stopPropagation();
+        const categoryId = inspectBtn.dataset.categoryInspect || "";
+        const category = state.blueprintChoiceCategories.find((cat) => cat.id === categoryId);
+        if (category) openBlueprintCategoryInspectModal(category);
+        return;
+      }
+      const continueBtn = event.target.closest("#blueprintChoiceContinue");
       if (continueBtn) {
         continueArtifactBenefitChoice();
         return;
       }
-      const card = event.target.closest(".artifact-choice__card");
+      const card = event.target.closest(".blueprint-choice__card");
       if (!card) return;
-      const idx = card.id === "artifactChoiceCard0" ? 0 : 1;
+      const idx = card.id === "blueprintChoiceCard0" ? 0 : 1;
       pickArtifactChoice(idx);
     });
   }
@@ -6826,7 +6866,7 @@ function maybeOpenPendingLevelReward() {
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
     state.crystalRewardModalOpen ||
-    state.artifactChoiceOpen ||
+    state.blueprintChoiceOpen ||
     state.isChoosingPerk
   ) {
     return;
@@ -6887,7 +6927,7 @@ function closeLevelUpModal() {
 }
 
 function grantLevelRewardArtifact() {
-  state.artifactCount++;
+  state.blueprintCount++;
   showPerkToast(t("toast.artifact_received"));
 }
 
@@ -6954,10 +6994,10 @@ function claimLevelReward(choiceId) {
   maybeOpenPendingLevelReward();
 }
 
-// ─── Artifact choice modal ────────────────────────────────────────────────────
+// ─── Blueprint choice modal ────────────────────────────────────────────────────
 
 function openNextArtifactChoice() {
-  if (state.artifactChoiceRemaining <= 0) {
+  if (state.blueprintChoiceRemaining <= 0) {
     state.shopModalOpen = true;
     syncTouchZonesInteractivity();
     playSound("shop_open");
@@ -6965,9 +7005,9 @@ function openNextArtifactChoice() {
     return;
   }
 
-  state.artifactChoiceRemaining--;
-  state.artifactActivationCount += 1;
-  const activation = state.artifactActivationCount;
+  state.blueprintChoiceRemaining--;
+  state.blueprintActivationCount += 1;
+  const activation = state.blueprintActivationCount;
   addSlot();
 
   if (activation <= 2) {
@@ -7011,27 +7051,27 @@ function beginArtifactCategoryChoice({ grantSlot, replaceBaseSlot }) {
     openNextArtifactChoice();
     return;
   }
-  state.artifactChoiceMode = "category";
-  state.artifactChoiceGrantSlot = !!grantSlot;
-  state.artifactChoiceReplaceBaseSlot = !!replaceBaseSlot;
+  state.blueprintChoiceMode = "category";
+  state.blueprintChoiceGrantSlot = !!grantSlot;
+  state.blueprintChoiceReplaceBaseSlot = !!replaceBaseSlot;
   if (locked.length === 1) {
     applyArtifactCategoryChoice(locked[0]);
     openNextArtifactChoice();
     return;
   }
-  // 2+ locked: show choice modal for this artifact
+  // 2+ locked: show choice modal for this blueprint
   const shuffled = locked.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  state.artifactChoiceCategories = [shuffled[0], shuffled[1]];
+  state.blueprintChoiceCategories = [shuffled[0], shuffled[1]];
   openArtifactChoice();
 }
 
 function applyArtifactCategoryChoice(chosen) {
   unlockCategory(chosen.id);
-  if (state.artifactChoiceReplaceBaseSlot) {
+  if (state.blueprintChoiceReplaceBaseSlot) {
     replaceOneBaseOfferWithSpecial();
     showPerkToast(t("toast.artifact_replace_basic_offer"));
   }
@@ -7039,32 +7079,32 @@ function applyArtifactCategoryChoice(chosen) {
 }
 
 function openArtifactBenefitChoice(subtitleKey) {
-  state.artifactChoiceMode = "benefit";
-  state.artifactChoiceCategories = [];
-  state.artifactChoiceBenefitSubtitleKey = subtitleKey;
+  state.blueprintChoiceMode = "benefit";
+  state.blueprintChoiceCategories = [];
+  state.blueprintChoiceBenefitSubtitleKey = subtitleKey;
   openArtifactChoice();
 }
 
 function openArtifactChoice() {
-  state.artifactChoiceOpen = true;
+  state.blueprintChoiceOpen = true;
   syncTouchZonesInteractivity();
-  const overlay = document.getElementById("artifactChoice");
+  const overlay = document.getElementById("blueprintChoice");
   if (!overlay) return;
   overlay.hidden = false;
   overlay.style.cssText =
     "position:absolute;inset:0;z-index:9999;display:flex;visibility:visible;pointer-events:auto;opacity:1;align-items:center;justify-content:center;background:rgba(10,8,6,0.85);";
 
-  const titleEl = document.getElementById("artifactChoiceTitle");
-  const subtitleEl = document.getElementById("artifactChoiceSubtitle");
-  const cardsRoot = document.getElementById("artifactChoiceCards");
-  const continueBtn = document.getElementById("artifactChoiceContinue");
-  const isBenefitMode = state.artifactChoiceMode === "benefit";
+  const titleEl = document.getElementById("blueprintChoiceTitle");
+  const subtitleEl = document.getElementById("blueprintChoiceSubtitle");
+  const cardsRoot = document.getElementById("blueprintChoiceCards");
+  const continueBtn = document.getElementById("blueprintChoiceContinue");
+  const isBenefitMode = state.blueprintChoiceMode === "benefit";
 
   if (titleEl) titleEl.textContent = isBenefitMode ? t("ui.artifact_benefit_title") : t("ui.choose_category");
   if (subtitleEl) {
     if (isBenefitMode) {
-      subtitleEl.textContent = t(state.artifactChoiceBenefitSubtitleKey || "ui.artifact_subtitle");
-    } else if (state.artifactChoiceReplaceBaseSlot) {
+      subtitleEl.textContent = t(state.blueprintChoiceBenefitSubtitleKey || "ui.artifact_subtitle");
+    } else if (state.blueprintChoiceReplaceBaseSlot) {
       subtitleEl.textContent = t("ui.artifact_subtitle_replace_basic");
     } else {
       subtitleEl.textContent = t("ui.artifact_subtitle");
@@ -7079,49 +7119,121 @@ function openArtifactChoice() {
     return;
   }
 
-  const [t0, t1] = state.artifactChoiceCategories;
-  const card0 = document.getElementById("artifactChoiceCard0");
-  const card1 = document.getElementById("artifactChoiceCard1");
+  const [t0, t1] = state.blueprintChoiceCategories;
+  const card0 = document.getElementById("blueprintChoiceCard0");
+  const card1 = document.getElementById("blueprintChoiceCard1");
   if (card0) card0.innerHTML = buildArtifactChoiceCard(t0);
   if (card1) card1.innerHTML = buildArtifactChoiceCard(t1);
 }
 
+function getBlueprintCategoryConceptRows(categoryId) {
+  const conceptIds = BLUEPRINT_CATEGORY_CONCEPT_MAP[categoryId] || [];
+  const rows = [];
+  for (const conceptId of conceptIds) {
+    const titleKey = `inspect.concept.${conceptId}.title`;
+    const descKey = `inspect.concept.${conceptId}.desc`;
+    const title = t(titleKey);
+    const desc = t(descKey);
+    if (title === titleKey || desc === descKey) continue;
+    rows.push({ title, desc });
+  }
+  return rows;
+}
+
+function openBlueprintCategoryInspectModal(category) {
+  if (!category) return;
+  const descKey = `category.desc.${category.id}`;
+  const descRaw = t(descKey);
+  const desc = descRaw === descKey ? "—" : descRaw;
+  const conceptRows = getBlueprintCategoryConceptRows(category.id);
+  const modal = document.getElementById("blueprintCategoryInspectModal");
+  if (!modal) return;
+  const icon = document.getElementById("blueprintCategoryInspectIcon");
+  const name = document.getElementById("blueprintCategoryInspectName");
+  const rarity = document.getElementById("blueprintCategoryInspectRarity");
+  const tags = document.getElementById("blueprintCategoryInspectTags");
+  const descEl = document.getElementById("blueprintCategoryInspectDesc");
+  const conceptsWrap = document.getElementById("blueprintCategoryInspectConcepts");
+  const conceptsList = document.getElementById("blueprintCategoryInspectStats");
+
+  if (icon) icon.textContent = category.icon || "✦";
+  if (name) name.textContent = category.name;
+  if (rarity) rarity.textContent = t("ui.choose_category");
+  if (tags) {
+    tags.innerHTML = `<span class="shop-tag">${category.icon} ${category.name}</span>`;
+  }
+  if (descEl) {
+    descEl.textContent = desc;
+  }
+  if (conceptsList) {
+    if (!conceptRows.length) {
+      conceptsList.innerHTML = `<div class="shop-inspect-modal__stat"><div class="shop-inspect-modal__stat-desc">${t("ui.no_concepts_mapped")}</div></div>`;
+      if (conceptsWrap) conceptsWrap.hidden = false;
+    } else {
+      conceptsList.innerHTML = conceptRows.map((row) => `
+        <div class="shop-inspect-modal__stat">
+          <div class="shop-inspect-modal__stat-name">${row.title}</div>
+          <div class="shop-inspect-modal__stat-desc">${row.desc}</div>
+        </div>
+      `).join("");
+      if (conceptsWrap) conceptsWrap.hidden = false;
+    }
+  }
+  modal.hidden = false;
+  modal.style.cssText = "z-index:10002;";
+  syncTouchZonesInteractivity();
+}
+
+function closeBlueprintCategoryInspectModal() {
+  const modal = document.getElementById("blueprintCategoryInspectModal");
+  if (!modal) return;
+  modal.hidden = true;
+  modal.style.cssText = "";
+  syncTouchZonesInteractivity();
+}
+
 function buildArtifactChoiceCard(category) {
-  const nodeText = state.artifactChoiceGrantSlot ? t("ui.hull_slot") : t("ui.replace_basic_offer");
+  const nodeText = state.blueprintChoiceGrantSlot ? t("ui.hull_slot") : t("ui.replace_basic_offer");
+  const descKey = `category.desc.${category.id}`;
+  const descText = t(descKey);
+  const hasDesc = descText && descText !== descKey;
   return `
-    <div class="artifact-choice__card-icon">${category.icon}</div>
-    <div class="artifact-choice__card-name">${category.name}</div>
-    <div class="artifact-choice__card-nodes"><div class="artifact-choice__node">${nodeText}</div></div>
+    <div class="blueprint-choice__card-icon">${category.icon}</div>
+    <div class="blueprint-choice__card-name">${category.name}</div>
+    ${hasDesc ? `<div class="blueprint-choice__card-desc">${descText}</div>` : ""}
+    <div class="blueprint-choice__card-nodes"><div class="blueprint-choice__node">${nodeText}</div></div>
+    <button class="blueprint-choice__card-inspect" type="button" data-category-inspect="${category.id}" aria-label="${t("ui.description")}">i</button>
   `;
 }
 
 function pickArtifactChoice(idx) {
-  if (!state.artifactChoiceOpen || state.artifactChoiceMode !== "category" || !state.artifactChoiceCategories[idx]) return;
-  const chosen = state.artifactChoiceCategories[idx];
+  if (!state.blueprintChoiceOpen || state.blueprintChoiceMode !== "category" || !state.blueprintChoiceCategories[idx]) return;
+  const chosen = state.blueprintChoiceCategories[idx];
   applyArtifactCategoryChoice(chosen);
   closeArtifactChoice();
   openNextArtifactChoice();
 }
 
 function continueArtifactBenefitChoice() {
-  if (!state.artifactChoiceOpen || state.artifactChoiceMode !== "benefit") return;
+  if (!state.blueprintChoiceOpen || state.blueprintChoiceMode !== "benefit") return;
   closeArtifactChoice();
   openNextArtifactChoice();
 }
 
 function closeArtifactChoice() {
-  state.artifactChoiceOpen = false;
-  state.artifactChoiceMode = "category";
-  state.artifactChoiceGrantSlot = true;
-  state.artifactChoiceReplaceBaseSlot = false;
-  state.artifactChoiceBenefitSubtitleKey = "";
-  state.artifactChoiceCategories = [];
-  state.artifactChoicePendingBeacon = null;
-  const overlay = document.getElementById("artifactChoice");
+  state.blueprintChoiceOpen = false;
+  state.blueprintChoiceMode = "category";
+  state.blueprintChoiceGrantSlot = true;
+  state.blueprintChoiceReplaceBaseSlot = false;
+  state.blueprintChoiceBenefitSubtitleKey = "";
+  state.blueprintChoiceCategories = [];
+  state.blueprintChoicePendingBeacon = null;
+  const overlay = document.getElementById("blueprintChoice");
   if (overlay) {
     overlay.hidden = true;
     overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
   }
+  closeBlueprintCategoryInspectModal();
   syncTouchZonesInteractivity();
 }
 
@@ -7191,7 +7303,7 @@ function isAnyBlockingModalOpen() {
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
     state.crystalRewardModalOpen ||
-    state.artifactChoiceOpen ||
+    state.blueprintChoiceOpen ||
     state.levelUpModalOpen ||
     state.crystalItemOfferOpen
   );
@@ -7315,7 +7427,7 @@ function update(dt) {
     state.manualModalOpen ||
     state.shopModalOpen ||
     state.debugPerkMenuOpen ||
-    state.artifactChoiceOpen ||
+    state.blueprintChoiceOpen ||
     state.levelUpModalOpen ||
     state.isChoosingPerk
   ) {
@@ -9325,9 +9437,9 @@ function addFuel(amount, originX = state.drill.x, originY = state.drill.y, optio
 }
 
 function dropArtifactOnDamage() {
-  if (state.artifactCount <= 0) return;
+  if (state.blueprintCount <= 0) return;
   playSound("artifact_drop");
-  state.artifactCount--;
+  state.blueprintCount--;
   const dx = state.drill.facingX;
   const dy = state.drill.facingY;
   const candidates = [
@@ -9341,12 +9453,12 @@ function dropArtifactOnDamage() {
     const ci = cellIndex(c.x, c.y);
     if (!state.tunnelMask[ci]) continue;
     if (c.x === state.drill.x && c.y === state.drill.y) continue;
-    state.artifactMask[ci] = 1;
+    state.blueprintMask[ci] = 1;
     showPerkToast(t("toast.artifact_lost"));
     return;
   }
   // Fallback: drop on self
-  state.artifactMask[cellIndex(state.drill.x, state.drill.y)] = 1;
+  state.blueprintMask[cellIndex(state.drill.x, state.drill.y)] = 1;
   showPerkToast(t("toast.artifact_lost"));
 }
 
@@ -9409,11 +9521,11 @@ function openSafeDoor(safeIdx, doorX, doorY) {
     state.droppedGoldMask[ci] += goldPerCell + (remainder > 0 ? 1 : 0);
     if (remainder > 0) remainder--;
   }
-  // 50/50: artifact or 3 random perks (+damage=3, +speed=5)
+  // 50/50: blueprint or 3 random perks (+damage=3, +speed=5)
   if (Math.random() < 0.5) {
-    // Artifact in center
+    // Blueprint in center
     const center = cells[Math.floor(cells.length / 2)];
-    state.artifactMask[cellIndex(center.x, center.y)] = 1;
+    state.blueprintMask[cellIndex(center.x, center.y)] = 1;
     showPerkToast(t("toast.safe_opened_artifact"));
   } else {
     // 3 random perks: damage(3) or speed(5)
@@ -10622,10 +10734,10 @@ function recordPlayerMove(fromX, fromY, toX, toY) {
   if (crystalOnTile > 0 && state.tunnelMask[moveIndex]) {
     collectCrystalTile(toX, toY, moveIndex, crystalOnTile);
   }
-  // Pick up artifact by walking over it — currency, no restrictions
-  if (state.artifactMask[moveIndex] > 0) {
-    state.artifactMask[moveIndex] = 0;
-    state.artifactCount++;
+  // Pick up blueprint by walking over it — currency, no restrictions
+  if (state.blueprintMask[moveIndex] > 0) {
+    state.blueprintMask[moveIndex] = 0;
+    state.blueprintCount++;
     playSound("artifact_pickup");
     showPerkToast(t("toast.artifact_picked_up"));
   }
@@ -11055,7 +11167,7 @@ function updateDrill(dt) {
     return;
   }
 
-  // While carrying key: cannot drill, drop by bumping wall for 1s (same as artifact)
+  // While carrying key: cannot drill, drop by bumping wall for 1s (same as blueprint)
   if (state.heldKeyForSafe >= 0) {
     // Check if bumping into this safe's door — open it!
     const doorVal = state.safeDoorMask[targetIndex];
@@ -11514,11 +11626,11 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         state.gold += Math.floor(state.unsafeGold);
         state.unsafeGold = 0;
       }
-      // Drain all artifacts now; each one will show a sequential choice modal
-      const artifactRemaining = state.artifactCount;
-      state.artifactCount = 0;
-      const pendingAction = artifactRemaining > 0
-        ? { type: "artifactChoice", remaining: artifactRemaining, beacon }
+      // Drain all blueprints now; each one will show a sequential choice modal
+      const blueprintRemaining = state.blueprintCount;
+      state.blueprintCount = 0;
+      const pendingAction = blueprintRemaining > 0
+        ? { type: "blueprintChoice", remaining: blueprintRemaining, beacon }
         : { type: "shop", beaconY: beacon.y };
       showPerkToast(t("toast.beacon_activated"));
       addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
@@ -11526,9 +11638,9 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
         beacon,
         startTs: beacon.activationAnimStart,
         pendingAction,
-        artifactFlightCount: artifactRemaining,
-        artifactFlightFromX: state.drill.renderX,
-        artifactFlightFromY: state.drill.renderY,
+        blueprintFlightCount: blueprintRemaining,
+        blueprintFlightFromX: state.drill.renderX,
+        blueprintFlightFromY: state.drill.renderY,
       };
     }
   }
@@ -12869,23 +12981,23 @@ function render() {
   renderHiddenBeaconReveal(camera);
   renderBeaconWires(camera, startX, endX, startY, endY);
 
-  // Artifact, key & worm nest overlay pass — drawn after all tiles so waves aren't clipped
+  // Blueprint, key & worm nest overlay pass — drawn after all tiles so waves aren't clipped
   for (let y = startY; y < endY; y += 1) {
     for (let x = startX; x < endX; x += 1) {
       const idx = cellIndex(x, y);
-      const hasArtifact = state.artifactMask[idx] > 0;
+      const hasBlueprint = state.blueprintMask[idx] > 0;
       const hasKey = state.keyMask[idx] > 0;
       let isNest = false;
       for (const n of state.wormNests) {
         if (!n.destroyed && n.x === x && n.y === y) { isNest = true; break; }
       }
-      if (!hasArtifact && !hasKey && !isNest) continue;
+      if (!hasBlueprint && !hasKey && !isNest) continue;
       const alpha = state.visibleAlpha[idx];
       if (alpha < 0.01) continue;
       const sx = x * TILE_SIZE - camera.x;
       const sy = y * TILE_SIZE - camera.y;
       if (alpha < 0.999) ctx.globalAlpha = alpha;
-      if (hasArtifact) renderArtifactTile(x, y, sx, sy);
+      if (hasBlueprint) renderArtifactTile(x, y, sx, sy);
       if (hasKey) renderKeyTile(x, y, sx, sy);
       if (isNest) renderWormNestTile(x, y, sx, sy);
       if (alpha < 0.999) ctx.globalAlpha = 1;
@@ -13262,9 +13374,9 @@ function updateBeaconActivationAnim() {
   // Animation done — execute pending action
   state.beaconActivationAnim = null;
   const pa = anim.pendingAction;
-  if (pa.type === "artifactChoice") {
-    state.artifactChoiceRemaining = pa.remaining;
-    state.artifactChoicePendingBeacon = pa.beacon;
+  if (pa.type === "blueprintChoice") {
+    state.blueprintChoiceRemaining = pa.remaining;
+    state.blueprintChoicePendingBeacon = pa.beacon;
     openNextArtifactChoice();
   } else {
     state.shopModalOpen = true;
@@ -13811,14 +13923,14 @@ function renderOneBeaconRadar(camera, beacon) {
     }
   }
 
-  // Artifact compass indicator: nearest artifact on the map
+  // Blueprint compass indicator: nearest blueprint on the map
   let artAngle = null;
   let artDotX = 0, artDotY = 0;
-  if (state.artifactRadarMode) {
+  if (state.blueprintRadarMode) {
     let bestDist = Infinity;
     for (let y = 0; y < GRID_H; y++) {
       for (let x = 0; x < GRID_W; x++) {
-        if (!state.artifactMask[y * GRID_W + x]) continue;
+        if (!state.blueprintMask[y * GRID_W + x]) continue;
         const dx = (x + 0.5) - (beacon.x + 0.5);
         const dy = (y + 0.5) - (beacon.y + 0.5);
         const d = Math.hypot(dx, dy);
@@ -13893,16 +14005,16 @@ function renderOneBeaconRadar(camera, beacon) {
   ctx.save();
   ctx.globalAlpha = visAlpha;
 
-  // Artifact transfer flight during beacon activation.
+  // Blueprint transfer flight during beacon activation.
   const activationAnim = state.beaconActivationAnim;
   const canRenderArtifactFlight =
     activationAnim &&
     activationAnim.beacon === beacon &&
-    (activationAnim.artifactFlightCount || 0) > 0 &&
+    (activationAnim.blueprintFlightCount || 0) > 0 &&
     animT < 1;
   if (canRenderArtifactFlight) {
-    const fromX = (activationAnim.artifactFlightFromX + 0.5) * TILE_SIZE - camera.x;
-    const fromY = (activationAnim.artifactFlightFromY + 0.5) * TILE_SIZE - camera.y;
+    const fromX = (activationAnim.blueprintFlightFromX + 0.5) * TILE_SIZE - camera.x;
+    const fromY = (activationAnim.blueprintFlightFromY + 0.5) * TILE_SIZE - camera.y;
     const flightT = clamp(animT / 0.55, 0, 1);
     const flightEase = 1 - Math.pow(1 - flightT, 3);
     const prevEase = 1 - Math.pow(1 - Math.max(0, flightT - 0.07), 3);
@@ -14053,7 +14165,7 @@ function renderOneBeaconRadar(camera, beacon) {
     }
   }
 
-  // --- Artifact compass indicator (purple) ---
+  // --- Blueprint compass indicator (purple) ---
   if (artAngle !== null) {
     if (lineEase > 0) {
       const aLineDotX = midX + Math.cos(artAngle) * radius * lineEase;
@@ -14120,7 +14232,7 @@ function renderOneBeaconRadar(camera, beacon) {
 function triggerPickupRadar(kind, fromX, fromY) {
   let bestDist = Infinity;
   let bestX = 0, bestY = 0;
-  if (kind === "artifact") {
+  if (kind === "blueprint") {
     // Find nearest inactive beacon
     for (const b of state.beacons) {
       if (b.active) continue;
@@ -14410,7 +14522,7 @@ function renderWormNestTile(x, y, sx, sy) {
 
 function renderArtifactTile(x, y, sx, sy) {
   const index = cellIndex(x, y);
-  if (!state.artifactMask[index]) return;
+  if (!state.blueprintMask[index]) return;
 
   const ctx = state.ctx;
   const t = state.lastTs || 0;
@@ -15479,7 +15591,9 @@ function renderDepthTitle() {
   const fadeOut = clamp(state.depthTitle.time / 0.45, 0, 1);
   const alpha = Math.min(fadeIn, fadeOut);
   const x = state.width * 0.5;
-  const y = 90 - (1 - alpha) * 12;
+  // Place depth announce below HUD, closer to screen center.
+  const baseY = Math.min(state.height * 0.48, 230);
+  const y = baseY - (1 - alpha) * 10;
   const text = state.depthTitle.text;
 
   ctx.save();
@@ -16057,10 +16171,10 @@ function renderHudCoreStats(x, y, width, title) {
     ctx.fillText(unsafeText, unsafeX, goldRowY);
   }
 
-  // Artifact row — below gold, same style
-  const artifactRowY = goldRowY + rowHeight;
+  // Blueprint row — below gold, same style
+  const blueprintRowY = goldRowY + rowHeight;
   ctx.save();
-  ctx.translate(x + 20, artifactRowY);
+  ctx.translate(x + 20, blueprintRowY);
   ctx.strokeStyle = "#b078e0";
   ctx.lineWidth = 1.5;
   ctx.fillStyle = "#7a40b0";
@@ -16078,15 +16192,15 @@ function renderHudCoreStats(x, y, width, title) {
 
   ctx.font = `700 11px ${HUD_FONT}`;
   ctx.textAlign = "left";
-  const artifactText = `${state.artifactCount}`;
+  const blueprintText = `${state.blueprintCount}`;
   ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
   ctx.lineWidth = 3;
-  ctx.strokeText(artifactText, x + 36, artifactRowY);
+  ctx.strokeText(blueprintText, x + 36, blueprintRowY);
   ctx.fillStyle = "#e8d0ff";
-  ctx.fillText(artifactText, x + 36, artifactRowY);
+  ctx.fillText(blueprintText, x + 36, blueprintRowY);
 
   for (let i = 0; i < rows.length; i += 1) {
-    const rowY = artifactRowY + (i + 1) * rowHeight;
+    const rowY = blueprintRowY + (i + 1) * rowHeight;
     renderHudMiniPerkIcon(rows[i].perkType, x + 20, rowY, 18);
     ctx.strokeStyle = "rgba(24, 12, 8, 0.82)";
     ctx.lineWidth = 3;
@@ -16371,7 +16485,7 @@ function prepareCutsceneField() {
   state.steamPocketMask.fill(0);
   state.boulderPocketMask.fill(0);
   state.beaconMask.fill(0);
-  state.artifactMask.fill(0);
+  state.blueprintMask.fill(0);
   state.safeDoorMask.fill(0);
   state.keyMask.fill(0);
   state.safeInteriorMask.fill(0);
@@ -16809,7 +16923,7 @@ function resetCutsceneTo(time = 0) {
   state.steamPocketMask.fill(0);
   state.boulderPocketMask.fill(0);
   state.beaconMask.fill(0);
-  state.artifactMask.fill(0);
+  state.blueprintMask.fill(0);
   state.safeDoorMask.fill(0);
   state.keyMask.fill(0);
   state.safeInteriorMask.fill(0);
@@ -16966,7 +17080,7 @@ function initDebugMapMode() {
     // Marker layers — drawn on top of real game tiles
     const MARKERS = [
       { id: "beacon",   label: t("map.beacon"),   color: "#ff8800", visible: true },
-      { id: "artifact", label: t("map.artifact"), color: "#ffff50", visible: true },
+      { id: "blueprint", label: t("map.blueprint"), color: "#ffff50", visible: true },
       { id: "safe",     label: t("map.safe"),     color: "#8888ff", visible: true },
       { id: "worm",     label: t("map.worm"),     color: "#ff4444", visible: true },
       { id: "boulder",  label: t("map.boulder"),  color: "#c8a040", visible: true },
@@ -16999,10 +17113,10 @@ function initDebugMapMode() {
     }
 
     if (markerOn("beacon"))   state.beacons.forEach((b) => dot(b.x, b.y, "#ff8800", "#fff"));
-    if (markerOn("artifact")) {
+    if (markerOn("blueprint")) {
       for (let y = 0; y < GRID_H; y++)
         for (let x = 0; x < GRID_W; x++)
-          if (state.artifactMask[cellIndex(x, y)]) dot(x, y, "#ffff50", "#000");
+          if (state.blueprintMask[cellIndex(x, y)]) dot(x, y, "#ffff50", "#000");
     }
     if (markerOn("safe"))  state.safes.forEach((s) => dot(s.x, s.y, "#8888ff", "#fff"));
     if (markerOn("worm"))  state.wormNests.forEach((n) => dot(n.x, n.y, "#ff4444", "#faa"));
@@ -17134,11 +17248,11 @@ function initDebugMapMode() {
   function getLocations(id) {
     switch (id) {
       case "beacon":   return state.beacons.map((b) => ({ x: b.x, y: b.y }));
-      case "artifact": {
+      case "blueprint": {
         const locs = [];
         for (let y = 0; y < GRID_H; y++)
           for (let x = 0; x < GRID_W; x++)
-            if (state.artifactMask[cellIndex(x, y)]) locs.push({ x, y });
+            if (state.blueprintMask[cellIndex(x, y)]) locs.push({ x, y });
         return locs;
       }
       case "safe":    return state.safes.map((s) => ({ x: s.x, y: s.y }));

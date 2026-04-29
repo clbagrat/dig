@@ -678,9 +678,9 @@ strong {
   }
 }
 
-/* ── Artifact choice modal ────────────────────────────────── */
+/* ── Blueprint choice modal ────────────────────────────────── */
 
-.artifact-choice {
+.blueprint-choice {
   position: absolute;
   inset: 0;
   z-index: 9999;
@@ -694,11 +694,11 @@ strong {
   touch-action: manipulation;
 }
 
-.artifact-choice[hidden] {
+.blueprint-choice[hidden] {
   display: none;
 }
 
-.artifact-choice__panel {
+.blueprint-choice__panel {
   width: min(100%, 520px);
   border: 1px solid rgba(180, 120, 255, 0.3);
   border-radius: 22px;
@@ -711,30 +711,30 @@ strong {
     0 18px 42px var(--shadow);
 }
 
-.artifact-choice__title {
+.blueprint-choice__title {
   font-size: 26px;
   font-weight: 700;
   color: #e8d0ff;
 }
 
-.artifact-choice__subtitle {
+.blueprint-choice__subtitle {
   margin-top: 6px;
   color: var(--muted);
   font-size: 14px;
 }
 
-.artifact-choice__cards {
+.blueprint-choice__cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-top: 20px;
 }
 
-.artifact-choice__cards[hidden] {
+.blueprint-choice__cards[hidden] {
   display: none;
 }
 
-.artifact-choice__continue {
+.blueprint-choice__continue {
   margin-top: 20px;
   width: 100%;
   padding: 12px 14px;
@@ -752,22 +752,22 @@ strong {
   transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
 }
 
-.artifact-choice__continue:hover,
-.artifact-choice__continue:focus-visible {
+.blueprint-choice__continue:hover,
+.blueprint-choice__continue:focus-visible {
   border-color: rgba(200, 160, 255, 0.65);
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(140, 80, 220, 0.25);
 }
 
-.artifact-choice__continue:active {
+.blueprint-choice__continue:active {
   transform: translateY(0);
 }
 
-.artifact-choice__continue[hidden] {
+.blueprint-choice__continue[hidden] {
   display: none;
 }
 
-.artifact-choice__card {
+.blueprint-choice__card {
   min-height: 180px;
   border: 1px solid rgba(180, 120, 255, 0.25);
   border-radius: 18px;
@@ -784,39 +784,77 @@ strong {
   font: inherit;
   color: var(--text);
   touch-action: manipulation;
+  position: relative;
 }
 
-.artifact-choice__card:hover,
-.artifact-choice__card:focus-visible {
+.blueprint-choice__card:hover,
+.blueprint-choice__card:focus-visible {
   border-color: rgba(200, 160, 255, 0.6);
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(140, 80, 220, 0.25);
 }
 
-.artifact-choice__card:active {
+.blueprint-choice__card:active {
   transform: translateY(0);
 }
 
-.artifact-choice__card-icon {
+.blueprint-choice__card-icon {
   font-size: 36px;
   line-height: 1;
 }
 
-.artifact-choice__card-name {
+.blueprint-choice__card-name {
   font-size: 18px;
   font-weight: 700;
   color: #e8d0ff;
 }
 
-.artifact-choice__card-nodes {
+.blueprint-choice__card-desc {
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #d7c8e8;
+  text-align: left;
+  background: rgba(200, 160, 255, 0.08);
+  border: 1px solid rgba(200, 160, 255, 0.22);
+  border-radius: 10px;
+  padding: 8px 9px;
+  margin-top: 2px;
+}
+
+.blueprint-choice__card-nodes {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: 2px;
   width: 100%;
 }
 
-.artifact-choice__node {
+.blueprint-choice__card-inspect {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(200, 160, 255, 0.45);
+  background: rgba(30, 16, 12, 0.82);
+  color: #ead4ff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.blueprint-choice__card-inspect:hover,
+.blueprint-choice__card-inspect:focus-visible {
+  border-color: rgba(220, 190, 255, 0.9);
+  background: rgba(52, 24, 72, 0.92);
+}
+
+.blueprint-choice__node {
   font-size: 12px;
   color: var(--muted);
   text-align: left;
@@ -825,7 +863,7 @@ strong {
   background: rgba(180, 120, 255, 0.06);
 }
 
-.artifact-choice__node-icon {
+.blueprint-choice__node-icon {
   font-weight: 700;
   color: #c8a0ff;
 }

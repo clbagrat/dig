@@ -1186,7 +1186,7 @@ const STAT_CONCEPT_MAP = {
   radarCrystalModule: ["radar", "crystals"],
   crystalLightRadarSeconds: ["radar", "crystals"],
 
-  artifactRadarMode: ["radar", "artifacts", "beacon"],
+  blueprintRadarMode: ["radar", "artifacts", "beacon"],
   crystalGoldGain: "crystals",
 
   cryoRocketCount: "afterburner",
