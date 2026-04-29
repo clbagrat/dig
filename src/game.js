@@ -6415,6 +6415,15 @@ function bindUi() {
 
   if (levelUpOverlay) {
     levelUpOverlay.addEventListener("click", (event) => {
+      const inspectBtn = event.target.closest("[data-level-reward-inspect-stat]");
+      if (inspectBtn) {
+        event.stopPropagation();
+        const statKey = inspectBtn.dataset.levelRewardInspectStat;
+        if (statKey) {
+          showStatTooltipForStat(inspectBtn, statKey, t(`shop.stat.${statKey}.label`));
+        }
+        return;
+      }
       const choice = event.target.closest("[data-level-reward-id]");
       if (choice) {
         claimLevelReward(choice.dataset.levelRewardId || "");
@@ -6903,7 +6912,10 @@ function syncLevelUpModal() {
     const rarityName = RARITY_NAMES[choice.rarity] || "";
     return `
     <button class="level-up-modal__choice" type="button" data-level-reward-id="${choice.id}" style="border-color:${color}">
-      <span class="level-up-modal__choice-label">${choice.label}</span>
+      <span class="level-up-modal__choice-head">
+        <span class="level-up-modal__choice-label">${choice.label}</span>
+        <span class="level-up-modal__choice-inspect" role="button" tabindex="0" data-level-reward-inspect-stat="${choice.stat}" aria-label="${t("ui.description")}">i</span>
+      </span>
       <span class="level-up-modal__choice-text" style="color:${color}">${rarityName}</span>
     </button>`;
   }).join("");

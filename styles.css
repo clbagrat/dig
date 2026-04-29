@@ -1975,6 +1975,34 @@ strong {
   font: 700 17px/1.1 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
 
+.level-up-modal__choice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.level-up-modal__choice-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.level-up-modal__choice-inspect {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(215, 159, 73, 0.35);
+  color: var(--acc2);
+  background: rgba(24, 14, 8, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 12px/1 system-ui, sans-serif;
+}
+
 .level-up-modal__choice-text {
   color: rgba(255, 236, 210, 0.74);
   font: 400 14px/1.35 Baskerville, "Palatino Linotype", "Book Antiqua", Georgia, serif;
