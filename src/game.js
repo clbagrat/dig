@@ -715,6 +715,9 @@ const state = {
   perkText: t("toast.none"),
   crystalRecipe: [],
   crystalCollected: [0, 0, 0, 0, 0, 0],
+  crystalCollectedVisual: [0, 0, 0, 0, 0, 0],
+  crystalRecipeFinaleActive: false,
+  crystalRecipeFinalePending: null,
   crystalProgress: 0,
   recipesCompletedThisRun: 0,
   crystalStatusText: "",
@@ -841,6 +844,9 @@ const state = {
   fatalErrorText: "",
   goldHitRect: null,
   hudInspectableRects: [],
+  hudRecipeSlots: [],
+  hudWrongCrystalFlash: 0,
+  hudWrongCrystalFlashSlotIndex: -1,
   itemInspectModalOpen: false,
   itemInspectItems: [],
   itemInspectIndex: -1,
@@ -2613,6 +2619,11 @@ function setupField(seedOverride = null) {
   state.perkText = t("toast.none");
   state.crystalRecipe = [];
   state.crystalCollected = [0, 0, 0, 0, 0, 0];
+  state.crystalCollectedVisual = [0, 0, 0, 0, 0, 0];
+  state.crystalRecipeFinaleActive = false;
+  state.crystalRecipeFinalePending = null;
+  state.hudWrongCrystalFlash = 0;
+  state.hudWrongCrystalFlashSlotIndex = -1;
   state.crystalProgress = 0;
   state.recipesCompletedThisRun = 0;
   state.crystalStatusText = "";
@@ -3011,6 +3022,9 @@ function placeDebugStartPerkZone() {
 function clearCrystalRecipe() {
   state.crystalRecipe = [];
   state.crystalCollected = [0, 0, 0, 0, 0, 0];
+  state.crystalCollectedVisual = [0, 0, 0, 0, 0, 0];
+  state.crystalRecipeFinaleActive = false;
+  state.crystalRecipeFinalePending = null;
   state.crystalProgress = 0;
   state.crystalStatusText = "";
 }
@@ -3332,6 +3346,9 @@ function startCrystalRecipe(firstCrystalType) {
     recipePool.splice(pickIndex, 1);
   }
   state.crystalCollected = [0, 0, 0, 0, 0, 0];
+  state.crystalCollectedVisual = [0, 0, 0, 0, 0, 0];
+  state.crystalRecipeFinaleActive = false;
+  state.crystalRecipeFinalePending = null;
   state.crystalCollected[firstCrystalType] = 1;
   state.crystalProgress = 1;
   state.crystalStatusText = `${CRYSTAL_TYPES[firstCrystalType].name}: 1/${state.crystalRecipe.length}`;
@@ -3677,7 +3694,14 @@ function collectCrystalTile(x, y, index, crystalType) {
   if (state.crystalRecipe.length === 0) {
     playSound("crystal_pickup");
     startCrystalRecipe(crystalType);
-    showCrystalToast(state.crystalStatusText);
+    const firstSlotIndex = getFirstRecipeSlotIndexForType(crystalType);
+    if (firstSlotIndex >= 0) {
+      spawnCrystalFlyToHudEffect(x, y, crystalType, firstSlotIndex);
+    }
+    return;
+  }
+
+  if (state.crystalRecipeFinaleActive) {
     return;
   }
 
@@ -3689,24 +3713,171 @@ function collectCrystalTile(x, y, index, crystalType) {
   }
 
   if (recipeCount > 0 && state.crystalCollected[crystalType] < recipeCount) {
+    const recipeSlotIndex = getRecipeTargetSlotIndex(crystalType);
     playSound("crystal_pickup");
     state.crystalCollected[crystalType] += 1;
     state.crystalProgress += 1;
+    if (recipeSlotIndex >= 0) {
+      spawnCrystalFlyToHudEffect(x, y, crystalType, recipeSlotIndex);
+    }
     state.crystalStatusText = `${CRYSTAL_TYPES[crystalType].name}: ${state.crystalProgress}/${state.crystalRecipe.length}`;
-    showCrystalToast(state.crystalStatusText);
     if (state.crystalProgress >= state.crystalRecipe.length) {
       const firstCrystalType = state.crystalRecipe[0];
       const completedRecipe = [...state.crystalRecipe];
-      showCrystalToast(t("toast.crystals_collected"));
       playSound("recipe_complete");
-      clearCrystalRecipe();
-      grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y);
+      state.crystalRecipeFinalePending = {
+        firstCrystalType,
+        completedRecipe,
+        rewardX: x,
+        rewardY: y,
+      };
     }
     return;
   }
 
   playSound("crystal_wrong");
-  applyStun(1, t("toast.wrong_crystal"));
+  const wrongSlotIndex = getFirstFreeRecipeSlotIndex();
+  const wrongSlots = getHudRecipeSlotPositions(state.crystalRecipe.length || CRYSTAL_RECIPE_LENGTH);
+  const wrongTarget = wrongSlots[wrongSlotIndex] || wrongSlots[0] || null;
+  state.effects.push({
+    kind: "crystalWrongRoute",
+    x,
+    y,
+    crystalType,
+    toHudDuration: 0.572,
+    holdDuration: 0.18,
+    toHeroDuration: 0.44,
+    phase: "toHud",
+    stunApplied: false,
+    hudFlashTriggered: false,
+    heroXAtStart: state.drill.renderX,
+    heroYAtStart: state.drill.renderY,
+    slotIndex: wrongSlotIndex,
+    targetX: wrongTarget?.x ?? null,
+    targetY: wrongTarget?.y ?? null,
+    time: 1.192,
+    duration: 1.192,
+    seed: (state.lastTs || 0) + x * 31 + y * 47 + crystalType * 59,
+  });
+}
+
+function getRecipeTargetSlotIndex(crystalType) {
+  if (!Array.isArray(state.crystalRecipe) || state.crystalRecipe.length === 0) {
+    return -1;
+  }
+  const consumedByType = [0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < state.crystalRecipe.length; i += 1) {
+    const type = state.crystalRecipe[i];
+    if (type !== crystalType) {
+      consumedByType[type] += 1;
+      continue;
+    }
+    const alreadyCollectedForType = state.crystalCollected[type] || 0;
+    if (consumedByType[type] >= alreadyCollectedForType) {
+      return i;
+    }
+    consumedByType[type] += 1;
+  }
+  return -1;
+}
+
+function getFirstRecipeSlotIndexForType(crystalType) {
+  if (!Array.isArray(state.crystalRecipe) || state.crystalRecipe.length === 0) {
+    return -1;
+  }
+  for (let i = 0; i < state.crystalRecipe.length; i += 1) {
+    if (state.crystalRecipe[i] === crystalType) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function getFirstFreeRecipeSlotIndex() {
+  if (!Array.isArray(state.crystalRecipe) || state.crystalRecipe.length === 0) {
+    return 0;
+  }
+  const usedCounts = [0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < state.crystalRecipe.length; i += 1) {
+    const crystalType = state.crystalRecipe[i];
+    const filled = usedCounts[crystalType] < (state.crystalCollectedVisual[crystalType] || 0);
+    if (!filled) {
+      return i;
+    }
+    usedCounts[crystalType] += 1;
+  }
+  return 0;
+}
+
+function spawnCrystalFlyToHudEffect(x, y, crystalType, slotIndex) {
+  const slots = getHudRecipeSlotPositions(state.crystalRecipe.length || CRYSTAL_RECIPE_LENGTH);
+  const target = slots[slotIndex] || null;
+  const duration = 0.768;
+  state.effects.push({
+    kind: "crystalFlyToHud",
+    fromX: x,
+    fromY: y,
+    crystalType,
+    slotIndex,
+    targetX: target?.x ?? null,
+    targetY: target?.y ?? null,
+    time: duration,
+    duration,
+    seed: (state.lastTs || 0) + x * 17 + y * 29 + crystalType * 43,
+  });
+}
+
+function getHudRecipeSlotPositions(recipeLength) {
+  const top = 14;
+  const gap = 10;
+  const totalWidth = Math.min(state.width - 28, 560);
+  const panelWidth = (totalWidth - gap) / 2;
+  const panelHeight = 34;
+  const secondRowTop = top + panelHeight + 8;
+  const detailTop = secondRowTop + panelHeight + 8;
+  const recipeWidth = Math.min(totalWidth, 420);
+  const recipeX = Math.round((state.width - recipeWidth) * 0.5);
+  const crystalGap = 24;
+  const recipeCenterX = recipeX + recipeWidth * 0.5;
+  const recipeStartX = recipeCenterX - ((recipeLength - 1) * crystalGap) * 0.5;
+  const y = detailTop + panelHeight * 0.5;
+  const slots = [];
+  for (let i = 0; i < recipeLength; i += 1) {
+    slots.push({ x: recipeStartX + i * crystalGap, y });
+  }
+  return slots;
+}
+
+function startCrystalRecipeFinale(firstCrystalType, completedRecipe, rewardX, rewardY) {
+  state.crystalRecipeFinaleActive = true;
+  state.crystalCollectedVisual = state.crystalCollected.slice();
+  const count = completedRecipe.length;
+  const waitDuration = 0.5;
+  const bumpPerCrystal = 0.18;
+  const bumpStagger = 0.08;
+  const bumpDuration = Math.max(0, (count - 1) * bumpStagger + bumpPerCrystal);
+  const flyDuration = 1.12;
+  const totalDuration = waitDuration + bumpDuration + flyDuration;
+  const fromSlots = (Array.isArray(state.hudRecipeSlots) && state.hudRecipeSlots.length === count)
+    ? state.hudRecipeSlots.map((p) => ({ x: p.x, y: p.y }))
+    : getHudRecipeSlotPositions(count);
+  state.effects.push({
+    kind: "recipeFinale",
+    time: totalDuration,
+    duration: totalDuration,
+    recipe: completedRecipe.slice(),
+    firstCrystalType,
+    rewardX,
+    rewardY,
+    fromSlots,
+    waitDuration,
+    bumpPerCrystal,
+    bumpStagger,
+    bumpDuration,
+    flyDuration,
+    hitMask: [],
+    seed: (state.lastTs || 0) + completedRecipe.length * 97,
+  });
 }
 
 function getDistanceToBase(x, y) {
@@ -7480,6 +7651,9 @@ function update(dt) {
   if (!state.cutsceneModeActive && !state.baseFound) {
     state.runTimeSec += dt;
   }
+  if (state.hudWrongCrystalFlash > 0) {
+    state.hudWrongCrystalFlash = Math.max(0, state.hudWrongCrystalFlash - dt);
+  }
 
   updateHudBarFx(dt);
 
@@ -7803,7 +7977,58 @@ function updateEffects(dt) {
   for (let i = state.effects.length - 1; i >= 0; i -= 1) {
     const effect = state.effects[i];
     effect.time -= dt;
+    if (effect.kind === "crystalWrongRoute") {
+      const toHeroDuration = effect.toHeroDuration || 0.22;
+      const holdDuration = effect.holdDuration || 0;
+      if (effect.phase === "toHud" && effect.time <= (toHeroDuration + holdDuration)) {
+        effect.phase = "hold";
+        if (!effect.hudFlashTriggered) {
+          effect.hudFlashTriggered = true;
+          state.hudWrongCrystalFlash = Math.max(state.hudWrongCrystalFlash || 0, 0.48);
+          state.hudWrongCrystalFlashSlotIndex = Number.isInteger(effect.slotIndex) ? effect.slotIndex : -1;
+        }
+      }
+      if (effect.phase === "hold" && effect.time <= toHeroDuration) {
+        effect.phase = "toHero";
+      }
+      if (effect.phase === "toHero" && effect.time <= 0 && !effect.stunApplied) {
+        effect.stunApplied = true;
+        const crystal = CRYSTAL_TYPES[effect.crystalType] || CRYSTAL_TYPES[1];
+        state.effects.push({
+          kind: "crystalWrongHitSpark",
+          x: state.drill.renderX,
+          y: state.drill.renderY,
+          color: crystal.color,
+          glow: crystal.glow,
+          time: 0.28,
+          duration: 0.28,
+          seed: (effect.seed || 0) + 911,
+        });
+        applyStun(1, t("toast.wrong_crystal"));
+        state.hudWrongCrystalFlashSlotIndex = -1;
+      }
+    }
     if (effect.time <= 0) {
+      if (effect.kind === "crystalFlyToHud" && Number.isInteger(effect.crystalType)) {
+        const crystalType = effect.crystalType;
+        if (crystalType >= 0 && crystalType < state.crystalCollectedVisual.length) {
+          state.crystalCollectedVisual[crystalType] = Math.min(
+            state.crystalCollected[crystalType] || 0,
+            (state.crystalCollectedVisual[crystalType] || 0) + 1,
+          );
+        }
+      }
+      if (effect.kind === "recipeFinale") {
+        state.crystalRecipeFinaleActive = false;
+        const firstCrystalType = effect.firstCrystalType;
+        const completedRecipe = Array.isArray(effect.recipe) ? effect.recipe.slice() : [];
+        const rx = Number.isFinite(effect.rewardX) ? effect.rewardX : state.drill.x;
+        const ry = Number.isFinite(effect.rewardY) ? effect.rewardY : state.drill.y;
+        clearCrystalRecipe();
+        grantCrystalRecipeReward(firstCrystalType, completedRecipe, rx, ry);
+        state.effects.splice(i, 1);
+        continue;
+      }
       if (effect.kind === "rocket") {
         if (effect.phase === "flying") {
           if (effect.instant) {
@@ -7821,6 +8046,19 @@ function updateEffects(dt) {
       } else {
         state.effects.splice(i, 1);
       }
+    }
+  }
+  if (state.crystalRecipeFinalePending && !state.crystalRecipeFinaleActive) {
+    const hasCrystalFlight = state.effects.some((effect) => effect.kind === "crystalFlyToHud");
+    if (!hasCrystalFlight) {
+      const pending = state.crystalRecipeFinalePending;
+      state.crystalRecipeFinalePending = null;
+      startCrystalRecipeFinale(
+        pending.firstCrystalType,
+        pending.completedRecipe,
+        pending.rewardX,
+        pending.rewardY,
+      );
     }
   }
 }
@@ -11949,6 +12187,7 @@ function drawTileSprite(sprite, sx, sy) {
 
 function renderEffects(camera) {
   const ctx = state.ctx;
+  const zoom = getCameraZoom();
   ctx.save();
   for (let i = 0; i < state.effects.length; i += 1) {
     const effect = state.effects[i];
@@ -12576,6 +12815,249 @@ function renderEffects(camera) {
         ctx.arc(px, py, size, 0, Math.PI * 2);
         ctx.fill();
       }
+    } else if (effect.kind === "crystalFlyToHud") {
+      const t = clamp(progress, 0, 1);
+      const ease = 1 - (1 - t) * (1 - t);
+      const crystal = CRYSTAL_TYPES[effect.crystalType];
+      if (!crystal) continue;
+
+      const fromX = effect.fromX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const fromY = effect.fromY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      const fallbackX = (state.width * 0.5) / zoom;
+      const fallbackY = 64 / zoom;
+      const slot = state.hudRecipeSlots?.[effect.slotIndex];
+      const hasFixedTarget = Number.isFinite(effect.targetX) && Number.isFinite(effect.targetY);
+      const toX = hasFixedTarget
+        ? effect.targetX / zoom
+        : (slot ? slot.x / zoom : fallbackX);
+      const toY = hasFixedTarget
+        ? effect.targetY / zoom
+        : (slot ? slot.y / zoom : fallbackY);
+
+      const mx = fromX + (toX - fromX) * ease;
+      const my = fromY + (toY - fromY) * ease - Math.sin(t * Math.PI) * 26;
+      const alpha = t > 0.85 ? (1 - t) / 0.15 : 1;
+      const tailT = Math.max(0, t - 0.16);
+      const tailEase = 1 - (1 - tailT) * (1 - tailT);
+      const tx = fromX + (toX - fromX) * tailEase;
+      const ty = fromY + (toY - fromY) * tailEase - Math.sin(tailT * Math.PI) * 26;
+
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = `${crystal.color}99`;
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(mx, my);
+      ctx.stroke();
+
+      ctx.fillStyle = crystal.glow;
+      ctx.beginPath();
+      ctx.arc(mx, my, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = crystal.color;
+      ctx.beginPath();
+      ctx.moveTo(mx, my - 8);
+      ctx.lineTo(mx + 6, my - 2);
+      ctx.lineTo(mx + 3, my + 7);
+      ctx.lineTo(mx - 3, my + 7);
+      ctx.lineTo(mx - 6, my - 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (effect.kind === "recipeFinale") {
+      ctx.globalAlpha = 1;
+      const t = clamp(progress, 0, 1);
+      const recipe = Array.isArray(effect.recipe) ? effect.recipe : [];
+      const count = recipe.length;
+      if (count <= 0) continue;
+      const fromSlots = Array.isArray(effect.fromSlots) ? effect.fromSlots : [];
+      const targetX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const targetY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      const hitMask = Array.isArray(effect.hitMask) ? effect.hitMask : [];
+      effect.hitMask = hitMask;
+      const waitDuration = Number.isFinite(effect.waitDuration) ? effect.waitDuration : 0.5;
+      const bumpPerCrystal = Number.isFinite(effect.bumpPerCrystal) ? effect.bumpPerCrystal : 0.18;
+      const bumpStagger = Number.isFinite(effect.bumpStagger) ? effect.bumpStagger : 0.08;
+      const bumpDuration = Number.isFinite(effect.bumpDuration)
+        ? effect.bumpDuration
+        : Math.max(0, (count - 1) * bumpStagger + bumpPerCrystal);
+      const flyDuration = Number.isFinite(effect.flyDuration) ? effect.flyDuration : 0.56;
+      const totalDuration = waitDuration + bumpDuration + flyDuration;
+      const elapsed = t * totalDuration;
+      const flyStart = waitDuration + bumpDuration;
+      const flyT = clamp((elapsed - flyStart) / Math.max(0.001, flyDuration), 0, 1);
+      const flyEase = 1 - (1 - flyT) * (1 - flyT);
+      const isFlying = elapsed >= flyStart;
+
+      for (let i = 0; i < count; i += 1) {
+        const crystalType = recipe[i];
+        const crystal = CRYSTAL_TYPES[crystalType];
+        if (!crystal) continue;
+
+        const fromRaw = fromSlots[i] || { x: targetX * zoom, y: targetY * zoom };
+        const from = { x: fromRaw.x / zoom, y: fromRaw.y / zoom };
+        const bumpElapsed = elapsed - waitDuration - i * bumpStagger;
+        const bumpT = clamp(bumpElapsed / Math.max(0.001, bumpPerCrystal), 0, 1);
+        const bumpScale = !isFlying && bumpT > 0 && bumpT < 1
+          ? 1 + Math.sin(bumpT * Math.PI) * 0.28
+          : 1;
+        const px = isFlying
+          ? from.x + (targetX - from.x) * flyEase
+          : from.x;
+        const py = isFlying
+          ? from.y + (targetY - from.y) * flyEase - Math.sin(flyT * Math.PI) * 14
+          : from.y;
+        const visible = !isFlying || flyT < 1;
+
+        if (isFlying && flyT >= 1 && !hitMask[i]) {
+          hitMask[i] = 1;
+          state.effects.push({
+            kind: "recipeHitSpark",
+            x: state.drill.renderX,
+            y: state.drill.renderY,
+            time: 0.26,
+            duration: 0.26,
+            seed: (effect.seed || 0) + i * 61,
+          });
+        }
+
+        if (!visible) continue;
+
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.translate(px, py);
+        ctx.scale(bumpScale, bumpScale);
+        ctx.fillStyle = crystal.glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = crystal.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -9);
+        ctx.lineTo(7, -2);
+        ctx.lineTo(4, 8);
+        ctx.lineTo(-4, 8);
+        ctx.lineTo(-7, -2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    } else if (effect.kind === "recipeHitSpark") {
+      const p = clamp(progress, 0, 1);
+      const alpha = 1 - p;
+      const ex = effect.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const ey = effect.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = "#fff0c8";
+      ctx.lineWidth = 1.8;
+      for (let s = 0; s < 8; s += 1) {
+        const ang = (((effect.seed || 0) + s * 77) % 628) / 100;
+        const r1 = 3 + p * 2;
+        const r2 = 8 + p * 12;
+        ctx.beginPath();
+        ctx.moveTo(ex + Math.cos(ang) * r1, ey + Math.sin(ang) * r1);
+        ctx.lineTo(ex + Math.cos(ang) * r2, ey + Math.sin(ang) * r2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = alpha * 0.6;
+      ctx.fillStyle = "#ffd99b";
+      ctx.beginPath();
+      ctx.arc(ex, ey, 3 + p * 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (effect.kind === "crystalWrongHitSpark") {
+      const p = clamp(progress, 0, 1);
+      const alpha = 1 - p;
+      const ex = effect.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const ey = effect.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      const color = effect.color || "#ffffff";
+      const glow = effect.glow || "rgba(255,255,255,0.25)";
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 8 + p * 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.9;
+      for (let s = 0; s < 10; s += 1) {
+        const ang = (((effect.seed || 0) + s * 71) % 628) / 100;
+        const r1 = 4 + p * 3;
+        const r2 = 10 + p * 16;
+        ctx.beginPath();
+        ctx.moveTo(ex + Math.cos(ang) * r1, ey + Math.sin(ang) * r1);
+        ctx.lineTo(ex + Math.cos(ang) * r2, ey + Math.sin(ang) * r2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 3 + p * 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (effect.kind === "crystalWrongRoute") {
+      const crystal = CRYSTAL_TYPES[effect.crystalType] || CRYSTAL_TYPES[1];
+      const fromX = effect.x * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const fromY = effect.y * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      const fallbackHudX = (state.width * 0.5) / zoom;
+      const fallbackHudY = 64 / zoom;
+      const hudX = Number.isFinite(effect.targetX) ? effect.targetX / zoom : fallbackHudX;
+      const hudY = Number.isFinite(effect.targetY) ? effect.targetY / zoom : fallbackHudY;
+      const heroX = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+      const heroY = state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y;
+      const toHudDuration = Number.isFinite(effect.toHudDuration) ? effect.toHudDuration : 0.22;
+      const holdDuration = Number.isFinite(effect.holdDuration) ? effect.holdDuration : 0;
+      const toHeroDuration = Number.isFinite(effect.toHeroDuration) ? effect.toHeroDuration : 0.22;
+      const elapsed = (effect.duration || 0.44) - effect.time;
+
+      let x0 = fromX;
+      let y0 = fromY;
+      let x1 = hudX;
+      let y1 = hudY;
+      let localT = clamp(elapsed / Math.max(0.001, toHudDuration), 0, 1);
+      if (elapsed > toHudDuration + holdDuration) {
+        x0 = hudX;
+        y0 = hudY;
+        x1 = heroX;
+        y1 = heroY;
+        localT = clamp((elapsed - toHudDuration - holdDuration) / Math.max(0.001, toHeroDuration), 0, 1);
+      } else if (elapsed > toHudDuration) {
+        x0 = hudX;
+        y0 = hudY;
+        x1 = hudX;
+        y1 = hudY;
+        localT = 0;
+      }
+      const ease = 1 - (1 - localT) * (1 - localT);
+      const mx = x0 + (x1 - x0) * ease;
+      const my = y0 + (y1 - y0) * ease - Math.sin(localT * Math.PI) * 26;
+      const tailT = Math.max(0, localT - 0.16);
+      const tailEase = 1 - (1 - tailT) * (1 - tailT);
+      const tx = x0 + (x1 - x0) * tailEase;
+      const ty = y0 + (y1 - y0) * tailEase - Math.sin(tailT * Math.PI) * 26;
+      const alpha = localT > 0.85 ? (1 - localT) / 0.15 : 1;
+
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = `${crystal.color}99`;
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(mx, my);
+      ctx.stroke();
+
+      ctx.fillStyle = crystal.glow;
+      ctx.beginPath();
+      ctx.arc(mx, my, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = crystal.color;
+      ctx.beginPath();
+      ctx.moveTo(mx, my - 8);
+      ctx.lineTo(mx + 6, my - 2);
+      ctx.lineTo(mx + 3, my + 7);
+      ctx.lineTo(mx - 3, my + 7);
+      ctx.lineTo(mx - 6, my - 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
   ctx.restore();
@@ -15865,95 +16347,21 @@ function renderHud() {
   const panelHeight = 34;
   const left = Math.round((state.width - totalWidth) * 0.5);
   const sideInset = Math.max(0, Math.round((state.width - totalWidth) * 0.5));
-  const secondRowTop = top + panelHeight + 8;
   state.hudInspectableRects = [];
 
   const hpLabel = `${Math.ceil(state.hp)}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
   state.goldHitRect = { x: left, y: top, width: panelWidth, height: panelHeight };
 
-  // Crystal recipe in top-right slot
-  const ctx = state.ctx;
-  const recipeX = left + panelWidth + gap;
-  drawHudPanel(recipeX, top, panelWidth, panelHeight);
-  ctx.save();
-  ctx.fillStyle = "#c6ab84";
-  ctx.font = `700 10px ${HUD_FONT}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText("CRYSTAL RECIPE", recipeX + 10, top + 16);
-  if (state.crystalRecipe.length > 0) {
-    const usedCounts = [0, 0, 0, 0, 0, 0];
-    for (let i = 0; i < state.crystalRecipe.length; i += 1) {
-      const crystalType = state.crystalRecipe[i];
-      const crystal = CRYSTAL_TYPES[crystalType];
-      if (!crystal) {
-        continue;
-      }
-      const cx = recipeX + 118 + i * 26;
-      const cy = top + panelHeight * 0.5;
-      const completed = usedCounts[crystalType] < state.crystalCollected[crystalType];
-      if (completed) usedCounts[crystalType] += 1;
-      ctx.globalAlpha = completed ? 1 : 0.82;
-      ctx.fillStyle = crystal.glow;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 9, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = crystal.color;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - 9);
-      ctx.lineTo(cx + 7, cy - 2);
-      ctx.lineTo(cx + 4, cy + 8);
-      ctx.lineTo(cx - 4, cy + 8);
-      ctx.lineTo(cx - 7, cy - 2);
-      ctx.closePath();
-      ctx.fill();
-      if (completed) {
-        ctx.strokeStyle = "rgba(255, 244, 214, 0.9)";
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 11, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-  }
-  ctx.restore();
-
   const xpRatio = clamp(state.xp / Math.max(1, state.xpToNext), 0, 1);
-  const xpBarWidth = (totalWidth - gap) / 2;
-  drawHudXpBar(left, secondRowTop, xpBarWidth, panelHeight, `LVL ${state.level}`, `${state.xp}/${state.xpToNext}`, xpRatio);
+  drawHudXpBar(left + panelWidth + gap, top, panelWidth, panelHeight, `LVL ${state.level}`, `${state.xp}/${state.xpToNext}`, xpRatio);
 
-  // Depth + beacons info panel
-  const infoX = left + xpBarWidth + gap;
-  const infoW = totalWidth - xpBarWidth - gap;
-  const curDepth = DEPTH_LEVELS.find(l => l.level === state.currentDepthLevel);
-  const levelBeacons = curDepth
-    ? state.beacons.filter(b => b.y >= curDepth.startY && b.y <= curDepth.endY)
-    : [];
-  const beaconsTotal = levelBeacons.length;
-  const beaconsActive = levelBeacons.filter(b => b.active).length;
-  drawHudPanel(infoX, secondRowTop, infoW, panelHeight);
-  {
-    const ctx = state.ctx;
-    ctx.save();
-    ctx.textBaseline = "middle";
-    const midY = secondRowTop + panelHeight * 0.5;
-    ctx.font = `700 10px ${HUD_FONT}`;
-    ctx.fillStyle = "#c8a96e";
-    ctx.textAlign = "left";
-    ctx.fillText(t("ui.depth_hud", { level: state.currentDepthLevel }), infoX + 12, midY);
-    ctx.textAlign = "right";
-    const beaconDone = beaconsTotal > 0 && beaconsActive === beaconsTotal;
-    ctx.fillStyle = beaconDone ? "#7de87d" : "#e5f8ff";
-    ctx.fillText(`${beaconsActive}/${beaconsTotal} 📡`, infoX + infoW - 10, midY);
-    ctx.restore();
-  }
-
-  const thirdRowTop = secondRowTop + panelHeight + 8;
-  drawHudBar(left, thirdRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
+  const ctx = state.ctx;
+  const secondRowTop = top + panelHeight + 8;
+  drawHudBar(left, secondRowTop, panelWidth, panelHeight, "FUEL", `${Math.floor(state.fuel)}/${state.maxFuel}`, fuelRatio, ["#ffbf62", "#ff8c3b"]);
   drawHudBar(
     left + panelWidth + gap,
-    thirdRowTop,
+    secondRowTop,
     panelWidth,
     panelHeight,
     "HEAT",
@@ -15961,7 +16369,67 @@ function renderHud() {
     heatRatio,
     ["#ffb36d", "#ff4c3f"],
   );
-  const detailTop = thirdRowTop + panelHeight + 8;
+  const detailTop = secondRowTop + panelHeight + 8;
+
+  const recipeWidth = Math.min(totalWidth, 420);
+  const recipeX = Math.round((state.width - recipeWidth) * 0.5);
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  const hasVisibleRecipeCrystal = state.crystalCollectedVisual.some((count) => count > 0);
+  if (state.crystalRecipe.length > 0 && !state.crystalRecipeFinaleActive && hasVisibleRecipeCrystal) {
+    state.hudRecipeSlots = [];
+    const usedCounts = [0, 0, 0, 0, 0, 0];
+    const crystalGap = 24;
+    const recipeCenterX = recipeX + recipeWidth * 0.5;
+    const recipeStartX = recipeCenterX - ((state.crystalRecipe.length - 1) * crystalGap) * 0.5;
+    for (let i = 0; i < state.crystalRecipe.length; i += 1) {
+      const crystalType = state.crystalRecipe[i];
+      const crystal = CRYSTAL_TYPES[crystalType];
+      if (!crystal) continue;
+      const cx = recipeStartX + i * crystalGap;
+      const cy = detailTop + panelHeight * 0.5;
+      state.hudRecipeSlots.push({ x: cx, y: cy });
+      const completed = usedCounts[crystalType] < state.crystalCollectedVisual[crystalType];
+      if (completed) usedCounts[crystalType] += 1;
+      if (completed) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = crystal.glow;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = crystal.color;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 9);
+        ctx.lineTo(cx + 7, cy - 2);
+        ctx.lineTo(cx + 4, cy + 8);
+        ctx.lineTo(cx - 4, cy + 8);
+        ctx.lineTo(cx - 7, cy - 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 244, 214, 0.9)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 11, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = crystal.color;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 9);
+        ctx.lineTo(cx + 7, cy - 2);
+        ctx.lineTo(cx + 4, cy + 8);
+        ctx.lineTo(cx - 4, cy + 8);
+        ctx.lineTo(cx - 7, cy - 2);
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  } else {
+    state.hudRecipeSlots = [];
+  }
+  ctx.restore();
 
   const topActions = document.querySelector(".top-actions");
   if (topActions) {
@@ -15973,7 +16441,7 @@ function renderHud() {
   // Key indicator
   if (state.heldKeyForSafe >= 0) {
     const keyX = left + panelWidth + gap;
-    const keyY = thirdRowTop - 30;
+    const keyY = secondRowTop - 30;
     const pulse = Math.sin((state.lastTs || 0) * 0.006) * 0.5 + 0.5;
     ctx.save();
     ctx.fillStyle = `rgba(255, 210, 80, ${0.5 + pulse * 0.3})`;
@@ -16043,6 +16511,36 @@ function renderHud() {
   }
 
   ctx.restore();
+
+  if (state.hudWrongCrystalFlash > 0) {
+    const pulse = Math.sin((state.lastTs || 0) * 0.06) * 0.5 + 0.5;
+    const a = Math.min(0.42, state.hudWrongCrystalFlash * 1.4) * (0.6 + pulse * 0.4);
+    const slots = state.hudRecipeSlots.length > 0
+      ? state.hudRecipeSlots
+      : getHudRecipeSlotPositions(Math.max(1, state.crystalRecipe.length || 1));
+    const flashSlotIndex = Number.isInteger(state.hudWrongCrystalFlashSlotIndex)
+      ? state.hudWrongCrystalFlashSlotIndex
+      : -1;
+    ctx.save();
+    for (let i = 0; i < slots.length; i += 1) {
+      if (flashSlotIndex >= 0 && i !== flashSlotIndex) continue;
+      const slot = slots[i];
+      const sx = slot.x;
+      const sy = slot.y;
+      ctx.globalAlpha = a * 0.35;
+      ctx.fillStyle = "#ff4040";
+      ctx.beginPath();
+      ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = a * 0.85;
+      ctx.strokeStyle = "#ff6060";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 11, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 function drawHudGoldCounter(x, y, width, height) {
