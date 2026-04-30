@@ -4566,15 +4566,15 @@ function debounceToast(key, value, color, fmt, level = 1) {
 }
 
 function showPerkToast(text) {
-  queueToast(`+ ${text}`, "#ffcf7a", 3);
+  queueToast(text, "#ffcf7a", 3);
 }
 
 function showCrystalToast(text) {
-  queueToast(`+ ${text}`, "#ffcf7a", 2);
+  queueToast(text, "#ffcf7a", 2);
 }
 
 function showLevelToast(text) {
-  queueToast(`+ ${text}`, "#ffcf7a", 3);
+  queueToast(text, "#ffcf7a", 3);
 }
 
 function showFuelToast(value) {
@@ -4596,7 +4596,7 @@ function showBonusFuelToast(value) {
 }
 
 function showGoldToast(value) {
-  debounceToast("gold", value, "#f8e040", v => `+${v} ●`, 1);
+  debounceToast("gold", value, "#f8e040", v => `${v} ●`, 1);
 }
 
 function showBonusGoldToast(value) {
@@ -4604,7 +4604,7 @@ function showBonusGoldToast(value) {
 }
 
 function showXpToast(value) {
-  debounceToast("xp", value, "#78d8ff", v => `+${v} ◆`, 1);
+  debounceToast("xp", value, "#78d8ff", v => `${v} ◆`, 1);
 }
 
 function showBonusXpToast(value) {
@@ -4615,7 +4615,7 @@ function showHpGainToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("hp_pos", value, "#8ff0a4", v => `+${v} HP`, 2);
+  debounceToast("hp_pos", value, "#8ff0a4", v => `${v} HP`, 2);
 }
 
 function showBonusHpToast(value) {

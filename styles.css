@@ -2052,6 +2052,7 @@ strong {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: nowrap;
   padding: 12px 16px;
   border-bottom: 1px solid rgba(215, 159, 73, 0.14);
   background: rgba(20, 10, 5, 0.8);
@@ -2059,18 +2060,21 @@ strong {
 }
 
 .shop-head__title {
-  order: 2;
-  flex: 1;
-  font-size: 15px;
+  display: none;
+  order: 1;
+  flex: 0 0 auto;
+  margin-right: auto;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
-  text-align: center;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .shop-head__gold {
-  order: 1;
+  order: 2;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2147,7 +2151,6 @@ strong {
 
 .shop-reroll {
   order: 3;
-  margin-left: auto;
   padding: 7px 12px;
   border: 1px solid rgba(215, 159, 73, 0.3);
   border-radius: 8px;
@@ -2179,6 +2182,8 @@ strong {
 }
 
 .shop-close {
+  order: 4;
+  margin-left: auto;
   width: 28px;
   height: 28px;
   border: 1px solid rgba(215, 159, 73, 0.2);
@@ -2927,13 +2932,8 @@ strong {
 }
 
 @media (max-width: 640px) {
-  .shop-head {
-    flex-wrap: wrap;
-  }
-
   .shop-head__title {
-    order: 1;
-    flex-basis: 100%;
+    font-size: 11px;
   }
 
   .shop-offerings {

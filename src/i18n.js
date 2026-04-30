@@ -428,6 +428,7 @@ const TRANSLATIONS = {
 
     // ── Shop UI ──────────────────────────────────────────────────────────────
     "shop.title": "Lv.{level} · Depth {depth}",
+    "shop.title_short": "Shop",
     "shop.empty.title": "Shop is empty",
     "shop.empty.text": "All items and equipment have been removed from the game.",
     "shop.sold": "Sold",
@@ -489,7 +490,7 @@ const TRANSLATIONS = {
     // ── Crystal types ────────────────────────────────────────────────────────
     "crystal.red": "Red",
     "crystal.yellow": "Yellow",
-    "crystal.light": "Light",
+    "crystal.light": "White",
     "crystal.green": "Green",
     "crystal.blue": "Blue",
 
@@ -795,7 +796,7 @@ const TRANSLATIONS = {
     "desc.crystalGoldGain": "Picking up crystal gives {val} gold",
     "desc.crystalRedDrillGain": "Picking up red crystal gives {val} drill power",
     "desc.crystalYellowExplosionGain": "Picking up yellow crystal gives {val} explosion power",
-    "desc.crystalLightRadarSeconds": "Picking up light crystal shows crystal radar for {val} sec",
+    "desc.crystalLightRadarSeconds": "Picking up white crystal shows crystal radar for {val} sec",
     "desc.crystalGreenHealGain": "Picking up green crystal heals {val} HP",
     "desc.crystalBlueSpeedGain": "Picking up blue crystal gives {val} drill speed",
     "desc.crystalXpGain": "Picking up crystal gives {val} XP",
@@ -1159,7 +1160,7 @@ const TRANSLATIONS = {
     "stat.crystalGoldGain": "Золото за кристалл",
     "stat.crystalRedDrillGain": "Сила бура за красный кристалл",
     "stat.crystalYellowExplosionGain": "Сила взрыва за жёлтый кристалл",
-    "stat.crystalLightRadarSeconds": "Сек. радара кристаллов за светлый кристалл",
+    "stat.crystalLightRadarSeconds": "Сек. радара кристаллов за белый кристалл",
     "stat.crystalGreenHealGain": "Лечение за зелёный кристалл",
     "stat.crystalBlueSpeedGain": "Скорость бура за синий кристалл",
     "stat.crystalXpGain": "XP за кристалл",
@@ -1366,6 +1367,7 @@ const TRANSLATIONS = {
 
     // ── Shop UI ──────────────────────────────────────────────────────────────
     "shop.title": "Ур.{level} · Глубина {depth}",
+    "shop.title_short": "Магазин",
     "shop.empty.title": "Магазин пуст",
     "shop.empty.text": "Все предметы и экипировка удалены из игры.",
     "shop.sold": "Продано",
@@ -1427,7 +1429,7 @@ const TRANSLATIONS = {
     // ── Crystal types ────────────────────────────────────────────────────────
     "crystal.red": "Красный",
     "crystal.yellow": "Желтый",
-    "crystal.light": "Светлый",
+    "crystal.light": "Белый",
     "crystal.green": "Зеленый",
     "crystal.blue": "Синий",
 
@@ -1733,7 +1735,7 @@ const TRANSLATIONS = {
     "desc.crystalGoldGain": "Подбор кристалла даёт {val} золота",
     "desc.crystalRedDrillGain": "Подбор красного кристалла даёт {val} силы бура",
     "desc.crystalYellowExplosionGain": "Подбор жёлтого кристалла даёт {val} силы взрыва",
-    "desc.crystalLightRadarSeconds": "Подбор светлого кристалла показывает радар кристаллов на {val} сек",
+    "desc.crystalLightRadarSeconds": "Подбор белого кристалла показывает радар кристаллов на {val} сек",
     "desc.crystalGreenHealGain": "Подбор зелёного кристалла лечит на {val} HP",
     "desc.crystalBlueSpeedGain": "Подбор синего кристалла даёт {val} скорости бура",
     "desc.crystalXpGain": "Подбор кристалла даёт {val} XP",

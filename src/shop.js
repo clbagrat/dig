@@ -139,7 +139,7 @@ export function renderShop(currentGold, stats = null, defaultStats = null) {
   const goldEl = document.getElementById("shopGoldValue");
   if (goldEl) goldEl.textContent = Math.floor(currentGold);
   const titleEl = document.getElementById("shopTitle");
-  if (titleEl) titleEl.textContent = t("shop.title", { level: shopLevel, depth: currentDepthLevel });
+  if (titleEl) titleEl.textContent = t("shop.title_short");
   renderStats(true);
   renderOfferings();
   renderInspectModal();
