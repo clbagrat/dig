@@ -1740,6 +1740,11 @@ strong {
     0 20px 48px rgba(0, 0, 0, 0.55);
 }
 
+.item-inspect-modal__panel--concept {
+  gap: 14px;
+  padding-top: 22px;
+}
+
 .item-inspect-modal__panel,
 .item-inspect-modal__panel * {
   touch-action: pan-y;

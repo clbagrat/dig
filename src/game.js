@@ -639,6 +639,7 @@ const state = {
   perkRerolls: 0,
   menuOpen: false,
   manualModalOpen: false,
+  crystalConceptModalOpen: false,
   shopModalOpen: false,
   beaconActivationAnim: null, // { beacon, startTs, pendingAction, blueprintFlightCount, blueprintFlightFromX, blueprintFlightFromY }
   debugPerkMenuOpen: false,
@@ -844,6 +845,7 @@ const state = {
   fatalErrorText: "",
   goldHitRect: null,
   hudInspectableRects: [],
+  hudRecipeHitRect: null,
   hudRecipeSlots: [],
   hudWrongCrystalFlash: 0,
   hudWrongCrystalFlashSlotIndex: -1,
@@ -2634,6 +2636,7 @@ function setupField(seedOverride = null) {
   state.perkRerolls = 2;
   state.menuOpen = false;
   state.manualModalOpen = false;
+  state.crystalConceptModalOpen = false;
   state.debugPerkMenuOpen = false;
   state.debugPerkSelection = "";
   state.crystalRewardModalOpen = false;
@@ -5458,6 +5461,51 @@ function syncItemInspectModal() {
   syncTouchZonesInteractivity();
 }
 
+function closeCrystalConceptModal() {
+  state.crystalConceptModalOpen = false;
+  syncCrystalConceptModal();
+}
+
+function openCrystalConceptModal() {
+  if (!state.crystalRecipe.length) return;
+  state.crystalConceptModalOpen = true;
+  syncCrystalConceptModal();
+}
+
+function syncCrystalConceptModal() {
+  const overlay = document.getElementById("crystalConceptModal");
+  const title = document.getElementById("crystalConceptTitle");
+  const desc = document.getElementById("crystalConceptDesc");
+  if (!overlay || !title || !desc) {
+    return;
+  }
+  if (!state.crystalConceptModalOpen) {
+    overlay.hidden = true;
+    overlay.style.cssText = "display:none;visibility:hidden;pointer-events:none;opacity:0;";
+    syncTouchZonesInteractivity();
+    return;
+  }
+  title.textContent = t("inspect.concept.crystals.title");
+  desc.textContent = t("inspect.concept.crystals.desc");
+  overlay.hidden = false;
+  overlay.removeAttribute("hidden");
+  overlay.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    "z-index:10002",
+    "display:flex",
+    "visibility:visible",
+    "pointer-events:auto",
+    "opacity:1",
+    "align-items:flex-end",
+    "justify-content:center",
+    "padding:20px",
+    "background:rgba(8,4,2,0.72)",
+    "backdrop-filter:blur(6px)",
+  ].join(";");
+  syncTouchZonesInteractivity();
+}
+
 function getShopInitOptions() {
   return {
     onClose: () => {
@@ -5663,6 +5711,8 @@ function bindUi() {
   const menuSummaryStatsTitle = document.getElementById("menuSummaryStatsTitle");
   const itemInspectOverlay = document.getElementById("itemInspectModal");
   const itemInspectPanel = itemInspectOverlay?.querySelector(".item-inspect-modal__panel");
+  const crystalConceptOverlay = document.getElementById("crystalConceptModal");
+  const crystalConceptPanel = crystalConceptOverlay?.querySelector(".item-inspect-modal__panel");
   const blueprintCategoryInspectOverlay = document.getElementById("blueprintCategoryInspectModal");
   const blueprintCategoryInspectPanel = document.getElementById("blueprintCategoryInspectPanel");
   const debugClose = document.getElementById("debugPerkClose");
@@ -5904,6 +5954,14 @@ function bindUi() {
       openItemInspectModal(inspectEntry);
       return;
     }
+    if (state.hudRecipeHitRect && isPointInsideRect(event.clientX, event.clientY, state.hudRecipeHitRect)) {
+      event.preventDefault();
+      event.stopPropagation();
+      resetPad();
+      playSound("shop_open", { volume: 0.45 });
+      openCrystalConceptModal();
+      return;
+    }
     if (state.goldHitRect && isPointInsideRect(event.clientX, event.clientY, state.goldHitRect)) {
       state.dragId = null;
       state.touchAimX = 0;
@@ -6143,6 +6201,24 @@ function bindUi() {
         return;
       }
       closeItemInspectModal();
+    });
+  }
+
+  if (crystalConceptOverlay) {
+    crystalConceptOverlay.addEventListener("click", (event) => {
+      if (event.target !== crystalConceptOverlay) {
+        return;
+      }
+      closeCrystalConceptModal();
+    });
+  }
+
+  if (crystalConceptPanel) {
+    crystalConceptPanel.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    crystalConceptPanel.addEventListener("click", (event) => {
+      event.stopPropagation();
     });
   }
 
@@ -7086,6 +7162,7 @@ function maybeOpenPendingLevelReward() {
   if (
     state.beaconActivationAnim ||
     state.itemInspectModalOpen ||
+    state.crystalConceptModalOpen ||
     state.menuOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
@@ -7526,6 +7603,7 @@ function isAnyBlockingModalOpen() {
   return !!(
     state.isChoosingPerk ||
     state.itemInspectModalOpen ||
+    state.crystalConceptModalOpen ||
     state.menuOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
@@ -7683,6 +7761,7 @@ function update(dt) {
 
   if (
     state.itemInspectModalOpen ||
+    state.crystalConceptModalOpen ||
     state.menuOpen ||
     state.manualModalOpen ||
     state.shopModalOpen ||
@@ -16373,6 +16452,7 @@ function renderHud() {
 
   const recipeWidth = Math.min(totalWidth, 420);
   const recipeX = Math.round((state.width - recipeWidth) * 0.5);
+  state.hudRecipeHitRect = null;
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
@@ -16426,8 +16506,17 @@ function renderHud() {
         ctx.stroke();
       }
     }
+    const rowY = detailTop + panelHeight * 0.5;
+    const rowWidth = Math.max(36, (state.crystalRecipe.length - 1) * crystalGap + 30);
+    state.hudRecipeHitRect = {
+      x: recipeCenterX - rowWidth * 0.5,
+      y: rowY - 14,
+      width: rowWidth,
+      height: 28,
+    };
   } else {
     state.hudRecipeSlots = [];
+    state.hudRecipeHitRect = null;
   }
   ctx.restore();
 
