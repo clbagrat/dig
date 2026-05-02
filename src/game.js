@@ -69,6 +69,7 @@ const TOAST_DURATION_LEVEL_2 = 2.0;
 const TOAST_DURATION_LEVEL_3 = 3.5;
 const HUD_LOG_MAX_ENTRIES = 160;
 const HUD_LOG_ENTRY_ANIM_DURATION = 0.22;
+const STARVATION_STATUS_HUD_DURATION = 0.24;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
 const AUTO_CLOSE_SEC_PER_BLOCK = 0.52;
@@ -623,6 +624,7 @@ const state = {
   baseFoundRunTimeSec: 0,
   baseFoundOverlayDelaySec: 0,
   outOfFuel: false,
+  starvationHudTimer: 0,
   dead: false,
   deathCause: null,
   deathAnimTime: 0,
@@ -2601,6 +2603,7 @@ function setupField(seedOverride = null) {
   state.cameraShake.time = 0;
   state.cameraShake.amplitude = 0;
   state.outOfFuel = false;
+  state.starvationHudTimer = 0;
   state.dead = false;
   state.deathCause = null;
   state.deathAnimTime = 0;
@@ -3976,6 +3979,8 @@ function collectPerkTile(x, y, index, perkType, resMultiplier = 1) {
   state.perkMask[index] = 0;
   runFuelEvent(() => applyTilePerk(perkType, x, y, true, resMultiplier));
   state.outOfFuel = false;
+  state.starvationHudTimer = 0;
+  state.starvationHudTimer = 0;
 }
 
 function getDualPerkZoneSideMeta(sideKey) {
@@ -7796,6 +7801,9 @@ function update(dt) {
   if (state.hudWrongCrystalFlash > 0) {
     state.hudWrongCrystalFlash = Math.max(0, state.hudWrongCrystalFlash - dt);
   }
+  if (state.starvationHudTimer > 0) {
+    state.starvationHudTimer = Math.max(0, state.starvationHudTimer - dt);
+  }
 
   updateHudBarFx(dt);
 
@@ -10152,6 +10160,7 @@ function drainFuel(amount, options = {}) {
     state.fuel -= amount;
     state.lastFuelHudChangeKind = hudKind;
     state.outOfFuel = false;
+    state.starvationHudTimer = 0;
     return;
   }
   const fromFuel = state.fuel;
@@ -10163,6 +10172,9 @@ function drainFuel(amount, options = {}) {
   if (!state.outOfFuel) {
     state.outOfFuel = true;
     playSound("fuel_emergency");
+  }
+  if (fromHp > 0) {
+    state.starvationHudTimer = STARVATION_STATUS_HUD_DURATION;
   }
   applyHazardDamage(fromHp, {
     affectsArmor: false,
@@ -14003,9 +14015,7 @@ function render() {
     renderContourBlastPressureStatus(camera);
     renderLoopPressureStatus(camera);
     renderOverdriveStatus(camera);
-    renderStunStatus(camera);
-    renderHeatWarningStatus(camera);
-    renderLowFuelStatus(camera);
+    renderBottomStatusStack(camera);
     renderVisionMask(camera);
   }
   ctx.restore();
@@ -16449,14 +16459,31 @@ function renderOverdriveStatus(camera) {
   ctx.restore();
 }
 
-function renderStunStatus(camera) {
+function renderBottomStatusStack(camera) {
+  const baseY = state.drill.renderY * TILE_SIZE - camera.y + 42;
+  const stackStep = 12; // 8px bar height + 4px gap
+  let nextY = baseY;
+
+  if (renderStunStatus(camera, nextY)) {
+    nextY += stackStep;
+  }
+  if (renderHeatWarningStatus(camera, nextY)) {
+    nextY += stackStep;
+  }
+  if (renderLowFuelStatus(camera, nextY)) {
+    nextY += stackStep;
+  }
+  renderStarvationStatus(camera, nextY);
+}
+
+function renderStunStatus(camera, yOverride = null) {
   if (state.stunTimer <= 0) {
-    return;
+    return false;
   }
 
   const ctx = state.ctx;
   const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.renderY * TILE_SIZE - camera.y + 42;
+  const y = Number.isFinite(yOverride) ? yOverride : (state.drill.renderY * TILE_SIZE - camera.y + 42);
   const width = 64;
   const ratio = clamp(state.stunTimer / Math.max(1, state.stunDisplayDuration || 1), 0, 1);
 
@@ -16474,63 +16501,101 @@ function renderStunStatus(camera) {
   buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
   ctx.fill();
   ctx.restore();
+  return true;
 }
 
-function renderHeatWarningStatus(camera) {
+function renderHeatWarningStatus(camera, yOverride = null) {
   const threshold = state.maxHeat * 0.8;
   if (state.heat < threshold) {
-    return;
+    return false;
   }
 
   const ctx = state.ctx;
   const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.renderY * TILE_SIZE - camera.y + 54;
+  const y = Number.isFinite(yOverride) ? yOverride : (state.drill.renderY * TILE_SIZE - camera.y + 54);
   const width = 64;
+  const left = x - width * 0.5;
   const ratio = clamp(state.heat / Math.max(1, state.maxHeat), 0, 1);
 
   ctx.save();
+  drawHudStatIcon("HEAT", left - 9, y - 1, 0.82);
   ctx.fillStyle = "rgba(23, 14, 9, 0.76)";
   ctx.strokeStyle = "rgba(255, 155, 95, 0.34)";
   ctx.lineWidth = 1.2;
-  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  buildRoundedRectPath(ctx, left, y - 4, width, 8, 4);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
-  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  buildRoundedRectPath(ctx, left + 2, y - 2, width - 4, 4, 3);
   ctx.fill();
   ctx.fillStyle = "#ff8f49";
-  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  buildRoundedRectPath(ctx, left + 2, y - 2, (width - 4) * ratio, 4, 3);
   ctx.fill();
   ctx.restore();
+  return true;
 }
 
-function renderLowFuelStatus(camera) {
+function renderLowFuelStatus(camera, yOverride = null) {
   const threshold = state.maxFuel * 0.3;
   if (state.maxFuel <= 0 || state.fuel > threshold) {
-    return;
+    return false;
   }
 
   const ctx = state.ctx;
   const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
-  const y = state.drill.renderY * TILE_SIZE - camera.y + 66;
+  const y = Number.isFinite(yOverride) ? yOverride : (state.drill.renderY * TILE_SIZE - camera.y + 66);
   const width = 64;
+  const left = x - width * 0.5;
   const ratio = clamp(state.fuel / Math.max(1, state.maxFuel), 0, 1);
   const pulse = Math.sin((state.lastTs || 0) * 0.01) * 0.5 + 0.5;
 
   ctx.save();
+  drawHudStatIcon("FUEL", left - 9, y - 1, 0.82);
   ctx.fillStyle = "rgba(23, 14, 9, 0.82)";
   ctx.strokeStyle = `rgba(255, 112, 112, ${0.3 + pulse * 0.2})`;
   ctx.lineWidth = 1.2;
-  buildRoundedRectPath(ctx, x - width * 0.5, y - 4, width, 8, 4);
+  buildRoundedRectPath(ctx, left, y - 4, width, 8, 4);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
-  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, width - 4, 4, 3);
+  buildRoundedRectPath(ctx, left + 2, y - 2, width - 4, 4, 3);
   ctx.fill();
   ctx.fillStyle = pulse > 0.5 ? "#ff6b57" : "#ff934f";
-  buildRoundedRectPath(ctx, x - width * 0.5 + 2, y - 2, (width - 4) * ratio, 4, 3);
+  buildRoundedRectPath(ctx, left + 2, y - 2, (width - 4) * ratio, 4, 3);
   ctx.fill();
   ctx.restore();
+  return true;
+}
+
+function renderStarvationStatus(camera, yOverride = null) {
+  if (state.starvationHudTimer <= 0 || state.hp <= 0) {
+    return false;
+  }
+
+  const ctx = state.ctx;
+  const x = state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x;
+  const y = Number.isFinite(yOverride) ? yOverride : (state.drill.renderY * TILE_SIZE - camera.y + 78);
+  const width = 64;
+  const left = x - width * 0.5;
+  const ratio = clamp(state.hp / Math.max(1, state.maxHp), 0, 1);
+  const pulse = Math.sin((state.lastTs || 0) * 0.014) * 0.5 + 0.5;
+
+  ctx.save();
+  drawHudStatIcon("HP", left - 10, y - 1, 0.82);
+  ctx.fillStyle = "rgba(23, 14, 9, 0.84)";
+  ctx.strokeStyle = `rgba(255, 112, 112, ${0.34 + pulse * 0.2})`;
+  ctx.lineWidth = 1.2;
+  buildRoundedRectPath(ctx, left, y - 4, width, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 244, 220, 0.12)";
+  buildRoundedRectPath(ctx, left + 2, y - 2, width - 4, 4, 3);
+  ctx.fill();
+  ctx.fillStyle = pulse > 0.5 ? "#ff5f5f" : "#ff7d62";
+  buildRoundedRectPath(ctx, left + 2, y - 2, (width - 4) * ratio, 4, 3);
+  ctx.fill();
+  ctx.restore();
+  return true;
 }
 
 
@@ -16956,7 +17021,7 @@ function drawHudGoldCounter(x, y, width, height) {
 
 function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   const ctx = state.ctx;
-  const trackX = x + 72;
+  const trackX = x + 76;
   const trackY = y + 12;
   const trackWidth = Math.max(44, width - 82);
   const trackHeight = 10;
@@ -16969,15 +17034,19 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   drawHudPanel(x, y, width, height);
 
   ctx.save();
+  const iconX = x + 16;
+  const iconY = y + height * 0.5;
+  const hasIcon = drawHudStatIcon(label, iconX, iconY);
+  const textX = hasIcon ? x + 28 : x + 10;
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#c6ab84";
   ctx.font = `700 10px ${HUD_FONT}`;
   ctx.textAlign = "left";
-  ctx.fillText(label, x + 10, y + 13);
+  ctx.fillText(label, textX, y + 13);
 
   ctx.fillStyle = "#f7ebd4";
   ctx.font = `700 11px ${HUD_FONT}`;
-  ctx.fillText(value, x + 10, y + 27);
+  ctx.fillText(value, textX, y + 27);
 
   ctx.fillStyle = "rgba(255, 240, 214, 0.08)";
   drawRoundedRectPath(trackX, trackY, trackWidth, trackHeight, 999);
@@ -17042,6 +17111,64 @@ function drawHudBar(x, y, width, height, label, value, ratio, colors) {
   ctx.restore();
 }
 
+function drawHudStatIcon(label, x, y, scale = 1) {
+  const ctx = state.ctx;
+  ctx.save();
+  ctx.translate(x, y);
+  const normalizedScale = Number.isFinite(scale) ? Math.max(0.5, Math.min(2, scale)) : 1;
+  ctx.scale(normalizedScale, normalizedScale);
+  ctx.lineWidth = 1.2;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  if (label === "HP") {
+    ctx.fillStyle = "rgba(255, 120, 120, 0.95)";
+    ctx.beginPath();
+    ctx.moveTo(0, 4.6);
+    ctx.bezierCurveTo(-5.2, 1.4, -5.6, -3.2, -2.6, -4.9);
+    ctx.bezierCurveTo(-1.1, -5.8, 0.7, -5.1, 1.7, -3.5);
+    ctx.bezierCurveTo(2.7, -5.1, 4.5, -5.8, 6, -4.9);
+    ctx.bezierCurveTo(9, -3.2, 8.6, 1.4, 3.4, 4.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    return true;
+  }
+
+  if (label === "FUEL") {
+    ctx.fillStyle = "rgba(255, 189, 98, 0.96)";
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.bezierCurveTo(3.8, -2.7, 5, -0.2, 5, 2.1);
+    ctx.bezierCurveTo(5, 5, 2.8, 7, 0, 7);
+    ctx.bezierCurveTo(-2.8, 7, -5, 5, -5, 2.1);
+    ctx.bezierCurveTo(-5, -0.2, -3.8, -2.7, 0, -6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    return true;
+  }
+
+  if (label === "HEAT") {
+    ctx.fillStyle = "rgba(255, 126, 76, 0.96)";
+    ctx.beginPath();
+    ctx.moveTo(0.5, -6.2);
+    ctx.bezierCurveTo(3.8, -3.6, 5.4, -1.1, 5.4, 1.9);
+    ctx.bezierCurveTo(5.4, 5.1, 3, 7, 0, 7);
+    ctx.bezierCurveTo(-3.4, 7, -5.7, 4.4, -5.3, 0.9);
+    ctx.bezierCurveTo(-5, -1.5, -4.1, -3.3, -2.2, -4.7);
+    ctx.bezierCurveTo(-2.2, -2.6, -1.1, -1.4, 0.9, -0.6);
+    ctx.bezierCurveTo(0.6, -2.5, 0.4, -4.5, 0.5, -6.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    return true;
+  }
+
+  ctx.restore();
+  return false;
+}
+
 function renderHudInfoColumn(x, y, width, rows, title) {
   const ctx = state.ctx;
   const rowHeight = 16;
@@ -17077,7 +17204,7 @@ function renderHudInfoColumn(x, y, width, rows, title) {
 
 function drawHudXpBar(x, y, width, height, label, value, ratio) {
   const ctx = state.ctx;
-  const trackX = x + 72;
+  const trackX = x + 76;
   const trackY = y + 12;
   const trackWidth = Math.max(44, width - 82);
   const trackHeight = 10;
@@ -17643,6 +17770,7 @@ function prepareCutsceneField() {
   state.deathOverlayReady = false;
   state.deathBurstSpawned = false;
   state.outOfFuel = false;
+  state.starvationHudTimer = 0;
   state.damageFlash = 0;
   state.levelUpFlash = 0;
   state.menuOpen = false;
