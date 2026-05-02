@@ -67,6 +67,8 @@ const GOLD_PERK_POPUP_DELAY = 0.5;
 const TOAST_DURATION_LEVEL_1 = 0.9;
 const TOAST_DURATION_LEVEL_2 = 2.0;
 const TOAST_DURATION_LEVEL_3 = 3.5;
+const HUD_LOG_MAX_ENTRIES = 160;
+const HUD_LOG_ENTRY_ANIM_DURATION = 0.22;
 const IDLE_AUTO_CLOSE_DELAY = 4;
 const IDLE_AUTO_CLOSE_MIN_DELAY = 1;
 const AUTO_CLOSE_SEC_PER_BLOCK = 0.52;
@@ -111,6 +113,7 @@ const SHARD_DRILL_BLAST_RADIUS = 1.0;
 const BLOCK_HP_BAR_HIGHLIGHT_MS = 3000;
 const BEACON_CONTOUR_ACTIVATION_RADIUS = 2;
 const BASE_FOUND_OVERLAY_DELAY_SEC = 1;
+const LEVEL_UP_BURST_DURATION = 1.4;
 const BLUEPRINT_CATEGORY_CONCEPT_MAP = {
   basic: ["breach", "contour", "xp"],
   economy: ["luck", "xp", "find"],
@@ -834,6 +837,7 @@ const state = {
   healPerLevel: 0,
   goldBonusPerLevel: 0,
   activeToasts: [],
+  worldToasts: [],
   toastQueue: [],
   toastQueueTimer: 0,
   toastDebounceMap: {},
@@ -852,6 +856,7 @@ const state = {
   hudRecipeSlots: [],
   hudWrongCrystalFlash: 0,
   hudWrongCrystalFlashSlotIndex: -1,
+  hudMainRect: null,
   itemInspectModalOpen: false,
   itemInspectItems: [],
   itemInspectIndex: -1,
@@ -1514,13 +1519,16 @@ function spawnMicroBonusRevealEffect(tileX, tileY, mType) {
   });
 }
 
-function spawnLevelUpBurst(x, y) {
+function spawnLevelUpBurst(x, y, fromLevel, toLevel) {
   playSound("level_up");
   state.effects.push({
     kind: "levelup",
     x, y,
-    time: 0.9,
-    duration: 0.9,
+    followHero: true,
+    fromLevel: Number.isFinite(fromLevel) ? Math.max(1, Math.round(fromLevel)) : null,
+    toLevel: Number.isFinite(toLevel) ? Math.max(1, Math.round(toLevel)) : null,
+    time: LEVEL_UP_BURST_DURATION,
+    duration: LEVEL_UP_BURST_DURATION,
     seed: (x * 73417 + y * 53923) % 1000,
   });
 }
@@ -1572,7 +1580,7 @@ function spawnExperienceParticles(tileX, tileY, totalValue, options = {}) {
   }
 }
 
-function spawnDamageNumberEffect(x, y, value) {
+function spawnDamageNumberEffect(x, y, value, options = {}) {
   if (value <= 0) {
     return;
   }
@@ -1582,6 +1590,7 @@ function spawnDamageNumberEffect(x, y, value) {
     x,
     y,
     value,
+    boosted: options.boosted === true,
     time: 0.55,
     duration: 0.55,
     seed: (x * 1877 + y * 3541 + Math.round(value * 10)) % 1000,
@@ -2809,6 +2818,7 @@ function setupField(seedOverride = null) {
   state.healPerLevel = 0;
   state.goldBonusPerLevel = 0;
   state.activeToasts.length = 0;
+  state.worldToasts.length = 0;
   state.toastQueue.length = 0;
   state.toastQueueTimer = 0;
   state.toastDebounceMap = {};
@@ -3656,6 +3666,7 @@ function grantCrystalRecipeReward(firstCrystalType, completedRecipe, x, y, optio
   state.effects.push({
     kind: "crystalComplete",
     x, y,
+    followHero: options.followHero !== false,
     time: delaySeconds,
     duration: delaySeconds,
     recipe,
@@ -3691,6 +3702,10 @@ function applyCrystalCatalystBonus(x, y) {
 
 function collectCrystalTile(x, y, index, crystalType) {
   state.crystalMask[index] = 0;
+  const crystalName = CRYSTAL_TYPES[crystalType]?.name || "";
+  if (crystalName) {
+    showCrystalToast(`+ ${crystalName} кристалл`);
+  }
   runFuelEvent(() => applyCrystalCatalystBonus(x, y));
   if (state.crystalGoldGain > 0) {
     state.unsafeGold += applyGoldBonus(state.crystalGoldGain);
@@ -3752,11 +3767,12 @@ function collectCrystalTile(x, y, index, crystalType) {
       const firstCrystalType = state.crystalRecipe[0];
       const completedRecipe = [...state.crystalRecipe];
       playSound("recipe_complete");
+      showCrystalToast(t("toast.recipe_done"));
       state.crystalRecipeFinalePending = {
         firstCrystalType,
         completedRecipe,
-        rewardX: x,
-        rewardY: y,
+        rewardX: state.drill.x,
+        rewardY: state.drill.y,
       };
     }
     return;
@@ -4224,7 +4240,7 @@ function applyTilePerk(perkType, x, y, showToast = true, resMultiplier = 1) {
     }
     case 8:
       activateDrillOverdrive(8, "");
-      showPerkToast(t("toast.tile_boost_seconds", { sec: 8 }));
+      showWorldToast(t("toast.tile_boost_seconds", { sec: 8 }), "#ffcf7a", 2);
       state.perkText = t("perk.tile.boost.name");
       break;
     default:
@@ -4719,23 +4735,28 @@ window.__digShowAudioToast = (id, opts = {}) => {
 function applyToast(item) {
   const duration = Math.max(0.1, Number(item.duration) || TOAST_DURATION_LEVEL_1);
   state.toastSeq += 1;
-  const stackGap = 5;
-  const baseHeight = 18;
-  let nextStackOffset = 0;
-  if (state.activeToasts.length > 0) {
-    const maxOffset = Math.max(...state.activeToasts.map((toast) => toast.stackOffset || 0));
-    nextStackOffset = maxOffset + baseHeight + stackGap;
+  const channel = item.channel === "world" ? "world" : "hud";
+  if (channel === "world") {
+    state.worldToasts.push({
+      id: state.toastSeq,
+      text: item.text,
+      color: item.color,
+      time: duration,
+      duration,
+      wx: state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5,
+      wy: state.drill.renderY * TILE_SIZE - 16,
+    });
   }
   state.activeToasts.push({
     id: state.toastSeq,
     text: item.text,
     color: item.color,
-    time: duration,
-    duration,
-    stackOffset: nextStackOffset,
-    wx: state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5,
-    wy: state.drill.renderY * TILE_SIZE - 16,
+    animTime: HUD_LOG_ENTRY_ANIM_DURATION,
+    animDuration: HUD_LOG_ENTRY_ANIM_DURATION,
   });
+  if (state.activeToasts.length > HUD_LOG_MAX_ENTRIES) {
+    state.activeToasts.splice(0, state.activeToasts.length - HUD_LOG_MAX_ENTRIES);
+  }
 }
 
 function getToastDurationByLevel(level = 1) {
@@ -4748,23 +4769,28 @@ function getToastDurationByLevel(level = 1) {
   return TOAST_DURATION_LEVEL_1;
 }
 
-function queueToast(text, color, level = 1) {
-  state.toastQueue.push({ text, color, duration: getToastDurationByLevel(level) });
+function queueToast(text, color, level = 1, channel = "hud") {
+  state.toastQueue.push({ text, color, duration: getToastDurationByLevel(level), channel });
 }
 
-function debounceToast(key, value, color, fmt, level = 1) {
+function debounceToast(key, value, color, fmt, level = 1, channel = "hud") {
   const duration = getToastDurationByLevel(level);
   if (state.toastDebounceMap[key]) {
     state.toastDebounceMap[key].value += value;
     state.toastDebounceMap[key].timer = 0.1;
     state.toastDebounceMap[key].duration = duration;
+    state.toastDebounceMap[key].channel = channel;
   } else {
-    state.toastDebounceMap[key] = { value, color, fmt, timer: 0.1, duration };
+    state.toastDebounceMap[key] = { value, color, fmt, timer: 0.1, duration, channel };
   }
 }
 
 function showPerkToast(text) {
   queueToast(text, "#ffcf7a", 3);
+}
+
+function showWorldToast(text, color = "#ffcf7a", level = 2) {
+  queueToast(text, color, level, "world");
 }
 
 function showCrystalToast(text) {
@@ -4783,6 +4809,7 @@ function showFuelToast(value) {
     value >= 0 ? "#ffbf62" : "#ff8f8f",
     v => (v >= 0 ? t("toast.fuel_plus_amount", { val: v }) : t("toast.fuel_minus_amount", { val: Math.abs(v) })),
     1,
+    "world",
   );
 }
 
@@ -4790,11 +4817,11 @@ function showBonusFuelToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("fuel_bonus", value, "#ffbf62", v => t("toast.fuel_bonus_amount", { val: v }), 1);
+  debounceToast("fuel_bonus", value, "#ffbf62", v => t("toast.fuel_bonus_amount", { val: v }), 1, "world");
 }
 
 function showGoldToast(value) {
-  debounceToast("gold", value, "#f8e040", v => `${v} ●`, 1);
+  debounceToast("gold", value, "#f8e040", v => `${v} ●`, 1, "world");
 }
 
 function showBonusGoldToast(value) {
@@ -4813,28 +4840,28 @@ function showHpGainToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("hp_pos", value, "#8ff0a4", v => `${v} HP`, 2);
+  debounceToast("hp_pos", value, "#8ff0a4", v => `${v} HP`, 2, "world");
 }
 
 function showBonusHpToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("hp_bonus", value, "#8ff0a4", v => t("toast.bonus_hp", { val: v }), 2);
+  debounceToast("hp_bonus", value, "#8ff0a4", v => t("toast.bonus_hp", { val: v }), 2, "world");
 }
 
 function showArmorGainToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("armor_pos", value, "#9dd3ff", v => t("toast.armor_plus", { amount: v }), 2);
+  debounceToast("armor_pos", value, "#9dd3ff", v => t("toast.armor_plus", { amount: v }), 2, "world");
 }
 
 function showBonusArmorToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("armor_bonus", value, "#9dd3ff", v => t("toast.bonus_armor", { val: v }), 2);
+  debounceToast("armor_bonus", value, "#9dd3ff", v => t("toast.bonus_armor", { val: v }), 2, "world");
 }
 
 function runFuelEvent(callback) {
@@ -6327,6 +6354,14 @@ function bindUi() {
     });
   }
 
+  const debugAddXp = document.getElementById("debugAddXp");
+  if (debugAddXp) {
+    debugAddXp.addEventListener("click", () => {
+      gainExperience(399);
+      showPerkToast("+399 XP");
+    });
+  }
+
   const debugZeroFuel = document.getElementById("debugZeroFuel");
   if (debugZeroFuel) {
     debugZeroFuel.addEventListener("click", () => {
@@ -6661,7 +6696,7 @@ function bindUi() {
         const recipe = [...state.crystalRecipe];
         clearCrystalRecipe();
         grantCrystalRecipeReward(firstType, recipe, state.drill.x, state.drill.y);
-        showPerkToast(t("toast.recipe_done"));
+        showWorldToast(t("toast.recipe_done"), "#ffcf7a", 2);
       } else {
         showPerkToast(t("toast.no_active_recipe"));
       }
@@ -8037,14 +8072,20 @@ function update(dt) {
     state.contourResonanceFlashTimer = Math.max(0, state.contourResonanceFlashTimer - dt);
   }
   for (let i = state.activeToasts.length - 1; i >= 0; i--) {
-    state.activeToasts[i].time -= dt;
-    if (state.activeToasts[i].time <= 0) state.activeToasts.splice(i, 1);
+    const entry = state.activeToasts[i];
+    if ((entry.animTime || 0) > 0) {
+      entry.animTime = Math.max(0, entry.animTime - dt);
+    }
+  }
+  for (let i = state.worldToasts.length - 1; i >= 0; i--) {
+    state.worldToasts[i].time -= dt;
+    if (state.worldToasts[i].time <= 0) state.worldToasts.splice(i, 1);
   }
   for (const key in state.toastDebounceMap) {
     const entry = state.toastDebounceMap[key];
     entry.timer -= dt;
     if (entry.timer <= 0) {
-      state.toastQueue.push({ text: entry.fmt(entry.value), color: entry.color, duration: entry.duration });
+      state.toastQueue.push({ text: entry.fmt(entry.value), color: entry.color, duration: entry.duration, channel: entry.channel || "hud" });
       delete state.toastDebounceMap[key];
     }
   }
@@ -8164,8 +8205,8 @@ function updateEffects(dt) {
       startCrystalRecipeFinale(
         pending.firstCrystalType,
         pending.completedRecipe,
-        pending.rewardX,
-        pending.rewardY,
+        state.drill.renderX,
+        state.drill.renderY,
       );
     }
   }
@@ -9750,6 +9791,7 @@ function gainExperience(amount) {
   }
   state.xp += amount;
   while (state.xp >= state.xpToNext) {
+    const prevLevel = state.level;
     state.xp -= state.xpToNext;
     state.level += 1;
     state.xpToNext = getXpNeededForLevel(state.level);
@@ -9764,8 +9806,8 @@ function gainExperience(amount) {
     }
     state.levelUpFlash = Math.min(1, (state.levelUpFlash || 0) + 0.55);
     state.levelUpPulse = 0.9;
-    state.levelUpModalDelay = 0.9;
-    spawnLevelUpBurst(state.drill.x, state.drill.y);
+    state.levelUpModalDelay = LEVEL_UP_BURST_DURATION;
+    spawnLevelUpBurst(state.drill.x, state.drill.y, prevLevel, state.level);
     showLevelToast(t("toast.level", { level: state.level }));
   }
 }
@@ -10146,11 +10188,11 @@ function applyHazardDamage(amount, options = {}) {
     if (absorbed > 0 && damageLeft <= 0) {
       state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.1);
       state.damageFlash = Math.min(1, state.damageFlash + 0.45);
-      showPerkToast(t("toast.armor_absorbed", { amount: absorbed }));
+      showWorldToast(t("toast.armor_absorbed", { amount: absorbed }), "#9dd3ff", 2);
       return;
     }
     if (absorbed > 0) {
-      showPerkToast(t("toast.armor_absorbed", { amount: absorbed }));
+      showWorldToast(t("toast.armor_absorbed", { amount: absorbed }), "#9dd3ff", 2);
     }
   }
 
@@ -10182,7 +10224,7 @@ function showHpToast(value) {
   if (value <= 0) {
     return;
   }
-  debounceToast("hp", value, "#ff8a8a", v => `-${v} HP`, 2);
+  debounceToast("hp", value, "#ff8a8a", v => `-${v} HP`, 2, "world");
 }
 
 
@@ -10801,9 +10843,11 @@ function damageCell(x, y, damage, options = {}) {
   const pierceDamageMult = Number.isFinite(options.pierceDamageMult) ? Math.max(0, options.pierceDamageMult) : 1;
   const pierceBaseDamage = Number.isFinite(options.pierceBaseDamage) ? options.pierceBaseDamage : damage;
   let pierceActive = !!options.pierceActive;
+  let boostedDamageNumber = options.boostedDamage === true;
   if (options.byDrill && state.weakSpotMask[index]) {
     state.lastStrikeHitWeakSpot = true;
     damage *= state.weakSpotMult;
+    boostedDamageNumber = true;
     state.weakSpotMask[index] = 0;
     pierceActive = true;
     spawnWeakSpotHitEffect(x, y, options.dirX ?? 0, options.dirY ?? 1);
@@ -10924,7 +10968,7 @@ function damageCell(x, y, damage, options = {}) {
   if (actualDamage > 0) {
     state.blockHpBarLastHitTs[index] = state.lastTs || performance.now();
   }
-  spawnDamageNumberEffect(x, y, displayedDamage);
+  spawnDamageNumberEffect(x, y, displayedDamage, { boosted: boostedDamageNumber });
   state.health[index] -= spikeExplosion ? actualDamage : damage;
   if (state.health[index] > 0) {
     continuePierce();
@@ -11776,6 +11820,7 @@ function updateDrill(dt) {
     pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)) + piercingCount,
     forcePierce: piercingCount > 0,
     pierceDamageMult: piercingCount > 0 ? piercingDamageMult : weakSpotPierceDamageMult,
+    boostedDamage: empoweredStrike,
   });
   let brokeAnyBlock = brokeTargetBlock;
   if (empoweredStrike) {
@@ -11797,6 +11842,7 @@ function updateDrill(dt) {
       dirY: dy,
       pierceLeft: Math.max(0, Math.floor(state.weakSpotPierce || 0)),
       pierceDamageMult: weakSpotPierceDamageMult,
+      boostedDamage: empoweredStrike,
     });
     brokeAnyBlock = brokeAnyBlock || brokeExtra;
     if (state.contourEnemy && state.contourEnemy.x === extra.x && state.contourEnemy.y === extra.y) {
@@ -12588,7 +12634,10 @@ function renderEffects(camera) {
       const alpha = 1 - progress;
       const driftX = (((effect.seed % 7) - 3) / 3) * 6 * progress;
       const lift = progress * 18;
-      const text = `${Math.max(1, Math.round(effect.value))}`;
+      const isBoosted = effect.boosted === true;
+      const text = isBoosted
+        ? `${Math.max(1, Math.round(effect.value))}!`
+        : `${Math.max(1, Math.round(effect.value))}`;
 
       ctx.globalAlpha = alpha;
       ctx.font = `700 15px ${HUD_FONT}`;
@@ -12596,7 +12645,7 @@ function renderEffects(camera) {
       ctx.textBaseline = "middle";
       ctx.lineWidth = 3.2;
       ctx.strokeStyle = "rgba(27, 15, 10, 0.88)";
-      ctx.fillStyle = "#fff7ea";
+      ctx.fillStyle = isBoosted ? "#ff9a34" : "#fff7ea";
       ctx.strokeText(text, cx + driftX, cy - 8 - lift);
       ctx.fillText(text, cx + driftX, cy - 8 - lift);
     } else if (effect.kind === "goldOre") {
@@ -12741,20 +12790,26 @@ function renderEffects(camera) {
         ctx.stroke();
       }
     } else if (effect.kind === "levelup") {
+      const anchorCx = effect.followHero
+        ? (state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x)
+        : cx;
+      const anchorCy = effect.followHero
+        ? (state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y)
+        : cy;
       const t = progress;
       const easeOut = 1 - (1 - t) * (1 - t);
 
       // 1. Central flash — bright cyan burst that fades in first 28%
       if (t < 0.28) {
         const ft = t / 0.28;
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 6 + ft * 30);
+        const grad = ctx.createRadialGradient(anchorCx, anchorCy, 0, anchorCx, anchorCy, 6 + ft * 30);
         grad.addColorStop(0, `rgba(210, 248, 255, ${0.88 * (1 - ft)})`);
         grad.addColorStop(0.5, `rgba(80, 220, 255, ${0.45 * (1 - ft)})`);
         grad.addColorStop(1, "rgba(40, 180, 255, 0)");
         ctx.globalAlpha = 1;
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(cx, cy, 6 + ft * 30, 0, Math.PI * 2);
+        ctx.arc(anchorCx, anchorCy, 6 + ft * 30, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -12765,7 +12820,7 @@ function renderEffects(camera) {
         ctx.strokeStyle = "#7de0ff";
         ctx.lineWidth = 2.8;
         ctx.beginPath();
-        ctx.arc(cx, cy, 4 + rt * 42, 0, Math.PI * 2);
+        ctx.arc(anchorCx, anchorCy, 4 + rt * 42, 0, Math.PI * 2);
         ctx.stroke();
       }
 
@@ -12776,8 +12831,39 @@ function renderEffects(camera) {
         ctx.strokeStyle = "#aaf0ff";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(cx, cy, 10 + rt * 60, 0, Math.PI * 2);
+        ctx.arc(anchorCx, anchorCy, 10 + rt * 60, 0, Math.PI * 2);
         ctx.stroke();
+      }
+
+      // 4. Floating level label above hero: Lvl. N -> Lvl. N+1
+      if (effect.toLevel && t < 0.95) {
+        const textRise = 26 + easeOut * 24;
+        const textAlpha = t < 0.15 ? t / 0.15 : Math.max(0, 1 - (t - 0.15) / 0.8);
+        const hasFrom = Number.isFinite(effect.fromLevel);
+        const splitT = 0.46;
+        const fromLabel = hasFrom ? `Lvl. ${effect.fromLevel}` : null;
+        const toLabel = `Lvl. ${effect.toLevel}`;
+        const fromAlpha = hasFrom
+          ? textAlpha * (t < splitT ? 1 : Math.max(0, 1 - (t - splitT) / 0.14))
+          : 0;
+        const toAlpha = textAlpha * (t < splitT ? 0 : Math.min(1, (t - splitT) / 0.14));
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `700 16px ${HUD_FONT}`;
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(4, 16, 28, 0.95)";
+        if (fromAlpha > 0 && fromLabel) {
+          ctx.globalAlpha = fromAlpha;
+          ctx.fillStyle = "#bff4ff";
+          ctx.strokeText(fromLabel, anchorCx, anchorCy - textRise);
+          ctx.fillText(fromLabel, anchorCx, anchorCy - textRise);
+        }
+        if (toAlpha > 0) {
+          ctx.globalAlpha = toAlpha;
+          ctx.fillStyle = "#e5fdff";
+          ctx.strokeText(toLabel, anchorCx, anchorCy - textRise);
+          ctx.fillText(toLabel, anchorCx, anchorCy - textRise);
+        }
       }
 
       // 4. Radial burst lines (first 48%)
@@ -12792,8 +12878,8 @@ function renderEffects(camera) {
           const r1 = 7 + st * 3;
           const r2 = 17 + st * 22;
           ctx.beginPath();
-          ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
-          ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
+          ctx.moveTo(anchorCx + Math.cos(angle) * r1, anchorCy + Math.sin(angle) * r1);
+          ctx.lineTo(anchorCx + Math.cos(angle) * r2, anchorCy + Math.sin(angle) * r2);
           ctx.stroke();
         }
       }
@@ -12803,8 +12889,8 @@ function renderEffects(camera) {
         const pseed = effect.seed + p * 113;
         const angle = ((pseed * 79) % 628) / 100;
         const speed = 20 + (pseed % 18);
-        const dpx = cx + Math.cos(angle) * speed * easeOut;
-        const dpy = cy + Math.sin(angle) * speed * easeOut;
+        const dpx = anchorCx + Math.cos(angle) * speed * easeOut;
+        const dpy = anchorCy + Math.sin(angle) * speed * easeOut;
         const palpha = Math.max(0, 1 - t * 1.25);
         const size = 1.8 + (pseed % 3) * 0.5;
         ctx.globalAlpha = palpha;
@@ -12816,6 +12902,35 @@ function renderEffects(camera) {
         ctx.beginPath();
         ctx.arc(dpx, dpy, size * 0.5, 0, Math.PI * 2);
         ctx.fill();
+      }
+
+      const fromLevel = Number.isFinite(effect.fromLevel) ? effect.fromLevel : null;
+      const toLevel = Number.isFinite(effect.toLevel) ? effect.toLevel : null;
+      if (fromLevel && toLevel && toLevel !== fromLevel) {
+        const swapStart = 0.14;
+        const swapEnd = 0.52;
+        const swapT = clamp((t - swapStart) / Math.max(0.001, swapEnd - swapStart), 0, 1);
+        const swapEase = 1 - (1 - swapT) * (1 - swapT);
+        const labelY = anchorCy - 32 - easeOut * 10;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `700 18px ${HUD_FONT}`;
+        ctx.lineWidth = 3.6;
+        ctx.strokeStyle = "rgba(8, 20, 30, 0.95)";
+
+        if (swapT < 1) {
+          ctx.globalAlpha = Math.max(0, 1 - swapT);
+          const oldY = labelY - swapEase * 12;
+          ctx.fillStyle = "#d6f7ff";
+          ctx.strokeText(`${fromLevel}`, anchorCx, oldY);
+          ctx.fillText(`${fromLevel}`, anchorCx, oldY);
+        }
+
+        ctx.globalAlpha = swapT > 0 ? swapT : 0;
+        const newY = labelY + (1 - swapEase) * 14;
+        ctx.fillStyle = "#7de0ff";
+        ctx.strokeText(`${toLevel}`, anchorCx, newY);
+        ctx.fillText(`${toLevel}`, anchorCx, newY);
       }
       ctx.globalAlpha = 1;
     } else if (effect.kind === "microReveal") {
@@ -12859,14 +12974,20 @@ function renderEffects(camera) {
       ctx.globalAlpha = 1;
     } else if (effect.kind === "crystalComplete") {
       // Three crystals fill up sequentially above the player
+      const anchorCx = effect.followHero
+        ? (state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 - camera.x)
+        : cx;
+      const anchorCy = effect.followHero
+        ? (state.drill.renderY * TILE_SIZE + TILE_SIZE * 0.5 - camera.y)
+        : cy;
       const recipe = effect.recipe;
       const count = Math.min(recipe.length, 3);
       const spacing = 18;
       const totalW = (count - 1) * spacing;
-      const baseX = cx - totalW * 0.5;
+      const baseX = anchorCx - totalW * 0.5;
       // Float upward as animation progresses
       const lift = progress * 22;
-      const baseY = cy - 24 - lift;
+      const baseY = anchorCy - 24 - lift;
       const CR = 7; // crystal hexagon radius
 
       for (let i = 0; i < count; i += 1) {
@@ -13868,13 +13989,13 @@ function render() {
   renderWorms(camera);
   renderContourEnemy(camera);
   renderDrill(camera);
+  renderWorldToasts(camera);
   if (state.cutsceneModeActive) {
     renderCutsceneWorldOverlay(camera);
   }
   renderWormTelegraph(camera);
   renderCollapseWarnings(camera);
   renderBaseProximityDot(camera);
-  renderActiveToast(camera);
   if (!state.debugMapActive) {
     renderSignalStatus(camera);
     renderBeaconRadar(camera);
@@ -13889,6 +14010,7 @@ function render() {
   }
   ctx.restore();
   if (!state.debugMapActive) renderHud();
+  renderActiveToastLog();
   if (state.menuOpen) {
     state.syncMenuSummary?.();
   }
@@ -16412,27 +16534,101 @@ function renderLowFuelStatus(camera) {
 }
 
 
-function renderActiveToast(camera) {
+function trimTextByWidth(text, maxWidth, ctx) {
+  if (ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+  const ellipsis = "...";
+  let result = text;
+  while (result.length > 0 && ctx.measureText(result + ellipsis).width > maxWidth) {
+    result = result.slice(0, -1);
+  }
+  return result ? result + ellipsis : ellipsis;
+}
+
+function renderActiveToastLog() {
   if (state.activeToasts.length === 0) return;
+  const ctx = state.ctx;
+  const isMobileHud = state.width <= 700;
+  const maxVisible = isMobileHud ? 5 : 7;
+  const lineHeight = isMobileHud ? 15 : 16;
+  const horizontalPadding = 0;
+  const hudRect = state.hudMainRect || {
+    left: Math.round((state.width - Math.min(state.width - 28, 560)) * 0.5),
+    top: 14,
+    width: Math.min(state.width - 28, 560),
+    height: 34 * 2 + 8,
+  };
+  const visibleToasts = state.activeToasts.slice(-maxVisible);
+  const panelWidth = hudRect.width;
+  const panelHeight = hudRect.height;
+  let left = hudRect.left;
+  let top = hudRect.top + hudRect.height + 38;
+  top = clamp(top, 8, Math.max(8, state.height - visibleToasts.length * lineHeight - 12));
+
+  ctx.save();
+  ctx.font = `700 12px ${HUD_FONT}`;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 2.6;
+  for (let i = 0; i < visibleToasts.length; i++) {
+    const toast = visibleToasts[i];
+    const y = top + 8 + i * lineHeight + lineHeight * 0.5;
+    const ageFade = 0.45 + (i + 1) / visibleToasts.length * 0.55;
+    const animDuration = Math.max(0.001, toast.animDuration || HUD_LOG_ENTRY_ANIM_DURATION);
+    const animProgress = clamp(1 - (toast.animTime || 0) / animDuration, 0, 1);
+    const animEase = 1 - (1 - animProgress) * (1 - animProgress);
+    const appearAlpha = toast.animTime > 0 ? animEase : 1;
+    const appearShiftX = toast.animTime > 0 ? (1 - animEase) * 8 : 0;
+    ctx.globalAlpha = ageFade * appearAlpha;
+    ctx.strokeStyle = "rgba(8, 4, 2, 0.95)";
+    ctx.fillStyle = toast.color;
+    const x = left + panelWidth - appearShiftX;
+    const maxTextWidth = panelWidth;
+    if (toast.text.endsWith(" ◆")) {
+      const prefix = toast.text.slice(0, -1); // "+N "
+      ctx.font = `700 12px ${HUD_FONT}`;
+      const clippedPrefix = trimTextByWidth(prefix, maxTextWidth - 12, ctx);
+      const prefixX = x - 11;
+      ctx.strokeText(clippedPrefix, prefixX, y);
+      ctx.fillText(clippedPrefix, prefixX, y);
+      ctx.font = `700 9px ${HUD_FONT}`;
+      const iconX = x - 8;
+      ctx.textAlign = "left";
+      ctx.strokeText("◆", iconX, y);
+      ctx.fillText("◆", iconX, y);
+      ctx.textAlign = "right";
+      ctx.font = `700 12px ${HUD_FONT}`;
+    } else {
+      const text = trimTextByWidth(toast.text, maxTextWidth, ctx);
+      ctx.strokeText(text, x, y);
+      ctx.fillText(text, x, y);
+    }
+  }
+  ctx.restore();
+}
+
+function renderWorldToasts(camera) {
+  if (state.worldToasts.length === 0) return;
   const ctx = state.ctx;
   ctx.save();
   ctx.font = `700 14px ${HUD_FONT}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineWidth = 3.5;
-  for (let i = 0; i < state.activeToasts.length; i++) {
-    const toast = state.activeToasts[i];
+  for (let i = 0; i < state.worldToasts.length; i++) {
+    const toast = state.worldToasts[i];
     const duration = Math.max(0.1, toast.duration || TOAST_DURATION_LEVEL_1);
     const t = 1 - toast.time / duration;
     const alpha = t < 0.08 ? t / 0.08 : Math.max(0, 1 - (t - 0.25) / 0.75);
     const lift = (1 - (1 - t) * (1 - t)) * 28;
     const x = toast.wx - camera.x;
-    const y = toast.wy - camera.y - lift - (toast.stackOffset || 0);
+    const y = toast.wy - camera.y - lift;
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = "rgba(8, 4, 2, 0.95)";
     ctx.fillStyle = toast.color;
     if (toast.text.endsWith(" ◆")) {
-      const prefix = toast.text.slice(0, -1); // "+N "
+      const prefix = toast.text.slice(0, -1);
       ctx.font = `700 14px ${HUD_FONT}`;
       const prefixW = ctx.measureText(prefix).width;
       ctx.font = `700 10px ${HUD_FONT}`;
@@ -16502,6 +16698,12 @@ function renderHud() {
   const left = Math.round((state.width - totalWidth) * 0.5);
   const sideInset = Math.max(0, Math.round((state.width - totalWidth) * 0.5));
   state.hudInspectableRects = [];
+  state.hudMainRect = {
+    left,
+    top,
+    width: totalWidth,
+    height: panelHeight * 2 + 8,
+  };
 
   const hpLabel = `${Math.ceil(state.hp)}/${state.maxHp}`;
   drawHudBar(left, top, panelWidth, panelHeight, "HP", hpLabel, hpRatio, ["#ff9d7a", "#ff5c5c"]);
@@ -16645,7 +16847,7 @@ function renderHud() {
   const enemyText = `ENM ${Math.round(state.contourEnemyBudget || 0)}`;
   const comboText = t("ui.combo_hud", { count: Math.max(0, Math.round(state.comboCount || 0)) });
   const fpsX = state.width - 14;
-  const fpsY = detailTop + 52;
+  const fpsY = state.height - 64;
   ctx.fillText(fpsText, fpsX, fpsY);
   ctx.fillText(collapseText, fpsX, fpsY + 12);
   ctx.fillText(enemyText, fpsX, fpsY + 24);
@@ -16656,7 +16858,7 @@ function renderHud() {
   const history = state.fpsHistory;
   if (history.length > 1) {
     const gx = state.width - 14 - 44 - 38;
-    const gy = detailTop + 52;
+    const gy = state.height - 64;
     const gw = 44;
     const gh = 12;
     const maxFps = 70;
