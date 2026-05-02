@@ -12847,34 +12847,53 @@ function renderEffects(camera) {
         ctx.stroke();
       }
 
-      // 4. Floating level label above hero: Lvl. N -> Lvl. N+1
+      // 4. Floating level label above hero:
+      //    1) Lvl. N appears
+      //    2) ceremonial bump + swap to Lvl. N+1
+      //    3) only Lvl. N+1 fades out
       if (effect.toLevel && t < 0.95) {
         const textRise = 26 + easeOut * 24;
-        const textAlpha = t < 0.15 ? t / 0.15 : Math.max(0, 1 - (t - 0.15) / 0.8);
         const hasFrom = Number.isFinite(effect.fromLevel);
-        const splitT = 0.46;
         const fromLabel = hasFrom ? `Lvl. ${effect.fromLevel}` : null;
         const toLabel = `Lvl. ${effect.toLevel}`;
-        const fromAlpha = hasFrom
-          ? textAlpha * (t < splitT ? 1 : Math.max(0, 1 - (t - splitT) / 0.14))
-          : 0;
-        const toAlpha = textAlpha * (t < splitT ? 0 : Math.min(1, (t - splitT) / 0.14));
+        const labelX = anchorCx;
+        const labelY = anchorCy - textRise;
+
+        const introEnd = 0.10;
+        const holdEnd = 0.44;
+        const swapEnd = 0.62;
+        const fadeStart = 0.88;
+        const outEnd = 0.95;
+
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.font = `700 16px ${HUD_FONT}`;
         ctx.lineWidth = 4;
         ctx.strokeStyle = "rgba(4, 16, 28, 0.95)";
-        if (fromAlpha > 0 && fromLabel) {
-          ctx.globalAlpha = fromAlpha;
+
+        if (hasFrom && t < holdEnd) {
+          const alpha = t < introEnd ? clamp(t / introEnd, 0, 1) : 1;
+          ctx.globalAlpha = alpha;
           ctx.fillStyle = "#bff4ff";
-          ctx.strokeText(fromLabel, anchorCx, anchorCy - textRise);
-          ctx.fillText(fromLabel, anchorCx, anchorCy - textRise);
-        }
-        if (toAlpha > 0) {
-          ctx.globalAlpha = toAlpha;
+          ctx.strokeText(fromLabel, labelX, labelY);
+          ctx.fillText(fromLabel, labelX, labelY);
+        } else {
+          const swapT = clamp((t - holdEnd) / Math.max(0.001, swapEnd - holdEnd), 0, 1);
+          const bump = Math.sin(swapT * Math.PI) * 0.16;
+          const scale = 1 + bump;
+          const alpha = t < fadeStart
+            ? 1
+            : Math.max(0, 1 - clamp((t - fadeStart) / Math.max(0.001, outEnd - fadeStart), 0, 1));
+          const rise = Math.sin(swapT * Math.PI) * 6;
+
+          ctx.save();
+          ctx.translate(labelX, labelY - rise);
+          ctx.scale(scale, scale);
+          ctx.globalAlpha = alpha;
           ctx.fillStyle = "#e5fdff";
-          ctx.strokeText(toLabel, anchorCx, anchorCy - textRise);
-          ctx.fillText(toLabel, anchorCx, anchorCy - textRise);
+          ctx.strokeText(toLabel, 0, 0);
+          ctx.fillText(toLabel, 0, 0);
+          ctx.restore();
         }
       }
 
@@ -12916,34 +12935,6 @@ function renderEffects(camera) {
         ctx.fill();
       }
 
-      const fromLevel = Number.isFinite(effect.fromLevel) ? effect.fromLevel : null;
-      const toLevel = Number.isFinite(effect.toLevel) ? effect.toLevel : null;
-      if (fromLevel && toLevel && toLevel !== fromLevel) {
-        const swapStart = 0.14;
-        const swapEnd = 0.52;
-        const swapT = clamp((t - swapStart) / Math.max(0.001, swapEnd - swapStart), 0, 1);
-        const swapEase = 1 - (1 - swapT) * (1 - swapT);
-        const labelY = anchorCy - 32 - easeOut * 10;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = `700 18px ${HUD_FONT}`;
-        ctx.lineWidth = 3.6;
-        ctx.strokeStyle = "rgba(8, 20, 30, 0.95)";
-
-        if (swapT < 1) {
-          ctx.globalAlpha = Math.max(0, 1 - swapT);
-          const oldY = labelY - swapEase * 12;
-          ctx.fillStyle = "#d6f7ff";
-          ctx.strokeText(`${fromLevel}`, anchorCx, oldY);
-          ctx.fillText(`${fromLevel}`, anchorCx, oldY);
-        }
-
-        ctx.globalAlpha = swapT > 0 ? swapT : 0;
-        const newY = labelY + (1 - swapEase) * 14;
-        ctx.fillStyle = "#7de0ff";
-        ctx.strokeText(`${toLevel}`, anchorCx, newY);
-        ctx.fillText(`${toLevel}`, anchorCx, newY);
-      }
       ctx.globalAlpha = 1;
     } else if (effect.kind === "microReveal") {
       const t = progress;

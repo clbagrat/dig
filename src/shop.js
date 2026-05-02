@@ -1511,7 +1511,8 @@ function renderOfferings() {
       card.style.setProperty("--shop-enter-delay", `${Math.min(280, i * 40)}ms`);
     }
 
-    const typeLabel = isEquip ? "⛏" : "✧";
+    const typeGlyph = isEquip ? "⛏" : "✧";
+    const typeLabel = isEquip ? t("ui.equipment") : t("ui.item");
     const mergeLabel = isMerge ? `<div class="shop-card__merge">${t("shop.merge_label")}</div>` : "";
     const catId = offering.good.category;
     const catDef = catId ? CATEGORIES.find(c => c.id === catId) : null;
@@ -1520,13 +1521,13 @@ function renderOfferings() {
 
     card.innerHTML = `
       <button class="shop-card__inspect" type="button" data-inspect-offering-idx="${i}" aria-label="${t("ui.description")}">i</button>
-      <div class="shop-card__type">${typeLabel}</div>
+      <div class="shop-card__type-glyph">${typeGlyph}</div>
       <div class="shop-card__icon">${offering.good.icon}</div>
       <div class="shop-card__name">${offering.good.name}</div>
-      ${catLabel}
+      <div class="shop-card__kind">${typeLabel}</div>
       <div class="shop-card__desc">${descHtml}</div>
       ${mergeLabel}
-      <div class="shop-card__cost">${RARITY_NAMES[offering.rarity]}</div>
+      ${catLabel}
     `;
     container.appendChild(card);
   }
@@ -1557,7 +1558,7 @@ function renderSlots() {
     } else {
       slot.className = "shop-slot shop-slot--empty";
       slot.dataset.slotIdx = i;
-      slot.innerHTML = `<span class="shop-slot__empty">+</span>`;
+      slot.innerHTML = `<span class="shop-slot__empty">⛏</span>`;
     }
 
     container.appendChild(slot);

@@ -2352,7 +2352,7 @@ strong {
   align-items: stretch;
   gap: 8px;
   min-height: 240px;
-  padding: 14px 12px 12px;
+  padding: 20px 12px 32px;
   border: 1.5px solid rgba(215, 159, 73, 0.18);
   border-radius: 14px;
   background: rgba(22, 11, 5, 0.7);
@@ -2367,9 +2367,7 @@ strong {
 .shop-card:active { transform: scale(0.95); }
 
 .shop-card--equipment {
-  background:
-    linear-gradient(180deg, rgba(66, 118, 182, 0.14), rgba(22, 11, 5, 0.7) 42%),
-    rgba(22, 11, 5, 0.7);
+  background: rgba(22, 11, 5, 0.7);
 }
 
 .shop-card--fading {
@@ -2468,15 +2466,111 @@ strong {
 .shop-card--selected.shop-card--rarity-4 { box-shadow: 0 0 0 2px rgba(255, 68, 68, 0.3), 0 0 14px rgba(255, 68, 68, 0.12); }
 
 .shop-card--merge {
-  background: rgba(68, 136, 255, 0.08);
+  background: rgba(22, 11, 5, 0.7);
 }
 
 .shop-card--poor {
   opacity: 0.5;
 }
 
+.shop-card__type-glyph {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ffe4b2;
+  position: absolute;
+  top: -2px;
+  left: -4px;
+  transform: none;
+  line-height: 1;
+  padding: 0 10px;
+  background: linear-gradient(180deg, rgba(14, 8, 4, 0.98), rgba(20, 10, 5, 0.95));
+  text-shadow: 0 0 12px rgba(255, 214, 150, 0.35);
+  z-index: 2;
+}
+
+.shop-card__kind {
+  margin-top: -4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  color: #cfb48b;
+}
+
+.shop-card--equipment .shop-card__kind {
+  color: #88b9ff;
+  text-shadow: 0 0 8px rgba(68, 136, 255, 0.28);
+}
+
+.shop-card--item .shop-card__kind {
+  color: #d6bf98;
+}
+
+.shop-card__icon {
+  font-size: 36px;
+  line-height: 1;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.shop-card__name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.shop-card__category {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #d7b47e;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  padding: 0 12px;
+  line-height: 1.2;
+  background: linear-gradient(180deg, rgba(20, 10, 5, 0.95), rgba(20, 10, 5, 0.98));
+}
+
+.shop-card__desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+  min-height: 66px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  margin-top: 4px;
+}
+
+.shop-card__merge {
+  margin-top: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: #4488ff;
+  letter-spacing: 0.03em;
+  text-align: left;
+}
+
+.shop-card__cost {
+  display: none;
+}
+
 .shop-card__type {
-  font-size: 13px;
   opacity: 0.92;
   position: absolute;
   top: 6px;
@@ -2506,70 +2600,12 @@ strong {
   transform: scale(0.95);
 }
 
-.shop-card--equipment .shop-card__type {
-  font-size: 14px;
-}
-
-.shop-card__icon {
-  font-size: 28px;
-  line-height: 1;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.shop-card__name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.02em;
-  line-height: 1.15;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.shop-card__category {
-  font-size: 11px;
-  color: var(--text-dim, #888);
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-.shop-card__desc {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.35;
-  min-height: 66px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-}
-
 .shop-desc-number--pos {
   color: #93e59a;
 }
 
 .shop-desc-number--neg {
   color: #ff9a8f;
-}
-
-.shop-card__merge {
-  font-size: 10px;
-  font-weight: 700;
-  color: #4488ff;
-  letter-spacing: 0.03em;
-}
-
-.shop-card__cost {
-  margin-top: auto;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--accent);
-  white-space: nowrap;
 }
 
 .shop-card__cost--poor {
@@ -2949,12 +2985,23 @@ strong {
 
   .shop-card {
     min-height: 210px;
-    padding: 12px 10px 10px;
+    padding: 18px 10px 30px;
   }
 
   .shop-card__name {
     font-size: 14px;
     min-height: 32px;
+  }
+
+  .shop-card__icon {
+    font-size: 30px;
+    height: 34px;
+  }
+
+  .shop-card__type-glyph {
+    font-size: 24px;
+    top: -2px;
+    left: -4px;
   }
 
   .shop-card__desc {
