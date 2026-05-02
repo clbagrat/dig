@@ -109,6 +109,7 @@ const FUEL_ROCKET_RADIUS = 1;
 const CRYO_ROCKET_DAMAGE = 20;
 const SHARD_DRILL_BLAST_RADIUS = 1.0;
 const BLOCK_HP_BAR_HIGHLIGHT_MS = 3000;
+const BASE_FOUND_OVERLAY_DELAY_SEC = 1;
 const BLUEPRINT_CATEGORY_CONCEPT_MAP = {
   basic: ["breach", "contour", "xp"],
   economy: ["luck", "xp", "find"],
@@ -616,6 +617,7 @@ const state = {
   baseFound: false,
   runTimeSec: 0,
   baseFoundRunTimeSec: 0,
+  baseFoundOverlayDelaySec: 0,
   outOfFuel: false,
   dead: false,
   deathCause: null,
@@ -941,10 +943,25 @@ function buildRoundedRectPath(ctx, x, y, width, height, radius) {
 }
 
 function shiftHexColor(color, amount) {
-  const hex = color.replace("#", "");
-  const r = clamp(parseInt(hex.slice(0, 2), 16) + amount, 0, 255);
-  const g = clamp(parseInt(hex.slice(2, 4), 16) + amount, 0, 255);
-  const b = clamp(parseInt(hex.slice(4, 6), 16) + amount, 0, 255);
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (typeof color === "string" && color.startsWith("#")) {
+    const hex = color.replace("#", "");
+    r = parseInt(hex.slice(0, 2), 16);
+    g = parseInt(hex.slice(2, 4), 16);
+    b = parseInt(hex.slice(4, 6), 16);
+  } else if (typeof color === "string") {
+    const rgbMatch = color.match(/rgba?\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)/i);
+    if (rgbMatch) {
+      r = Number(rgbMatch[1]);
+      g = Number(rgbMatch[2]);
+      b = Number(rgbMatch[3]);
+    }
+  }
+  r = clamp(r + amount, 0, 255);
+  g = clamp(g + amount, 0, 255);
+  b = clamp(b + amount, 0, 255);
   return `rgb(${r}, ${g}, ${b})`;
 }
 
@@ -961,13 +978,18 @@ function createBlockSprite(type, tier) {
   const ctx = canvas.getContext("2d");
   const t = (tier - 1) / 6; // 0..1
 
-  // Градиент — контрастность растёт с тиром
-  const gradLight = Math.round(6 + t * 20);
-  const gradDark = Math.round(8 + t * 24);
+  // Tone separation by tier:
+  // low tiers become clearly lighter, high tiers clearly darker.
+  const tierToneShift = Math.round(18 - t * 42); // +18 .. -24
+  const baseTone = shiftHexColor(type.color, tierToneShift);
+
+  // Gradient contrast also grows with tier.
+  const gradLight = Math.round(10 + t * 22);
+  const gradDark = Math.round(14 + t * 30);
   const gradient = ctx.createLinearGradient(0, 0, TILE_SIZE, TILE_SIZE);
-  gradient.addColorStop(0, lightenColor(type.color, gradLight));
-  gradient.addColorStop(0.52, type.color);
-  gradient.addColorStop(1, darkenColor(type.color, gradDark));
+  gradient.addColorStop(0, lightenColor(baseTone, gradLight));
+  gradient.addColorStop(0.52, baseTone);
+  gradient.addColorStop(1, darkenColor(baseTone, gradDark));
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
@@ -2565,6 +2587,7 @@ function setupField(seedOverride = null) {
   state.baseFound = false;
   state.runTimeSec = 0;
   state.baseFoundRunTimeSec = 0;
+  state.baseFoundOverlayDelaySec = 0;
   state.cameraShake.time = 0;
   state.cameraShake.amplitude = 0;
   state.outOfFuel = false;
@@ -4709,8 +4732,8 @@ function applyToast(item) {
     time: duration,
     duration,
     stackOffset: nextStackOffset,
-    wx: state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5 + (Math.random() - 0.5) * TILE_SIZE * 1.6,
-    wy: state.drill.renderY * TILE_SIZE - 10,
+    wx: state.drill.renderX * TILE_SIZE + TILE_SIZE * 0.5,
+    wy: state.drill.renderY * TILE_SIZE - 16,
   });
 }
 
@@ -6162,18 +6185,20 @@ function bindUi() {
     }
   });
 
+  const openManualModal = (event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    closeMenu();
+    resetPad();
+    if (manualFrame) {
+      manualFrame.src = `./manual.html?v=${Date.now()}`;
+    }
+    state.manualModalOpen = true;
+    syncManualModal();
+  };
+
   if (manualOpen) {
-    manualOpen.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      closeMenu();
-      resetPad();
-      if (manualFrame) {
-        manualFrame.src = `./manual.html?v=${Date.now()}`;
-      }
-      state.manualModalOpen = true;
-      syncManualModal();
-    });
+    manualOpen.addEventListener("pointerdown", openManualModal);
   }
 
   if (manualClose) {
@@ -7728,6 +7753,9 @@ function update(dt) {
   }
   if (!state.cutsceneModeActive && !state.baseFound) {
     state.runTimeSec += dt;
+  }
+  if (state.baseFoundOverlayDelaySec > 0) {
+    state.baseFoundOverlayDelaySec = Math.max(0, state.baseFoundOverlayDelaySec - dt);
   }
   if (state.hudWrongCrystalFlash > 0) {
     state.hudWrongCrystalFlash = Math.max(0, state.hudWrongCrystalFlash - dt);
@@ -11851,6 +11879,7 @@ function updateDiscovery() {
   if (!state.baseFound && state.tunnelMask[cellIndex(state.base.x, state.base.y)]) {
     state.baseFound = true;
     state.baseFoundRunTimeSec = state.runTimeSec;
+    state.baseFoundOverlayDelaySec = BASE_FOUND_OVERLAY_DELAY_SEC;
     playSound("base_found");
   }
 }
@@ -13832,7 +13861,7 @@ function render() {
     renderCutsceneScreenFx(camera);
   }
 
-  if (state.baseFound && !state.cutsceneModeActive) {
+  if (state.baseFound && !state.cutsceneModeActive && state.baseFoundOverlayDelaySec <= 0) {
     showBaseFoundOverlay(true, state.baseFoundRunTimeSec || state.runTimeSec);
   } else if (state.dead && state.deathOverlayReady && !state.cutsceneModeActive) {
     showDeadOverlay(true);
