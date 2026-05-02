@@ -10134,6 +10134,9 @@ function applyHazardDamage(amount, options = {}) {
   if (amount <= 0 || state.dead) {
     return;
   }
+  if (state.beaconActivationAnim) {
+    return;
+  }
 
   let damageLeft = amount;
   if (options.affectsArmor !== false && state.armor > 0) {
