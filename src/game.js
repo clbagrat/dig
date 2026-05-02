@@ -109,6 +109,7 @@ const FUEL_ROCKET_RADIUS = 1;
 const CRYO_ROCKET_DAMAGE = 20;
 const SHARD_DRILL_BLAST_RADIUS = 1.0;
 const BLOCK_HP_BAR_HIGHLIGHT_MS = 3000;
+const BEACON_CONTOUR_ACTIVATION_RADIUS = 2;
 const BASE_FOUND_OVERLAY_DELAY_SEC = 1;
 const BLUEPRINT_CATEGORY_CONCEPT_MAP = {
   basic: ["breach", "contour", "xp"],
@@ -12088,62 +12089,104 @@ function triggerPathLoop(loopStartIndex, targetX, targetY) {
   spawnLoopFieldEffect(loopPath, affectedCells);
 
   for (const beacon of state.beacons) {
-    let allInside = true;
-    for (let dy = 0; dy < 2 && allInside; dy += 1) {
-      for (let dx = 0; dx < 2 && allInside; dx += 1) {
-        if (!isPointInPolygon(beacon.x + dx + 0.5, beacon.y + dy + 0.5, polygon)) {
-          allInside = false;
+    let anyCoreCellInside = false;
+    for (let dy = 0; dy < 2 && !anyCoreCellInside; dy += 1) {
+      for (let dx = 0; dx < 2 && !anyCoreCellInside; dx += 1) {
+        const cellX = beacon.x + dx;
+        const cellY = beacon.y + dy;
+        const samplePoints = [
+          { x: cellX + 0.5, y: cellY + 0.5 },
+          { x: cellX + 0.2, y: cellY + 0.2 },
+          { x: cellX + 0.8, y: cellY + 0.2 },
+          { x: cellX + 0.2, y: cellY + 0.8 },
+          { x: cellX + 0.8, y: cellY + 0.8 },
+        ];
+        for (const p of samplePoints) {
+          if (isPointInPolygon(p.x, p.y, polygon)) {
+            anyCoreCellInside = true;
+            break;
+          }
         }
       }
     }
-    if (!allInside) continue;
-    // All contour cells must be within the beacon's 4x4 area (the 2x2 beacon + 1-tile ring)
-    const pathWithinBeaconArea = loopPath.every(
-      (cell) =>
-        cell.x >= beacon.x - 1 &&
-        cell.x <= beacon.x + 2 &&
-        cell.y >= beacon.y - 1 &&
-        cell.y <= beacon.y + 2,
-    );
-    if (!pathWithinBeaconArea) continue;
+    if (!anyCoreCellInside) continue;
+    const contourPoints = [...loopPath, { x: targetX, y: targetY }];
+    const pointToSegmentDistance = (px, py, ax, ay, bx, by) => {
+      const abx = bx - ax;
+      const aby = by - ay;
+      const apx = px - ax;
+      const apy = py - ay;
+      const abLenSq = abx * abx + aby * aby;
+      if (abLenSq <= 1e-9) return Math.hypot(px - ax, py - ay);
+      const t = clamp((apx * abx + apy * aby) / abLenSq, 0, 1);
+      const cx = ax + abx * t;
+      const cy = ay + aby * t;
+      return Math.hypot(px - cx, py - cy);
+    };
+    const drillCx = state.drill.x + 0.5;
+    const drillCy = state.drill.y + 0.5;
+    let drillNearContour = contourPoints.some((cell) => Math.hypot(drillCx - (cell.x + 0.5), drillCy - (cell.y + 0.5)) <= BEACON_CONTOUR_ACTIVATION_RADIUS);
+    if (!drillNearContour) {
+      for (let i = 0; i < contourPoints.length; i += 1) {
+        const a = contourPoints[i];
+        const b = contourPoints[(i + 1) % contourPoints.length];
+        const dist = pointToSegmentDistance(
+          drillCx,
+          drillCy,
+          a.x + 0.5,
+          a.y + 0.5,
+          b.x + 0.5,
+          b.y + 0.5,
+        );
+        if (dist <= BEACON_CONTOUR_ACTIVATION_RADIUS) {
+          drillNearContour = true;
+          break;
+        }
+      }
+    }
+    if (!drillNearContour) continue;
+    const drillNearBeaconArea =
+      state.drill.x >= beacon.x - 1 &&
+      state.drill.x <= beacon.x + 2 &&
+      state.drill.y >= beacon.y - 1 &&
+      state.drill.y <= beacon.y + 2;
+    if (!drillNearBeaconArea) continue;
     if (beacon.hidden && !isBeaconFullyExcavated(beacon)) continue;
     if (beacon.active) {
       continue;
     }
-    if (pathWithinBeaconArea) {
-      revealHiddenBeacon(beacon);
-      beacon.active = true;
-      playSound("beacon_activate");
-      beacon.activationAnimStart = state.lastTs || performance.now();
-      state.pendingBeaconWireActivation = beacon;
-      if (state.beaconCatalystLevel > 0 && state.crystalRecipe.length > 0 && state.crystalProgress < state.crystalRecipe.length) {
-        const firstType = state.crystalRecipe[0];
-        const completedRecipe = [...state.crystalRecipe];
-        clearCrystalRecipe();
-        grantCrystalRecipeReward(firstType, completedRecipe, beacon.x, beacon.y);
-      }
-      // Deposit any remaining unsafe gold (most was deposited progressively)
-      if (state.unsafeGold > 0) {
-        state.gold += Math.floor(state.unsafeGold);
-        state.unsafeGold = 0;
-      }
-      // Drain all blueprints now; each one will show a sequential choice modal
-      const blueprintRemaining = state.blueprintCount;
-      state.blueprintCount = 0;
-      const pendingAction = blueprintRemaining > 0
-        ? { type: "blueprintChoice", remaining: blueprintRemaining, beacon }
-        : { type: "shop", beaconY: beacon.y };
-      showPerkToast(t("toast.beacon_activated"));
-      addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
-      state.beaconActivationAnim = {
-        beacon,
-        startTs: beacon.activationAnimStart,
-        pendingAction,
-        blueprintFlightCount: blueprintRemaining,
-        blueprintFlightFromX: state.drill.renderX,
-        blueprintFlightFromY: state.drill.renderY,
-      };
+    revealHiddenBeacon(beacon);
+    beacon.active = true;
+    playSound("beacon_activate");
+    beacon.activationAnimStart = state.lastTs || performance.now();
+    state.pendingBeaconWireActivation = beacon;
+    if (state.beaconCatalystLevel > 0 && state.crystalRecipe.length > 0 && state.crystalProgress < state.crystalRecipe.length) {
+      const firstType = state.crystalRecipe[0];
+      const completedRecipe = [...state.crystalRecipe];
+      clearCrystalRecipe();
+      grantCrystalRecipeReward(firstType, completedRecipe, beacon.x, beacon.y);
     }
+    // Deposit any remaining unsafe gold (most was deposited progressively)
+    if (state.unsafeGold > 0) {
+      state.gold += Math.floor(state.unsafeGold);
+      state.unsafeGold = 0;
+    }
+    // Drain all blueprints now; each one will show a sequential choice modal
+    const blueprintRemaining = state.blueprintCount;
+    state.blueprintCount = 0;
+    const pendingAction = blueprintRemaining > 0
+      ? { type: "blueprintChoice", remaining: blueprintRemaining, beacon }
+      : { type: "shop", beaconY: beacon.y };
+    showPerkToast(t("toast.beacon_activated"));
+    addFuel(Math.ceil(state.maxFuel - state.fuel), beacon.x, beacon.y);
+    state.beaconActivationAnim = {
+      beacon,
+      startTs: beacon.activationAnimStart,
+      pendingAction,
+      blueprintFlightCount: blueprintRemaining,
+      blueprintFlightFromX: state.drill.renderX,
+      blueprintFlightFromY: state.drill.renderY,
+    };
   }
 
   return true;
