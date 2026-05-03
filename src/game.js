@@ -2372,7 +2372,7 @@ function canPlaceGasPocketAt(x, y) {
 function revealGasPocket(x, y) {
   const startIndex = cellIndex(x, y);
   if (!state.gasPocketMask[startIndex]) {
-    return;
+    return [];
   }
 
   const frontier = [{ x, y }];
@@ -2423,6 +2423,7 @@ function revealGasPocket(x, y) {
   });
   playSound("gas_release");
   applyGasContactDamage();
+  return released;
 }
 
 function addSteamCells(cells, delta) {
@@ -5628,6 +5629,14 @@ function showFindHerButton(show) {
   button.style.display = show ? "inline-flex" : "none";
 }
 
+function showCutsceneSkipButton(show) {
+  const button = document.getElementById("cutSkipButton");
+  if (!button) return;
+  button.textContent = t("ui.skip");
+  button.hidden = !show;
+  button.style.display = show ? "inline-flex" : "none";
+}
+
 function formatRunTime(totalSeconds) {
   const seconds = Math.max(0, Math.floor(totalSeconds));
   const mins = Math.floor(seconds / 60);
@@ -5680,6 +5689,7 @@ function startGameplayRun() {
   state.debugMapActive = false;
   state.debugMapGenerationPanelCollapsed = false;
   showFindHerButton(false);
+  showCutsceneSkipButton(false);
   showStartOverlay(false);
   showBaseFoundOverlay(false);
   setupField();
@@ -5689,6 +5699,7 @@ function startGameplayRun() {
 function startIntroCutsceneFromMenu() {
   showStartOverlay(false);
   showBaseFoundOverlay(false);
+  showCutsceneSkipButton(true);
   state.cutsceneLaunchesGame = true;
   prepareCutsceneField();
   state.cutsceneModeActive = true;
@@ -5702,6 +5713,7 @@ function initMainMenuMode() {
     ensureCoreReady();
     bindCutsceneControls();
     showFindHerButton(false);
+    showCutsceneSkipButton(false);
     showBaseFoundOverlay(false);
     showStartOverlay(true);
     const newGameButton = document.getElementById("newGameButton");
@@ -11133,7 +11145,12 @@ function breakCell(x, y, index, options = {}) {
       continue;
     }
     if (state.gasPocketMask[cellIndex(nx, ny)]) {
-      revealGasPocket(nx, ny);
+      const releasedGasCells = revealGasPocket(nx, ny);
+      if (options.cause === "explosion" && Array.isArray(releasedGasCells)) {
+        for (let gi = 0; gi < releasedGasCells.length; gi += 1) {
+          scheduleChainExplosion({ kind: "gas", x: releasedGasCells[gi].x, y: releasedGasCells[gi].y });
+        }
+      }
     }
     if (state.steamPocketMask[cellIndex(nx, ny)]) {
       revealSteamPocket(nx, ny, x - nx, y - ny);
@@ -18120,9 +18137,16 @@ function updateCutsceneControlsUi() {
   const pause = document.getElementById("cutPause");
   const timeline = document.getElementById("cutTimeline");
   const findHerButton = document.getElementById("cutFindHerButton");
+  const skipButton = document.getElementById("cutSkipButton");
   if (status) status.textContent = `Phase: ${phase.label} (${cut.time.toFixed(2)}s)`;
   if (pause) pause.textContent = cut.playing ? "⏸ Pause" : "▶ Play";
   if (timeline) timeline.value = String(cut.time);
+  if (skipButton) {
+    skipButton.textContent = t("ui.skip");
+    const show = state.cutsceneLaunchesGame;
+    skipButton.hidden = !show;
+    skipButton.style.display = show ? "inline-flex" : "none";
+  }
   if (findHerButton) {
     findHerButton.textContent = t("ui.find_her");
     const show = cut.time >= CUTSCENE_TOTAL_TIME - 0.02;
@@ -18184,6 +18208,12 @@ function bindCutsceneControls() {
     state.cutscene.playing = false;
     state.cameraShake.amplitude = Math.max(state.cameraShake.amplitude, 1.5);
     state.cameraShake.time = Math.max(state.cameraShake.time, 0.35);
+  });
+
+  document.getElementById("cutSkipButton")?.addEventListener("click", () => {
+    if (!state.cutsceneModeActive || !state.cutsceneLaunchesGame) return;
+    markIntroCutsceneSeen();
+    startGameplayRun();
   });
 
   document.getElementById("cutRestart")?.addEventListener("click", () => {

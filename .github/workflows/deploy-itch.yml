@@ -1,0 +1,36 @@
+name: Deploy to itch.io
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ITCH_USERNAME: ${{ secrets.ITCH_USERNAME }}
+      ITCH_GAME: ${{ secrets.ITCH_GAME }}
+      ITCH_CHANNEL: ${{ vars.ITCH_CHANNEL || 'web' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate config
+        run: |
+          test -n "$ITCH_USERNAME" || (echo "Missing secret: ITCH_USERNAME" && exit 1)
+          test -n "$ITCH_GAME" || (echo "Missing secret: ITCH_GAME" && exit 1)
+          test -n "${{ secrets.ITCH_API_KEY }}" || (echo "Missing secret: ITCH_API_KEY" && exit 1)
+
+      - name: Prepare upload directory
+        run: ./scripts/prepare-itch-build.sh
+
+      - name: Push with Butler
+        uses: yeslayla/butler-publish-itchio-action@v1.0.3
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.ITCH_API_KEY }}
+          CHANNEL: ${{ env.ITCH_CHANNEL }}
+          ITCH_GAME: ${{ env.ITCH_GAME }}
+          ITCH_USER: ${{ env.ITCH_USERNAME }}
+          PACKAGE: ./.itch-build

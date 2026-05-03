@@ -3212,3 +3212,22 @@ strong {
 .cut-find-her[hidden] {
   display: none !important;
 }
+
+.cut-skip {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 120;
+  min-width: 132px;
+  height: 40px;
+  pointer-events: auto;
+}
+
+.cut-skip:active {
+  transform: translateX(-50%) scale(0.96);
+}
+
+.cut-skip[hidden] {
+  display: none !important;
+}
