@@ -26,11 +26,14 @@ jobs:
       - name: Prepare upload directory
         run: ./scripts/prepare-itch-build.sh
 
+      - name: Install Butler
+        run: |
+          curl -sSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -oq butler.zip
+          chmod +x butler
+
       - name: Push with Butler
-        uses: yeslayla/butler-publish-itchio-action@v1.0.3
         env:
-          BUTLER_CREDENTIALS: ${{ secrets.ITCH_API_KEY }}
-          CHANNEL: ${{ env.ITCH_CHANNEL }}
-          ITCH_GAME: ${{ env.ITCH_GAME }}
-          ITCH_USER: ${{ env.ITCH_USERNAME }}
-          PACKAGE: ./.itch-build
+          BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
+        run: |
+          ./butler push ./.itch-build "$ITCH_USERNAME/$ITCH_GAME:$ITCH_CHANNEL"
